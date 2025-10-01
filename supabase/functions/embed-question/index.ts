@@ -59,8 +59,9 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error en embed-question:', error);
+    const err = error as Error;
     return new Response(
-      JSON.stringify({ error: error.message || 'Error interno del servidor' }),
+      JSON.stringify({ error: err.message || 'Error interno del servidor' }),
       { status: 500, headers: corsHeaders }
     );
   }

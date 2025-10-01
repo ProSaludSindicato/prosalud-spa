@@ -47,7 +47,15 @@ async function getEmbedding(text: string) {
 }
 
 // Helper: Inserta chunk y embedding en Supabase
-async function insertChunk({ doc_path, chunk_index, content, embedding }) {
+async function insertChunk({ doc_path, chunk_index, content, embedding }: {
+  doc_path: string;
+  chunk_index: number;
+  content: string;
+  embedding: number[];
+}) {
+  if (!SUPABASE_SERVICE_KEY) {
+    throw new Error("SUPABASE_SERVICE_KEY no configurada");
+  }
   const resp = await fetch(`${SUPABASE_URL}/rest/v1/doc_chunks`, {
     method: "POST",
     headers: {
@@ -93,6 +101,7 @@ serve(async (req: Request) => {
       headers: { "Access-Control-Allow-Origin": "*" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+    const error = e as Error;
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
   }
 });

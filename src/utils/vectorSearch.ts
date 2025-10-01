@@ -12,10 +12,10 @@ export type RelevantChunk = {
   similarity: number;
 };
 
-// Genera embedding usando la edge function de Supabase
+// Genera embedding usando la edge function de Supabase con Lovable AI
 export async function getQuestionEmbedding(text: string): Promise<number[]> {
   try {
-    const { data, error } = await supabase.functions.invoke('embed-question', {
+    const { data, error } = await supabase.functions.invoke('prosalud-embedding', {
       body: { input: text }
     });
 
@@ -122,6 +122,7 @@ export async function searchRelevantChunks(query: string, topK: number = 5): Pro
     const questionEmbedding = await getQuestionEmbedding(expandedQuery);
     
     console.log('Buscando chunks relevantes...');
+    // @ts-ignore - RPC function exists in database
     const { data, error } = await supabase.rpc("match_doc_chunks", {
       query_embedding: JSON.stringify(questionEmbedding),
       match_count: topK * 2 // Obtenemos más resultados para filtrar mejor
@@ -141,6 +142,7 @@ export async function searchRelevantChunks(query: string, topK: number = 5): Pro
       console.log('Buscando con query original como fallback...');
       const originalEmbedding = await getQuestionEmbedding(query);
       
+      // @ts-ignore - RPC function exists in database
       const { data: fallbackData, error: fallbackError } = await supabase.rpc("match_doc_chunks", {
         query_embedding: JSON.stringify(originalEmbedding),
         match_count: topK

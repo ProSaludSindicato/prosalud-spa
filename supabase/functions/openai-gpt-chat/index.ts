@@ -155,8 +155,9 @@ RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud,
     });
   } catch (error) {
     console.error('Error in openai-gpt-chat function:', error);
+    const err = error as Error;
     return new Response(
-      JSON.stringify({ error: error.message || 'Error inesperado en función OpenAI.' }),
+      JSON.stringify({ error: err.message || 'Error inesperado en función OpenAI.' }),
       {
         status: 500,
         headers: corsHeaders,

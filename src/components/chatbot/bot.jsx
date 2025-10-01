@@ -771,16 +771,16 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         blockquote: ({ children }) => <blockquote className="border-l-4 border-gray-300 pl-3 py-1 my-2 italic dark:border-gray-600">{children}</blockquote>,
     }
 
-    // función para llamar a la edge function en Supabase
+    // función para llamar a la edge function con Lovable AI
     async function solicitarRespuestaConOpenAI(messages) {
         try {
-            console.log('Iniciando llamada a edge function con mensajes:', messages);
+            console.log('🚀 Iniciando llamada a Lovable AI con mensajes:', messages.length);
             
-            const response = await fetch('https://wgzzegyxorlustvfjueb.supabase.co/functions/v1/openai-gpt-chat', {
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prosalud-chat`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndnenplZ3l4b3JsdXN0dmZqdWViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQxNTgzNjUsImV4cCI6MjA0OTczNDM2NX0.TjSDTrGPY0JuVWOAYZgRyGcBrmORAcZT_HNtFSNaLSU'}`
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
                 },
                 body: JSON.stringify({ messages }),
             });
