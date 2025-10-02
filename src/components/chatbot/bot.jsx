@@ -788,14 +788,29 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             console.log('Response status:', response.status);
             console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
-            if (!response.ok) {
-                console.error('Response no OK:', response.status, response.statusText);
-                throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
-            }
-
-            // Leer el contenido como texto primero
+            // Leer el contenido primero
             const responseText = await response.text();
             console.log('Response raw text:', responseText);
+
+            if (!response.ok) {
+                // Intentar parsear el error del servidor
+                let errorMessage = `Error del servidor: ${response.status}`;
+                try {
+                    const errorData = JSON.parse(responseText);
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                    }
+                } catch (e) {
+                    // Si no se puede parsear, usar mensaje genérico
+                }
+                
+                console.error('Response no OK:', response.status, errorMessage);
+                
+                // Lanzar error con código de estado para manejarlo específicamente
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                throw error;
+            }
 
             if (!responseText || responseText.trim() === '') {
                 throw new Error('El servidor retornó una respuesta vacía');
@@ -824,7 +839,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             return data.generatedText;
         } catch (err) {
             console.error('Error completo en solicitarRespuestaConOpenAI:', err);
-            throw new Error(err?.message || 'Error inesperado al comunicarse con el backend');
+            throw err; // Re-lanzar el error original para preservar el código de estado
         }
     }
 
@@ -1017,11 +1032,24 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             })
         } catch (error) {
             console.error('Error generating response:', error)
+            
+            // Determinar el mensaje de error según el tipo
+            let errorMessage = "Lo siento, encontré un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.";
+            
+            if (error.status === 402) {
+                errorMessage = "⚠️ **Servicio temporalmente no disponible**\n\nEl chatbot ha alcanzado el límite de uso mensual. Por favor, contacta al administrador del sistema para resolver este inconveniente.\n\nPuedes consultar nuestros servicios directamente en el menú o contactarnos para asistencia personalizada.";
+            } else if (error.status === 429) {
+                errorMessage = "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
+            } else if (error.message) {
+                // Mostrar el mensaje de error específico si está disponible
+                errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
+            }
+            
             setMessages((prev) => [
                 ...prev,
                 {
                     role: 'assistant',
-                    content: "Lo siento, encontré un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.",
+                    content: errorMessage,
                     isBot: true,
                     isStreaming: false,
                 },
