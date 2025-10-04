@@ -925,7 +925,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             }
 
             // Calcular tokens para esta request específica
-            const inputTokens = estimateTokens(JSON.stringify(mensajesFormateados));
+            const inputTokens = estimateTokens(JSON.stringify(messages));
             const outputTokens = estimateTokens(data.generatedText);
             const totalTokens = inputTokens + outputTokens;
             
