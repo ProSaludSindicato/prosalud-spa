@@ -18,6 +18,8 @@ import {
     CreditCard,
     CircleMinus,
     Download,
+    ThumbsUp,
+    ThumbsDown,
 } from 'lucide-react'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/light'
 import js from 'react-syntax-highlighter/dist/cjs/languages/hljs/javascript'
@@ -184,42 +186,50 @@ export default function ChatBot() {
         exportText += `Tokens totales de entrada: ${conversationTokens.totalInput.toLocaleString()}\n`;
         exportText += `Tokens totales de salida: ${conversationTokens.totalOutput.toLocaleString()}\n`;
         exportText += `Tokens totales: ${(conversationTokens.totalInput + conversationTokens.totalOutput).toLocaleString()}\n`;
-        exportText += `Costo aproximado total: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
-        exportText += `\n${'='.repeat(60)}\n\n`;
-
-        // Agrupar preguntas y respuestas
+        exportText += `Total de requests: ${conversationTokens.requestCount}\n`;
+        exportText += `Costo total aproximado: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
+        exportText += `\n--- CONVERSACIÓN ---\n\n`;
+        
+        // Agrupar mensajes por pares de pregunta-respuesta
         let questionNumber = 0;
         for (let i = 0; i < messages.length; i++) {
-            const msg = messages[i];
-            if (msg.role === 'user') {
+            const message = messages[i];
+            
+            if (message.role === 'user') {
                 questionNumber++;
-                exportText += `PREGUNTA #${questionNumber}\n`;
-                exportText += `${'-'.repeat(60)}\n`;
-                exportText += `Usuario: ${msg.content}\n`;
-                if (msg.metrics) {
-                    exportText += `Tokens de entrada: ${msg.metrics.inputTokens.toLocaleString()}\n`;
+                exportText += `\n[PREGUNTA #${questionNumber}]\n`;
+                exportText += `Usuario: ${message.content}\n`;
+                
+                // Buscar la respuesta correspondiente del bot
+                if (i + 1 < messages.length && messages[i + 1].isBot) {
+                    const botResponse = messages[i + 1];
+                    exportText += `\nAsistente: ${botResponse.content}\n`;
+                    
+                    // 🔧 TEMPORAL: Agregar métricas por pregunta si están disponibles
+                    if (botResponse.tokens) {
+                        exportText += `\n--- Métricas de esta pregunta ---\n`;
+                        exportText += `Tokens de contexto (entrada): ${botResponse.tokens.input.toLocaleString()}\n`;
+                        exportText += `Tokens de respuesta (salida): ${botResponse.tokens.output.toLocaleString()}\n`;
+                        exportText += `Total tokens: ${(botResponse.tokens.input + botResponse.tokens.output).toLocaleString()}\n`;
+                        exportText += `Costo aproximado: $${botResponse.tokens.cost.toFixed(6)} USD\n`;
+                    }
+                    
+                    // 🔧 TEMPORAL: Agregar rating si está disponible
+                    if (botResponse.rating) {
+                        exportText += `Calificación del usuario: ${botResponse.rating === 'like' ? '👍 Me gusta' : '👎 No me gusta'}\n`;
+                    }
+                    
+                    exportText += `\n${'-'.repeat(80)}\n`;
+                    i++; // Saltar el siguiente mensaje ya que lo procesamos
                 }
-                exportText += `\n`;
-            } else if (msg.role === 'assistant' && !msg.isStreaming) {
-                exportText += `Respuesta del Bot:\n`;
-                exportText += `${msg.content}\n`;
-                if (msg.metrics) {
-                    exportText += `\nMétricas de esta respuesta:\n`;
-                    exportText += `  - Tokens de entrada: ${msg.metrics.inputTokens.toLocaleString()}\n`;
-                    exportText += `  - Tokens de salida: ${msg.metrics.outputTokens.toLocaleString()}\n`;
-                    exportText += `  - Tokens totales: ${msg.metrics.totalTokens.toLocaleString()}\n`;
-                    exportText += `  - Costo aproximado: $${msg.metrics.cost.toFixed(6)} USD\n`;
-                }
-                exportText += `\n${'='.repeat(60)}\n\n`;
             }
         }
-
-        exportText += `\n--- RESUMEN FINAL ---\n`;
-        exportText += `Total de preguntas realizadas: ${messages.filter(m => m.role === 'user').length}\n`;
-        exportText += `Tokens totales procesados: ${(conversationTokens.totalInput + conversationTokens.totalOutput).toLocaleString()}\n`;
+        
+        exportText += `\n\n=== RESUMEN FINAL ===\n`;
+        exportText += `Total de preguntas: ${questionNumber}\n`;
         exportText += `Costo total aproximado: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
         exportText += `\nNOTA: Los costos son aproximados y basados en el modelo google/gemini-2.5-flash\n`;
-        exportText += `Tasa estimada: Input $0.075/1M tokens, Output $0.30/1M tokens\n`;
+        exportText += `Tasa estimada: Input $0.00001875/1K tokens, Output $0.000075/1K tokens\n`;
 
         const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -963,7 +973,14 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 return newStats;
             });
 
-            return data.generatedText;
+            return {
+                text: data.generatedText,
+                tokens: {
+                    input: inputTokens,
+                    output: outputTokens,
+                    cost: totalCost
+                }
+            };
         } catch (err) {
             console.error('Error completo en solicitarRespuestaConOpenAI:', err);
             throw err; // Re-lanzar el error original para preservar el código de estado
@@ -1145,15 +1162,16 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             ])
 
             // Llama a edge function, recibe la respuesta completa (sin streaming)
-            const generatedText = await solicitarRespuestaConOpenAI(promptMessages);
+            const result = await solicitarRespuestaConOpenAI(promptMessages);
 
             setMessages((prevMessages) => {
                 const updatedMessages = [...prevMessages];
                 updatedMessages[updatedMessages.length - 1] = {
                     role: 'assistant',
-                    content: generatedText,
+                    content: result.text,
                     isBot: true,
                     isStreaming: false,
+                    tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
                 };
                 return updatedMessages;
             })
@@ -1623,7 +1641,7 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                 </div>
                                                             )}
 
-                                                            <div
+                                                             <div
                                                                 className={`rounded-lg sm:max-w-lg lg:max-w-2xl p-3 ${message.isBot
                                                                     ? 'bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-gray-100'
                                                                     : 'bg-prosalud-salud sm:max-w-lg lg:max-w-2xl text-white'
@@ -1646,6 +1664,49 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                         </ReactMarkdown>
                                                                     )}
                                                                 </div>
+
+                                                                {/* 🔧 TEMPORAL: Botones de rating para mensajes del bot (ELIMINAR EN PRODUCCIÓN) */}
+                                                                {message.isBot && !message.isStreaming && message.content && (
+                                                                    <div className="mt-2 flex items-center gap-1 border-t border-gray-200 dark:border-gray-600 pt-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setMessages(prev => prev.map((m, i) => 
+                                                                                    i === messages.indexOf(message) 
+                                                                                        ? { ...m, rating: m.rating === 'like' ? null : 'like' }
+                                                                                        : m
+                                                                                ));
+                                                                            }}
+                                                                            className={`p-1 rounded transition-colors ${
+                                                                                message.rating === 'like' 
+                                                                                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300' 
+                                                                                    : 'text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                                                            }`}
+                                                                            title="Me gusta"
+                                                                        >
+                                                                            <ThumbsUp className="h-3 w-3" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setMessages(prev => prev.map((m, i) => 
+                                                                                    i === messages.indexOf(message) 
+                                                                                        ? { ...m, rating: m.rating === 'dislike' ? null : 'dislike' }
+                                                                                        : m
+                                                                                ));
+                                                                            }}
+                                                                            className={`p-1 rounded transition-colors ${
+                                                                                message.rating === 'dislike' 
+                                                                                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300' 
+                                                                                    : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                                                            }`}
+                                                                            title="No me gusta"
+                                                                        >
+                                                                            <ThumbsDown className="h-3 w-3" />
+                                                                        </button>
+                                                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">
+                                                                            ¿Te fue útil?
+                                                                        </span>
+                                                                    </div>
+                                                                )}
 
                                                                 {!message.isBot &&
                                                                     index === messages.filter(m => m.role !== 'system').length - 1 &&
