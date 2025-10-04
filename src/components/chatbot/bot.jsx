@@ -17,6 +17,7 @@ import {
     Search,
     CreditCard,
     CircleMinus,
+    Download,
 } from 'lucide-react'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/light'
 import js from 'react-syntax-highlighter/dist/cjs/languages/hljs/javascript'
@@ -171,6 +172,66 @@ export default function ChatBot() {
     const clearPersistedState = () => {
         localStorage.removeItem(CHATBOT_STORAGE_KEY);
         console.log('🗑️ Estado persistido limpiado');
+    };
+
+    // 🔧 TEMPORAL: Función para exportar conversación (ELIMINAR EN PRODUCCIÓN)
+    const exportConversation = () => {
+        const timestamp = new Date().toISOString();
+        let exportText = `=== REPORTE DE CONVERSACIÓN CHATBOT PROSALUD ===\n`;
+        exportText += `Fecha de exportación: ${new Date().toLocaleString('es-CO')}\n`;
+        exportText += `Total de mensajes: ${messages.length}\n`;
+        exportText += `\n--- MÉTRICAS DE LA CONVERSACIÓN ---\n`;
+        exportText += `Tokens totales de entrada: ${conversationTokens.totalInput.toLocaleString()}\n`;
+        exportText += `Tokens totales de salida: ${conversationTokens.totalOutput.toLocaleString()}\n`;
+        exportText += `Tokens totales: ${(conversationTokens.totalInput + conversationTokens.totalOutput).toLocaleString()}\n`;
+        exportText += `Costo aproximado total: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
+        exportText += `\n${'='.repeat(60)}\n\n`;
+
+        // Agrupar preguntas y respuestas
+        let questionNumber = 0;
+        for (let i = 0; i < messages.length; i++) {
+            const msg = messages[i];
+            if (msg.role === 'user') {
+                questionNumber++;
+                exportText += `PREGUNTA #${questionNumber}\n`;
+                exportText += `${'-'.repeat(60)}\n`;
+                exportText += `Usuario: ${msg.content}\n`;
+                if (msg.metrics) {
+                    exportText += `Tokens de entrada: ${msg.metrics.inputTokens.toLocaleString()}\n`;
+                }
+                exportText += `\n`;
+            } else if (msg.role === 'assistant' && !msg.isStreaming) {
+                exportText += `Respuesta del Bot:\n`;
+                exportText += `${msg.content}\n`;
+                if (msg.metrics) {
+                    exportText += `\nMétricas de esta respuesta:\n`;
+                    exportText += `  - Tokens de entrada: ${msg.metrics.inputTokens.toLocaleString()}\n`;
+                    exportText += `  - Tokens de salida: ${msg.metrics.outputTokens.toLocaleString()}\n`;
+                    exportText += `  - Tokens totales: ${msg.metrics.totalTokens.toLocaleString()}\n`;
+                    exportText += `  - Costo aproximado: $${msg.metrics.cost.toFixed(6)} USD\n`;
+                }
+                exportText += `\n${'='.repeat(60)}\n\n`;
+            }
+        }
+
+        exportText += `\n--- RESUMEN FINAL ---\n`;
+        exportText += `Total de preguntas realizadas: ${messages.filter(m => m.role === 'user').length}\n`;
+        exportText += `Tokens totales procesados: ${(conversationTokens.totalInput + conversationTokens.totalOutput).toLocaleString()}\n`;
+        exportText += `Costo total aproximado: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
+        exportText += `\nNOTA: Los costos son aproximados y basados en el modelo google/gemini-2.5-flash\n`;
+        exportText += `Tasa estimada: Input $0.075/1M tokens, Output $0.30/1M tokens\n`;
+
+        const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `chatbot-conversacion-${timestamp.split('T')[0]}-${timestamp.split('T')[1].split('.')[0].replace(/:/g, '-')}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log('📥 Conversación exportada exitosamente');
     };
 
     // Mensajes del tooltip rotativo
@@ -1450,6 +1511,15 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                     <span className="truncate">Asistente ProSalud</span>
                                 </h2>
                                 <div className="flex items-center space-x-2 flex-shrink-0">
+                                    {/* 🔧 TEMPORAL: Botón de exportación (ELIMINAR EN PRODUCCIÓN) */}
+                                    <button
+                                        onClick={exportConversation}
+                                        className="text-gray-500 transition-colors duration-300 hover:text-primary-500 focus:outline-none dark:text-gray-400 dark:hover:text-primary-400"
+                                        title="Exportar conversación (Dev)"
+                                        aria-label="Exportar conversación"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                    </button>
                                     <button
                                         onClick={startNewChat}
                                         className="text-gray-500 transition-colors duration-300 hover:text-primary-500 focus:outline-none dark:text-gray-400 dark:hover:text-primary-400"
