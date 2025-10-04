@@ -19,10 +19,12 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Image, GalleryVertical, Home } from "lucide-react"
 import { usePagination } from "@/hooks/usePagination"
+import { PageLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 const GaleriaBienestarPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"date-desc" | "date-asc">("date-desc")
   const [filterCategory, setFilterCategory] = useState<string>("all")
+  const [isLoading, setIsLoading] = useState(true)
 
   const uniqueCategories = useMemo(() => {
     const categories = new Set(mockEvents.map((event) => event.category).filter(Boolean) as string[])
@@ -62,6 +64,12 @@ const GaleriaBienestarPage: React.FC = () => {
   })
 
   useEffect(() => {
+    // Simular carga inicial
+    const timer = setTimeout(() => setIsLoading(false), 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
     window.scrollTo(0, 0)
     goToPage(1) // Reset to first page when filters change
   }, [sortOrder, filterCategory, goToPage])
@@ -69,6 +77,14 @@ const GaleriaBienestarPage: React.FC = () => {
   const handlePageChange = (page: number) => {
     goToPage(page)
     window.scrollTo(0, 0)
+  }
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <PageLoadingSkeleton />
+      </MainLayout>
+    )
   }
 
   return (

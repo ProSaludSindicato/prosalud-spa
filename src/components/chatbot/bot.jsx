@@ -77,6 +77,22 @@ export default function ChatBot() {
     const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(true);
     const [currentTooltipMessage, setCurrentTooltipMessage] = useState(0);
     
+    // Estado para tracking de tokens y costos
+    const [conversationTokens, setConversationTokens] = useState({
+        totalInput: 0,
+        totalOutput: 0,
+        totalCost: 0,
+        requestCount: 0
+    });
+    
+    // Función para estimar tokens (aproximación: ~2.5 caracteres = 1 token en español)
+    const estimateTokens = (text) => {
+        if (typeof text !== 'string') {
+            text = JSON.stringify(text);
+        }
+        return Math.ceil(text.length / 2.5);
+    };
+    
     // Estados para mantener contexto conversacional
     const [conversationContext, setConversationContext] = useState({
         lastCategory: null,
@@ -135,6 +151,17 @@ export default function ChatBot() {
             };
             localStorage.setItem(CHATBOT_STORAGE_KEY, JSON.stringify(stateToSave));
             console.log('💾 Estado del chatbot guardado');
+            
+            // Log de tokens acumulados
+            if (conversationTokens.requestCount > 0) {
+                console.log('📊 TOKENS ACUMULADOS EN LA CONVERSACIÓN:', {
+                    'Total requests': conversationTokens.requestCount,
+                    'Tokens de entrada (contexto)': conversationTokens.totalInput.toLocaleString(),
+                    'Tokens de salida (respuestas)': conversationTokens.totalOutput.toLocaleString(),
+                    'Tokens totales': (conversationTokens.totalInput + conversationTokens.totalOutput).toLocaleString(),
+                    'Costo aproximado (USD)': `$${conversationTokens.totalCost.toFixed(4)}`
+                });
+            }
         } catch (error) {
             console.warn('⚠️ Error guardando estado:', error);
         }
@@ -835,6 +862,45 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             if (!data.generatedText) {
                 throw new Error('La respuesta no contiene el campo generatedText: ' + JSON.stringify(data));
             }
+
+            // Calcular tokens para esta request específica
+            const inputTokens = estimateTokens(JSON.stringify(mensajesFormateados));
+            const outputTokens = estimateTokens(data.generatedText);
+            const totalTokens = inputTokens + outputTokens;
+            
+            // Costo aproximado usando gemini-2.5-flash pricing
+            // Input: $0.00001875 por 1K tokens, Output: $0.000075 por 1K tokens
+            const inputCost = (inputTokens / 1000) * 0.00001875;
+            const outputCost = (outputTokens / 1000) * 0.000075;
+            const totalCost = inputCost + outputCost;
+            
+            console.log('🔢 TOKENS DE ESTA REQUEST:', {
+                'Tokens de entrada (contexto + prompt)': inputTokens.toLocaleString(),
+                'Tokens de salida (respuesta)': outputTokens.toLocaleString(),
+                'Tokens totales de esta request': totalTokens.toLocaleString(),
+                'Costo de esta request': `$${totalCost.toFixed(6)} USD`,
+                'Modelo estimado': 'google/gemini-2.5-flash'
+            });
+            
+            // Actualizar tokens acumulados
+            setConversationTokens(prev => {
+                const newStats = {
+                    totalInput: prev.totalInput + inputTokens,
+                    totalOutput: prev.totalOutput + outputTokens,
+                    totalCost: prev.totalCost + totalCost,
+                    requestCount: prev.requestCount + 1
+                };
+                
+                console.log('📈 RESUMEN CONVERSACIÓN ACTUALIZADO:', {
+                    'Total requests hasta ahora': newStats.requestCount,
+                    'Total tokens entrada': newStats.totalInput.toLocaleString(),
+                    'Total tokens salida': newStats.totalOutput.toLocaleString(),
+                    'Total tokens conversación': (newStats.totalInput + newStats.totalOutput).toLocaleString(),
+                    'Costo acumulado': `$${newStats.totalCost.toFixed(4)} USD`
+                });
+                
+                return newStats;
+            });
 
             return data.generatedText;
         } catch (err) {

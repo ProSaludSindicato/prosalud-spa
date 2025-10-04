@@ -33,6 +33,7 @@ import JsonView from '@uiw/react-json-view';
 import { requestsService } from '@/services/requestsServiceApi';
 import { Request } from '@/types/requests';
 import { useMemo } from 'react';
+import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 const AdminSolicitudesPage: React.FC = () => {
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
@@ -387,9 +388,7 @@ const AdminSolicitudesPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-prosalud"></div>
-                  </div>
+                  <TableLoadingSkeleton />
                 ) : (
                   <>
                     <div className="rounded-md border overflow-hidden">
