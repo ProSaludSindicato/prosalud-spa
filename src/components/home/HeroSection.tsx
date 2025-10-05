@@ -35,16 +35,22 @@ const HeroSection: React.FC = () => {
     { src: "/images/avatar_hero/avatar2.webp", fallback: "P1", alt: "Profesional 1" },
   ];
 
-  const collageImages = [
+  /*const collageImages = [
     "/images/collage/image_collage_1_.webp",
     "/images/collage/image_collage_3_.webp",
     "/images/collage/image_collage_2_.webp",
+  ];*/
+
+  const collageImages = [
+    "/images/collage/c1.webp",
+    "/images/collage/c3.webp",
+    "/images/collage/c2.webp",
   ];
 
   return (
     <section
       ref={sectionRef}
-      className="bg-gradient-to-br from-primary-prosalud via-primary-prosalud-dark to-slate-900 text-text-light py-16 md:py-20 lg:py-24"
+      className="bg-gradient-to-br from-primary-prosalud-dark via-primary-prosalud-dark to-primary-prosalud-light text-text-light py-16 md:py-20 lg:py-24"
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {isVisible ? (
@@ -56,10 +62,10 @@ const HeroSection: React.FC = () => {
                   <HeartPulse className="h-4 w-4" />
                   Tu Bienestar, Nuestra Prioridad
                 </span>
-                <span className="block text-5xl md:text-6xl lg:text-7xl leading-tight">
-                  <span className="text-prosalud-pro">Pro</span><span className="text-prosalud-salud">Salud</span>
+                <span className="block text-7xl md:text-7xl lg:text-7xl leading-tight drop-shadow-lg">
+                  <span className="text-prosalud-pro drop-shadow-lg">Pro</span><span className="text-prosalud-salud drop-shadow-lg">Salud</span>
                 </span>
-                <span className="block text-4xl md:text-5xl lg:text-6xl mt-2 md:mt-3 leading-snug">
+                <span className="block text-5xl md:text-6xl lg:text-6xl mt-2 md:mt-3 leading-snug">
                   Cuidamos de ti,<br />
                   como tú cuidas de los demás
                 </span>

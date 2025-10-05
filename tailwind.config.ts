@@ -1,14 +1,22 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
-	darkMode: ["class"],
-	content: [
-		"./pages/**/*.{ts,tsx}",
-		"./components/**/*.{ts,tsx}",
-		"./app/**/*.{ts,tsx}",
-		"./src/**/*.{ts,tsx}",
-	],
+    darkMode: ["class"],
+    content: [
+        "./pages/**/*.{js,ts,jsx,tsx}",
+        "./components/**/*.{js,ts,jsx,tsx}",
+        "./app/**/*.{js,ts,jsx,tsx}",
+        "./src/**/*.{js,ts,jsx,tsx}",
+    ],
+    safelist: [
+        // Ensure like button hover/active colors are generated
+        'bg-green-50', 'hover:bg-green-50', 'bg-green-100', 'hover:bg-green-100',
+        'text-green-600', 'hover:text-green-700',
+        'dark:hover:bg-green-900/20', 'dark:hover:bg-green-900/30',
+        'bg-emerald-50', 'hover:bg-emerald-50', 'bg-emerald-100', 'hover:bg-emerald-100',
+        'text-emerald-600', 'hover:text-emerald-700',
+        'dark:hover:bg-emerald-900/20', 'dark:hover:bg-emerald-900/30'
+    ],
 	prefix: "",
 	theme: {
 		container: {

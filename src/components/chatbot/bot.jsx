@@ -80,7 +80,7 @@ export default function ChatBot() {
     const [isTooltipOpen, setIsTooltipOpen] = useState(false);
     const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(true);
     const [currentTooltipMessage, setCurrentTooltipMessage] = useState(0);
-    
+
     // Estado para tracking de tokens y costos
     const [conversationTokens, setConversationTokens] = useState({
         totalInput: 0,
@@ -88,7 +88,7 @@ export default function ChatBot() {
         totalCost: 0,
         requestCount: 0
     });
-    
+
     // Función para estimar tokens (aproximación: ~2.5 caracteres = 1 token en español)
     const estimateTokens = (text) => {
         if (typeof text !== 'string') {
@@ -96,7 +96,7 @@ export default function ChatBot() {
         }
         return Math.ceil(text.length / 2.5);
     };
-    
+
     // Estados para mantener contexto conversacional
     const [conversationContext, setConversationContext] = useState({
         lastCategory: null,
@@ -114,18 +114,18 @@ export default function ChatBot() {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 console.log('📥 Cargando estado persistido del chatbot:', parsed);
-                
+
                 // Restaurar mensajes (excluyendo mensajes del sistema)
                 if (parsed.messages && parsed.messages.length > 0) {
                     const filteredMessages = parsed.messages.filter(msg => msg.role !== 'system');
                     setMessages(filteredMessages);
                 }
-                
+
                 // Restaurar contexto conversacional
                 if (parsed.conversationContext) {
                     setConversationContext(parsed.conversationContext);
                 }
-                
+
                 // Restaurar otros estados relevantes
                 if (parsed.hasContext !== undefined) {
                     setHasContext(parsed.hasContext);
@@ -133,7 +133,7 @@ export default function ChatBot() {
                 if (parsed.allPageContents) {
                     setAllPageContents(parsed.allPageContents);
                 }
-                
+
                 return true; // Indica que se cargó estado persistido
             }
         } catch (error) {
@@ -155,7 +155,7 @@ export default function ChatBot() {
             };
             localStorage.setItem(CHATBOT_STORAGE_KEY, JSON.stringify(stateToSave));
             console.log('💾 Estado del chatbot guardado');
-            
+
             // Log de tokens acumulados
             if (conversationTokens.requestCount > 0) {
                 console.log('📊 TOKENS ACUMULADOS EN LA CONVERSACIÓN:', {
@@ -190,22 +190,22 @@ export default function ChatBot() {
         exportText += `Total de requests: ${conversationTokens.requestCount}\n`;
         exportText += `Costo total aproximado: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
         exportText += `\n--- CONVERSACIÓN ---\n\n`;
-        
+
         // Agrupar mensajes por pares de pregunta-respuesta
         let questionNumber = 0;
         for (let i = 0; i < messages.length; i++) {
             const message = messages[i];
-            
+
             if (message.role === 'user') {
                 questionNumber++;
                 exportText += `\n[PREGUNTA #${questionNumber}]\n`;
                 exportText += `Usuario: ${message.content}\n`;
-                
+
                 // Buscar la respuesta correspondiente del bot
                 if (i + 1 < messages.length && messages[i + 1].isBot) {
                     const botResponse = messages[i + 1];
                     exportText += `\nAsistente: ${botResponse.content}\n`;
-                    
+
                     // 🔧 TEMPORAL: Agregar métricas por pregunta si están disponibles
                     if (botResponse.tokens) {
                         exportText += `\n--- Métricas de esta pregunta ---\n`;
@@ -214,18 +214,18 @@ export default function ChatBot() {
                         exportText += `Total tokens: ${(botResponse.tokens.input + botResponse.tokens.output).toLocaleString()}\n`;
                         exportText += `Costo aproximado: $${botResponse.tokens.cost.toFixed(6)} USD\n`;
                     }
-                    
+
                     // 🔧 TEMPORAL: Agregar rating si está disponible
                     if (botResponse.rating) {
                         exportText += `Calificación del usuario: ${botResponse.rating === 'like' ? '👍 Me gusta' : '👎 No me gusta'}\n`;
                     }
-                    
+
                     exportText += `\n${'-'.repeat(80)}\n`;
                     i++; // Saltar el siguiente mensaje ya que lo procesamos
                 }
             }
         }
-        
+
         exportText += `\n\n=== RESUMEN FINAL ===\n`;
         exportText += `Total de preguntas: ${questionNumber}\n`;
         exportText += `Costo total aproximado: $${conversationTokens.totalCost.toFixed(6)} USD\n`;
@@ -241,7 +241,7 @@ export default function ChatBot() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         console.log('📥 Conversación exportada exitosamente');
     };
 
@@ -316,7 +316,7 @@ export default function ChatBot() {
     // Función mejorada para clasificar la pregunta por categoría con contexto conversacional
     const classifyQuestion = (question, conversationHistory = []) => {
         const questionLower = question.toLowerCase();
-        
+
         // Detectar preguntas de seguimiento o contextuales
         const followUpIndicators = [
             'y sobre', 'qué más', 'también quiero', 'adicional', 'además', 'otra consulta',
@@ -326,20 +326,20 @@ export default function ChatBot() {
             'necesito', 'requiero', 'me interesa', 'y el', 'y la', 'y los', 'y las',
             'respecto a', 'acerca de', 'relacionado con', 'sobre eso', 'sobre esto'
         ];
-        
-        const hasFollowUpIndicator = followUpIndicators.some(indicator => 
+
+        const hasFollowUpIndicator = followUpIndicators.some(indicator =>
             questionLower.includes(indicator)
         );
-        
+
         // Si es una pregunta de seguimiento y hay contexto previo, usar la categoría anterior
         if (hasFollowUpIndicator && conversationContext.lastCategory && conversationHistory.length > 0) {
             console.log(`🔄 Pregunta de seguimiento detectada, manteniendo categoría: ${conversationContext.lastCategory}`);
             return conversationContext.lastCategory;
         }
-        
+
         // Buscar coincidencias directas en cada categoría
         for (const [category, keywords] of Object.entries(categoryKeywords)) {
-            const hasMatch = keywords.some(keyword => 
+            const hasMatch = keywords.some(keyword =>
                 questionLower.includes(keyword.toLowerCase())
             );
             if (hasMatch) {
@@ -347,21 +347,21 @@ export default function ChatBot() {
                 return category;
             }
         }
-        
+
         // Si no hay coincidencia directa pero hay contexto previo, considerar la categoría anterior
         if (conversationContext.lastCategory && conversationHistory.length > 0) {
             // Verificar si la pregunta podría estar relacionada con el contexto previo
             const contextualWords = ['esto', 'eso', 'lo anterior', 'lo que dijiste', 'la información'];
-            const hasContextualReference = contextualWords.some(word => 
+            const hasContextualReference = contextualWords.some(word =>
                 questionLower.includes(word)
             );
-            
+
             if (hasContextualReference) {
                 console.log(`🔗 Usando contexto anterior por referencia contextual: ${conversationContext.lastCategory}`);
                 return conversationContext.lastCategory;
             }
         }
-        
+
         console.log('🎯 Pregunta clasificada como: general (sin categoría específica)');
         return 'general';
     };
@@ -370,7 +370,7 @@ export default function ChatBot() {
     const loadSelectiveContext = async (category) => {
         try {
             console.log(`📂 Cargando contexto para categoría: ${category}`);
-            
+
             // Mapeo de categorías a archivos específicos
             const categoryFiles = {
                 incapacidades: [
@@ -416,7 +416,7 @@ export default function ChatBot() {
             };
 
             const filesToLoad = categoryFiles[category] || categoryFiles.general;
-            
+
             // Cargar solo los archivos de la categoría
             const loadPromises = filesToLoad.map(async (filePath) => {
                 const fullPath = `/src/doc/${filePath}`;
@@ -438,10 +438,10 @@ export default function ChatBot() {
             const loadedContents = await Promise.all(loadPromises);
             const filteredContents = loadedContents.filter(content => content.trim() !== '');
             const contextContent = filteredContents.join('\n\n---\n\n');
-            
+
             console.log(`📄 Contexto cargado: ${contextContent.length} caracteres para categoría ${category}`);
             console.log(`📊 Archivos cargados: ${filteredContents.length}/${filesToLoad.length}`);
-            
+
             return contextContent;
 
         } catch (error) {
@@ -637,12 +637,12 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     const initializeChat = async () => {
         // Intentar cargar estado persistido primero
         const hasPersistedState = loadPersistedState();
-        
+
         if (hasPersistedState) {
             console.log('✅ Estado del chatbot restaurado desde localStorage');
             return; // Si hay estado persistido, no inicializar desde cero
         }
-        
+
         // Si no hay estado persistido, inicializar normalmente
         const newSpecialty = extractSpecialtyFromURL()
         const context = await importContext(newSpecialty.specialtyPart)
@@ -679,17 +679,17 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             setShowSuggestions(true)
             setIsSuggestionsExpanded(false)
             setHasContext(false)
-            
+
             // Reiniciar contexto conversacional
             setConversationContext({
                 lastCategory: null,
                 lastContextFiles: [],
                 questionCount: 0
             });
-            
+
             // Limpiar estado persistido cuando se resetea el chat
             clearPersistedState();
-            
+
             console.log('🔄 Contexto conversacional reiniciado');
         } catch (error) {
             console.error('Error generating initial message:', error)
@@ -874,10 +874,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     async function solicitarRespuestaConOpenAI(messages) {
         try {
             console.log('🚀 Iniciando llamada a Lovable AI con mensajes:', messages.length);
-            
+
             const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prosalud-chat`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
                 },
@@ -902,9 +902,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 } catch (e) {
                     // Si no se puede parsear, usar mensaje genérico
                 }
-                
+
                 console.error('Response no OK:', response.status, errorMessage);
-                
+
                 // Lanzar error con código de estado para manejarlo específicamente
                 const error = new Error(errorMessage);
                 error.status = response.status;
@@ -939,13 +939,13 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             const inputTokens = estimateTokens(JSON.stringify(messages));
             const outputTokens = estimateTokens(data.generatedText);
             const totalTokens = inputTokens + outputTokens;
-            
+
             // Costo aproximado usando gemini-2.5-flash pricing
             // Input: $0.00001875 por 1K tokens, Output: $0.000075 por 1K tokens
             const inputCost = (inputTokens / 1000) * 0.00001875;
             const outputCost = (outputTokens / 1000) * 0.000075;
             const totalCost = inputCost + outputCost;
-            
+
             console.log('🔢 TOKENS DE ESTA REQUEST:', {
                 'Tokens de entrada (contexto + prompt)': inputTokens.toLocaleString(),
                 'Tokens de salida (respuesta)': outputTokens.toLocaleString(),
@@ -953,7 +953,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 'Costo de esta request': `$${totalCost.toFixed(6)} USD`,
                 'Modelo estimado': 'google/gemini-2.5-flash'
             });
-            
+
             // Actualizar tokens acumulados
             setConversationTokens(prev => {
                 const newStats = {
@@ -962,7 +962,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                     totalCost: prev.totalCost + totalCost,
                     requestCount: prev.requestCount + 1
                 };
-                
+
                 console.log('📈 RESUMEN CONVERSACIÓN ACTUALIZADO:', {
                     'Total requests hasta ahora': newStats.requestCount,
                     'Total tokens entrada': newStats.totalInput.toLocaleString(),
@@ -970,7 +970,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                     'Total tokens conversación': (newStats.totalInput + newStats.totalOutput).toLocaleString(),
                     'Costo acumulado': `$${newStats.totalCost.toFixed(4)} USD`
                 });
-                
+
                 return newStats;
             });
 
@@ -998,7 +998,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
         // NUEVA VALIDACIÓN DE SEGURIDAD - Filtrar antes de procesar
         const validation = isValidUserInput(text);
-        
+
         // Manejar saludos sin consumir API
         if (validation.isGreeting) {
             const greetingResponse = {
@@ -1006,7 +1006,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 content: getGreetingResponse(),
                 isBot: true
             };
-            
+
             const userMessage = {
                 role: 'user',
                 content: text,
@@ -1016,7 +1016,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             setMessages(prev => [...prev, userMessage, greetingResponse]);
             setInputMessage('');
             setIsSuggestionsExpanded(false);
-            
+
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'
             }
@@ -1030,7 +1030,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 content: getSecurityMessage(validation.reason),
                 isBot: true
             };
-            
+
             const userMessage = {
                 role: 'user',
                 content: text,
@@ -1040,7 +1040,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             setMessages(prev => [...prev, userMessage, securityMessage]);
             setInputMessage('');
             setIsSuggestionsExpanded(false);
-            
+
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'
             }
@@ -1090,7 +1090,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             console.log('🔍 Iniciando clasificación temática para:', text);
             const detectedCategory = classifyQuestion(text, chatMessages);
             const selectiveContext = await loadSelectiveContext(detectedCategory);
-            
+
             // Actualizar contexto conversacional
             setConversationContext(prev => ({
                 lastCategory: detectedCategory,
@@ -1178,10 +1178,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             })
         } catch (error) {
             console.error('Error generating response:', error)
-            
+
             // Determinar el mensaje de error según el tipo
             let errorMessage = "Lo siento, encontré un error al procesar tu solicitud. Por favor, intenta de nuevo más tarde.";
-            
+
             if (error.status === 402) {
                 errorMessage = "⚠️ **Servicio temporalmente no disponible**\n\nEl chatbot ha alcanzado el límite de uso mensual. Por favor, contacta al administrador del sistema para resolver este inconveniente.\n\nPuedes consultar nuestros servicios directamente en el menú o contactarnos para asistencia personalizada.";
             } else if (error.status === 429) {
@@ -1190,7 +1190,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 // Mostrar el mensaje de error específico si está disponible
                 errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
             }
-            
+
             setMessages((prev) => [
                 ...prev,
                 {
@@ -1500,8 +1500,8 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                             }
               ${isFullscreen
                                 ? 'fixed inset-0 m-0 flex flex-col rounded-none h-screen w-screen'
-                                : `fixed bottom-2 right-2 flex flex-col ${isMobile 
-                                    ? 'w-[calc(100vw-1rem)] max-w-80 mx-2' 
+                                : `fixed bottom-2 right-2 flex flex-col ${isMobile
+                                    ? 'w-[calc(100vw-1rem)] max-w-80 mx-2'
                                     : 'w-96 lg:w-[28rem] mx-2'
                                 }`
                             }
@@ -1642,7 +1642,7 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                 </div>
                                                             )}
 
-                                                             <div
+                                                            <div
                                                                 className={`rounded-lg sm:max-w-lg lg:max-w-2xl p-3 ${message.isBot
                                                                     ? 'bg-white text-gray-900 shadow-md dark:bg-gray-700 dark:text-gray-100'
                                                                     : 'bg-prosalud-salud sm:max-w-lg lg:max-w-2xl text-white'
@@ -1671,34 +1671,32 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                     <div className="mt-2 flex items-center gap-1 border-t border-gray-200 dark:border-gray-600 pt-2">
                                                                         <button
                                                                             onClick={() => {
-                                                                                setMessages(prev => prev.map((m, i) => 
-                                                                                    i === messages.indexOf(message) 
+                                                                                setMessages(prev => prev.map((m, i) =>
+                                                                                    i === messages.indexOf(message)
                                                                                         ? { ...m, rating: m.rating === 'like' ? null : 'like' }
                                                                                         : m
                                                                                 ));
                                                                             }}
-                                                                            className={`p-1 rounded transition-colors ${
-                                                                                message.rating === 'like' 
-                                                                                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300' 
+                                                                            className={`p-1 rounded transition-colors ${message.rating === 'like'
+                                                                                    ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'
                                                                                     : 'text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                                                            }`}
+                                                                                }`}
                                                                             title="Me gusta"
                                                                         >
                                                                             <ThumbsUp className="h-3 w-3" />
                                                                         </button>
                                                                         <button
                                                                             onClick={() => {
-                                                                                setMessages(prev => prev.map((m, i) => 
-                                                                                    i === messages.indexOf(message) 
+                                                                                setMessages(prev => prev.map((m, i) =>
+                                                                                    i === messages.indexOf(message)
                                                                                         ? { ...m, rating: m.rating === 'dislike' ? null : 'dislike' }
                                                                                         : m
                                                                                 ));
                                                                             }}
-                                                                            className={`p-1 rounded transition-colors ${
-                                                                                message.rating === 'dislike' 
-                                                                                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300' 
+                                                                            className={`p-1 rounded transition-colors ${message.rating === 'dislike'
+                                                                                    ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300'
                                                                                     : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                                                            }`}
+                                                                                }`}
                                                                             title="No me gusta"
                                                                         >
                                                                             <ThumbsDown className="h-3 w-3" />
@@ -1846,30 +1844,23 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <button
-                                                            type="button"
-                                                            className="mb-5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 p-2 transition-colors flex-shrink-0"
-                                                            aria-label="Ayuda"
+                                                            type="submit"
+                                                            className={`mb-5 transform rounded-lg bg-prosalud-salud p-2 text-white transition-all duration-300 hover:scale-105 hover:bg-prosalud-salud/90 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 ${isFullscreen ? 'p-3' : ''
+                                                                }`}
+                                                            disabled={isTyping || inputMessage.trim() === '' || inputMessage.length > MAX_CHARS}
+                                                            title="Enviar mensaje"
+                                                            aria-label="Enviar mensaje"
                                                         >
-                                                            <HelpCircle className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                                                            <Send
+                                                                className={`${isFullscreen ? 'h-6 w-6' : 'h-4 w-4'}`}
+                                                            />
                                                         </button>
                                                     </TooltipTrigger>
-                                                    <TooltipContent side="top" className="max-w-xs">
-                                                        <p className="text-sm">Entre mayor detalle tenga tu pregunta, la respuesta será más clara y exacta.</p>
+                                                    <TooltipContent side="top" align="center" className="max-w-xs">
+                                                        <p className="text-sm">Cuanta más información incluyas en tu pregunta, más precisa y útil será la respuesta.</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>
-                                            <button
-                                                type="submit"
-                                                className={`mb-5 transform rounded-lg bg-prosalud-salud p-2 text-white transition-all duration-300 hover:scale-105 hover:bg-prosalud-salud/90 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 ${isFullscreen ? 'p-3' : ''
-                                                    }`}
-                                                disabled={isTyping || inputMessage.trim() === '' || inputMessage.length > MAX_CHARS}
-                                                title="Enviar mensaje"
-                                                aria-label="Enviar mensaje"
-                                            >
-                                                <Send
-                                                    className={`${isFullscreen ? 'h-6 w-6' : 'h-4 w-4'}`}
-                                                />
-                                            </button>
                                         </div>
                                     </form>
                                 )}
@@ -1901,8 +1892,8 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                 <MessageSquare className="h-7 w-7" />
                             </button>
                         </TooltipTrigger>
-                        <TooltipContent 
-                            side="left" 
+                        <TooltipContent
+                            side="left"
                             className="bg-gray-800 text-white border-gray-700 max-w-xs relative"
                         >
                             <div className="flex justify-between items-start gap-2">
