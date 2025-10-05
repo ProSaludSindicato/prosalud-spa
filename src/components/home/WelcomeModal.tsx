@@ -53,7 +53,7 @@ const WelcomeModal: React.FC = () => {
     {
       icon: Sparkles,
       title: 'Diseño Renovado',
-      description: 'Interfaz moderna y responsive para una mejor experiencia de usuario.'
+      description: 'Interfaz moderna y adaptativa para una mejor experiencia de usuario.'
     }
   ];
 
