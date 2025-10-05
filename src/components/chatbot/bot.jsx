@@ -135,6 +135,11 @@ export default function ChatBot() {
                     setConversationContext(parsed.conversationContext);
                 }
 
+                // Restaurar conversation_id si existe para mantener el mismo hilo tras recarga
+                if (parsed.conversationId) {
+                    setConversationId(parsed.conversationId);
+                }
+
                 // Restaurar otros estados relevantes
                 if (parsed.hasContext !== undefined) {
                     setHasContext(parsed.hasContext);
@@ -158,6 +163,7 @@ export default function ChatBot() {
             const stateToSave = {
                 messages: messages.filter(msg => msg.role !== 'system'), // Excluir mensajes del sistema
                 conversationContext,
+                conversationId, // Persistir el ID de la conversación actual
                 hasContext,
                 allPageContents,
                 timestamp: Date.now()

@@ -38,11 +38,16 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
+// Extender localmente para incluir nuevos campos del backend
+type AdminChatbotConversation = ChatbotConversation & {
+  client_turn_id?: string;
+};
+
 const AdminChatbotPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [selectedConversation, setSelectedConversation] = useState<ChatbotConversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<AdminChatbotConversation | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [expandedConversations, setExpandedConversations] = useState<Set<string>>(new Set());
 
@@ -486,7 +491,7 @@ const AdminChatbotPage: React.FC = () => {
 
       {/* Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto bg-slate-50">
           <DialogHeader>
             <DialogTitle>Detalle de la Conversación</DialogTitle>
             <DialogDescription>
@@ -502,7 +507,7 @@ const AdminChatbotPage: React.FC = () => {
                   <User className="h-4 w-4" />
                   Pregunta del Usuario
                 </h3>
-                <p className="text-sm bg-slate-50 p-4 rounded-lg">
+                <p className="text-sm bg-white p-4 rounded-lg">
                   {selectedConversation.user_question}
                 </p>
               </div>
@@ -513,7 +518,7 @@ const AdminChatbotPage: React.FC = () => {
                   <Bot className="h-4 w-4" />
                   Respuesta del Asistente
                 </h3>
-                <div className="text-sm bg-slate-50 p-4 rounded-lg whitespace-pre-wrap">
+                <div className="text-sm bg-white p-4 rounded-lg whitespace-pre-wrap">
                   {selectedConversation.bot_answer}
                 </div>
               </div>
@@ -528,6 +533,12 @@ const AdminChatbotPage: React.FC = () => {
                   <p className="text-muted-foreground mb-1">Conversation ID</p>
                   <p className="font-medium font-mono text-xs">
                     {selectedConversation.conversation_id || 'N/A'}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-muted-foreground mb-1">Client Turn ID</p>
+                  <p className="font-medium font-mono text-xs break-all">
+                    {selectedConversation.client_turn_id || 'N/A'}
                   </p>
                 </div>
                 <div>
