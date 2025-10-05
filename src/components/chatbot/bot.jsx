@@ -110,6 +110,9 @@ export default function ChatBot() {
         return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     });
 
+    // Generador de client_turn_id por turno
+    const generateClientTurnId = () => `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
     // Clave para persistencia en localStorage
     const CHATBOT_STORAGE_KEY = 'prosalud-chatbot-state';
 
@@ -186,22 +189,14 @@ export default function ChatBot() {
     };
 
     // Función para guardar conversación en el backend
-    const saveConversationToBackend = async (userQuestion, botAnswer, feedbackValue = null, metadata = null) => {
+    const saveConversationToBackend = async (payload) => {
         try {
             const { chatbotApi } = await import('@/services/chatbotApi');
-            
-            await chatbotApi.createConversation({
-                conversation_id: conversationId,
-                user_question: userQuestion,
-                bot_answer: botAnswer,
-                feedback: feedbackValue,
-                metadata: metadata
-            });
-            
-            // No mostramos nada al usuario, es transparente
+            const created = await chatbotApi.createConversation(payload);
+            return created; // puede ser null si falla
         } catch (error) {
-            // Solo log en consola, no afectar UX
             console.error('⚠️ Error guardando conversación (no afecta funcionamiento):', error);
+            return null;
         }
     };
 
@@ -1267,7 +1262,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                 };
                 updatedMessages[updatedMessages.length - 1] = botMessage;
                 
-                // Guardar conversación en el backend (asíncrono, no bloquea UX)
+                // Guardar conversación en el backend con client_turn_id (asíncrono, no bloquea UX)
+                const clientTurnId = generateClientTurnId();
                 const metadata = result.tokens ? {
                     llm_model: 'google/gemini-2.5-flash',
                     tokens_input: result.tokens.input,
@@ -1275,9 +1271,34 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
                     cost_usd: result.tokens.cost,
                     category: detectedCategory
                 } : null;
-                
-                saveConversationToBackend(text, result.text, null, metadata);
-                
+
+                // Anexar identificadores al mensaje del bot inmediatamente (id se seteará luego si existe)
+                updatedMessages[updatedMessages.length - 1] = {
+                    ...botMessage,
+                    client_turn_id: clientTurnId,
+                };
+
+                // Disparar POST y, si retorna id, actualizar el mensaje con backend_id
+                (async () => {
+                    const created = await saveConversationToBackend({
+                        client_turn_id: clientTurnId,
+                        conversation_id: conversationId,
+                        user_question: text,
+                        bot_answer: result.text,
+                        metadata,
+                    });
+                    if (created && created.id != null) {
+                        setMessages(curr => {
+                            const copy = [...curr];
+                            const lastIdx = copy.length - 1;
+                            if (lastIdx >= 0 && copy[lastIdx]?.client_turn_id === clientTurnId) {
+                                copy[lastIdx] = { ...copy[lastIdx], backend_id: created.id };
+                            }
+                            return copy;
+                        });
+                    }
+                })();
+
                 return updatedMessages;
             })
         } catch (error) {
@@ -1498,29 +1519,22 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                         ? null 
                         : (isPositive ? 'like' : 'dislike');
                     
-                    // Buscar el mensaje de usuario correspondiente para obtener la pregunta
-                    let userQuestion = '';
-                    for (let j = i - 1; j >= 0; j--) {
-                        if (prevMessages[j].role === 'user') {
-                            userQuestion = prevMessages[j].content;
-                            break;
+                    // Guardar feedback en backend (asíncrono, no bloquea UX) usando id o client_turn_id
+                    (async () => {
+                        try {
+                            const { chatbotApi } = await import('@/services/chatbotApi');
+                            const feedback = newRating;
+                            if (feedback) {
+                                if (m.backend_id != null) {
+                                    await chatbotApi.updateFeedbackById(m.backend_id, feedback);
+                                } else if (m.client_turn_id) {
+                                    await chatbotApi.updateFeedbackByClientTurnId(m.client_turn_id, feedback);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('⚠️ Error enviando feedback (no afecta UX):', err);
                         }
-                    }
-                    
-                    // Guardar feedback en backend (asíncrono, no bloquea UX)
-                    if (userQuestion && m.content) {
-                        saveConversationToBackend(
-                            userQuestion, 
-                            m.content, 
-                            newRating,
-                            m.tokens ? {
-                                llm_model: 'google/gemini-2.5-flash',
-                                tokens_input: m.tokens.input,
-                                tokens_output: m.tokens.output,
-                                cost_usd: m.tokens.cost
-                            } : null
-                        );
-                    }
+                    })();
                     
                     return { ...m, rating: newRating };
                 }
@@ -1812,13 +1826,7 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                 {message.isBot && !message.isStreaming && message.content && (
                                                                     <div className="mt-2 flex items-center gap-1 border-t border-gray-200 dark:border-gray-600 pt-2">
                                                                         <button
-                                                                            onClick={() => {
-                                                                                setMessages(prev => prev.map((m, i) =>
-                                                                                    i === messages.indexOf(message)
-                                                                                        ? { ...m, rating: m.rating === 'like' ? null : 'like' }
-                                                                                        : m
-                                                                                ));
-                                                                            }}
+                                                                            onClick={() => handleFeedback(messages.indexOf(message), true)}
                                                                             className={`p-1 rounded transition-colors ${message.rating === 'like'
                                                                                     ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300'
                                                                                     : 'text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
@@ -1828,13 +1836,7 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                                             <ThumbsUp className="h-3 w-3" />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => {
-                                                                                setMessages(prev => prev.map((m, i) =>
-                                                                                    i === messages.indexOf(message)
-                                                                                        ? { ...m, rating: m.rating === 'dislike' ? null : 'dislike' }
-                                                                                        : m
-                                                                                ));
-                                                                            }}
+                                                                            onClick={() => handleFeedback(messages.indexOf(message), false)}
                                                                             className={`p-1 rounded transition-colors ${message.rating === 'dislike'
                                                                                     ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300'
                                                                                     : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'

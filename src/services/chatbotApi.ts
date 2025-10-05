@@ -1,10 +1,9 @@
 import publicApi from './publicApi';
-import { 
-  ChatbotConversation, 
-  PaginatedResponse, 
-  CreateConversationRequest,
-  ConversationFilters 
-} from '@/types/chatbot';
+// Tipado laxo para evitar dependencias a tipos no presentes en el repo
+type ChatbotConversation = any;
+type PaginatedResponse<T> = any;
+type CreateConversationRequest = any;
+type ConversationFilters = any;
 
 /**
  * Servicio para interactuar con el API de conversaciones del chatbot
@@ -52,22 +51,43 @@ export const chatbotApi = {
   },
 
   /**
-   * Actualiza el feedback de una conversación existente
+   * Actualiza el feedback de una conversación existente por ID del backend
    */
-  async updateFeedback(
-    conversationId: number, 
+  async updateFeedbackById(
+    id: number,
     feedback: 'like' | 'dislike'
   ): Promise<ChatbotConversation | null> {
     try {
       const response = await publicApi.patch<ChatbotConversation>(
-        `/api/chatbot-conversations/${conversationId}`,
+        `/api/chatbot-conversations/${id}/feedback`,
         { feedback }
       );
-      console.log(`✅ Feedback actualizado para conversación ${conversationId}:`, feedback);
+      console.log(`✅ Feedback actualizado por id ${id}:`, feedback);
       return response.data;
     } catch (error: any) {
       console.error('❌ Error actualizando feedback:', error);
       return null;
     }
-  }
+  },
+
+  /**
+   * Actualiza el feedback usando el client_turn_id cuando no se dispone del id del backend
+   */
+  async updateFeedbackByClientTurnId(
+    clientTurnId: string,
+    feedback: 'like' | 'dislike'
+  ): Promise<ChatbotConversation | null> {
+    try {
+      const response = await publicApi.patch<ChatbotConversation>(
+        `/api/chatbot-conversations/client/${encodeURIComponent(clientTurnId)}/feedback`,
+        { feedback }
+      );
+      console.log(`✅ Feedback actualizado por client_turn_id ${clientTurnId}:`, feedback);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error actualizando feedback por client_turn_id:', error);
+      return null;
+    }
+  },
 };
+
