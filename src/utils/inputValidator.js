@@ -1,4 +1,3 @@
-
 // Patrones prohibidos para prevenir red teaming, prompt injection y acceso a parámetros internos
 const forbiddenPatterns = [
   /tokens?/i,
