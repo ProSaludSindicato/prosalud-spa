@@ -23,6 +23,7 @@ import AdminSolicitudesPage from '@/pages/AdminSolicitudesPage';
 import AdminInventarioPage from '@/pages/AdminInventarioPage';
 import AdminBienestarPage from '@/pages/AdminBienestarPage';
 import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
+import AdminChatbotPage from '@/pages/AdminChatbotPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -99,6 +100,7 @@ function App() {
             <Route path="/admin/inventario" element={<AdminInventarioPage />} />
             <Route path="/admin/bienestar" element={<AdminBienestarPage />} />
             <Route path="/admin/comfenalco" element={<AdminComfenalcoPage />} />
+            <Route path="/admin/chatbot" element={<AdminChatbotPage />} />
 
             {/* Admin Routes 
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />

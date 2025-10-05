@@ -104,6 +104,12 @@ export default function ChatBot() {
         questionCount: 0
     });
 
+    // Estado para tracking de conversación con backend
+    const [conversationId, setConversationId] = useState(() => {
+        // Generar un ID único para esta conversación
+        return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    });
+
     // Clave para persistencia en localStorage
     const CHATBOT_STORAGE_KEY = 'prosalud-chatbot-state';
 
@@ -175,6 +181,28 @@ export default function ChatBot() {
     const clearPersistedState = () => {
         localStorage.removeItem(CHATBOT_STORAGE_KEY);
         console.log('🗑️ Estado persistido limpiado');
+        // Generar nuevo conversation_id al limpiar
+        setConversationId(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+    };
+
+    // Función para guardar conversación en el backend
+    const saveConversationToBackend = async (userQuestion, botAnswer, feedbackValue = null, metadata = null) => {
+        try {
+            const { chatbotApi } = await import('@/services/chatbotApi');
+            
+            await chatbotApi.createConversation({
+                conversation_id: conversationId,
+                user_question: userQuestion,
+                bot_answer: botAnswer,
+                feedback: feedbackValue,
+                metadata: metadata
+            });
+            
+            // No mostramos nada al usuario, es transparente
+        } catch (error) {
+            // Solo log en consola, no afectar UX
+            console.error('⚠️ Error guardando conversación (no afecta funcionamiento):', error);
+        }
     };
 
     // 🔧 TEMPORAL: Función para exportar conversación (ELIMINAR EN PRODUCCIÓN)
@@ -1017,6 +1045,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             setInputMessage('');
             setIsSuggestionsExpanded(false);
 
+            // Guardar saludo en backend
+            saveConversationToBackend(text, greetingResponse.content, null, { type: 'greeting' });
+
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'
             }
@@ -1040,6 +1071,12 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             setMessages(prev => [...prev, userMessage, securityMessage]);
             setInputMessage('');
             setIsSuggestionsExpanded(false);
+
+            // Guardar mensaje de seguridad en backend
+            saveConversationToBackend(text, securityMessage.content, null, { 
+                type: 'security_warning', 
+                reason: validation.reason 
+            });
 
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'
@@ -1167,13 +1204,26 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
             setMessages((prevMessages) => {
                 const updatedMessages = [...prevMessages];
-                updatedMessages[updatedMessages.length - 1] = {
+                const botMessage = {
                     role: 'assistant',
                     content: result.text,
                     isBot: true,
                     isStreaming: false,
                     tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
                 };
+                updatedMessages[updatedMessages.length - 1] = botMessage;
+                
+                // Guardar conversación en el backend (asíncrono, no bloquea UX)
+                const metadata = result.tokens ? {
+                    llm_model: 'google/gemini-2.5-flash',
+                    tokens_input: result.tokens.input,
+                    tokens_output: result.tokens.output,
+                    cost_usd: result.tokens.cost,
+                    category: detectedCategory
+                } : null;
+                
+                saveConversationToBackend(text, result.text, null, metadata);
+                
                 return updatedMessages;
             })
         } catch (error) {
@@ -1381,12 +1431,50 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
         setShowIncapacidadForm(false)
     }
 
-    const handleFeedback = (messageIndex, isPositive) => {
+    const handleFeedback = async (messageIndex, isPositive) => {
         console.log(
-            `Feedback ${isPositive ? 'positivo' : 'negativo'
-            } para el mensaje ${messageIndex}`
-        )
-    }
+            `Feedback ${isPositive ? 'positivo' : 'negativo'} para el mensaje ${messageIndex}`
+        );
+        
+        // Actualizar rating en el estado local
+        setMessages((prevMessages) => {
+            const newMessages = prevMessages.map((m, i) => {
+                if (i === messageIndex) {
+                    const newRating = m.rating === (isPositive ? 'like' : 'dislike') 
+                        ? null 
+                        : (isPositive ? 'like' : 'dislike');
+                    
+                    // Buscar el mensaje de usuario correspondiente para obtener la pregunta
+                    let userQuestion = '';
+                    for (let j = i - 1; j >= 0; j--) {
+                        if (prevMessages[j].role === 'user') {
+                            userQuestion = prevMessages[j].content;
+                            break;
+                        }
+                    }
+                    
+                    // Guardar feedback en backend (asíncrono, no bloquea UX)
+                    if (userQuestion && m.content) {
+                        saveConversationToBackend(
+                            userQuestion, 
+                            m.content, 
+                            newRating,
+                            m.tokens ? {
+                                llm_model: 'google/gemini-2.5-flash',
+                                tokens_input: m.tokens.input,
+                                tokens_output: m.tokens.output,
+                                cost_usd: m.tokens.cost
+                            } : null
+                        );
+                    }
+                    
+                    return { ...m, rating: newRating };
+                }
+                return m;
+            });
+            return newMessages;
+        });
+    };
 
     const handleScroll = () => {
         const { scrollTop, scrollHeight, clientHeight } =
