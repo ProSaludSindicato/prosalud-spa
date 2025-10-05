@@ -13,20 +13,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { toast } from "@/components/ui/sonner";
 import { submitRequest } from '@/services/requestsService';
-import { toast } from "@/hooks/use-toast";
 
 import DatosPersonalesSection from '@/components/solicitud-certificado/DatosPersonalesSection';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
 const idTypes = [
-    { value: "CC", label: "Cédula de Ciudadanía (CC)" },
-    { value: "CE", label: "Cédula de Extranjería (CE)" },
-    { value: "PP", label: "Pasaporte (PP)" },
-    { value: "PT", label: "Permiso por protección temporal (PT)" },
+  { value: "CC", label: "Cédula de Ciudadanía (CC)" },
+  { value: "CE", label: "Cédula de Extranjería (CE)" },
+  { value: "PP", label: "Pasaporte (PP)" },
+  { value: "PT", label: "Permiso por protección temporal (PT)" },
 ];
-
 const sedesOptions = [
   { value: 'BELLO', label: 'Bello' },
   { value: 'CALDAS', label: 'Caldas' },
@@ -98,20 +97,17 @@ const SolicitudMicrocreditoPage: React.FC = () => {
 
       form.reset();
       
-      toast({
-        title: "Solicitud enviada",
+      toast.success("Solicitud enviada", {
         description: "Su solicitud de microcrédito ha sido enviada para revisión.",
       });
       
-      // Redirect immediately but with a small delay to ensure toast is visible
+      // Redirect with a longer delay to ensure the toast is visible before unmount
       setTimeout(() => {
         navigate('/');
-      }, 500);
+      }, 2000);
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Error al enviar solicitud. Por favor intente nuevamente.",
-        variant: "destructive",
       });
     }
   };
