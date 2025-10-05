@@ -14,10 +14,10 @@ const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-4"> {/* Container for both logos */}
               <Link to="https://www.minsalud.gov.co" target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-14" width={256} height={48} />
+                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-14" width={256} height={56} />
               </Link>
               <Link to="/" className="inline-block">
-                <img src={logoUrl} alt="ProSalud Logo" className="h-14" width={120} height={48} />
+                <img src={logoUrl} alt="ProSalud Logo" className="h-14" width={500} height={265} />
               </Link>
             </div>
             <p className="text-sm text-slate-400">

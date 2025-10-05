@@ -23,8 +23,8 @@ const Header: React.FC = () => {
               src="/images/logo_prosalud_fondo.png" 
               alt="ProSalud Logo" 
               className="h-12 w-auto" 
-              width={120}
-              height={48}
+              width={500}
+              height={265}
             />
           </Link>
 
