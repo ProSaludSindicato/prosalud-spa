@@ -180,7 +180,7 @@ const AdminSolicitudesPage: React.FC = () => {
       'certificado-convenio': 'Certificado de Convenio',
       'compensacion-anual': 'Compensación Anual Diferida',
       'verificacion-pagos': 'Verificación de Pagos',
-      'descanso-laboral': 'Solicitud de Descanso',
+      'compensacion-descanso': 'Compensación por Descanso',
       'actualizar-cuenta': 'Actualizar Cuenta Bancaria',
       'retiro-sindical': 'Retiro Sindical',
       'microcredito': 'Microcrédito CEII',
@@ -347,7 +347,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         <SelectItem value="certificado-convenio">Certificado de Convenio</SelectItem>
                         <SelectItem value="compensacion-anual">Compensación Anual</SelectItem>
                         <SelectItem value="verificacion-pagos">Verificación de Pagos</SelectItem>
-                        <SelectItem value="descanso-laboral">Descanso Laboral</SelectItem>
+                        <SelectItem value="compensacion-descanso">Compensación por Descanso</SelectItem>
                         <SelectItem value="actualizar-cuenta">Actualizar Cuenta</SelectItem>
                         <SelectItem value="retiro-sindical">Retiro Sindical</SelectItem>
                         <SelectItem value="microcredito">Microcrédito</SelectItem>

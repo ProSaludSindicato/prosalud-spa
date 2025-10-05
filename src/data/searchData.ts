@@ -73,10 +73,10 @@ export const searchData: SearchItem[] = [
     keywords: ["certificado", "convenio", "solicitud", "documento", "descargar", "constancia"]
   },
   {
-    id: "descanso-sindical",
-    title: "Solicitud de Descanso",
-    description: "Tramita tu solicitud de descanso",
-    path: "/servicios/descanso-sindical",
+    id: "compensacion-descanso",
+    title: "Solicitud de Compensación por Descanso",
+    description: "Tramita tu solicitud de compensación por descanso",
+    path: "/servicios/compensacion-descanso",
     category: "Servicios",
     keywords: ["descanso", "sindical", "vacaciones", "permiso", "receso", "tiempo libre"]
   },

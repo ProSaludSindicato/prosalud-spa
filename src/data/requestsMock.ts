@@ -171,7 +171,7 @@ export const mockRequestStats: RequestStats = {
 export const requestTypeLabels: Record<string, string> = {
   'certificado-convenio': 'Certificado de Convenio',
   'compensacion-anual': 'Compensación Anual Diferida',
-  'descanso-laboral': 'Solicitud de Descanso',
+  'compensacion-descanso': 'Compensación por Descanso',
   'verificacion-pagos': 'Verificación de Pagos',
   'retiro-sindical': 'Retiro Sindical',
   'actualizar-cuenta': 'Actualizar Cuenta Bancaria',

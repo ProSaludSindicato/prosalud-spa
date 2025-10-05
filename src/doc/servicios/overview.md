@@ -16,7 +16,7 @@
 - **Verificación de Pagos**: Consulta y verificación de compensaciones
 
 ### Solicitudes Especiales
-- **Solicitud de Descanso Laboral**: Trámite para permisos de descanso
+- **Solicitud de Compensación por Descanso**: Trámite para solicitar compensación por descanso
 - **Solicitud de Retiro Sindical**: Proceso de retiro del sindicato
 - **Compensación Anual Diferida**: Solicitud de compensaciones anuales
 - **Microcrédito**: Acceso a servicios de microcrédito con CEII

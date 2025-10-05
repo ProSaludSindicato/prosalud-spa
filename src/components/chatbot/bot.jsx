@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 
 // Importar el validador de input
-import { isValidUserInput, getSecurityMessage, isGreeting, getGreetingResponse } from '@/utils/inputValidator';
+import { isValidUserInput, getSecurityMessage, isGreeting, getGreetingResponse, isThankYou, getThankYouResponse, isFarewell, getFarewellResponse } from '@/utils/inputValidator';
 
 import IncapacidadForm from './IncapacidadForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1047,6 +1047,60 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
             // Guardar saludo en backend
             saveConversationToBackend(text, greetingResponse.content, null, { type: 'greeting' });
+
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto'
+            }
+            return;
+        }
+
+        // Manejar agradecimientos sin consumir API
+        if (validation.isThankYou) {
+            const thankYouResponse = {
+                role: 'assistant',
+                content: getThankYouResponse(),
+                isBot: true
+            };
+
+            const userMessage = {
+                role: 'user',
+                content: text,
+                isBot: false,
+            };
+
+            setMessages(prev => [...prev, userMessage, thankYouResponse]);
+            setInputMessage('');
+            setIsSuggestionsExpanded(false);
+
+            // Guardar agradecimiento en backend
+            saveConversationToBackend(text, thankYouResponse.content, null, { type: 'thank_you' });
+
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto'
+            }
+            return;
+        }
+
+        // Manejar despedidas sin consumir API
+        if (validation.isFarewell) {
+            const farewellResponse = {
+                role: 'assistant',
+                content: getFarewellResponse(),
+                isBot: true
+            };
+
+            const userMessage = {
+                role: 'user',
+                content: text,
+                isBot: false,
+            };
+
+            setMessages(prev => [...prev, userMessage, farewellResponse]);
+            setInputMessage('');
+            setIsSuggestionsExpanded(false);
+
+            // Guardar despedida en backend
+            saveConversationToBackend(text, farewellResponse.content, null, { type: 'farewell' });
 
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto'

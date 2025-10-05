@@ -99,13 +99,13 @@ export const faqData: FAQItem[] = [
     redirectText: "Verificar pagos"
   },
   {
-    id: "descanso-sindical",
-    question: "¿Cómo solicitar descanso sindical?",
-    answer: "El descanso sindical se solicita a través del formulario en línea. Debe completar sus datos personales, información del proceso donde labora, fechas del descanso solicitado y adjuntar el formato diligenciado correspondiente. La solicitud será procesada según los requisitos establecidos.",
+    id: "compensacion-descanso",
+    question: "¿Cómo solicitar compensación por descanso?",
+    answer: "La compensación por descanso se solicita a través del formulario en línea. Debe completar sus datos personales, información del proceso donde labora, fechas del descanso solicitado y adjuntar el formato diligenciado correspondiente. La solicitud será procesada según los requisitos establecidos.",
     category: "servicios",
-    keywords: ["descanso", "sindical", "vacaciones", "permisos"],
-    redirectUrl: "/servicios/descanso-sindical",
-    redirectText: "Solicitar descanso sindical"
+    keywords: ["descanso", "compensación", "vacaciones", "permisos"],
+    redirectUrl: "/servicios/compensacion-descanso",
+    redirectText: "Solicitar compensación por descanso"
   },
   {
     id: "compensacion-anual",

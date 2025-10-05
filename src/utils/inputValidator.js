@@ -48,6 +48,19 @@ const greetingPatterns = [
   /^(qué tal|como estas|cómo estás|que tal|como va)$/i,
 ];
 
+// Patrones para detectar agradecimientos
+const thankYouPatterns = [
+  /^(gracias|muchas gracias|mil gracias|thanks|thank you|thx)$/i,
+  /^(gracias|muchas gracias)\s*[.!]?$/i,
+  /^(te lo agradezco|muy agradecido|agradecido)$/i,
+];
+
+// Patrones para detectar despedidas
+const farewellPatterns = [
+  /^(adiós|adios|hasta luego|chao|chau|nos vemos|hasta pronto|bye|goodbye)$/i,
+  /^(adiós|adios|chao)\s*[.!]?$/i,
+];
+
 // Patrones para detectar texto sin sentido
 const nonsensePatterns = [
   /^[a-z]{1,3}$/i, // Una a tres letras solas
@@ -103,6 +116,30 @@ export const isNonsenseText = (input) => {
 };
 
 /**
+ * Detecta si el input es un agradecimiento
+ * @param {string} input - El texto de entrada del usuario
+ * @returns {boolean} - true si es un agradecimiento
+ */
+export const isThankYou = (input) => {
+  if (!input || typeof input !== 'string') return false;
+  
+  const trimmedInput = input.trim();
+  return thankYouPatterns.some(pattern => pattern.test(trimmedInput));
+};
+
+/**
+ * Detecta si el input es una despedida
+ * @param {string} input - El texto de entrada del usuario
+ * @returns {boolean} - true si es una despedida
+ */
+export const isFarewell = (input) => {
+  if (!input || typeof input !== 'string') return false;
+  
+  const trimmedInput = input.trim();
+  return farewellPatterns.some(pattern => pattern.test(trimmedInput));
+};
+
+/**
  * Genera una respuesta automática para saludos
  * @returns {string} - Mensaje de saludo apropiado
  */
@@ -117,25 +154,63 @@ export const getGreetingResponse = () => {
 };
 
 /**
+ * Genera una respuesta automática para agradecimientos
+ * @returns {string} - Mensaje de respuesta a agradecimiento
+ */
+export const getThankYouResponse = () => {
+  const thankYouResponses = [
+    "Con gusto. ¿Hay algo más en lo que pueda ayudarte?",
+    "¡Con mucho gusto! Estoy aquí si necesitas algo más.",
+    "Es un placer ayudarte. ¿Tienes alguna otra consulta?",
+  ];
+  
+  return thankYouResponses[Math.floor(Math.random() * thankYouResponses.length)];
+};
+
+/**
+ * Genera una respuesta automática para despedidas
+ * @returns {string} - Mensaje de despedida apropiado
+ */
+export const getFarewellResponse = () => {
+  const farewellResponses = [
+    "¡Hasta pronto! Que tengas un excelente día.",
+    "¡Adiós! Estaré aquí cuando me necesites.",
+    "¡Hasta luego! No dudes en volver si necesitas algo más.",
+  ];
+  
+  return farewellResponses[Math.floor(Math.random() * farewellResponses.length)];
+};
+
+/**
  * Valida si el input del usuario es válido y no contiene patrones prohibidos ni hipotéticos
  * @param {string} input - El texto de entrada del usuario
- * @returns {Object} - { isValid: boolean, reason: string, isGreeting: boolean, isNonsense: boolean }
+ * @returns {Object} - { isValid: boolean, reason: string, isGreeting: boolean, isThankYou: boolean, isFarewell: boolean, isNonsense: boolean }
  */
 export const isValidUserInput = (input) => {
   if (!input || typeof input !== 'string') {
-    return { isValid: false, reason: 'Input inválido', isGreeting: false, isNonsense: false };
+    return { isValid: false, reason: 'Input inválido', isGreeting: false, isThankYou: false, isFarewell: false, isNonsense: false };
   }
 
   const trimmedInput = input.trim();
 
   // Validar longitud mínima
   if (trimmedInput.length < 1) {
-    return { isValid: false, reason: 'Consulta muy corta', isGreeting: false, isNonsense: false };
+    return { isValid: false, reason: 'Consulta muy corta', isGreeting: false, isThankYou: false, isFarewell: false, isNonsense: false };
   }
 
   // Detectar saludos
   if (isGreeting(trimmedInput)) {
-    return { isValid: true, reason: '', isGreeting: true, isNonsense: false };
+    return { isValid: true, reason: '', isGreeting: true, isThankYou: false, isFarewell: false, isNonsense: false };
+  }
+
+  // Detectar agradecimientos
+  if (isThankYou(trimmedInput)) {
+    return { isValid: true, reason: '', isGreeting: false, isThankYou: true, isFarewell: false, isNonsense: false };
+  }
+
+  // Detectar despedidas
+  if (isFarewell(trimmedInput)) {
+    return { isValid: true, reason: '', isGreeting: false, isThankYou: false, isFarewell: true, isNonsense: false };
   }
 
   // Detectar texto sin sentido
@@ -144,6 +219,8 @@ export const isValidUserInput = (input) => {
       isValid: false, 
       reason: 'Por favor, escribe una consulta clara y completa sobre ProSalud, sus servicios o beneficios.',
       isGreeting: false,
+      isThankYou: false,
+      isFarewell: false,
       isNonsense: true
     };
   }
@@ -154,6 +231,8 @@ export const isValidUserInput = (input) => {
       isValid: false, 
       reason: 'Por favor, escribe una consulta más específica sobre ProSalud.',
       isGreeting: false,
+      isThankYou: false,
+      isFarewell: false,
       isNonsense: false
     };
   }
@@ -165,6 +244,8 @@ export const isValidUserInput = (input) => {
       isValid: false, 
       reason: 'Consulta demasiado extensa. Por favor, realice una consulta más concisa.',
       isGreeting: false,
+      isThankYou: false,
+      isFarewell: false,
       isNonsense: false
     };
   }
@@ -176,12 +257,14 @@ export const isValidUserInput = (input) => {
         isValid: false, 
         reason: 'Lo siento, solo puedo responder preguntas reales y relacionadas con ProSalud, sus servicios y beneficios. Por favor, realiza una consulta relevante para ti como afiliado.',
         isGreeting: false,
+        isThankYou: false,
+        isFarewell: false,
         isNonsense: false
       };
     }
   }
 
-  return { isValid: true, reason: '', isGreeting: false, isNonsense: false };
+  return { isValid: true, reason: '', isGreeting: false, isThankYou: false, isFarewell: false, isNonsense: false };
 };
 
 /**

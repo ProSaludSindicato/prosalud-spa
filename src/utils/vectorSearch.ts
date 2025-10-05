@@ -45,7 +45,7 @@ function expandQuery(query: string): string {
     'incapacidad': 'incapacidad licencia maternidad paternidad ProSalud',
     'cuenta bancaria': 'actualizar cuenta bancaria compensaciones pagos ProSalud',
     'turnos': 'cuadro turnos ProSanet programación ProSalud',
-    'descanso': 'descanso laboral solicitud ProSalud',
+    'descanso': 'descanso compensación solicitud ProSalud',
     'retiro': 'retiro sindical afiliado ProSalud',
     'microcrédito': 'microcrédito CEII Capital Ideas ProSalud',
     'pagos': 'verificación pagos compensaciones ProSalud',

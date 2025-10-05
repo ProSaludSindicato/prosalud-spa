@@ -1,18 +1,18 @@
 
-# Solicitud de Descanso Laboral - ProSalud
+# Solicitud de Compensación por Descanso - ProSalud
 
 ## Descripción del Servicio
-Este formulario permite a los afiliados solicitar formalmente un descanso laboral remunerado, que debe ser compensado por el contratante siempre y cuando se cumplan los requisitos y se apruebe la solicitud.
+Este formulario permite a los afiliados solicitar formalmente la compensación por descanso, que debe ser pagada por el contratante siempre y cuando se cumplan los requisitos y se apruebe la solicitud.
 
-**Enlace al formulario en el sitio web:** [`/solicitud-descanso-laboral`](/solicitud-descanso-laboral)
+**Enlace al formulario en el sitio web:** [`/servicios/compensacion-descanso`](/servicios/compensacion-descanso)
 
 ## Información Importante
-- El descanso laboral remunerado debe ser compensado por el contratante.
+- La compensación por descanso debe ser pagada por el contratante.
 - Para que proceda la compensación, se deben cumplir todos los requisitos.
 - La solicitud será revisada y, de ser aprobada, se incluirá con la compensación correspondiente.
 - Solo se contactará al solicitante en caso de inconsistencias.
 
-La página también incluye una sección de "Requisitos para el Descanso Laboral" que se debe consultar.
+La página también incluye una sección de "Requisitos para la Compensación por Descanso" que se debe consultar.
 
 ## Datos del Formulario
 
@@ -56,5 +56,5 @@ R: Es obligatorio adjuntar el documento con el Visto Bueno (V°B°) de su coordi
 R: Su solicitud será revisada. Si es aprobada, el descanso y su compensación serán procesados. Solo lo contactaremos si hay alguna inconsistencia.
 
 **P: ¿El descanso es pagado?**
-R: Sí, el descanso laboral es remunerado y debe ser compensado por el contratante, siempre que se cumplan los requisitos.
+R: Sí, la compensación por descanso es remunerada y debe ser pagada por el contratante, siempre que se cumplan los requisitos.
 

@@ -79,7 +79,8 @@ function App() {
 
             {/* Service Routes */}
             <Route path="/servicios/certificado-convenio" element={<SolicitudCertificadoConvenioPage />} />
-            <Route path="/servicios/descanso-sindical" element={<SolicitudDescansoLaboralPage />} />
+            <Route path="/servicios/compensacion-descanso" element={<SolicitudDescansoLaboralPage />} />
+            <Route path="/servicios/descanso-sindical" element={<SolicitudDescansoLaboralPage />} /> {/* Redirect antigua URL */}
             <Route path="/servicios/compensacion-anual" element={<SolicitudAnualDiferidaPage />} />
             <Route path="/servicios/consulta-pagos" element={<VerificacionPagosPage />} />
             <Route path="/servicios/certificado-seguridad-social" element={<CertificadoSeguridadSocialPage />} />

@@ -81,7 +81,7 @@ export const menuItems: MenuItemType[] = [
         submenu: [
           { name: 'Verificación de pagos', path: '/servicios/consulta-pagos' },
           { name: 'Certificado de Convenio', path: '/servicios/certificado-convenio' }, 
-          { name: 'Descanso', path: '/servicios/descanso-sindical' },
+          { name: 'Compensación por Descanso', path: '/servicios/compensacion-descanso' },
           { name: 'Solicitud anual diferida', path: '/servicios/compensacion-anual' },
           { name: 'Solicitud de Retiro Sindical', path: '/servicios/retiro-sindical' },
         ]

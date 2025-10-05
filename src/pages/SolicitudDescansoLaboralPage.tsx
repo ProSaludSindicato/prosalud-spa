@@ -94,7 +94,7 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
       }
 
       const requestData = {
-        request_type: 'descanso-laboral',
+        request_type: 'compensacion-descanso',
         id_type: data.tipoIdentificacion,
         id_number: data.numeroIdentificacion,
         name: data.nombres,
@@ -115,7 +115,7 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
 
       form.reset();
       
-      toast.success('Solicitud de descanso enviada con éxito', {
+      toast.success('Solicitud de compensación por descanso enviada con éxito', {
         description: (
           <>
             Su solicitud será revisada y en caso de ser aprobada será incluida junto con la compensación correspondiente.
@@ -168,7 +168,7 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 font-medium text-foreground">
                 <FileText className="h-4 w-4" />
-                Solicitud de Descanso
+                Compensación por Descanso
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
