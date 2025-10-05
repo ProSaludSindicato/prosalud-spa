@@ -55,7 +55,7 @@ export const submitRequest = async (requestData: RequestData): Promise<any> => {
       });
     }
 
-    const response = await publicApi.post('/api/store/request', formData, {
+    const response = await publicApi.post('/api/requests', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
