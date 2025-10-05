@@ -10,17 +10,15 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Security: Add security headers and basic protections
   useEffect(() => {
+    // Security: Disable console in production first to prevent any errors from showing
+    if (import.meta.env.PROD) {
+      console.log = () => {};
+      console.warn = () => {};
+      console.error = () => {};
+    }
+
     // Security: Add meta tags for security
     const addSecurityMeta = () => {
-      // Prevent clickjacking
-      const frameOptions = document.querySelector('meta[http-equiv="X-Frame-Options"]');
-      if (!frameOptions) {
-        const meta = document.createElement('meta');
-        meta.httpEquiv = 'X-Frame-Options';
-        meta.content = 'DENY';
-        document.head.appendChild(meta);
-      }
-
       // Content type sniffing protection
       const contentType = document.querySelector('meta[http-equiv="X-Content-Type-Options"]');
       if (!contentType) {
@@ -62,14 +60,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     };
 
     cleanUrl();
-
-    // Security: Remove any console.log statements in production
-    if (import.meta.env.PROD) {
-      console.log = () => {};
-      console.warn = () => {};
-      console.error = () => {};
-    }
-
   }, []);
 
   // Security: Content Security Policy (basic implementation)
