@@ -1841,6 +1841,22 @@ Si algún dato no coincide con tu información o tienes dudas sobre el proceso, 
                                                     )}
                                                 </div>
                                             </div>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            className="mb-5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 p-2 transition-colors flex-shrink-0"
+                                                            aria-label="Ayuda"
+                                                        >
+                                                            <HelpCircle className={`${isFullscreen ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="max-w-xs">
+                                                        <p className="text-sm">Entre mayor detalle tenga tu pregunta, la respuesta será más clara y exacta.</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                             <button
                                                 type="submit"
                                                 className={`mb-5 transform rounded-lg bg-prosalud-salud p-2 text-white transition-all duration-300 hover:scale-105 hover:bg-prosalud-salud/90 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 ${isFullscreen ? 'p-3' : ''
