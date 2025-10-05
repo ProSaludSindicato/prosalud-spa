@@ -20,6 +20,7 @@ import {
     Download,
     ThumbsUp,
     ThumbsDown,
+    HelpCircle
 } from 'lucide-react'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/light'
 import js from 'react-syntax-highlighter/dist/cjs/languages/hljs/javascript'
