@@ -110,11 +110,56 @@ const AdminSolicitudesPage: React.FC = () => {
     return filtered;
   }, [allSolicitudes, searchTerm, selectedStatus, selectedType, sortBy, sortOrder]);
 
-  // Fetch stats
-  const { data: stats } = useQuery({
-    queryKey: ["admin-solicitudes-stats"],
-    queryFn: requestsService.getRequestStats,
-  });
+  // Fetch stats - computed from allSolicitudes for real-time accuracy
+  const stats = useMemo(() => {
+    if (!allSolicitudes || allSolicitudes.length === 0) {
+      return {
+        total: 0,
+        pending: 0,
+        in_progress: 0,
+        resolved: 0,
+        rejected: 0,
+        this_month: 0,
+        avg_resolution_time: 0
+      };
+    }
+
+    const total = allSolicitudes.length;
+    const pending = allSolicitudes.filter(r => r.status === 'pending').length;
+    const in_progress = allSolicitudes.filter(r => r.status === 'in_progress').length;
+    const resolved = allSolicitudes.filter(r => r.status === 'resolved').length;
+    const rejected = allSolicitudes.filter(r => r.status === 'rejected').length;
+    
+    const currentMonth = new Date().getMonth();
+    const this_month = allSolicitudes.filter(r => 
+      new Date(r.created_at).getMonth() === currentMonth
+    ).length;
+    
+    // Calculate average resolution time
+    const resolvedRequests = allSolicitudes.filter(r => r.status === 'resolved' && r.resolved_at);
+    let avg_resolution_time = 0;
+    
+    if (resolvedRequests.length > 0) {
+      const totalTime = resolvedRequests.reduce((acc, request) => {
+        const created = new Date(request.created_at).getTime();
+        const resolved = new Date(request.resolved_at!).getTime();
+        return acc + (resolved - created);
+      }, 0);
+      
+      // Convert to hours
+      avg_resolution_time = Math.round(totalTime / (resolvedRequests.length * 1000 * 60 * 60));
+    }
+    
+    return {
+      total,
+      pending,
+      in_progress,
+      resolved,
+      rejected,
+      this_month,
+      avg_resolution_time
+    };
+  }, [allSolicitudes]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -728,29 +773,70 @@ const AdminSolicitudesPage: React.FC = () => {
                           typeof selectedSolicitud.payload === "object" &&
                           Object.keys(selectedSolicitud.payload).length > 0 ? (
                             <div className="space-y-4">
-                              {Object.entries(selectedSolicitud.payload).map(([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center py-2 border-b border-gray-100 last:border-b-0"
-                                >
-                                  <div className="md:col-span-1">
-                                    <label className="text-sm font-medium text-gray-700 capitalize">
-                                      {key.replace(/[_-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                                    </label>
-                                  </div>
-                                  <div className="md:col-span-2">
-                                    <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                                      <p className="text-gray-900 text-sm">
-                                        {value !== null && value !== undefined
-                                          ? typeof value === "object"
-                                            ? JSON.stringify(value, null, 2)
-                                            : String(value)
-                                          : "No especificado"}
-                                      </p>
+                              {Object.entries(selectedSolicitud.payload).map(([key, value]) => {
+                                // Format field name: remove underscores/hyphens and capitalize each word
+                                const formatFieldName = (str: string) => {
+                                  return str
+                                    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+                                    .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
+                                    .trim()
+                                    .split(' ')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                    .join(' ');
+                                };
+
+                                // Format value for display
+                                const formatValue = (val: any): React.ReactNode => {
+                                  if (val === null || val === undefined) {
+                                    return "No especificado";
+                                  }
+                                  
+                                  if (typeof val === "object") {
+                                    // Special handling for nested objects like infoCertificado
+                                    if (typeof val === "object" && !Array.isArray(val)) {
+                                      return (
+                                        <div className="space-y-2">
+                                          {Object.entries(val).map(([nestedKey, nestedValue]) => (
+                                            <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
+                                              <span className="text-xs font-medium text-gray-600">
+                                                {formatFieldName(nestedKey)}:
+                                              </span>
+                                              <span className="text-xs text-gray-900 ml-2">
+                                                {nestedValue === true || nestedValue === "true" ? "✓ Sí" : 
+                                                 nestedValue === false || nestedValue === "false" ? "✗ No" : 
+                                                 String(nestedValue)}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return JSON.stringify(val, null, 2);
+                                  }
+                                  
+                                  return String(val);
+                                };
+
+                                return (
+                                  <div
+                                    key={key}
+                                    className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-2 border-b border-gray-100 last:border-b-0"
+                                  >
+                                    <div className="md:col-span-1">
+                                      <label className="text-sm font-medium text-gray-700">
+                                        {formatFieldName(key)}
+                                      </label>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 max-w-full overflow-auto">
+                                        <div className="text-gray-900 text-sm break-words">
+                                          {formatValue(value)}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           ) : (
                             <div className="text-gray-500 text-sm text-center py-8">
@@ -763,7 +849,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
 
                     {/* Acciones */}
-                    {selectedSolicitud.status === "pending" && (
+                    {selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                         <Button
                           variant="outline"
@@ -772,11 +858,20 @@ const AdminSolicitudesPage: React.FC = () => {
                         >
                           Rechazar
                         </Button>
+                        {selectedSolicitud.status === "pending" && (
+                          <Button
+                            variant="outline"
+                            onClick={() => handleChangeStatus(selectedSolicitud.id, "in_progress")}
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            Marcar en Revisión
+                          </Button>
+                        )}
                         <Button
                           onClick={() => handleChangeStatus(selectedSolicitud.id, "resolved")}
                           className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
                         >
-                          Resolver
+                          Marcar como Completado
                         </Button>
                       </div>
                     )}
