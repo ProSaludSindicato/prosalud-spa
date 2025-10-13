@@ -146,21 +146,21 @@ const SolicitudMicrocreditoPage: React.FC = () => {
             </p>
           </header>
 
-          <section className="mt-10 mb-8 p-6 border rounded-lg shadow-sm bg-blue-50 border-blue-200">
-                <h2 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
-                  <Info className="mr-3 h-6 w-6 text-blue-700" /> Información importante
+          <section className="mt-10 mb-8 p-6 border rounded-lg shadow-sm bg-accent/50 border-border">
+                <h2 className="text-xl font-semibold mb-4 text-foreground flex items-center">
+                  <Info className="mr-3 h-6 w-6 text-primary" /> Información importante
                 </h2>
-                <div className="space-y-3 text-blue-700">
+                <div className="space-y-3 text-foreground">
                   <p>Por favor diligencie los datos solicitados. Los datos enviados son solo de manera informativa. No garantiza o autoriza ningún proceso.</p>
                   
-                  <Alert className="border-blue-300 bg-blue-100">
-                    <Mail className="h-5 w-5 text-blue-600" />
-                    <AlertDescription className="text-blue-800">
-                      Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado y a la lista de contactos.
+                  <Alert className="border-border bg-card">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <AlertDescription className="text-card-foreground">
+                      Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo <strong className="font-mono bg-muted px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado y a la lista de contactos.
                     </AlertDescription>
                   </Alert>
                   
-                  <p>Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas S.A.S. desde el correo <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong>.</p>
+                  <p>Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas S.A.S. desde el correo <strong className="font-mono bg-muted px-1 rounded">ceiisas@hotmail.com</strong>.</p>
                   
                   <Alert className="border-amber-300 bg-amber-50">
                     <Clock className="h-5 w-5 text-amber-600" />

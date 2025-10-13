@@ -259,7 +259,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         description: data.description,
         attendees: data.attendees,
         gift: data.gift,
-        is_visible: true,
+        is_visible: true, // Boolean, not string
         images,
       };
       createMutation.mutate(createData);
