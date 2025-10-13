@@ -92,6 +92,13 @@ export default function ChatBot() {
     requestCount: 0,
   });
 
+  // Estado para tracking de rate limiting
+  const [rateLimitInfo, setRateLimitInfo] = useState({
+    messagesHour: 0,
+    messagesDay: 0,
+    showWarning: false,
+  });
+
   // Función para estimar tokens (aproximación: ~2.5 caracteres = 1 token en español)
   const estimateTokens = (text) => {
     if (typeof text !== "string") {
@@ -1088,10 +1095,25 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       if (!response.ok) {
         // Intentar parsear el error del servidor
         let errorMessage = `Error del servidor: ${response.status}`;
+        let isRateLimitError = false;
         try {
           const errorData = JSON.parse(responseText);
           if (errorData.error) {
             errorMessage = errorData.error;
+          }
+          
+          // Manejar rate limit específicamente
+          if (response.status === 429 && errorData.rateLimitExceeded) {
+            isRateLimitError = true;
+            
+            // Actualizar información de uso si está disponible
+            if (errorData.usageInfo) {
+              setRateLimitInfo({
+                messagesHour: errorData.usageInfo.messagesHour || 0,
+                messagesDay: errorData.usageInfo.messagesDay || 0,
+                showWarning: true,
+              });
+            }
           }
         } catch (e) {
           // Si no se puede parsear, usar mensaje genérico
@@ -1099,9 +1121,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
         console.error("Response no OK:", response.status, errorMessage);
 
-        // Lanzar error con código de estado para manejarlo específicamente
+        // Lanzar error con código de estado y flag de rate limit
         const error = new Error(errorMessage);
         error.status = response.status;
+        error.isRateLimit = isRateLimitError;
         throw error;
       }
 
@@ -1127,6 +1150,23 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       if (!data.generatedText) {
         throw new Error("La respuesta no contiene el campo generatedText: " + JSON.stringify(data));
+      }
+
+      // Actualizar información de uso de rate limiting si está disponible
+      if (data.usageInfo) {
+        const { messagesHour, messagesDay } = data.usageInfo;
+        const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
+        
+        // Mostrar advertencia si está cerca del límite (80% o más)
+        const showWarning = 
+          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || 
+          messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
+        
+        setRateLimitInfo({
+          messagesHour,
+          messagesDay,
+          showWarning,
+        });
       }
 
       // Calcular tokens para esta request específica
@@ -1170,6 +1210,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       return {
         text: data.generatedText,
+        usageInfo: data.usageInfo || null,
         tokens: {
           input: inputTokens,
           output: outputTokens,
@@ -1542,6 +1583,23 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       // Llama a edge function, recibe la respuesta completa (sin streaming)
       const result = await solicitarRespuestaConOpenAI(promptMessages);
 
+      // Actualizar información de rate limiting si está disponible
+      if (result.usageInfo) {
+        const { messagesHour, messagesDay } = result.usageInfo;
+        const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
+        
+        // Mostrar advertencia si está cerca del límite (80% o más)
+        const showWarning = 
+          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || 
+          messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
+        
+        setRateLimitInfo({
+          messagesHour,
+          messagesDay,
+          showWarning,
+        });
+      }
+
       setMessages((prevMessages) => {
         const updatedMessages = [...prevMessages];
 
@@ -1618,8 +1676,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         errorMessage =
           "⚠️ **Servicio temporalmente no disponible**\n\nEl chatbot ha alcanzado el límite de uso mensual. Por favor, contacta al administrador del sistema para resolver este inconveniente.\n\nPuedes consultar nuestros servicios directamente en el menú o contactarnos para asistencia personalizada.";
       } else if (error.status === 429) {
-        errorMessage =
-          "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
+        // Usar el mensaje específico del error si es rate limit
+        errorMessage = error.isRateLimit && error.message 
+          ? `⚠️ ${error.message}`
+          : "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
       } else if (error.message) {
         // Mostrar el mensaje de error específico si está disponible
         errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
@@ -2325,6 +2385,24 @@ ${incapacidad.detalles}
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Rate Limit Warning - Solo se muestra cerca del límite */}
+                {!showIncapacidadForm && rateLimitInfo.showWarning && (
+                  <div className="flex-shrink-0 border-t border-yellow-200 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20">
+                    <div className="px-3 py-2">
+                      <div className="flex items-start gap-2 text-xs text-yellow-800 dark:text-yellow-200">
+                        <HelpCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Límite de uso del chatbot</p>
+                          <p className="mt-1 text-yellow-700 dark:text-yellow-300">
+                            Has usado {rateLimitInfo.messagesDay}/50 mensajes hoy. 
+                            {rateLimitInfo.messagesHour >= 12 && ` (${rateLimitInfo.messagesHour}/15 esta hora)`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

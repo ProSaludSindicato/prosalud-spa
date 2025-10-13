@@ -1,13 +1,152 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Variable de entorno para habilitar/deshabilitar rate limiting (por defecto: habilitado)
+const ENABLE_RATE_LIMITING = Deno.env.get('ENABLE_CHATBOT_RATE_LIMITING') !== 'false';
+
+const RATE_LIMITS = {
+  messagesPerHour: 15,
+  messagesPerDay: 50,
+  maxConsecutive: 5,
+  cooldownMinutes: 2,
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Content-Type': 'application/json',
 };
+
+// Función para verificar rate limit
+async function checkRateLimit(supabase: any, userIp: string, userAgent: string) {
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  // Buscar registro existente
+  const { data: rateLimit, error } = await supabase
+    .from('chatbot_rate_limits')
+    .select('*')
+    .eq('user_ip', userIp)
+    .maybeSingle();
+
+  if (error) {
+    console.error('⚠️ Error verificando rate limit:', error);
+    return { allowed: true }; // En caso de error, permitir (fail-open)
+  }
+
+  // Si no existe registro, crear uno nuevo
+  if (!rateLimit) {
+    const { error: insertError } = await supabase.from('chatbot_rate_limits').insert({
+      user_ip: userIp,
+      user_agent: userAgent,
+      message_count_hour: 1,
+      message_count_day: 1,
+      consecutive_messages: 1,
+      last_message_at: now.toISOString(),
+    });
+    
+    if (insertError) {
+      console.error('⚠️ Error creando rate limit:', insertError);
+    }
+    
+    return { allowed: true, usageInfo: { messagesHour: 1, messagesDay: 1 } };
+  }
+
+  // Verificar cooldown activo
+  if (rateLimit.cooldown_until && new Date(rateLimit.cooldown_until) > now) {
+    const remainingSeconds = Math.ceil((new Date(rateLimit.cooldown_until).getTime() - now.getTime()) / 1000);
+    return {
+      allowed: false,
+      reason: 'cooldown',
+      remainingSeconds,
+      message: `Has enviado muchos mensajes seguidos. Por favor espera ${remainingSeconds} segundos antes de continuar.`
+    };
+  }
+
+  // Resetear contadores si pasó más de 1 hora/día
+  let messageCountHour = rateLimit.message_count_hour;
+  let messageCountDay = rateLimit.message_count_day;
+  let consecutiveMessages = rateLimit.consecutive_messages;
+
+  if (new Date(rateLimit.last_message_at) < oneHourAgo) {
+    messageCountHour = 0;
+  }
+
+  if (new Date(rateLimit.last_message_at) < oneDayAgo) {
+    messageCountDay = 0;
+  }
+
+  // Resetear consecutivos si pasaron más de 2 minutos
+  const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+  if (new Date(rateLimit.last_message_at) < twoMinutesAgo) {
+    consecutiveMessages = 0;
+  }
+
+  // Verificar límites
+  if (messageCountDay >= RATE_LIMITS.messagesPerDay) {
+    return {
+      allowed: false,
+      reason: 'daily_limit',
+      message: `Has alcanzado el límite diario de ${RATE_LIMITS.messagesPerDay} mensajes. Podrás continuar mañana. Gracias por tu comprensión.`,
+      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay }
+    };
+  }
+
+  if (messageCountHour >= RATE_LIMITS.messagesPerHour) {
+    const minutesLeft = Math.ceil((60 - (now.getTime() - new Date(rateLimit.last_message_at).getTime()) / (1000 * 60)));
+    return {
+      allowed: false,
+      reason: 'hourly_limit',
+      message: `Has alcanzado el límite de ${RATE_LIMITS.messagesPerHour} mensajes por hora. Intenta de nuevo en aproximadamente ${minutesLeft} minutos.`,
+      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay }
+    };
+  }
+
+  // Verificar mensajes consecutivos
+  const newConsecutive = consecutiveMessages + 1;
+  let newCooldown = null;
+
+  if (newConsecutive > RATE_LIMITS.maxConsecutive) {
+    newCooldown = new Date(now.getTime() + RATE_LIMITS.cooldownMinutes * 60 * 1000).toISOString();
+    return {
+      allowed: false,
+      reason: 'too_fast',
+      message: `Has enviado ${RATE_LIMITS.maxConsecutive} mensajes muy rápido. Toma un descanso de ${RATE_LIMITS.cooldownMinutes} minutos para continuar.`,
+      usageInfo: { messagesHour: messageCountHour + 1, messagesDay: messageCountDay + 1 }
+    };
+  }
+
+  // Actualizar contadores
+  const { error: updateError } = await supabase
+    .from('chatbot_rate_limits')
+    .update({
+      message_count_hour: messageCountHour + 1,
+      message_count_day: messageCountDay + 1,
+      consecutive_messages: newConsecutive,
+      last_message_at: now.toISOString(),
+      cooldown_until: newCooldown,
+      updated_at: now.toISOString(),
+    })
+    .eq('user_ip', userIp);
+
+  if (updateError) {
+    console.error('⚠️ Error actualizando rate limit:', updateError);
+  }
+
+  return { 
+    allowed: true, 
+    usageInfo: { 
+      messagesHour: messageCountHour + 1, 
+      messagesDay: messageCountDay + 1 
+    } 
+  };
+}
 
 serve(async (req) => {
   // CORS preflight
@@ -16,6 +155,40 @@ serve(async (req) => {
   }
 
   try {
+    // Obtener IP y user agent para rate limiting
+    const userIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                   req.headers.get('x-real-ip') || 
+                   'unknown';
+    const userAgent = req.headers.get('user-agent') || 'unknown';
+
+    // Verificar rate limit si está habilitado
+    let usageInfo = null;
+    if (ENABLE_RATE_LIMITING) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const rateLimitCheck = await checkRateLimit(supabase, userIp, userAgent);
+      
+      if (!rateLimitCheck.allowed) {
+        console.warn(`⚠️ Rate limit excedido para IP ${userIp}: ${rateLimitCheck.reason}`);
+        return new Response(
+          JSON.stringify({ 
+            error: rateLimitCheck.message,
+            rateLimitExceeded: true,
+            reason: rateLimitCheck.reason,
+            remainingSeconds: rateLimitCheck.remainingSeconds,
+            usageInfo: rateLimitCheck.usageInfo
+          }),
+          { status: 429, headers: corsHeaders }
+        );
+      }
+      
+      usageInfo = rateLimitCheck.usageInfo;
+      if (usageInfo) {
+        console.log(`✅ Rate limit OK para IP ${userIp}. Uso: ${usageInfo.messagesDay}/${RATE_LIMITS.messagesPerDay} diario, ${usageInfo.messagesHour}/${RATE_LIMITS.messagesPerHour} por hora`);
+      }
+    } else {
+      console.log('ℹ️ Rate limiting deshabilitado (modo desarrollo)');
+    }
+
     const body = await req.json();
     let messages = body.messages;
 
@@ -191,7 +364,10 @@ RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud.
 
     console.log('✅ Respuesta generada exitosamente');
 
-    return new Response(JSON.stringify({ generatedText }), {
+    return new Response(JSON.stringify({ 
+      generatedText,
+      usageInfo: ENABLE_RATE_LIMITING ? usageInfo : null
+    }), {
       headers: corsHeaders,
     });
   } catch (error) {
