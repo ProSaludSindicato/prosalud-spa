@@ -1,8 +1,5 @@
-import axios from 'axios';
+import api from './api';
 import { BienestarEvent } from '@/types/admin';
-
-// Base URL - ajustar según el entorno
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface WellnessEventImage {
   id: number;
@@ -107,14 +104,21 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
  */
 export async function getWellnessEvents(filters?: WellnessEventFilters): Promise<BienestarEvent[]> {
   try {
-    const response = await axios.get<PaginatedWellnessEvents>(`${API_BASE_URL}/api/wellness-events`, {
+    const response = await api.get<PaginatedWellnessEvents>('/api/wellness-events', {
       params: filters
     });
+    
+    // Validar que la respuesta tenga la estructura esperada
+    if (!response.data || !response.data.data) {
+      console.warn('Respuesta de la API sin datos:', response.data);
+      return [];
+    }
     
     return response.data.data.map(mapToBienestarEvent);
   } catch (error) {
     console.error('Error al obtener eventos de bienestar:', error);
-    throw error;
+    // Retornar array vacío en caso de error para evitar crashes
+    return [];
   }
 }
 
@@ -123,7 +127,7 @@ export async function getWellnessEvents(filters?: WellnessEventFilters): Promise
  */
 export async function getWellnessEvent(id: number | string): Promise<BienestarEvent> {
   try {
-    const response = await axios.get<WellnessEventResponse>(`${API_BASE_URL}/api/wellness-events/${id}`);
+    const response = await api.get<WellnessEventResponse>(`/api/wellness-events/${id}`);
     return mapToBienestarEvent(response.data);
   } catch (error) {
     console.error('Error al obtener evento:', error);
@@ -157,8 +161,8 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       });
     }
     
-    const response = await axios.post<WellnessEventResponse>(
-      `${API_BASE_URL}/api/wellness-events`,
+    const response = await api.post<WellnessEventResponse>(
+      '/api/wellness-events',
       formData,
       {
         headers: {
@@ -201,8 +205,8 @@ export async function updateWellnessEvent(
       });
     }
     
-    const response = await axios.put<WellnessEventResponse>(
-      `${API_BASE_URL}/api/wellness-events/${id}`,
+    const response = await api.put<WellnessEventResponse>(
+      `/api/wellness-events/${id}`,
       formData,
       {
         headers: {
@@ -226,8 +230,8 @@ export async function toggleWellnessEventVisibility(
   isVisible: boolean
 ): Promise<BienestarEvent> {
   try {
-    const response = await axios.patch<WellnessEventResponse>(
-      `${API_BASE_URL}/api/wellness-events/${id}/visibility`,
+    const response = await api.patch<WellnessEventResponse>(
+      `/api/wellness-events/${id}/visibility`,
       { is_visible: isVisible },
       {
         headers: {
@@ -257,8 +261,8 @@ export async function addImagesToWellnessEvent(
       formData.append(`images[${index}]`, file);
     });
     
-    const response = await axios.post<WellnessEventResponse>(
-      `${API_BASE_URL}/api/wellness-events/${eventId}/images`,
+    const response = await api.post<WellnessEventResponse>(
+      `/api/wellness-events/${eventId}/images`,
       formData,
       {
         headers: {
@@ -282,8 +286,8 @@ export async function deleteWellnessEventImage(
   imageId: number
 ): Promise<{ message: string }> {
   try {
-    const response = await axios.delete(
-      `${API_BASE_URL}/api/wellness-events/${eventId}/images/${imageId}`
+    const response = await api.delete(
+      `/api/wellness-events/${eventId}/images/${imageId}`
     );
     
     return response.data;
