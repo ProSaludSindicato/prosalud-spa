@@ -16,7 +16,7 @@ const InformacionImportanteConsolidada: React.FC = () => {
   return (
     <div className="mb-8">
       <Tabs defaultValue="incapacidad" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 bg-muted/30">
           <TabsTrigger value="tiempos">Tiempos</TabsTrigger>
           <TabsTrigger value="incapacidad">Incapacidades</TabsTrigger>
           <TabsTrigger value="importante">Información</TabsTrigger>

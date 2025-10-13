@@ -133,7 +133,7 @@ const SolicitudMicrocreditoPage: React.FC = () => {
       </div>
 
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <header className="mb-8 text-center">
             <div className="flex justify-center items-center gap-3 mb-4">
                 <CreditCard className="h-8 w-8 text-primary-prosalud-dark" />
