@@ -768,7 +768,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         <Button
                           variant="outline"
                           onClick={() => handleChangeStatus(selectedSolicitud.id, "rejected")}
-                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-600"
                         >
                           Rechazar
                         </Button>
