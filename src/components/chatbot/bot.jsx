@@ -1219,7 +1219,7 @@ ${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ''}- Tipo d
                 return;
             }
 
-            // Verificar si es un número válido
+            // Verificar si es un número válido (posición en la lista)
             const selectedNumber = parseInt(trimmedInput);
             if (!isNaN(selectedNumber) && selectedNumber >= 1 && selectedNumber <= lastBotMessage.multipleIncapacidades.length) {
                 const selectedIncapacidad = lastBotMessage.multipleIncapacidades[selectedNumber - 1];
@@ -1227,6 +1227,27 @@ ${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ''}- Tipo d
                 const detailMessage = {
                     role: 'assistant',
                     content: generateIncapacidadResponse(selectedIncapacidad),
+                    isBot: true,
+                    isStreaming: false,
+                    // Mantener el contexto para futuras preguntas
+                    multipleIncapacidades: lastBotMessage.multipleIncapacidades
+                };
+
+                setMessages(prev => [...prev, detailMessage]);
+                setIsTyping(false);
+                setIsSuggestionsExpanded(false);
+                return;
+            }
+
+            // Verificar si es un número de radicado válido
+            const selectedByRadicado = lastBotMessage.multipleIncapacidades.find(
+                inc => inc["N° Radicado"] && inc["N° Radicado"].toString().toLowerCase() === trimmedInput
+            );
+
+            if (selectedByRadicado) {
+                const detailMessage = {
+                    role: 'assistant',
+                    content: generateIncapacidadResponse(selectedByRadicado),
                     isBot: true,
                     isStreaming: false,
                     // Mantener el contexto para futuras preguntas
@@ -1584,18 +1605,19 @@ A continuación se muestran tus incapacidades:\n\n`;
                              inc.estado === 'RECHAZADA' ? '❌' : 'ℹ️';
             
             response += `**${index + 1}. ${statusIcon} Incapacidad**
-• Radicado: ${inc["N° Radicado"] || 'N/A'}
-• Período: ${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}
-• Días: ${inc["Dias Incapacidad"]}
-• Estado: ${inc.estado}
-${inc["valor Incapacidad Recibido"] ? `• Valor: ${inc["valor Incapacidad Recibido"]}` : ''}
+- Radicado: ${inc["N° Radicado"] || 'N/A'}
+- Período: ${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}
+- Días: ${inc["Dias Incapacidad"]}
+- Estado: ${inc.estado}
+${inc["valor Incapacidad Recibido"] ? `- Valor: ${inc["valor Incapacidad Recibido"]}` : ''}
 
 `;
         });
 
         response += `**¿Qué deseas hacer?**
-• Escribe el **número** de la incapacidad que deseas ver en detalle
-• O escribe **"todas"** para ver el detalle completo de todas
+- Escribe el **número** de la incapacidad que deseas ver en detalle (ejemplo: 1, 2, 3...)
+- Escribe el **número de radicado** de la incapacidad que deseas consultar
+- O escribe **"todas"** para ver el detalle completo de todas
 
 **🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
 
@@ -1934,9 +1956,11 @@ ${incapacidad.detalles}
                                             </CardTitle>
                                             <button
                                                 onClick={closeIncapacidadForm}
-                                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                                title="Volver al chatbot"
                                             >
-                                                <CircleMinus className="h-4 w-4" />
+                                                <X className="h-4 w-4" />
+                                                <span>Cancelar</span>
                                             </button>
                                         </div>
                                         <IncapacidadForm
