@@ -88,7 +88,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
       toast({
         title: "Evento creado",
-        description: "El evento de bienestar ha sido creado exitosamente."
+        description: "El evento de bienestar ha sido creado exitosamente.",
+        variant: "default"
       });
       onClose();
     },
@@ -107,13 +108,29 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           description: errorMessages || error.response?.data?.message,
           variant: "destructive"
         });
+      } else if (error.response?.status === 404) {
+        toast({
+          title: "Endpoint no encontrado",
+          description: "La ruta del API no existe. Verifica la configuración del backend.",
+          variant: "destructive"
+        });
+      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        toast({
+          title: "Error de conexión",
+          description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Error al crear evento",
-          description: error.response?.data?.message || "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
+          description: error.response?.data?.message || error.message || "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
           variant: "destructive"
         });
       }
+    },
+    onSettled: () => {
+      // Esto se ejecuta siempre, independientemente de si fue exitoso o error
+      console.log('Mutation settled');
     }
   });
 
@@ -124,7 +141,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
       toast({
         title: "Evento actualizado",
-        description: "El evento de bienestar ha sido actualizado exitosamente."
+        description: "El evento de bienestar ha sido actualizado exitosamente.",
+        variant: "default"
       });
       onClose();
     },
@@ -143,13 +161,28 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           description: errorMessages || error.response?.data?.message,
           variant: "destructive"
         });
+      } else if (error.response?.status === 404) {
+        toast({
+          title: "Evento no encontrado",
+          description: "El evento que intentas actualizar no existe.",
+          variant: "destructive"
+        });
+      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        toast({
+          title: "Error de conexión",
+          description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Error al actualizar evento",
-          description: error.response?.data?.message || "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
+          description: error.response?.data?.message || error.message || "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
           variant: "destructive"
         });
       }
+    },
+    onSettled: () => {
+      console.log('Update mutation settled');
     }
   });
 
