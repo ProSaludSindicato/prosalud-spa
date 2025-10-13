@@ -1,12 +1,13 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import AdminLayout from "@/components/admin/AdminLayout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ExportRequestsDialog from "@/components/admin/solicitudes/ExportRequestsDialog";
-import {
+
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ExportRequestsDialog from '@/components/admin/solicitudes/ExportRequestsDialog';
+import { 
   FileText,
   Download,
   Filter,
@@ -22,47 +23,37 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  AlertCircle,
-} from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { motion } from "framer-motion";
-import { useToast } from "@/hooks/use-toast";
-import DataPagination from "@/components/ui/data-pagination";
-import { usePagination } from "@/hooks/usePagination";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import JsonView from "@uiw/react-json-view";
-import { requestsService } from "@/services/requestsServiceApi";
-import { Request } from "@/types/requests";
-import { useMemo } from "react";
+  AlertCircle
+} from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { motion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
+import DataPagination from '@/components/ui/data-pagination';
+import { usePagination } from '@/hooks/usePagination';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import JsonView from '@uiw/react-json-view';
+import { requestsService } from '@/services/requestsServiceApi';
+import { Request } from '@/types/requests';
+import { useMemo } from 'react';
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 const AdminSolicitudesPage: React.FC = () => {
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedType, setSelectedType] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"name" | "date">("date");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const { toast } = useToast();
 
   // Fetch all requests from API
-  const {
-    data: allSolicitudes = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["admin-solicitudes"],
+  const { data: allSolicitudes = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['admin-solicitudes'],
     queryFn: requestsService.getRequests,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -74,36 +65,39 @@ const AdminSolicitudesPage: React.FC = () => {
     // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (request) =>
-          request.name.toLowerCase().includes(searchLower) ||
-          request.last_name.toLowerCase().includes(searchLower) ||
-          request.email.toLowerCase().includes(searchLower) ||
-          request.id_number.toLowerCase().includes(searchLower) ||
-          getRequestTypeLabel(request.request_type).toLowerCase().includes(searchLower),
+      filtered = filtered.filter(request => 
+        request.name.toLowerCase().includes(searchLower) ||
+        request.last_name.toLowerCase().includes(searchLower) ||
+        request.email.toLowerCase().includes(searchLower) ||
+        request.id_number.toLowerCase().includes(searchLower) ||
+        getRequestTypeLabel(request.request_type).toLowerCase().includes(searchLower)
       );
     }
 
     // Apply status filter
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter((request) => request.status === selectedStatus);
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(request => request.status === selectedStatus);
     }
 
     // Apply type filter
-    if (selectedType !== "all") {
-      filtered = filtered.filter((request) => request.request_type === selectedType);
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(request => request.request_type === selectedType);
     }
 
     // Apply sorting
     filtered.sort((a, b) => {
-      if (sortBy === "name") {
+      if (sortBy === 'name') {
         const nameA = `${a.name} ${a.last_name}`.toLowerCase();
         const nameB = `${b.name} ${b.last_name}`.toLowerCase();
-        return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        return sortOrder === 'asc' 
+          ? nameA.localeCompare(nameB)
+          : nameB.localeCompare(nameA);
       } else {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+        return sortOrder === 'asc' 
+          ? dateA - dateB
+          : dateB - dateA;
       }
     });
 
@@ -112,8 +106,8 @@ const AdminSolicitudesPage: React.FC = () => {
 
   // Fetch stats
   const { data: stats } = useQuery({
-    queryKey: ["admin-solicitudes-stats"],
-    queryFn: requestsService.getRequestStats,
+    queryKey: ['admin-solicitudes-stats'],
+    queryFn: requestsService.getRequestStats
   });
 
   const containerVariants = {
@@ -122,9 +116,9 @@ const AdminSolicitudesPage: React.FC = () => {
       opacity: 1,
       transition: {
         staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
-    },
+        delayChildren: 0.2
+      }
+    }
   };
 
   const itemVariants = {
@@ -132,110 +126,106 @@ const AdminSolicitudesPage: React.FC = () => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { type: "spring", stiffness: 100 },
-    },
+      transition: { type: "spring", stiffness: 100 }
+    }
   };
 
   const handleViewDetails = (solicitud: Request) => {
-    console.log("Ver detalles de solicitud:", solicitud);
+    console.log('Ver detalles de solicitud:', solicitud);
     setSelectedSolicitud(solicitud);
   };
 
-  const handleChangeStatus = async (id: string, newStatus: Request["status"]) => {
+  const handleChangeStatus = async (id: string, newStatus: Request['status']) => {
     try {
       const updatedRequest = await requestsService.updateRequestStatus(id, newStatus);
-
+      
       const statusLabels = {
-        in_progress: "Marcada en Revisión",
-        resolved: "Marcada como Completada",
-        rejected: "Rechazada",
+        'in_progress': 'Marcada en Revisión',
+        'resolved': 'Marcada como Completada',
+        'rejected': 'Rechazada'
       };
-
+      
       toast({
         title: `Solicitud ${statusLabels[newStatus]}`,
         description: `La solicitud #${id} ha sido ${statusLabels[newStatus].toLowerCase()} exitosamente.`,
       });
-
+      
       // Update selected request if it's being viewed
       if (selectedSolicitud?.id === id) {
         setSelectedSolicitud(updatedRequest);
       }
-
+      
       refetch();
     } catch (error) {
-      console.error("Error updating request status:", error);
+      console.error('Error updating request status:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo actualizar el estado de la solicitud",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
 
-  const { currentPage, itemsPerPage, totalPages, totalItems, paginatedData, goToPage, setItemsPerPage } = usePagination(
-    {
-      data: filteredSolicitudes,
-      initialItemsPerPage: 10,
-    },
-  );
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    totalItems,
+    paginatedData,
+    goToPage,
+    setItemsPerPage
+  } = usePagination({
+    data: filteredSolicitudes,
+    initialItemsPerPage: 10
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-700";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700";
-      case "resolved":
-        return "bg-green-100 text-green-700";
-      case "rejected":
-        return "bg-red-100 text-red-700";
-      default:
-        return "bg-gray-100 text-gray-700";
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
+      case 'in_progress': return 'bg-blue-100 text-blue-700';
+      case 'resolved': return 'bg-green-100 text-green-700';
+      case 'rejected': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "pending":
-        return "Pendiente";
-      case "in_progress":
-        return "En Revisión";
-      case "resolved":
-        return "Completado";
-      case "rejected":
-        return "Rechazado";
-      default:
-        return status;
+      case 'pending': return 'Pendiente';
+      case 'in_progress': return 'En Revisión';
+      case 'resolved': return 'Completado';  
+      case 'rejected': return 'Rechazado';
+      default: return status;
     }
   };
 
   const getRequestTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      "certificado-convenio": "Certificado de Convenio",
-      "compensacion-anual": "Compensación Anual Diferida",
-      "verificacion-pagos": "Verificación de Pagos",
-      "compensacion-descanso": "Compensación por Descanso",
-      "actualizar-cuenta": "Actualizar Cuenta Bancaria",
-      "retiro-sindical": "Retiro Sindical",
-      microcredito: "Microcrédito CEII",
-      "incapacidad-maternidad": "Incapacidad de Maternidad",
-      "permisos-turnos": "Permisos y Turnos",
+      'certificado-convenio': 'Certificado de Convenio',
+      'compensacion-anual': 'Compensación Anual Diferida',
+      'verificacion-pagos': 'Verificación de Pagos',
+      'compensacion-descanso': 'Compensación por Descanso',
+      'actualizar-cuenta': 'Actualizar Cuenta Bancaria',
+      'retiro-sindical': 'Retiro Sindical',
+      'microcredito': 'Microcrédito CEII',
+      'incapacidad-maternidad': 'Incapacidad de Maternidad',
+      'permisos-turnos': 'Permisos y Turnos'
     };
     return labels[type] || type;
   };
 
   const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedStatus("all");
-    setSelectedType("all");
+    setSearchTerm('');
+    setSelectedStatus('all');
+    setSelectedType('all');
   };
 
-  const toggleSort = (column: "name" | "date") => {
+  const toggleSort = (column: 'name' | 'date') => {
     if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(column);
-      setSortOrder("asc");
+      setSortOrder('asc');
     }
   };
 
@@ -258,13 +248,15 @@ const AdminSolicitudesPage: React.FC = () => {
                       <FileText className="h-8 w-8 text-primary-prosalud" />
                     </div>
                     <div>
-                      <CardTitle className="text-3xl font-bold text-primary-prosalud">Gestión de Solicitudes</CardTitle>
+                      <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                        Gestión de Solicitudes
+                      </CardTitle>
                       <CardDescription className="text-base mt-2">
                         Administra y procesa las solicitudes de los usuarios de ProSalud
                       </CardDescription>
                     </div>
                   </div>
-                  <Button
+                  <Button 
                     className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
                     onClick={() => setExportDialogOpen(true)}
                   >
@@ -338,7 +330,11 @@ const AdminSolicitudesPage: React.FC = () => {
           </motion.div>
 
           {/* Filters */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
             <Card className="border shadow-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold">
@@ -365,13 +361,13 @@ const AdminSolicitudesPage: React.FC = () => {
                       <SelectTrigger className="h-10">
                         <SelectValue placeholder="Todos los estados" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los estados</SelectItem>
-                        <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="in_progress">En Revisión</SelectItem>
-                        <SelectItem value="resolved">Completado</SelectItem>
-                        <SelectItem value="rejected">Rechazado</SelectItem>
-                      </SelectContent>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los estados</SelectItem>
+                          <SelectItem value="pending">Pendiente</SelectItem>
+                          <SelectItem value="in_progress">En Revisión</SelectItem>
+                          <SelectItem value="resolved">Completado</SelectItem>
+                          <SelectItem value="rejected">Rechazado</SelectItem>
+                        </SelectContent>
                     </Select>
                   </div>
                   <div>
@@ -394,7 +390,11 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Select>
                   </div>
                   <div>
-                    <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={clearFilters}
+                      className="h-10 w-full flex items-center gap-2"
+                    >
                       <Brush className="w-4 h-4" />
                       Limpiar Filtros
                     </Button>
@@ -405,10 +405,16 @@ const AdminSolicitudesPage: React.FC = () => {
           </motion.div>
 
           {/* Requests Table */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
             <Card className="border shadow-sm">
               <CardHeader>
-                <CardTitle className="text-2xl font-bold text-gray-900">Solicitudes ({totalItems})</CardTitle>
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  Solicitudes ({totalItems})
+                </CardTitle>
                 <CardDescription className="text-gray-600 mt-1">
                   Lista completa de solicitudes realizadas por los afiliados
                 </CardDescription>
@@ -422,7 +428,11 @@ const AdminSolicitudesPage: React.FC = () => {
                     <AlertTitle>Error de conexión</AlertTitle>
                     <AlertDescription>
                       No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.
-                      {error instanceof Error && <div className="mt-2 text-sm">Detalles: {error.message}</div>}
+                      {error instanceof Error && (
+                        <div className="mt-2 text-sm">
+                          Detalles: {error.message}
+                        </div>
+                      )}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -434,16 +444,12 @@ const AdminSolicitudesPage: React.FC = () => {
                             <TableHead className="w-1/4">
                               <Button
                                 variant="ghost"
-                                onClick={() => toggleSort("name")}
-                                className="flex items-center gap-2"
+                                onClick={() => toggleSort('name')}
+                                className="flex items-center gap-2 hover:bg-gray-100"
                               >
                                 Solicitante
-                                {sortBy === "name" ? (
-                                  sortOrder === "asc" ? (
-                                    <ArrowUp className="h-4 w-4" />
-                                  ) : (
-                                    <ArrowDown className="h-4 w-4" />
-                                  )
+                                {sortBy === 'name' ? (
+                                  sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                                 ) : (
                                   <ArrowUpDown className="h-4 w-4 opacity-50" />
                                 )}
@@ -454,16 +460,12 @@ const AdminSolicitudesPage: React.FC = () => {
                             <TableHead className="w-1/6">
                               <Button
                                 variant="ghost"
-                                onClick={() => toggleSort("date")}
-                                className="flex items-center gap-2"
+                                onClick={() => toggleSort('date')}
+                                className="flex items-center gap-2 hover:bg-gray-100"
                               >
                                 Fecha
-                                {sortBy === "date" ? (
-                                  sortOrder === "asc" ? (
-                                    <ArrowUp className="h-4 w-4" />
-                                  ) : (
-                                    <ArrowDown className="h-4 w-4" />
-                                  )
+                                {sortBy === 'date' ? (
+                                  sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
                                 ) : (
                                   <ArrowUpDown className="h-4 w-4 opacity-50" />
                                 )}
@@ -481,21 +483,15 @@ const AdminSolicitudesPage: React.FC = () => {
                                     <User className="h-4 w-4 text-gray-600" />
                                   </div>
                                   <div>
-                                    <p className="font-medium text-gray-900">
-                                      {solicitud.name} {solicitud.last_name} {solicitud.full_name}
-                                    </p>
+                                    <p className="font-medium text-gray-900">{solicitud.name} {solicitud.last_name}</p>
                                     <p className="text-sm text-gray-600">{solicitud.email}</p>
-                                    <p className="text-xs text-gray-500">
-                                      {solicitud.id_type}: {solicitud.id_number}
-                                    </p>
+                                    <p className="text-xs text-gray-500">{solicitud.id_type}: {solicitud.id_number}</p>
                                   </div>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div>
-                                  <p className="font-medium text-gray-900">
-                                    {getRequestTypeLabel(solicitud.request_type)}
-                                  </p>
+                                  <p className="font-medium text-gray-900">{getRequestTypeLabel(solicitud.request_type)}</p>
                                   <p className="text-sm text-gray-500">ID: {solicitud.id}</p>
                                 </div>
                               </TableCell>
@@ -507,30 +503,27 @@ const AdminSolicitudesPage: React.FC = () => {
                               <TableCell>
                                 <div>
                                   <p className="text-sm text-gray-900">
-                                    {new Date(solicitud.created_at).toLocaleDateString("es-ES", {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
+                                    {new Date(solicitud.created_at).toLocaleDateString('es-ES', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric'
                                     })}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {new Date(solicitud.created_at).toLocaleTimeString("es-ES", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
+                                    {new Date(solicitud.created_at).toLocaleTimeString('es-ES', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
                                     })}
                                   </p>
-                                  {solicitud.status === "resolved" && solicitud.resolved_at && (
+                                  {solicitud.status === 'resolved' && solicitud.resolved_at && (
                                     <p className="text-xs text-green-600 font-medium mt-1">
-                                      ✓ Resuelto:{" "}
-                                      {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                      })}
-                                      ,{" "}
-                                      {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
+                                      ✓ Resuelto: {new Date(solicitud.resolved_at).toLocaleDateString('es-ES', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })}, {new Date(solicitud.resolved_at).toLocaleTimeString('es-ES', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
                                       })}
                                     </p>
                                   )}
@@ -548,20 +541,18 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
-                                    {solicitud.status === "pending" && (
+                                    {solicitud.status === 'pending' && (
                                       <>
-                                        <DropdownMenuItem
-                                          onClick={() => handleChangeStatus(solicitud.id, "in_progress")}
-                                        >
+                                        <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, 'in_progress')}>
                                           <div className="h-4 w-4 mr-2 bg-blue-600 rounded-full"></div>
                                           Marcar en Revisión
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, "resolved")}>
+                                        <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, 'resolved')}>
                                           <div className="h-4 w-4 mr-2 bg-green-600 rounded-full"></div>
                                           Marcar como Completado
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={() => handleChangeStatus(solicitud.id, "rejected")}
+                                        <DropdownMenuItem 
+                                          onClick={() => handleChangeStatus(solicitud.id, 'rejected')}
                                           className="text-red-600 focus:text-red-600"
                                         >
                                           <div className="h-4 w-4 mr-2 bg-red-600 rounded-full"></div>
@@ -569,8 +560,8 @@ const AdminSolicitudesPage: React.FC = () => {
                                         </DropdownMenuItem>
                                       </>
                                     )}
-                                    {solicitud.status === "in_progress" && (
-                                      <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, "resolved")}>
+                                    {solicitud.status === 'in_progress' && (
+                                      <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, 'resolved')}>
                                         <div className="h-4 w-4 mr-2 bg-green-600 rounded-full"></div>
                                         Marcar como Completado
                                       </DropdownMenuItem>
@@ -600,7 +591,10 @@ const AdminSolicitudesPage: React.FC = () => {
           </motion.div>
 
           {/* Export Dialog */}
-          <ExportRequestsDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
+          <ExportRequestsDialog
+            open={exportDialogOpen}
+            onOpenChange={setExportDialogOpen}
+          />
 
           {/* Request Details Dialog */}
           {selectedSolicitud && (
@@ -616,52 +610,48 @@ const AdminSolicitudesPage: React.FC = () => {
                         <h2 className="text-2xl font-bold text-gray-900">
                           Detalles de Solicitud #{selectedSolicitud.id}
                         </h2>
-                        <p className="text-sm text-gray-600">Información completa de la solicitud</p>
+                        <p className="text-sm text-gray-600">
+                          Información completa de la solicitud
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-6 space-y-6">
-                    {/* Información del Solicitante */}
+                     {/* Información del Solicitante */}
                     <Card className="border border-gray-200 shadow-sm">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
-                        <CardTitle className="text-lg font-semibold text-gray-900">
-                          Información del Solicitante
-                        </CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-900">Información del Solicitante</CardTitle>
                       </CardHeader>
                       <CardContent className="p-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Documento</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">
-                                {selectedSolicitud.id_type}: {selectedSolicitud.id_number}
-                              </p>
+                              <p className="text-gray-900">{selectedSolicitud.id_type}: {selectedSolicitud.id_number}</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Nombres</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
                               <p className="text-gray-900">
-                                {selectedSolicitud.name && selectedSolicitud.last_name
+                                {selectedSolicitud.name && selectedSolicitud.last_name 
                                   ? `${selectedSolicitud.name} ${selectedSolicitud.last_name}`.trim()
-                                  : selectedSolicitud.name ||
-                                    selectedSolicitud.last_name ||
-                                    selectedSolicitud.full_name ||
-                                    "No especificado"}
+                                  : selectedSolicitud.name || selectedSolicitud.last_name || 'No especificado'
+                                }
                               </p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Correo Electrónico</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">{selectedSolicitud.email || "No especificado"}</p>
+                              <p className="text-gray-900">{selectedSolicitud.email || 'No especificado'}</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Teléfono</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">{selectedSolicitud.phone_number || "No especificado"}</p>
+                              <p className="text-gray-900">{selectedSolicitud.phone_number || 'No especificado'}</p>
                             </div>
                           </div>
                         </div>
@@ -671,9 +661,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     {/* Información de la Solicitud */}
                     <Card className="border border-gray-200 shadow-sm">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
-                        <CardTitle className="text-lg font-semibold text-gray-900">
-                          Información de la Solicitud
-                        </CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-900">Información de la Solicitud</CardTitle>
                       </CardHeader>
                       <CardContent className="p-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -695,15 +683,13 @@ const AdminSolicitudesPage: React.FC = () => {
                             <label className="text-sm font-medium text-gray-700">Fecha de Creación</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
                               <p className="text-gray-900">
-                                {new Date(selectedSolicitud.created_at).toLocaleDateString("es-ES", {
-                                  day: "2-digit",
-                                  month: "long",
-                                  year: "numeric",
-                                })}{" "}
-                                a las{" "}
-                                {new Date(selectedSolicitud.created_at).toLocaleTimeString("es-ES", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
+                                {new Date(selectedSolicitud.created_at).toLocaleDateString('es-ES', {
+                                  day: '2-digit',
+                                  month: 'long',
+                                  year: 'numeric'
+                                })} a las {new Date(selectedSolicitud.created_at).toLocaleTimeString('es-ES', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
                                 })}
                               </p>
                             </div>
@@ -721,34 +707,29 @@ const AdminSolicitudesPage: React.FC = () => {
                     {/* Detalles Específicos */}
                     <Card className="border border-gray-200 shadow-sm">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
-                        <CardTitle className="text-lg font-semibold text-gray-900">
-                          Detalles Específicos de la Solicitud
-                        </CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-900">Detalles Específicos de la Solicitud</CardTitle>
                       </CardHeader>
                       <CardContent className="p-6">
                         <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          {selectedSolicitud.payload &&
-                          typeof selectedSolicitud.payload === "object" &&
-                          Object.keys(selectedSolicitud.payload).length > 0 ? (
+                          {selectedSolicitud.payload && typeof selectedSolicitud.payload === 'object' && Object.keys(selectedSolicitud.payload).length > 0 ? (
                             <div className="space-y-4">
                               {Object.entries(selectedSolicitud.payload).map(([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center py-2 border-b border-gray-100 last:border-b-0"
-                                >
+                                <div key={key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center py-2 border-b border-gray-100 last:border-b-0">
                                   <div className="md:col-span-1">
                                     <label className="text-sm font-medium text-gray-700 capitalize">
-                                      {key.replace(/[_-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                      {key.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                     </label>
                                   </div>
                                   <div className="md:col-span-2">
                                     <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
                                       <p className="text-gray-900 text-sm">
-                                        {value !== null && value !== undefined
-                                          ? typeof value === "object"
-                                            ? JSON.stringify(value, null, 2)
-                                            : String(value)
-                                          : "No especificado"}
+                                        {value !== null && value !== undefined 
+                                          ? (typeof value === 'object' 
+                                              ? JSON.stringify(value, null, 2)
+                                              : String(value)
+                                            )
+                                          : 'No especificado'
+                                        }
                                       </p>
                                     </div>
                                   </div>
@@ -766,17 +747,17 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
 
                     {/* Acciones */}
-                    {selectedSolicitud.status === "pending" && (
+                    {selectedSolicitud.status === 'pending' && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleChangeStatus(selectedSolicitud.id, "rejected")}
+                        <Button 
+                          variant="outline" 
+                          onClick={() => handleChangeStatus(selectedSolicitud.id, 'rejected')}
                           className="text-red-600 border-red-200 hover:bg-red-50"
                         >
                           Rechazar
                         </Button>
-                        <Button
-                          onClick={() => handleChangeStatus(selectedSolicitud.id, "resolved")}
+                        <Button 
+                          onClick={() => handleChangeStatus(selectedSolicitud.id, 'resolved')}
                           className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
                         >
                           Resolver
