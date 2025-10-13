@@ -1240,28 +1240,117 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       const trimmedInput = text.trim().toLowerCase();
       const allWords = ["todas", "todos", "all", "todo"];
 
-      // Ver todas
-      if (allWords.includes(trimmedInput)) {
-        const firstIncapacidad = lastBotMessage.multipleIncapacidades[0];
-        const nombreAfiliado = firstIncapacidad?.Nombres || "";
+      // Detectar si es una pregunta nueva sobre otro tema (no una selección de incapacidad)
+      const isNewQuestion = (() => {
+        // Si tiene más de 6 palabras, probablemente es una pregunta nueva
+        if (trimmedInput.split(/\s+/).length > 6) return true;
+        
+        // Si contiene palabras clave de otros servicios/temas de ProSalud
+        const otherTopicsKeywords = [
+          'certificado', 'descanso', 'compensación', 'retiro', 'afiliación', 'comfenalco',
+          'sst', 'seguridad', 'salud', 'trabajo', 'bienestar', 'eventos', 'galería',
+          'microcrédito', 'permisos', 'turnos', 'cuenta', 'bancaria', 'convenio',
+          'estatutos', 'beneficios', 'contrato', 'sindical', 'quiénes', 'somos',
+          'contacto', 'teléfono', 'correo', 'dirección', 'horario', 'servicio',
+          'eps', 'sura', 'cómo', 'cuándo', 'dónde', 'qué', 'por qué', 'ayuda'
+        ];
+        return otherTopicsKeywords.some(keyword => trimmedInput.includes(keyword));
+      })();
 
-        const datosPersonales = `**👤 Datos personales:**\n- Nombre: ${firstIncapacidad?.Nombres || "N/A"}\n${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ""}- Tipo documento: ${firstIncapacidad?.Tipo || "N/A"}\n- Número documento: ${firstIncapacidad?.["Numero Documento"] || "N/A"}\n\n`;
+      // Si es una pregunta nueva, permitir que se procese normalmente (salir del modo selección)
+      if (isNewQuestion) {
+        console.log('✅ Detectada pregunta nueva sobre otro tema, saliendo del modo selección de incapacidad');
+        // Continuar con el flujo normal sin procesar como selección
+      } else {
+        // Ver todas
+        if (allWords.includes(trimmedInput)) {
+          const firstIncapacidad = lastBotMessage.multipleIncapacidades[0];
+          const nombreAfiliado = firstIncapacidad?.Nombres || "";
 
-        const allDetailsResponse = lastBotMessage.multipleIncapacidades
-          .map((inc, index) => `**Incapacidad #${index + 1}**\n\n${generateIncapacidadResponse(inc, false, false)}`)
-          .join("\n---\n\n");
+          const datosPersonales = `**👤 Datos personales:**\n- Nombre: ${firstIncapacidad?.Nombres || "N/A"}\n${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ""}- Tipo documento: ${firstIncapacidad?.Tipo || "N/A"}\n- Número documento: ${firstIncapacidad?.["Numero Documento"] || "N/A"}\n\n`;
 
-        const notaConfidencial = `\n**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+          const allDetailsResponse = lastBotMessage.multipleIncapacidades
+            .map((inc, index) => `**Incapacidad #${index + 1}**\n\n${generateIncapacidadResponse(inc, false, false)}`)
+            .join("\n---\n\n");
 
-        const detailMessage = {
+          const notaConfidencial = `\n**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+
+          const detailMessage = {
+            role: "assistant",
+            content: `¡Hola${nombreAfiliado ? ` ${nombreAfiliado}` : ""}! Como asistente de ProSalud, estoy aquí para ayudarte.\n\nSegún la información que me proporcionaste, aquí tienes el detalle completo de tus incapacidades:\n\n${datosPersonales}${allDetailsResponse}${notaConfidencial}`,
+            isBot: true,
+            isStreaming: false,
+            multipleIncapacidades: lastBotMessage.multipleIncapacidades,
+          };
+
+          setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
+          setInputMessage("");
+          setIsTyping(false);
+          setIsSuggestionsExpanded(false);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+          }
+          return;
+        }
+
+        // Selección por índice
+        const selectedNumber = parseInt(trimmedInput, 10);
+        if (!isNaN(selectedNumber) && selectedNumber >= 1 && selectedNumber <= lastBotMessage.multipleIncapacidades.length) {
+          const selectedIncapacidad = lastBotMessage.multipleIncapacidades[selectedNumber - 1];
+          const detailMessage = {
+            role: "assistant",
+            content: generateIncapacidadResponse(selectedIncapacidad),
+            isBot: true,
+            isStreaming: false,
+            multipleIncapacidades: lastBotMessage.multipleIncapacidades,
+          };
+          setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
+          setInputMessage("");
+          setIsTyping(false);
+          setIsSuggestionsExpanded(false);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+          }
+          return;
+        }
+
+        // Selección por radicado (admite "N° Radicado" o "RADICADO")
+        const selectedByRadicado = lastBotMessage.multipleIncapacidades.find((inc) => {
+          const r1 = inc["N° Radicado"]; const r2 = inc["RADICADO"]; 
+          return [r1, r2].some((r) => r && r.toString().toLowerCase() === trimmedInput);
+        });
+        if (selectedByRadicado) {
+          const detailMessage = {
+            role: "assistant",
+            content: generateIncapacidadResponse(selectedByRadicado),
+            isBot: true,
+            isStreaming: false,
+            multipleIncapacidades: lastBotMessage.multipleIncapacidades,
+          };
+          setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
+          setInputMessage("");
+          setIsTyping(false);
+          setIsSuggestionsExpanded(false);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+          }
+          return;
+        }
+
+        // Si llegamos aquí, el input no coincide con ninguna selección válida Y no es una pregunta nueva
+        // Mostrar recordatorio SIN mantener el contexto para la próxima vez
+        const reminder = {
           role: "assistant",
-          content: `¡Hola${nombreAfiliado ? ` ${nombreAfiliado}` : ""}! Como asistente de ProSalud, estoy aquí para ayudarte.\n\nSegún la información que me proporcionaste, aquí tienes el detalle completo de tus incapacidades:\n\n${datosPersonales}${allDetailsResponse}${notaConfidencial}`,
+          content:
+            `He encontrado varias incapacidades registradas para ti.\n` +
+            `Por favor, responde con el **número** de la incapacidad (1, 2, 3, ...) ` +
+            `o escribe el **número de radicado**. También puedes escribir "todas" para verlas completas.\n\n` +
+            `💡 Si prefieres preguntar sobre otro tema, hazme una pregunta más detallada.`,
           isBot: true,
           isStreaming: false,
-          multipleIncapacidades: lastBotMessage.multipleIncapacidades,
+          // NO mantener multipleIncapacidades para permitir salir del modo
         };
-
-        setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
+        setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, reminder]);
         setInputMessage("");
         setIsTyping(false);
         setIsSuggestionsExpanded(false);
@@ -1270,70 +1359,6 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         }
         return;
       }
-
-      // Selección por índice
-      const selectedNumber = parseInt(trimmedInput, 10);
-      if (!isNaN(selectedNumber) && selectedNumber >= 1 && selectedNumber <= lastBotMessage.multipleIncapacidades.length) {
-        const selectedIncapacidad = lastBotMessage.multipleIncapacidades[selectedNumber - 1];
-        const detailMessage = {
-          role: "assistant",
-          content: generateIncapacidadResponse(selectedIncapacidad),
-          isBot: true,
-          isStreaming: false,
-          multipleIncapacidades: lastBotMessage.multipleIncapacidades,
-        };
-        setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
-        setInputMessage("");
-        setIsTyping(false);
-        setIsSuggestionsExpanded(false);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-        return;
-      }
-
-      // Selección por radicado (admite "N° Radicado" o "RADICADO")
-      const selectedByRadicado = lastBotMessage.multipleIncapacidades.find((inc) => {
-        const r1 = inc["N° Radicado"]; const r2 = inc["RADICADO"]; 
-        return [r1, r2].some((r) => r && r.toString().toLowerCase() === trimmedInput);
-      });
-      if (selectedByRadicado) {
-        const detailMessage = {
-          role: "assistant",
-          content: generateIncapacidadResponse(selectedByRadicado),
-          isBot: true,
-          isStreaming: false,
-          multipleIncapacidades: lastBotMessage.multipleIncapacidades,
-        };
-        setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, detailMessage]);
-        setInputMessage("");
-        setIsTyping(false);
-        setIsSuggestionsExpanded(false);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = "auto";
-        }
-        return;
-      }
-
-      // Si estamos esperando una selección pero el texto es genérico, recordar al usuario cómo seleccionar
-      const reminder = {
-        role: "assistant",
-        content:
-          `He encontrado varias incapacidades registradas para ti.\n` +
-          `Por favor, responde con el **número** de la incapacidad (1, 2, 3, ...) ` +
-          `o escribe el **número de radicado**. También puedes escribir "todas" para verlas completas.`,
-        isBot: true,
-        isStreaming: false,
-        multipleIncapacidades: lastBotMessage.multipleIncapacidades,
-      };
-      setMessages((prev) => [...prev, { role: "user", content: text, isBot: false }, reminder]);
-      setInputMessage("");
-      setIsTyping(false);
-      setIsSuggestionsExpanded(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-      }
-      return;
     }
 
     // NUEVA VALIDACIÓN DE SEGURIDAD - Filtrar antes de procesar
