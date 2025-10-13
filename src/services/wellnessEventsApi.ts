@@ -110,13 +110,21 @@ export async function getWellnessEvents(filters?: WellnessEventFilters): Promise
     
     // Validar que la respuesta tenga la estructura esperada
     if (!response.data || !response.data.data) {
-      console.warn('Respuesta de la API sin datos:', response.data);
+      console.warn('Respuesta de la API sin datos esperados:', response.data);
       return [];
     }
     
     return response.data.data.map(mapToBienestarEvent);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al obtener eventos de bienestar:', error);
+    
+    // Mostrar mensaje específico según el tipo de error
+    if (error.response?.status === 404) {
+      console.error('Endpoint no encontrado. Verifica que el backend esté configurado correctamente.');
+    } else if (error.response?.status === 500) {
+      console.error('Error del servidor al obtener eventos.');
+    }
+    
     // Retornar array vacío en caso de error para evitar crashes
     return [];
   }

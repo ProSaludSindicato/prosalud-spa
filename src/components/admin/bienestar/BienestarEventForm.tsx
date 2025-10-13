@@ -17,14 +17,33 @@ import { BienestarEvent, CreateBienestarEventData } from '@/types/admin';
 import { baseNameValidation, baseTextValidation, baseCategoryValidation, numberValidation } from '@/hooks/useFormValidation';
 
 const formSchema = z.object({
-  title: baseNameValidation.min(5, 'El título debe tener al menos 5 caracteres'),
-  date: z.string().min(1, 'La fecha es requerida'),
-  category: baseCategoryValidation,
-  description: baseTextValidation.optional(),
-  location: z.string().max(100, 'Máximo 100 caracteres').optional(),
-  attendees: numberValidation(1, 10000).optional(),
-  gift: z.string().max(100, 'Máximo 100 caracteres').optional(),
-  provider: z.string().max(50, 'Máximo 50 caracteres').optional(),
+  title: z.string()
+    .min(1, 'El título es obligatorio')
+    .max(255, 'El título no puede exceder 255 caracteres')
+    .trim(),
+  date: z.string()
+    .min(1, 'La fecha es obligatoria')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha no tiene un formato válido'),
+  category: z.string()
+    .min(1, 'La categoría es obligatoria')
+    .max(255, 'La categoría no puede exceder 255 caracteres')
+    .trim(),
+  description: z.string().optional(),
+  location: z.string()
+    .min(1, 'La ubicación es obligatoria')
+    .max(255, 'La ubicación no puede exceder 255 caracteres')
+    .trim(),
+  attendees: z.number()
+    .int('El número de asistentes debe ser un número entero')
+    .min(0, 'El número de asistentes no puede ser negativo')
+    .optional(),
+  gift: z.string()
+    .max(255, 'El obsequio no puede exceder 255 caracteres')
+    .optional(),
+  provider: z.string()
+    .max(255, 'El proveedor no puede exceder 255 caracteres')
+    .refine((val) => !val || val === 'ProSalud', 'El proveedor seleccionado no es válido')
+    .optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -74,11 +93,27 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       onClose();
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "No se pudo crear el evento. Inténtalo de nuevo.",
-        variant: "destructive"
-      });
+      console.error('Error al crear evento:', error);
+      
+      // Manejar errores de validación (422)
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.entries(errors)
+          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(', ')}`)
+          .join('\n');
+        
+        toast({
+          title: "Error de validación",
+          description: errorMessages || error.response?.data?.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error al crear evento",
+          description: error.response?.data?.message || "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
+          variant: "destructive"
+        });
+      }
     }
   });
 
@@ -94,11 +129,27 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       onClose();
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "No se pudo actualizar el evento. Inténtalo de nuevo.",
-        variant: "destructive"
-      });
+      console.error('Error al actualizar evento:', error);
+      
+      // Manejar errores de validación (422)
+      if (error.response?.status === 422 && error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.entries(errors)
+          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(', ')}`)
+          .join('\n');
+        
+        toast({
+          title: "Error de validación",
+          description: errorMessages || error.response?.data?.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error al actualizar evento",
+          description: error.response?.data?.message || "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
+          variant: "destructive"
+        });
+      }
     }
   });
 
@@ -114,21 +165,40 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       return;
     }
 
-    // Validar cada archivo
+    // Validar cada archivo según las reglas del backend
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
     for (const file of files) {
-      if (file.size > 5 * 1024 * 1024) {
+      if (!file || !(file instanceof File)) {
         toast({
-          title: "Archivo muy grande",
-          description: `La imagen ${file.name} debe ser menor a 5MB.`,
+          title: "Archivo inválido",
+          description: "Cada elemento debe ser un archivo válido.",
           variant: "destructive"
         });
         return;
       }
 
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Archivo inválido",
+          description: "Cada archivo debe ser una imagen válida.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Formato no válido",
-          description: `Solo se permiten archivos JPG, PNG o WebP.`,
+          description: "Las imágenes deben ser de tipo: jpeg, png, jpg, gif, webp.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Archivo muy grande",
+          description: `Cada imagen no puede exceder 5MB. ${file.name} es muy grande.`,
           variant: "destructive"
         });
         return;
@@ -326,7 +396,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="location" className="text-sm font-medium">
-                      Ubicación
+                      Ubicación *
                     </Label>
                     <Input
                       id="location"
@@ -334,6 +404,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       className="h-10"
                       placeholder="Ej: Sede Principal"
                     />
+                    {form.formState.errors.location && (
+                      <p className="text-destructive text-sm">{form.formState.errors.location.message}</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -364,6 +437,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                         placeholder="ProSalud"
                         className="h-10"
                       />
+                      {form.formState.errors.provider && (
+                        <p className="text-destructive text-sm">{form.formState.errors.provider.message}</p>
+                      )}
                     </div>
                   </div>
 
@@ -377,6 +453,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       className="h-10"
                       placeholder="Ej: Kit de bienestar"
                     />
+                    {form.formState.errors.gift && (
+                      <p className="text-destructive text-sm">{form.formState.errors.gift.message}</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -404,7 +483,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                         <input
                           type="file"
                           multiple
-                          accept="image/jpeg,image/png,image/webp"
+                          accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
                           onChange={handleImageUpload}
                           className="hidden"
                           id="image-upload"

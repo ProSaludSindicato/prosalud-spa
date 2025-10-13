@@ -49,8 +49,16 @@ const AdminBienestarPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
       toast({
-        title: "Estado actualizado",
-        description: "La visibilibilidad del evento ha sido actualizada."
+        title: "Visibilidad actualizada",
+        description: "La visibilidad del evento se ha actualizado correctamente."
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error al cambiar visibilidad:', error);
+      toast({
+        title: "Error al cambiar visibilidad",
+        description: error.response?.data?.message || "No se pudo cambiar la visibilidad del evento.",
+        variant: "destructive"
       });
     }
   });
