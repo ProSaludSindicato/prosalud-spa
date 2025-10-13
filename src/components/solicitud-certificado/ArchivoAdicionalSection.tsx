@@ -19,9 +19,11 @@ const ArchivoAdicionalSection = <TFieldValues extends FieldValues>({
       <FileUploadField
         control={control}
         name={"adjuntarArchivoAdicional" as any}
-        label="Seleccione un archivo (PDF, Word o imagen, máx. 4MB)"
+        label="Seleccione archivos (PDF, Word o imagen, máx. 4MB c/u)"
         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
-        description="Si necesita adjuntar algún documento adicional, puede hacerlo aquí. Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP)."
+        description="Si necesita adjuntar documentos adicionales, puede hacerlo aquí. Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP)."
+        multiple={true}
+        maxFiles={4}
       />
     </section>
   );
