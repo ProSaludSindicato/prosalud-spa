@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { bienestarApi } from '@/services/adminApi';
+import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from '@/services/wellnessEventsApi';
 import { BienestarEvent, CreateBienestarEventData } from '@/types/admin';
 import { baseNameValidation, baseTextValidation, baseCategoryValidation, numberValidation } from '@/hooks/useFormValidation';
 
@@ -64,7 +64,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   }, [event]);
 
   const createMutation = useMutation({
-    mutationFn: bienestarApi.createEvent,
+    mutationFn: (data: CreateWellnessEventData) => wellnessEventsApi.createEvent(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
       toast({
@@ -73,18 +73,18 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       });
       onClose();
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "No se pudo crear el evento. Inténtalo de nuevo.",
+        description: error.response?.data?.message || "No se pudo crear el evento. Inténtalo de nuevo.",
         variant: "destructive"
       });
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<CreateBienestarEventData & { isVisible: boolean }>) => 
-      bienestarApi.updateEvent(event!.id, data),
+    mutationFn: (data: UpdateWellnessEventData) => 
+      wellnessEventsApi.updateEvent(event!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
       toast({
@@ -93,10 +93,10 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       });
       onClose();
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "No se pudo actualizar el evento. Inténtalo de nuevo.",
+        description: error.response?.data?.message || "No se pudo actualizar el evento. Inténtalo de nuevo.",
         variant: "destructive"
       });
     }
@@ -166,23 +166,33 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       return;
     }
 
-    const eventData: CreateBienestarEventData = {
-      title: data.title,
-      date: data.date,
-      category: data.category,
-      description: data.description || undefined,
-      location: data.location || undefined,
-      attendees: data.attendees || undefined,
-      gift: data.gift || undefined,
-      provider: data.provider || 'ProSalud',
-      images,
-      mainImageIndex
-    };
-
     if (event) {
-      updateMutation.mutate(eventData);
+      // Actualización de evento existente
+      const updateData: UpdateWellnessEventData = {
+        title: data.title,
+        date: data.date,
+        category: data.category,
+        location: data.location || '',
+        description: data.description,
+        attendees: data.attendees,
+        gift: data.gift,
+        images: images.length > 0 ? images : undefined,
+      };
+      updateMutation.mutate(updateData);
     } else {
-      createMutation.mutate(eventData);
+      // Creación de nuevo evento
+      const createData: CreateWellnessEventData = {
+        title: data.title,
+        date: data.date,
+        category: data.category,
+        location: data.location || '',
+        description: data.description,
+        attendees: data.attendees,
+        gift: data.gift,
+        is_visible: true,
+        images,
+      };
+      createMutation.mutate(createData);
     }
   };
 

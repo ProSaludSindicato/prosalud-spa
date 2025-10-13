@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { useToast } from '@/hooks/use-toast';
-import { bienestarApi } from '@/services/adminApi';
+import { wellnessEventsApi } from '@/services/wellnessEventsApi';
 import { BienestarEvent } from '@/types/admin';
 import BienestarEventForm from '@/components/admin/bienestar/BienestarEventForm';
 
@@ -37,14 +37,14 @@ const AdminBienestarPage: React.FC = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  const { data: events = [], isLoading } = useQuery({
+  const { data: events = [], isLoading } = useQuery<BienestarEvent[]>({
     queryKey: ['bienestar-events'],
-    queryFn: bienestarApi.getEvents
+    queryFn: () => wellnessEventsApi.getEvents()
   });
 
   const toggleVisibilityMutation = useMutation({
     mutationFn: async (event: BienestarEvent) => {
-      return bienestarApi.updateEvent(event.id, { isVisible: !event.isVisible });
+      return wellnessEventsApi.toggleVisibility(event.id, !event.isVisible);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
@@ -55,14 +55,14 @@ const AdminBienestarPage: React.FC = () => {
     }
   });
 
-  const filteredEvents = events.filter(event => {
+  const filteredEvents = events.filter((event: BienestarEvent) => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || event.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ['all', ...new Set(events.map(event => event.category))];
+  const categories = ['all', ...new Set(events.map((event: BienestarEvent) => event.category))];
 
   const {
     currentPage,
