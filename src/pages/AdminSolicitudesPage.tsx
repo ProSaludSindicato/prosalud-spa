@@ -435,7 +435,7 @@ const AdminSolicitudesPage: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 onClick={() => toggleSort("name")}
-                                className="flex items-center gap-2 hover:bg-gray-100"
+                                className="flex items-center gap-2"
                               >
                                 Solicitante
                                 {sortBy === "name" ? (
@@ -455,7 +455,7 @@ const AdminSolicitudesPage: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 onClick={() => toggleSort("date")}
-                                className="flex items-center gap-2 hover:bg-gray-100"
+                                className="flex items-center gap-2"
                               >
                                 Fecha
                                 {sortBy === "date" ? (
@@ -482,7 +482,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                   </div>
                                   <div>
                                     <p className="font-medium text-gray-900">
-                                      {solicitud.name} {solicitud.last_name}
+                                      {solicitud.name} {solicitud.last_name} {solicitud.full_name}
                                     </p>
                                     <p className="text-sm text-gray-600">{solicitud.email}</p>
                                     <p className="text-xs text-gray-500">
