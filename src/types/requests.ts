@@ -1,15 +1,24 @@
-
 export interface Request {
   id: string;
-  request_type: 'certificado-convenio' | 'compensacion-anual' | 'descanso-laboral' | 'verificacion-pagos' | 'retiro-sindical' | 'actualizar-cuenta' | 'microcredito' | 'incapacidad-licencia' | 'permisos-turnos';
-  id_type: 'CC' | 'CE' | 'TI' | 'PP';
+  request_type:
+    | "certificado-convenio"
+    | "compensacion-anual"
+    | "descanso-laboral"
+    | "verificacion-pagos"
+    | "retiro-sindical"
+    | "actualizar-cuenta"
+    | "microcredito"
+    | "incapacidad-licencia"
+    | "permisos-turnos";
+  id_type: "CC" | "CE" | "TI" | "PP";
   id_number: string;
   name: string;
   last_name: string;
+  full_name: string;
   email: string;
   phone_number: string;
   payload: Record<string, any>;
-  status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
+  status: "pending" | "in_progress" | "resolved" | "rejected";
   created_at: string;
   processed_at?: string;
   resolved_at?: string;
