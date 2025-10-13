@@ -1357,7 +1357,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         // Add loading message
         const loadingMessage = {
             role: 'assistant',
-            content: 'Consultando información de tu incapacidad...',
+            content: '🔍 Consultando información de tu incapacidad...',
             isBot: true,
             isLoading: true
         }
@@ -1365,25 +1365,57 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         setMessages(prev => [...prev, loadingMessage])
 
         try {
-            // Use the mock service
-            const incapacidadData = await consultarIncapacidad(formData);
+            // Usar servicio real de API
+            const incapacidades = await consultarIncapacidad(formData);
 
-            const responseMessage = {
-                role: 'assistant',
-                content: generateIncapacidadResponse(incapacidadData),
-                isBot: true
+            let responseMessage;
+
+            if (!incapacidades || incapacidades.length === 0) {
+                // No se encontraron incapacidades
+                responseMessage = {
+                    role: 'assistant',
+                    content: generateNoDataResponse(),
+                    isBot: true
+                }
+            } else if (incapacidades.length === 1) {
+                // Una sola incapacidad encontrada
+                responseMessage = {
+                    role: 'assistant',
+                    content: generateIncapacidadResponse(incapacidades[0]),
+                    isBot: true
+                }
+            } else {
+                // Múltiples incapacidades - mostrar lista y preguntar cuál desea ver
+                responseMessage = {
+                    role: 'assistant',
+                    content: generateMultipleIncapacidadesResponse(incapacidades),
+                    isBot: true,
+                    multipleIncapacidades: incapacidades // Guardar para selección posterior
+                }
             }
 
             setMessages(prev => {
                 const newMessages = [...prev]
-                // Replace loading message with response
                 newMessages[newMessages.length - 1] = responseMessage
                 return newMessages
             })
+
         } catch (error) {
+            console.error('Error en consulta de incapacidad:', error);
+            
+            // Mensaje de error según el tipo
+            let errorContent;
+            if (error?.response?.status === 500) {
+                errorContent = generateServerErrorResponse();
+            } else if (error?.response?.status === 422) {
+                errorContent = generateValidationErrorResponse(error?.response?.data?.errors);
+            } else {
+                errorContent = generateGenericErrorResponse();
+            }
+
             const errorMessage = {
                 role: 'assistant',
-                content: generateErrorResponse(),
+                content: errorContent,
                 isBot: true
             }
 
@@ -1397,52 +1429,91 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         }
     }
 
-    const generateErrorResponse = () => {
-        return `❌ **Error en la consulta**
+    const generateNoDataResponse = () => {
+        return `ℹ️ **No se encontraron registros de incapacidad**
 
-Lo sentimos, ocurrió un problema al consultar la información de tu incapacidad. 
+No encontramos información de incapacidades asociadas al documento consultado.
 
-Por favor, intenta nuevamente en unos minutos o comunícate con nosotros para obtener asistencia.
-
-**Nota:** Esta consulta es confidencial y solo visible para ti.`;
-    }
-
-    const generateIncapacidadResponse = (data) => {
-        // Validar que los datos principales estén presentes
-        const hasMainData = data && (data.nombres || data.estado || data.radicado);
-
-        if (!hasMainData) {
-            return `❌ **No se encontró información de incapacidad**
-
-Lo sentimos, no pudimos encontrar información sobre tu incapacidad en nuestros registros. 
+**Posibles razones:**
+• No hay incapacidades registradas con estos datos
+• La información aún no ha sido procesada en el sistema
+• Los datos ingresados no coinciden con nuestros registros
 
 **¿Necesitas ayuda?**
-Por favor, comunícate con nosotros para verificar tu información y obtener el estado actualizado de tu solicitud.
+Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu solicitud.
 
-**Nota:** Esta consulta es confidencial y solo visible para ti.`;
-        }
+**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+    }
 
-        // Generar párrafo de resumen
-        let summary = '';
-        const estado = data.estado || 'DESCONOCIDO';
+    const generateServerErrorResponse = () => {
+        return `⚠️ **Servicio temporalmente no disponible**
 
-        switch (estado) {
-            case 'PAGADA':
-                summary = `Tu solicitud de incapacidad laboral del período ${data.fechaInicio || 'N/A'} a ${data.fechaFin || 'N/A'} ha sido procesada exitosamente y el pago${data.valor ? ` por valor de ${data.valor}` : ''} ha sido realizado. El proceso tardó desde la fecha de recepción${data.fechaRecibido ? ` (${data.fechaRecibido})` : ''} hasta la aprobación final.`;
-                break;
-            case 'EN_PROCESO':
-                summary = `Tu solicitud de incapacidad está actualmente en proceso de revisión. Fue recibida${data.fechaRecibido ? ` el ${data.fechaRecibido}` : ''} y nuestro equipo está trabajando en la verificación de la documentación.`;
-                break;
-            case 'PENDIENTE_DOCUMENTOS':
-                summary = `Tu solicitud de incapacidad requiere documentación adicional para completar el proceso. Por favor, revisa los requisitos y envía la información faltante.`;
-                break;
-            case 'RECHAZADA':
-                summary = `Tu solicitud de incapacidad ha sido revisada pero no cumple con los requisitos establecidos. Te recomendamos contactarnos para obtener más detalles sobre los motivos.`;
-                break;
-            default:
-                summary = `Hemos encontrado información sobre tu solicitud de incapacidad. Revisa los detalles a continuación.`;
-        }
+Lo sentimos, el sistema de consulta de incapacidades no está disponible en este momento.
 
+**¿Qué puedes hacer?**
+• Intenta nuevamente en unos minutos
+• Comunícate con nosotros para consultar directamente
+• Visita nuestra oficina para obtener información
+
+Lamentamos el inconveniente.
+
+**🔒 Nota:** Tus datos están seguros y no se han compartido.`;
+    }
+
+    const generateValidationErrorResponse = (errors) => {
+        return `❌ **Error en los datos ingresados**
+
+Hay un problema con la información proporcionada. Por favor verifica los datos e intenta nuevamente.
+
+Si el problema persiste, comunícate con nosotros para asistencia.`;
+    }
+
+    const generateGenericErrorResponse = () => {
+        return `❌ **Error en la consulta**
+
+Ocurrió un problema al procesar tu solicitud. 
+
+**¿Qué hacer?**
+• Verifica tu conexión a internet
+• Intenta nuevamente en unos momentos
+• Comunícate con nosotros si el problema persiste
+
+**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+    }
+
+    const generateMultipleIncapacidadesResponse = (incapacidades) => {
+        let response = `📋 **Se encontraron ${incapacidades.length} incapacidades registradas**
+
+A continuación se muestran tus incapacidades:\n\n`;
+
+        incapacidades.forEach((inc, index) => {
+            const statusIcon = inc.estado === 'PAGADA' ? '✅' : 
+                             inc.estado === 'EN_PROCESO' ? '🔄' : 
+                             inc.estado === 'PENDIENTE_DOCUMENTOS' ? '📋' : 
+                             inc.estado === 'RECHAZADA' ? '❌' : 'ℹ️';
+            
+            response += `**${index + 1}. ${statusIcon} Incapacidad**
+• Radicado: ${inc["N° Radicado"] || 'N/A'}
+• Período: ${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}
+• Días: ${inc["Dias Incapacidad"]}
+• Estado: ${inc.estado}
+${inc["valor Incapacidad Recibido"] ? `• Valor: ${inc["valor Incapacidad Recibido"]}` : ''}
+
+`;
+        });
+
+        response += `**¿Qué deseas hacer?**
+• Escribe el **número** de la incapacidad que deseas ver en detalle
+• O escribe **"todas"** para ver el detalle completo de todas
+
+**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+
+        return response;
+    }
+
+    const generateIncapacidadResponse = (incapacidad) => {
+        const estado = incapacidad.estado || 'DESCONOCIDO';
+        
         // Generar iconos según el estado
         const getStatusIcon = (status) => {
             switch (status) {
@@ -1455,55 +1526,45 @@ Por favor, comunícate con nosotros para verificar tu información y obtener el 
         };
 
         const statusIcon = getStatusIcon(estado);
-        const statusText = estado === 'PAGADA' ? 'PAGADA' :
-            estado === 'EN_PROCESO' ? 'EN PROCESO' :
-                estado === 'PENDIENTE_DOCUMENTOS' ? 'PENDIENTE DOCUMENTOS' :
-                    estado === 'RECHAZADA' ? 'RECHAZADA' : estado;
 
-        return `${statusIcon} **Tu incapacidad está ${statusText}**
-
-${summary}
-
-**📋 Detalles de tu incapacidad:**
-
+        return `${statusIcon} **Detalle de tu incapacidad - ${estado}**
 
 **👤 Datos personales:**
-
-• Nombre: ${data.nombres || 'No disponible'}
-
-• Cargo: ${data.cargo || 'No especificado'}
-
+• Nombre: ${incapacidad.Nombres}
+• Cargo: ${incapacidad.Cargo}
+• Tipo documento: ${incapacidad.Tipo}
+• Número documento: ${incapacidad["Numero Documento"]}
 
 **📅 Período de incapacidad:**
+• Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"]}
+• Fecha fin: ${incapacidad["Fecha Fin Incapacidad"]}
+• Total días: ${incapacidad["Dias Incapacidad"]}
+• Tipo: ${incapacidad["TIPO INCAPACIDAD"]}
+• Clasificación: ${incapacidad.CLASIFICACION}
 
-• Fecha inicio: ${data.fechaInicio || 'No disponible'}
+**🏥 Información médica:**
+• Código CIE-10: ${incapacidad["CODIGO CIE-10"]}
+• Hospital: ${incapacidad.Hospital}
+• Administradora: ${incapacidad.ADMINISTRADORA}
 
-• Fecha fin: ${data.fechaFin || 'No disponible'}
+**📄 Información administrativa:**
+• N° Radicado: ${incapacidad["N° Radicado"]}
+• Fecha recibido: ${incapacidad["fecha recibido"]}
+• Radicado adicional: ${incapacidad.RADICADO || 'N/A'}
+${incapacidad["FECHA ENVIO"] ? `• Fecha envío: ${incapacidad["FECHA ENVIO"]}` : ''}
 
-• Total días: ${data.dias || 'No especificado'}
+${incapacidad["valor Incapacidad Recibido"] ? `**💰 Información de pago:**
+• Valor recibido: ${incapacidad["valor Incapacidad Recibido"]}
+• Estado: ${estado}
 
+` : ''}**📊 Reportes:**
+• Reporte Factura: ${incapacidad["REPORTE FACTURA"] || 'N/A'}
+• Reporte VIVI: ${incapacidad["REPORTE VIVI"] || 'N/A'}
 
-${data.valor ? `**💰 Información de pago:**
+${incapacidad.detalles ? `**📝 Detalles adicionales:**
+${incapacidad.detalles}
 
-• Estado: ${statusText}
-
-• Valor recibido: ${data.valor}
-
-
-` : ''}**🏥 Entidad:**
-
-• Hospital: ${data.hospital || 'No especificado'}
-
-• Administradora: ${data.administradora || 'No especificada'}
-
-**📄 Detalles administrativos:**
-
-• N° Radicado: ${data.radicado || 'No disponible'}
-
-• Fecha de recibido: ${data.fechaRecibido || 'No disponible'}
-
-
-Si algún dato no coincide con tu información o tienes dudas sobre el proceso, puedes comunicarte con nosotros para más detalles.
+` : ''}Si tienes dudas sobre esta información, puedes comunicarte con nosotros para más detalles.
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`
     }
