@@ -14,13 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chatbot_rate_limits: {
+        Row: {
+          consecutive_messages: number | null
+          cooldown_until: string | null
+          created_at: string | null
+          id: string
+          last_message_at: string | null
+          message_count_day: number | null
+          message_count_hour: number | null
+          updated_at: string | null
+          user_agent: string | null
+          user_ip: string
+        }
+        Insert: {
+          consecutive_messages?: number | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count_day?: number | null
+          message_count_hour?: number | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_ip: string
+        }
+        Update: {
+          consecutive_messages?: number | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          message_count_day?: number | null
+          message_count_hour?: number | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_ip?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_old_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
