@@ -1184,17 +1184,29 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             const allWords = ['todas', 'todos', 'all', 'todo'];
             
             if (allWords.includes(trimmedInput)) {
-                // Obtener el nombre del primer registro para personalizar el saludo
-                const nombreAfiliado = lastBotMessage.multipleIncapacidades[0]?.Nombres || '';
+                // Obtener datos personales del primer registro
+                const firstIncapacidad = lastBotMessage.multipleIncapacidades[0];
+                const nombreAfiliado = firstIncapacidad?.Nombres || '';
                 
-                // Mostrar todas las incapacidades en detalle
+                // Datos personales (mostrados una sola vez al inicio)
+                const datosPersonales = `**👤 Datos personales:**
+- Nombre: ${firstIncapacidad?.Nombres || 'N/A'}
+${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ''}- Tipo documento: ${firstIncapacidad?.Tipo || 'N/A'}
+- Número documento: ${firstIncapacidad?.["Numero Documento"] || 'N/A'}
+
+`;
+                
+                // Mostrar todas las incapacidades en detalle (sin datos personales ni nota)
                 const allDetailsResponse = lastBotMessage.multipleIncapacidades.map((inc, index) => 
-                    `**Incapacidad #${index + 1}**\n\n${generateIncapacidadResponse(inc)}`
-                ).join('\n\n---\n\n');
+                    `**Incapacidad #${index + 1}**\n\n${generateIncapacidadResponse(inc, false, false)}`
+                ).join('\n---\n\n');
+
+                // Nota confidencial (mostrada una sola vez al final)
+                const notaConfidencial = `\n**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
 
                 const detailMessage = {
                     role: 'assistant',
-                    content: `¡Hola${nombreAfiliado ? ` ${nombreAfiliado}` : ''}! Como asistente de ProSalud, estoy aquí para ayudarte.\n\nSegún la información que me proporcionaste, aquí tienes el detalle completo de tus incapacidades:\n\n${allDetailsResponse}`,
+                    content: `¡Hola${nombreAfiliado ? ` ${nombreAfiliado}` : ''}! Como asistente de ProSalud, estoy aquí para ayudarte.\n\nSegún la información que me proporcionaste, aquí tienes el detalle completo de tus incapacidades:\n\n${datosPersonales}${allDetailsResponse}${notaConfidencial}`,
                     isBot: true,
                     isStreaming: false,
                     // Mantener el contexto de incapacidades para futuras preguntas
@@ -1590,7 +1602,8 @@ ${inc["valor Incapacidad Recibido"] ? `• Valor: ${inc["valor Incapacidad Recib
         return response;
     }
 
-    const generateIncapacidadResponse = (incapacidad) => {
+    // Generar respuesta completa de incapacidad (con datos personales y nota confidencial)
+    const generateIncapacidadResponse = (incapacidad, includePersonalData = true, includeConfidentialNote = true) => {
         const estado = incapacidad.estado || 'DESCONOCIDO';
         
         // Generar iconos según el estado
@@ -1606,46 +1619,66 @@ ${inc["valor Incapacidad Recibido"] ? `• Valor: ${inc["valor Incapacidad Recib
 
         const statusIcon = getStatusIcon(estado);
 
-        return `${statusIcon} **Detalle de tu incapacidad - ${estado}**
+        let response = `${statusIcon} **Detalle de tu incapacidad - ${estado}**\n\n`;
 
-**👤 Datos personales:**
-• Nombre: ${incapacidad.Nombres || 'N/A'}
-${incapacidad.Cargo ? `• Cargo: ${incapacidad.Cargo}` : ''}
-• Tipo documento: ${incapacidad.Tipo || 'N/A'}
-• Número documento: ${incapacidad["Numero Documento"] || 'N/A'}
+        // Datos personales (solo si se requiere)
+        if (includePersonalData) {
+            response += `**👤 Datos personales:**
+- Nombre: ${incapacidad.Nombres || 'N/A'}
+${incapacidad.Cargo ? `- Cargo: ${incapacidad.Cargo}\n` : ''}- Tipo documento: ${incapacidad.Tipo || 'N/A'}
+- Número documento: ${incapacidad["Numero Documento"] || 'N/A'}
 
-**📅 Período de incapacidad:**
-${incapacidad["fecha recibido"] ? `• Fecha recibido: ${incapacidad["fecha recibido"]}` : ''}
-• Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"] || 'N/A'}
-• Fecha fin: ${incapacidad["Fecha Fin Incapacidad"] || 'N/A'}
-• Total días: ${incapacidad["Dias Incapacidad"] || 'N/A'}
-${incapacidad["TIPO INCAPACIDAD"] ? `• Tipo: ${incapacidad["TIPO INCAPACIDAD"]}` : ''}
-${incapacidad.CLASIFICACION ? `• Clasificación: ${incapacidad.CLASIFICACION}` : ''}
+`;
+        }
 
-**🏥 Información médica:**
-• Código CIE-10: ${incapacidad["CODIGO CIE-10"] || 'N/A'}
-${incapacidad.Hospital ? `• Hospital: ${incapacidad.Hospital}` : ''}
-${incapacidad.ADMINISTRADORA ? `• Administradora: ${incapacidad.ADMINISTRADORA}` : ''}
+        // Período de incapacidad
+        response += `**📅 Período de incapacidad:**
+${incapacidad["fecha recibido"] ? `- Fecha recibido: ${incapacidad["fecha recibido"]}\n` : ''}- Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"] || 'N/A'}
+- Fecha fin: ${incapacidad["Fecha Fin Incapacidad"] || 'N/A'}
+- Total días: ${incapacidad["Dias Incapacidad"] || 'N/A'}
+${incapacidad["TIPO INCAPACIDAD"] ? `- Tipo: ${incapacidad["TIPO INCAPACIDAD"]}\n` : ''}${incapacidad.CLASIFICACION ? `- Clasificación: ${incapacidad.CLASIFICACION}\n` : ''}
+`;
 
-**📄 Información administrativa:**
-• N° Radicado: ${incapacidad["N° Radicado"] || 'N/A'}
-${incapacidad.RADICADO ? `• Radicado adicional: ${incapacidad.RADICADO}` : ''}
-${incapacidad["FECHA ENVIO"] ? `• Fecha envío: ${incapacidad["FECHA ENVIO"]}` : ''}
+        // Información médica
+        response += `**🏥 Información médica:**
+- Código CIE-10: ${incapacidad["CODIGO CIE-10"] || 'N/A'}
+${incapacidad.Hospital ? `- Hospital: ${incapacidad.Hospital}\n` : ''}${incapacidad.ADMINISTRADORA ? `- Administradora: ${incapacidad.ADMINISTRADORA}\n` : ''}
+`;
 
-${incapacidad["valor Incapacidad Recibido"] ? `**💰 Información de pago:**
-• Valor recibido: ${incapacidad["valor Incapacidad Recibido"]}
-• Estado: ${estado}
+        // Información administrativa
+        response += `**📄 Información administrativa:**
+- N° Radicado: ${incapacidad["N° Radicado"] || 'N/A'}
+${incapacidad.RADICADO ? `- Radicado adicional: ${incapacidad.RADICADO}\n` : ''}${incapacidad["FECHA ENVIO"] ? `- Fecha envío: ${incapacidad["FECHA ENVIO"]}\n` : ''}
+`;
 
-` : ''}**📊 Reportes:**
-${incapacidad["REPORTE FACTURA"] ? `• Reporte Factura: ${incapacidad["REPORTE FACTURA"]}` : ''}
-${incapacidad["REPORTE VIVI"] ? `• Reporte VIVI: ${incapacidad["REPORTE VIVI"]}` : ''}
+        // Información de pago
+        if (incapacidad["valor Incapacidad Recibido"]) {
+            response += `**💰 Información de pago:**
+- Valor recibido: ${incapacidad["valor Incapacidad Recibido"]}
+- Estado: ${estado}
 
-${incapacidad.detalles ? `**📝 Detalles adicionales:**
+`;
+        }
+
+        // Detalles adicionales
+        if (incapacidad.detalles) {
+            response += `**📝 Detalles adicionales:**
 ${incapacidad.detalles}
 
-` : ''}Si tienes dudas sobre esta información, puedes comunicarte con nosotros para más detalles.
+`;
+        }
 
-**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`
+        // Mensaje de ayuda (solo si incluye datos personales, es decir, es una vista individual)
+        if (includePersonalData) {
+            response += `Si tienes dudas sobre esta información, puedes comunicarte con nosotros para más detalles.\n\n`;
+        }
+
+        // Nota confidencial (solo si se requiere)
+        if (includeConfidentialNote) {
+            response += `**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+        }
+
+        return response;
     }
 
     const closeIncapacidadForm = () => {
