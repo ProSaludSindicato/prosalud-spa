@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Download, FileText, FileSpreadsheet, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { mockRequests, requestTypeLabels, statusLabels } from '@/data/requestsMock';
+import { requestsService } from '@/services/requestsServiceApi';
 import { generateRequestsPDFReport } from './utils/requestsPdfGenerator';
 import { generateRequestsExcelReport } from './utils/requestsExcelGenerator';
 import * as XLSX from 'xlsx';
@@ -68,13 +68,16 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
     
     try {
       console.log('Starting export process...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Fetch real data from API
+      const allRequests = await requestsService.getRequests();
+      console.log('Fetched requests from API:', allRequests.length);
 
-      let filteredRequests = mockRequests;
+      let filteredRequests = allRequests;
       
       // Filter by date range if specified
       if (!dateRange.includeAll && dateRange.start && dateRange.end) {
-        filteredRequests = mockRequests.filter(request => {
+        filteredRequests = allRequests.filter(request => {
           const requestDate = new Date(request.created_at);
           return requestDate >= dateRange.start! && requestDate <= dateRange.end!;
         });
@@ -111,7 +114,7 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
       console.error('Export error:', error);
       toast({
         title: "Error al Generar Reporte",
-        description: error instanceof Error ? error.message : "Hubo un problema al generar el reporte. Inténtalo de nuevo.",
+        description: error instanceof Error ? error.message : "No se pudo conectar con el servidor. Verifique su conexión.",
         variant: "destructive",
         duration: 4000,
       });

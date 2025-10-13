@@ -14,12 +14,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import AdminLayout from '@/components/admin/AdminLayout';
 import UserFormModal from '@/components/admin/usuarios/UserFormModal';
 import UserStatusConfirmationDialog from '@/components/admin/usuarios/UserStatusConfirmationDialog';
-import BackendStatusIndicator from '@/components/admin/common/BackendStatusIndicator';
 import UserAvatar from '@/components/admin/UserAvatar';
 import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { usersApi } from '@/services/adminApi';
 import { User } from '@/types/admin';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const AdminUsuariosPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -117,12 +118,9 @@ const AdminUsuariosPage: React.FC = () => {
                       <Users className="h-8 w-8 text-primary-prosalud" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <CardTitle className="text-3xl font-bold text-primary-prosalud">
-                          Gestión de Usuarios
-                        </CardTitle>
-                        <BackendStatusIndicator />
-                      </div>
+                      <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                        Gestión de Usuarios
+                      </CardTitle>
                       <CardDescription className="text-base mt-2">
                         Administra los usuarios del panel administrativo
                       </CardDescription>
@@ -192,9 +190,18 @@ const AdminUsuariosPage: React.FC = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-prosalud"></div>
                 </div>
               ) : error ? (
-                <div className="text-center py-8 text-red-600">
-                  Error al cargar los usuarios
-                </div>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error de conexión</AlertTitle>
+                  <AlertDescription>
+                    No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.
+                    {error instanceof Error && (
+                      <div className="mt-2 text-sm">
+                        Detalles: {error.message}
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <div className="space-y-4">
                   {paginatedUsers.map((user) => (

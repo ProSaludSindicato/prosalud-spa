@@ -19,8 +19,13 @@ import {
   CheckCircle,
   TrendingUp,
   Users,
-  Brush
+  Brush,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import DataPagination from '@/components/ui/data-pagination';
@@ -41,17 +46,19 @@ const AdminSolicitudesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const { toast } = useToast();
 
   // Fetch all requests from API
-  const { data: allSolicitudes = [], isLoading, refetch } = useQuery({
+  const { data: allSolicitudes = [], isLoading, error, refetch } = useQuery({
     queryKey: ['admin-solicitudes'],
     queryFn: requestsService.getRequests,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Filter requests locally for better performance
+  // Filter and sort requests locally for better performance
   const filteredSolicitudes = useMemo(() => {
     let filtered = [...allSolicitudes];
 
@@ -77,8 +84,25 @@ const AdminSolicitudesPage: React.FC = () => {
       filtered = filtered.filter(request => request.request_type === selectedType);
     }
 
+    // Apply sorting
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        const nameA = `${a.name} ${a.last_name}`.toLowerCase();
+        const nameB = `${b.name} ${b.last_name}`.toLowerCase();
+        return sortOrder === 'asc' 
+          ? nameA.localeCompare(nameB)
+          : nameB.localeCompare(nameA);
+      } else {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return sortOrder === 'asc' 
+          ? dateA - dateB
+          : dateB - dateA;
+      }
+    });
+
     return filtered;
-  }, [allSolicitudes, searchTerm, selectedStatus, selectedType]);
+  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, sortBy, sortOrder]);
 
   // Fetch stats
   const { data: stats } = useQuery({
@@ -194,6 +218,15 @@ const AdminSolicitudesPage: React.FC = () => {
     setSearchTerm('');
     setSelectedStatus('all');
     setSelectedType('all');
+  };
+
+  const toggleSort = (column: 'name' | 'date') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
   };
 
   return (
@@ -389,16 +422,55 @@ const AdminSolicitudesPage: React.FC = () => {
               <CardContent>
                 {isLoading ? (
                   <TableLoadingSkeleton />
+                ) : error ? (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error de conexión</AlertTitle>
+                    <AlertDescription>
+                      No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.
+                      {error instanceof Error && (
+                        <div className="mt-2 text-sm">
+                          Detalles: {error.message}
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
                 ) : (
                   <>
                     <div className="rounded-md border overflow-hidden">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gray-50">
-                            <TableHead className="w-1/4">Solicitante</TableHead>
+                            <TableHead className="w-1/4">
+                              <Button
+                                variant="ghost"
+                                onClick={() => toggleSort('name')}
+                                className="flex items-center gap-2 hover:bg-gray-100"
+                              >
+                                Solicitante
+                                {sortBy === 'name' ? (
+                                  sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                )}
+                              </Button>
+                            </TableHead>
                             <TableHead className="w-1/5">Tipo</TableHead>
                             <TableHead className="w-1/6">Estado</TableHead>
-                            <TableHead className="w-1/6">Fecha</TableHead>
+                            <TableHead className="w-1/6">
+                              <Button
+                                variant="ghost"
+                                onClick={() => toggleSort('date')}
+                                className="flex items-center gap-2 hover:bg-gray-100"
+                              >
+                                Fecha
+                                {sortBy === 'date' ? (
+                                  sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                )}
+                              </Button>
+                            </TableHead>
                             <TableHead className="w-16">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>

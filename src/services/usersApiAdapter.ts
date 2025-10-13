@@ -1,6 +1,5 @@
 import { User, CreateUserData, UpdateUserData, PaginatedResponse } from '@/types/admin';
 import { realUsersApi, BackendUser, BackendPaginatedResponse } from './realUsersApi';
-import { usersService } from './usersService'; // Fallback to mock data
 
 // Adapter functions to convert between backend and frontend formats
 function adaptBackendUserToFrontend(backendUser: BackendUser): User {
@@ -28,61 +27,36 @@ function adaptBackendPaginationToFrontend<T>(
   };
 }
 
-// API adapter that implements the expected interface with fallback to mock data
+// API adapter that connects to real backend only - no mock fallbacks
 export const usersApiAdapter = {
   async getUsers(page = 1, pageSize = 10, search = '', status = ''): Promise<PaginatedResponse<User>> {
-    try {
-      const backendResponse = await realUsersApi.getUsers(page, search, status);
-      return adaptBackendPaginationToFrontend(backendResponse);
-    } catch (error) {
-      console.warn('🔄 Fallback to mock data - Backend not available:', error);
-      return usersService.getUsers(page, pageSize, search, status);
-    }
+    const backendResponse = await realUsersApi.getUsers(page, search, status);
+    return adaptBackendPaginationToFrontend(backendResponse);
   },
 
   async getUserById(id: string): Promise<User | null> {
-    try {
-      const backendUser = await realUsersApi.getUserById(id);
-      return adaptBackendUserToFrontend(backendUser);
-    } catch (error) {
-      console.warn('🔄 Fallback to mock data - Backend not available:', error);
-      return usersService.getUserById(id);
-    }
+    const backendUser = await realUsersApi.getUserById(id);
+    return adaptBackendUserToFrontend(backendUser);
   },
 
   async createUser(userData: CreateUserData): Promise<User> {
-    try {
-      const backendUser = await realUsersApi.createUser(userData);
-      return adaptBackendUserToFrontend(backendUser);
-    } catch (error) {
-      console.warn('🔄 Fallback to mock data - Backend not available:', error);
-      return usersService.createUser(userData);
-    }
+    const backendUser = await realUsersApi.createUser(userData);
+    return adaptBackendUserToFrontend(backendUser);
   },
 
   async updateUser(id: string, userData: UpdateUserData): Promise<User> {
-    try {
-      const updateData: { name?: string; email?: string; is_active?: boolean } = {};
-      
-      if (userData.name !== undefined) updateData.name = userData.name;
-      if (userData.email !== undefined) updateData.email = userData.email;
-      if (userData.isActive !== undefined) updateData.is_active = userData.isActive;
+    const updateData: { name?: string; email?: string; is_active?: boolean } = {};
+    
+    if (userData.name !== undefined) updateData.name = userData.name;
+    if (userData.email !== undefined) updateData.email = userData.email;
+    if (userData.isActive !== undefined) updateData.is_active = userData.isActive;
 
-      const backendUser = await realUsersApi.updateUser(id, updateData);
-      return adaptBackendUserToFrontend(backendUser);
-    } catch (error) {
-      console.warn('🔄 Fallback to mock data - Backend not available:', error);
-      return usersService.updateUser(id, userData);
-    }
+    const backendUser = await realUsersApi.updateUser(id, updateData);
+    return adaptBackendUserToFrontend(backendUser);
   },
 
   async toggleUserStatus(id: string): Promise<User> {
-    try {
-      const backendUser = await realUsersApi.toggleUserStatus(id);
-      return adaptBackendUserToFrontend(backendUser);
-    } catch (error) {
-      console.warn('🔄 Fallback to mock data - Backend not available:', error);
-      return usersService.toggleUserStatus(id);
-    }
+    const backendUser = await realUsersApi.toggleUserStatus(id);
+    return adaptBackendUserToFrontend(backendUser);
   },
 };
