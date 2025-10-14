@@ -104,25 +104,48 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
  */
 export async function getWellnessEvents(filters?: WellnessEventFilters): Promise<BienestarEvent[]> {
   try {
+    console.log('🔍 [GET] Solicitando eventos de bienestar:', { filters, url: '/api/wellness-events' });
+    
     const response = await api.get<PaginatedWellnessEvents>('/api/wellness-events', {
       params: filters
     });
     
+    console.log('✅ [GET] Respuesta exitosa:', { 
+      status: response.status, 
+      statusText: response.statusText,
+      data: response.data 
+    });
+    
     // Validar que la respuesta tenga la estructura esperada
     if (!response.data || !response.data.data) {
-      console.warn('Respuesta de la API sin datos esperados:', response.data);
+      console.warn('⚠️ Respuesta de la API sin datos esperados:', response.data);
       return [];
     }
     
-    return response.data.data.map(mapToBienestarEvent);
+    const mappedEvents = response.data.data.map(mapToBienestarEvent);
+    console.log('📦 Eventos mapeados:', mappedEvents.length);
+    
+    return mappedEvents;
   } catch (error: any) {
-    console.error('Error al obtener eventos de bienestar:', error);
+    console.error('❌ [GET] Error al obtener eventos de bienestar:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+      fullError: error
+    });
     
     // Mostrar mensaje específico según el tipo de error
     if (error.response?.status === 404) {
-      console.error('Endpoint no encontrado. Verifica que el backend esté configurado correctamente.');
+      console.error('🔴 Endpoint no encontrado. Verifica que el backend esté configurado correctamente.');
     } else if (error.response?.status === 500) {
-      console.error('Error del servidor al obtener eventos.');
+      console.error('🔴 Error del servidor al obtener eventos.');
+    } else if (error.code === 'ERR_NETWORK') {
+      console.error('🔴 Error de red: No se pudo conectar al servidor. Verifica la URL base:', error.config?.baseURL);
     }
     
     // Retornar array vacío en caso de error para evitar crashes
@@ -148,6 +171,11 @@ export async function getWellnessEvent(id: number | string): Promise<BienestarEv
  */
 export async function createWellnessEvent(data: CreateWellnessEventData): Promise<BienestarEvent> {
   try {
+    console.log('📤 [POST] Creando evento de bienestar:', {
+      data,
+      url: '/api/wellness-events'
+    });
+    
     const formData = new FormData();
     
     // Agregar campos requeridos
@@ -167,7 +195,13 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       data.images.forEach((file, index) => {
         formData.append(`images[${index}]`, file);
       });
+      console.log('📸 Adjuntando imágenes:', data.images.length);
     }
+    
+    console.log('📋 FormData enviado:', Array.from(formData.entries()).map(([key, value]) => ({
+      key,
+      value: value instanceof File ? `File: ${value.name}` : value
+    })));
     
     const response = await api.post<WellnessEventResponse>(
       '/api/wellness-events',
@@ -179,9 +213,28 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       }
     );
     
-    return mapToBienestarEvent(response.data);
-  } catch (error) {
-    console.error('Error al crear evento:', error);
+    console.log('✅ [POST] Evento creado exitosamente:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data
+    });
+    
+    const mappedEvent = mapToBienestarEvent(response.data);
+    console.log('📦 Evento mapeado:', mappedEvent);
+    
+    return mappedEvent;
+  } catch (error: any) {
+    console.error('❌ [POST] Error al crear evento:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+      fullError: error
+    });
     throw error;
   }
 }
@@ -194,6 +247,12 @@ export async function updateWellnessEvent(
   data: UpdateWellnessEventData
 ): Promise<BienestarEvent> {
   try {
+    console.log('📝 [PUT] Actualizando evento:', {
+      id,
+      data,
+      url: `/api/wellness-events/${id}`
+    });
+    
     const formData = new FormData();
     
     // Agregar solo los campos que se van a actualizar
@@ -211,7 +270,13 @@ export async function updateWellnessEvent(
       data.images.forEach((file, index) => {
         formData.append(`images[${index}]`, file);
       });
+      console.log('📸 Actualizando imágenes:', data.images.length);
     }
+    
+    console.log('📋 FormData enviado:', Array.from(formData.entries()).map(([key, value]) => ({
+      key,
+      value: value instanceof File ? `File: ${value.name}` : value
+    })));
     
     const response = await api.put<WellnessEventResponse>(
       `/api/wellness-events/${id}`,
@@ -223,9 +288,23 @@ export async function updateWellnessEvent(
       }
     );
     
+    console.log('✅ [PUT] Evento actualizado exitosamente:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data
+    });
+    
     return mapToBienestarEvent(response.data);
-  } catch (error) {
-    console.error('Error al actualizar evento:', error);
+  } catch (error: any) {
+    console.error('❌ [PUT] Error al actualizar evento:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      fullError: error
+    });
     throw error;
   }
 }
@@ -238,6 +317,12 @@ export async function toggleWellnessEventVisibility(
   isVisible: boolean
 ): Promise<BienestarEvent> {
   try {
+    console.log('🔄 [PATCH] Cambiando visibilidad:', {
+      id,
+      isVisible,
+      url: `/api/wellness-events/${id}/visibility`
+    });
+    
     const response = await api.patch<WellnessEventResponse>(
       `/api/wellness-events/${id}/visibility`,
       { is_visible: isVisible },
@@ -248,9 +333,20 @@ export async function toggleWellnessEventVisibility(
       }
     );
     
+    console.log('✅ [PATCH] Visibilidad cambiada exitosamente:', {
+      status: response.status,
+      data: response.data
+    });
+    
     return mapToBienestarEvent(response.data);
-  } catch (error) {
-    console.error('Error al cambiar visibilidad del evento:', error);
+  } catch (error: any) {
+    console.error('❌ [PATCH] Error al cambiar visibilidad:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      data: error.response?.data,
+      fullError: error
+    });
     throw error;
   }
 }
