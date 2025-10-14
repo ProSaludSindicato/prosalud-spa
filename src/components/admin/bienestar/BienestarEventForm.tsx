@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from '@/services/wellnessEventsApi';
 import { BienestarEvent, CreateBienestarEventData } from '@/types/admin';
@@ -302,33 +303,20 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const categories = ['Salud', 'Bienestar', 'Capacitación', 'Recreación', 'Cultura', 'Deporte'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-8"
-        >
-          {/* Header compacto */}
-          <div className="flex items-center gap-6 mb-8">
-            <Button
-              variant="ghost"
-              onClick={onClose}
-              className="rounded-full h-12 w-12 shrink-0"
-            >
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800">
-                {event ? 'Editar Evento' : 'Nuevo Evento'} de Bienestar
-              </h1>
-              <p className="text-slate-600 mt-1">
-                {event ? 'Modifica los detalles del evento' : 'Crea un nuevo evento para la galería de bienestar'}
-              </p>
-            </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0">
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <div className="space-y-2">
+            <DialogTitle className="text-2xl font-bold text-slate-800">
+              {event ? 'Editar Evento' : 'Nuevo Evento'} de Bienestar
+            </DialogTitle>
+            <DialogDescription className="text-slate-600">
+              {event ? 'Modifica los detalles del evento' : 'Crea un nuevo evento para la galería de bienestar'}
+            </DialogDescription>
           </div>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Columna izquierda */}
             <div className="space-y-6">
               {/* Información Básica */}
@@ -608,9 +596,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
               </div>
             </div>
           </form>
-        </motion.div>
-      </div>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

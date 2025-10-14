@@ -114,15 +114,6 @@ const AdminBienestarPage: React.FC = () => {
     }
   };
 
-  if (showForm) {
-    return (
-      <BienestarEventForm
-        event={selectedEvent}
-        onClose={handleFormClose}
-      />
-    );
-  }
-
   return (
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
@@ -318,6 +309,14 @@ const AdminBienestarPage: React.FC = () => {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Modal del Formulario */}
+      {showForm && (
+        <BienestarEventForm
+          event={selectedEvent}
+          onClose={handleFormClose}
+        />
+      )}
     </AdminLayout>
   );
 };
