@@ -1,49 +1,53 @@
-
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Upload, X, Plus, Star, Image as ImageIcon, MapPin, Users, Gift } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from '@/services/wellnessEventsApi';
-import { BienestarEvent, CreateBienestarEventData } from '@/types/admin';
-import { baseNameValidation, baseTextValidation, baseCategoryValidation, numberValidation } from '@/hooks/useFormValidation';
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { ArrowLeft, Upload, X, Plus, Star, Image as ImageIcon, MapPin, Users, Gift } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
+import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
+import {
+  baseNameValidation,
+  baseTextValidation,
+  baseCategoryValidation,
+  numberValidation,
+} from "@/hooks/useFormValidation";
 
 const formSchema = z.object({
-  title: z.string()
-    .min(1, 'El título es obligatorio')
-    .max(255, 'El título no puede exceder 255 caracteres')
-    .trim(),
-  date: z.string()
-    .min(1, 'La fecha es obligatoria')
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha no tiene un formato válido'),
-  category: z.string()
-    .min(1, 'La categoría es obligatoria')
-    .max(255, 'La categoría no puede exceder 255 caracteres')
+  title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
+  date: z
+    .string()
+    .min(1, "La fecha es obligatoria")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha no tiene un formato válido"),
+  category: z
+    .string()
+    .min(1, "La categoría es obligatoria")
+    .max(255, "La categoría no puede exceder 255 caracteres")
     .trim(),
   description: z.string().optional(),
-  location: z.string()
-    .min(1, 'La ubicación es obligatoria')
-    .max(255, 'La ubicación no puede exceder 255 caracteres')
+  location: z
+    .string()
+    .min(1, "La ubicación es obligatoria")
+    .max(255, "La ubicación no puede exceder 255 caracteres")
     .trim(),
-  attendees: z.number()
-    .int('El número de asistentes debe ser un número entero')
-    .min(0, 'El número de asistentes no puede ser negativo')
+  attendees: z
+    .number()
+    .int("El número de asistentes debe ser un número entero")
+    .min(0, "El número de asistentes no puede ser negativo")
     .optional(),
-  gift: z.string()
-    .max(255, 'El obsequio no puede exceder 255 caracteres')
-    .optional(),
-  provider: z.string()
-    .max(255, 'El proveedor no puede exceder 255 caracteres')
-    .refine((val) => !val || val === 'ProSalud', 'El proveedor seleccionado no es válido')
+  gift: z.string().max(255, "El obsequio no puede exceder 255 caracteres").optional(),
+  provider: z
+    .string()
+    .max(255, "El proveedor no puede exceder 255 caracteres")
+    .refine((val) => !val || val === "ProSalud", "El proveedor seleccionado no es válido")
     .optional(),
 });
 
@@ -64,158 +68,163 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: event?.title || '',
-      date: event?.date || '',
-      category: event?.category || '',
-      description: event?.description || '',
-      location: event?.location || '',
+      title: event?.title || "",
+      date: event?.date || "",
+      category: event?.category || "",
+      description: event?.description || "",
+      location: event?.location || "",
       attendees: event?.attendees || undefined,
-      gift: event?.gift || '',
-      provider: event?.provider || 'ProSalud',
-    }
+      gift: event?.gift || "",
+      provider: event?.provider || "ProSalud",
+    },
   });
 
   useEffect(() => {
     if (event && event.images.length > 0) {
-      const previews = event.images.map(img => img.url);
+      const previews = event.images.map((img) => img.url);
       setImagePreviews(previews);
-      setMainImageIndex(event.images.findIndex(img => img.isMain));
+      setMainImageIndex(event.images.findIndex((img) => img.isMain));
     }
   }, [event]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateWellnessEventData) => wellnessEventsApi.createEvent(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
+      queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
       toast({
         title: "Evento creado",
         description: "El evento de bienestar ha sido creado exitosamente.",
-        variant: "default"
+        variant: "default",
       });
       onClose();
     },
     onError: (error: any) => {
-      console.error('Error al crear evento:', error);
-      
+      console.error("Error al crear evento:", error);
+
       // Manejar errores de validación (422)
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const errors = error.response.data.errors;
         const errorMessages = Object.entries(errors)
-          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(', ')}`)
-          .join('\n');
-        
+          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(", ")}`)
+          .join("\n");
+
         toast({
           title: "Error de validación",
           description: errorMessages || error.response?.data?.message,
-          variant: "destructive"
+          variant: "destructive",
         });
       } else if (error.response?.status === 404) {
         toast({
           title: "Endpoint no encontrado",
           description: "La ruta del API no existe. Verifica la configuración del backend.",
-          variant: "destructive"
+          variant: "destructive",
         });
-      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
         toast({
           title: "Error de conexión",
           description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
-          variant: "destructive"
+          variant: "destructive",
         });
       } else {
         toast({
           title: "Error al crear evento",
-          description: error.response?.data?.message || error.message || "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
-          variant: "destructive"
+          description:
+            error.response?.data?.message ||
+            error.message ||
+            "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
+          variant: "destructive",
         });
       }
     },
     onSettled: () => {
       // Esto se ejecuta siempre, independientemente de si fue exitoso o error
-      console.log('Mutation settled');
-    }
+      console.log("Mutation settled");
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateWellnessEventData) => 
-      wellnessEventsApi.updateEvent(event!.id, data),
+    mutationFn: (data: UpdateWellnessEventData) => wellnessEventsApi.updateEvent(event!.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
+      queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
       toast({
         title: "Evento actualizado",
         description: "El evento de bienestar ha sido actualizado exitosamente.",
-        variant: "default"
+        variant: "default",
       });
       onClose();
     },
     onError: (error: any) => {
-      console.error('Error al actualizar evento:', error);
-      
+      console.error("Error al actualizar evento:", error);
+
       // Manejar errores de validación (422)
       if (error.response?.status === 422 && error.response?.data?.errors) {
         const errors = error.response.data.errors;
         const errorMessages = Object.entries(errors)
-          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(', ')}`)
-          .join('\n');
-        
+          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(", ")}`)
+          .join("\n");
+
         toast({
           title: "Error de validación",
           description: errorMessages || error.response?.data?.message,
-          variant: "destructive"
+          variant: "destructive",
         });
       } else if (error.response?.status === 404) {
         toast({
           title: "Evento no encontrado",
           description: "El evento que intentas actualizar no existe.",
-          variant: "destructive"
+          variant: "destructive",
         });
-      } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
         toast({
           title: "Error de conexión",
           description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
-          variant: "destructive"
+          variant: "destructive",
         });
       } else {
         toast({
           title: "Error al actualizar evento",
-          description: error.response?.data?.message || error.message || "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
-          variant: "destructive"
+          description:
+            error.response?.data?.message ||
+            error.message ||
+            "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
+          variant: "destructive",
         });
       }
     },
     onSettled: () => {
-      console.log('Update mutation settled');
-    }
+      console.log("Update mutation settled");
+    },
   });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     if (images.length + files.length > 20) {
       toast({
         title: "Límite excedido",
         description: "Máximo 20 imágenes permitidas.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     // Validar cada archivo según las reglas del backend
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/webp"];
     for (const file of files) {
       if (!file || !(file instanceof File)) {
         toast({
           title: "Archivo inválido",
           description: "Cada elemento debe ser un archivo válido.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "Archivo inválido",
           description: "Cada archivo debe ser una imagen válida.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -224,7 +233,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         toast({
           title: "Formato no válido",
           description: "Las imágenes deben ser de tipo: jpeg, png, jpg, gif, webp.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -233,30 +242,30 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         toast({
           title: "Archivo muy grande",
           description: `Cada imagen no puede exceder 5MB. ${file.name} es muy grande.`,
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
     }
 
-    setImages(prev => [...prev, ...files]);
-    
-    files.forEach(file => {
+    setImages((prev) => [...prev, ...files]);
+
+    files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreviews(prev => [...prev, e.target?.result as string]);
+        setImagePreviews((prev) => [...prev, e.target?.result as string]);
       };
       reader.readAsDataURL(file);
     });
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
     if (mainImageIndex === index) {
       setMainImageIndex(0);
     } else if (mainImageIndex > index) {
-      setMainImageIndex(prev => prev - 1);
+      setMainImageIndex((prev) => prev - 1);
     }
   };
 
@@ -265,7 +274,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       toast({
         title: "Imágenes requeridas",
         description: "Debes subir al menos una imagen.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -276,7 +285,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         title: data.title,
         date: data.date,
         category: data.category,
-        location: data.location || '',
+        location: data.location || "",
         description: data.description,
         attendees: data.attendees,
         gift: data.gift,
@@ -289,7 +298,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         title: data.title,
         date: data.date,
         category: data.category,
-        location: data.location || '',
+        location: data.location || "",
         description: data.description,
         attendees: data.attendees,
         gift: data.gift,
@@ -300,19 +309,19 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     }
   };
 
-  const categories = ['Salud', 'Bienestar', 'Capacitación', 'Recreación', 'Cultura', 'Deporte'];
+  const categories = ["Salud", "Bienestar", "Capacitación", "Recreación", "Cultura", "Deporte"];
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0 bg-white">
         <div className="p-6 space-y-6">
           {/* Header */}
           <div className="space-y-2">
             <DialogTitle className="text-2xl font-bold text-slate-800">
-              {event ? 'Editar Evento' : 'Nuevo Evento'} de Bienestar
+              {event ? "Editar Evento" : "Nuevo Evento"} de Bienestar
             </DialogTitle>
             <DialogDescription className="text-slate-600">
-              {event ? 'Modifica los detalles del evento' : 'Crea un nuevo evento para la galería de bienestar'}
+              {event ? "Modifica los detalles del evento" : "Crea un nuevo evento para la galería de bienestar"}
             </DialogDescription>
           </div>
 
@@ -339,7 +348,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Input
                       id="title"
-                      {...form.register('title')}
+                      {...form.register("title")}
                       className="h-10"
                       placeholder="Ej: Jornada de Vacunación 2024"
                     />
@@ -353,12 +362,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       <Label htmlFor="date" className="text-sm font-medium">
                         Fecha *
                       </Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        {...form.register('date')}
-                        className="h-10"
-                      />
+                      <Input id="date" type="date" {...form.register("date")} className="h-10" />
                       {form.formState.errors.date && (
                         <p className="text-destructive text-sm">{form.formState.errors.date.message}</p>
                       )}
@@ -369,12 +373,14 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       </Label>
                       <select
                         id="category"
-                        {...form.register('category')}
+                        {...form.register("category")}
                         className="w-full h-10 px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       >
                         <option value="">Seleccionar</option>
-                        {categories.map(category => (
-                          <option key={category} value={category}>{category}</option>
+                        {categories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
                         ))}
                       </select>
                       {form.formState.errors.category && (
@@ -389,7 +395,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Textarea
                       id="description"
-                      {...form.register('description')}
+                      {...form.register("description")}
                       rows={3}
                       className="resize-none text-sm"
                       placeholder="Describe los detalles del evento..."
@@ -421,7 +427,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Input
                       id="location"
-                      {...form.register('location')}
+                      {...form.register("location")}
                       className="h-10"
                       placeholder="Ej: Sede Principal"
                     />
@@ -440,7 +446,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                         type="number"
                         min="1"
                         max="10000"
-                        {...form.register('attendees', { valueAsNumber: true })}
+                        {...form.register("attendees", { valueAsNumber: true })}
                         className="h-10"
                         placeholder="150"
                       />
@@ -452,12 +458,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       <Label htmlFor="provider" className="text-sm font-medium">
                         Organizador
                       </Label>
-                      <Input
-                        id="provider"
-                        {...form.register('provider')}
-                        placeholder="ProSalud"
-                        className="h-10"
-                      />
+                      <Input id="provider" {...form.register("provider")} placeholder="ProSalud" className="h-10" />
                       {form.formState.errors.provider && (
                         <p className="text-destructive text-sm">{form.formState.errors.provider.message}</p>
                       )}
@@ -468,12 +469,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     <Label htmlFor="gift" className="text-sm font-medium">
                       Obsequio
                     </Label>
-                    <Input
-                      id="gift"
-                      {...form.register('gift')}
-                      className="h-10"
-                      placeholder="Ej: Kit de bienestar"
-                    />
+                    <Input id="gift" {...form.register("gift")} className="h-10" placeholder="Ej: Kit de bienestar" />
                     {form.formState.errors.gift && (
                       <p className="text-destructive text-sm">{form.formState.errors.gift.message}</p>
                     )}
@@ -533,7 +529,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                                   onClick={() => setMainImageIndex(index)}
                                   className="h-7 w-7 p-0"
                                 >
-                                  <Star className={`h-3 w-3 ${mainImageIndex === index ? 'fill-current' : ''}`} />
+                                  <Star className={`h-3 w-3 ${mainImageIndex === index ? "fill-current" : ""}`} />
                                 </Button>
                                 <Button
                                   type="button"
@@ -581,16 +577,12 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                   className="h-12 bg-primary-prosalud hover:bg-primary-prosalud-dark"
                 >
                   {createMutation.isPending || updateMutation.isPending
-                    ? 'Guardando...'
-                    : event ? 'Actualizar Evento' : 'Crear Evento'
-                  }
+                    ? "Guardando..."
+                    : event
+                      ? "Actualizar Evento"
+                      : "Crear Evento"}
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={onClose}
-                  className="h-12"
-                >
+                <Button type="button" variant="outline" onClick={onClose} className="h-12">
                   Cancelar
                 </Button>
               </div>
