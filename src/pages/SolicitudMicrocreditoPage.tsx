@@ -1,24 +1,31 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Link, useNavigate } from "react-router-dom";
 
-import MainLayout from '@/components/layout/MainLayout';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Form } from '@/components/ui/form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
+import MainLayout from "@/components/layout/MainLayout";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Form } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { submitRequest } from '@/services/requestsService';
+import { submitRequest } from "@/services/requestsService";
 
-import DatosPersonalesSection from '@/components/solicitud-certificado/DatosPersonalesSection';
-import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
-import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
+import DatosPersonalesSection from "@/components/solicitud-certificado/DatosPersonalesSection";
+import ConfirmacionCorreoSection from "@/components/solicitud-certificado/ConfirmacionCorreoSection";
+import AutorizacionDatosSection from "@/components/solicitud-certificado/AutorizacionDatosSection";
 
 const idTypes = [
   { value: "CC", label: "Cédula de Ciudadanía (CC)" },
@@ -27,31 +34,46 @@ const idTypes = [
   { value: "PT", label: "Permiso por protección temporal (PT)" },
 ];
 const sedesOptions = [
-  { value: 'BELLO', label: 'Bello' },
-  { value: 'CALDAS', label: 'Caldas' },
-  { value: 'LA_MARIA', label: 'La Maria' },
-  { value: 'RIONEGRO', label: 'Rionegro' },
-  { value: 'GENERAL', label: 'General' },
+  { value: "BELLO", label: "Bello" },
+  { value: "CALDAS", label: "Caldas" },
+  { value: "LA_MARIA", label: "La Maria" },
+  { value: "RIONEGRO", label: "Rionegro" },
+  { value: "GENERAL", label: "General" },
 ];
 
 const microcreditoFormSchema = z.object({
-  tipoIdentificacion: z.string({ required_error: "Tipo de identificación es requerido." }).min(1, "Tipo de identificación es requerido."),
-  numeroIdentificacion: z.string({ required_error: "Número de identificación es requerido." }).min(5, "Número de identificación inválido."),
+  tipoIdentificacion: z
+    .string({ required_error: "Tipo de identificación es requerido." })
+    .min(1, "Tipo de identificación es requerido."),
+  numeroIdentificacion: z
+    .string({ required_error: "Número de identificación es requerido." })
+    .min(5, "Número de identificación inválido."),
   nombres: z.string({ required_error: "Nombres son requeridos." }).min(2, "Nombres deben tener al menos 2 caracteres."),
-  apellidos: z.string({ required_error: "Apellidos son requeridos." }).min(2, "Apellidos deben tener al menos 2 caracteres."),
-  correoElectronico: z.string({ required_error: "Correo electrónico es requerido." }).email("Correo electrónico inválido."),
-  numeroCelular: z.string({ required_error: "Número de celular es requerido." }).regex(/^\d{10}$/, "Número de celular debe tener 10 dígitos."),
+  apellidos: z
+    .string({ required_error: "Apellidos son requeridos." })
+    .min(2, "Apellidos deben tener al menos 2 caracteres."),
+  correoElectronico: z
+    .string({ required_error: "Correo electrónico es requerido." })
+    .email("Correo electrónico inválido."),
+  numeroCelular: z
+    .string({ required_error: "Número de celular es requerido." })
+    .regex(/^\d{10}$/, "Número de celular debe tener 10 dígitos."),
   sedeProceso: z.string({ required_error: "Sede es requerida." }).min(1, "Sede es requerida."),
   montoSolicitado: z.preprocess(
-    (val) => (val === "" ? undefined : Number(String(val).replace(/\./g, ''))),
-    z.number({ required_error: "Monto es requerido.", invalid_type_error: "Monto debe ser un número." })
-     .min(1, "Monto debe ser mayor a 0.")
+    (val) => (val === "" ? undefined : Number(String(val).replace(/\./g, ""))),
+    z
+      .number({ required_error: "Monto es requerido.", invalid_type_error: "Monto debe ser un número." })
+      .min(1, "Monto debe ser mayor a 0."),
   ),
   numeroCuotas: z.preprocess(
     (val) => (val === "" ? undefined : Number(val)),
-    z.number({ required_error: "Número de cuotas es requerido.", invalid_type_error: "Número de cuotas debe ser un número." })
-     .min(1, "Mínimo 1 cuota.")
-     .max(12, "Máximo 12 cuotas.")
+    z
+      .number({
+        required_error: "Número de cuotas es requerido.",
+        invalid_type_error: "Número de cuotas debe ser un número.",
+      })
+      .min(1, "Mínimo 1 cuota.")
+      .max(12, "Máximo 12 cuotas."),
   ),
   confirmacionCorreo: z.boolean().optional(),
 });
@@ -63,13 +85,13 @@ const SolicitudMicrocreditoPage: React.FC = () => {
   const form = useForm<MicrocreditoFormValues>({
     resolver: zodResolver(microcreditoFormSchema),
     defaultValues: {
-      tipoIdentificacion: '',
-      numeroIdentificacion: '',
-      nombres: '',
-      apellidos: '',
-      correoElectronico: '',
-      numeroCelular: '',
-      sedeProceso: '',
+      tipoIdentificacion: "",
+      numeroIdentificacion: "",
+      nombres: "",
+      apellidos: "",
+      correoElectronico: "",
+      numeroCelular: "",
+      sedeProceso: "",
       montoSolicitado: undefined,
       numeroCuotas: undefined,
       confirmacionCorreo: false,
@@ -79,7 +101,7 @@ const SolicitudMicrocreditoPage: React.FC = () => {
   const onSubmit = async (data: MicrocreditoFormValues) => {
     try {
       const requestData = {
-        request_type: 'microcredito',
+        request_type: "microcredito",
         id_type: data.tipoIdentificacion,
         id_number: data.numeroIdentificacion,
         name: data.nombres,
@@ -89,21 +111,21 @@ const SolicitudMicrocreditoPage: React.FC = () => {
         payload: {
           sedeProceso: data.sedeProceso,
           montoSolicitado: data.montoSolicitado,
-          numeroCuotas: data.numeroCuotas
+          numeroCuotas: data.numeroCuotas,
         },
       };
 
       await submitRequest(requestData);
 
       form.reset();
-      
+
       toast.success("Solicitud enviada", {
         description: "Su solicitud de microcrédito ha sido enviada para revisión.",
       });
-      
+
       // Redirect with a longer delay to ensure the toast is visible before unmount
       setTimeout(() => {
-        navigate('/');
+        navigate("/");
       }, 2000);
     } catch (error) {
       toast.error("Error", {
@@ -119,7 +141,9 @@ const SolicitudMicrocreditoPage: React.FC = () => {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link to="/"><Home className="h-4 w-4 mr-1 inline-block" /> Inicio</Link>
+                <Link to="/">
+                  <Home className="h-4 w-4 mr-1 inline-block" /> Inicio
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -136,39 +160,49 @@ const SolicitudMicrocreditoPage: React.FC = () => {
         <div className="max-w-5xl mx-auto">
           <header className="mb-8 text-center">
             <div className="flex justify-center items-center gap-3 mb-4">
-                <CreditCard className="h-8 w-8 text-primary-prosalud-dark" />
-                <h1 className="text-3xl font-bold text-primary-prosalud-dark">
-                Solicitud - Microcrédito CEII
-                </h1>
+              <CreditCard className="h-8 w-8 text-primary-prosalud-dark" />
+              <h1 className="text-3xl font-bold text-primary-prosalud-dark">Solicitud - Microcrédito CEII</h1>
             </div>
             <p className="mt-2 text-base text-muted-foreground max-w-3xl mx-auto">
-              Por favor, complete todos los campos del siguiente formulario para tramitar su solicitud de microcrédito. Verifique que la información ingresada sea correcta.
+              Por favor, complete todos los campos del siguiente formulario para tramitar su solicitud de microcrédito.
+              Verifique que la información ingresada sea correcta.
             </p>
           </header>
 
-          <section className="mt-10 mb-8 p-6 border rounded-lg shadow-sm bg-accent/50 border-border">
-                <h2 className="text-xl font-semibold mb-4 text-foreground flex items-center">
-                  <Info className="mr-3 h-6 w-6 text-primary" /> Información importante
-                </h2>
-                <div className="space-y-3 text-foreground">
-                  <p>Por favor diligencie los datos solicitados. Los datos enviados son solo de manera informativa. No garantiza o autoriza ningún proceso.</p>
-                  
-                  <Alert className="border-border bg-card">
-                    <Mail className="h-5 w-5 text-primary" />
-                    <AlertDescription className="text-card-foreground">
-                      Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo <strong className="font-mono bg-muted px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado y a la lista de contactos.
-                    </AlertDescription>
-                  </Alert>
-                  
-                  <p>Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas S.A.S. desde el correo <strong className="font-mono bg-muted px-1 rounded">ceiisas@hotmail.com</strong>.</p>
-                  
-                  <Alert className="border-amber-300 bg-amber-50">
-                    <Clock className="h-5 w-5 text-amber-600" />
-                    <AlertDescription className="text-amber-800">
-                       El horario de revisión de solicitudes es de lunes a viernes de 8:00 a.m. a 4:00 p.m., cualquier registro vencido el citado horario, se entenderá presentado el siguiente día hábil. Se registran y asigna su revisión por orden de registro.
-                    </AlertDescription>
-                  </Alert>
-                </div>
+          <section className="mt-10 mb-8 p-6 border rounded-lg shadow-sm bg-blue-50 border-blue-200">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
+              <Info className="mr-3 h-6 w-6 text-blue-700" /> Información importante
+            </h2>
+            <div className="space-y-3 text-blue-700">
+              <p>
+                Por favor diligencie los datos solicitados. Los datos enviados son solo de manera informativa. No
+                garantiza o autoriza ningún proceso.
+              </p>
+
+              <Alert className="border-blue-300 bg-blue-100">
+                <Mail className="h-5 w-5 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo{" "}
+                  <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado
+                  y a la lista de contactos.
+                </AlertDescription>
+              </Alert>
+
+              <p>
+                Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas
+                S.A.S. desde el correo{" "}
+                <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong>.
+              </p>
+
+              <Alert className="border-amber-300 bg-amber-50">
+                <Clock className="h-5 w-5 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  El horario de revisión de solicitudes es de lunes a viernes de 8:00 a.m. a 4:00 p.m., cualquier
+                  registro vencido el citado horario, se entenderá presentado el siguiente día hábil. Se registran y
+                  asigna su revisión por orden de registro.
+                </AlertDescription>
+              </Alert>
+            </div>
           </section>
 
           <Form {...form}>
@@ -191,8 +225,10 @@ const SolicitudMicrocreditoPage: React.FC = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {sedesOptions.map(sede => (
-                              <SelectItem key={sede.value} value={sede.value}>{sede.label}</SelectItem>
+                            {sedesOptions.map((sede) => (
+                              <SelectItem key={sede.value} value={sede.value}>
+                                {sede.label}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -205,9 +241,19 @@ const SolicitudMicrocreditoPage: React.FC = () => {
                     name="montoSolicitado"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Monto en COP a solicitar * <span className="text-xs text-muted-foreground">(Sin puntos ni comas)</span></FormLabel>
+                        <FormLabel>
+                          Monto en COP a solicitar *{" "}
+                          <span className="text-xs text-muted-foreground">(Sin puntos ni comas)</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="Ej: 500000" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value.replace(/\D/g, ''))} />
+                          <Input
+                            type="number"
+                            placeholder="Ej: 500000"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(e.target.value === "" ? undefined : e.target.value.replace(/\D/g, ""))
+                            }
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -218,9 +264,20 @@ const SolicitudMicrocreditoPage: React.FC = () => {
                     name="numeroCuotas"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número de cuotas * <span className="text-xs text-muted-foreground">(Min 1 y Max 12)</span></FormLabel>
+                        <FormLabel>
+                          Número de cuotas * <span className="text-xs text-muted-foreground">(Min 1 y Max 12)</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input type="number" min="1" max="12" placeholder="Ej: 6" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
+                          <Input
+                            type="number"
+                            min="1"
+                            max="12"
+                            placeholder="Ej: 6"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(e.target.value === "" ? undefined : parseInt(e.target.value, 10))
+                            }
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -228,12 +285,16 @@ const SolicitudMicrocreditoPage: React.FC = () => {
                   />
                 </div>
               </section>
-              
+
               <ConfirmacionCorreoSection />
               <AutorizacionDatosSection />
 
               <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-10">
-                <Button type="submit" size="lg" className="w-full sm:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90">
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full sm:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90"
+                >
                   <Send className="mr-2 h-5 w-5" />
                   Enviar Solicitud
                 </Button>
