@@ -1647,7 +1647,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       setMessages((prevMessages) => {
         const updatedMessages = [...prevMessages];
 
-        // Verificar si hay contexto de incapacidades para mantenerlo
+        // NUEVO: Solo mantener contexto de incapacidades si la pregunta actual es sobre incapacidades
         const lastIncapContext = prevMessages
           .slice()
           .reverse()
@@ -1661,9 +1661,13 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
         };
 
-        // Mantener contexto de incapacidades si existe
-        if (lastIncapContext?.multipleIncapacidades) {
+        // Solo mantener contexto de incapacidades si la categoría detectada es "incapacidades"
+        // Esto evita que el bot se quede "atascado" en el modo de selección de incapacidad
+        if (lastIncapContext?.multipleIncapacidades && detectedCategory === 'incapacidades') {
           botMessage.multipleIncapacidades = lastIncapContext.multipleIncapacidades;
+          console.log('🔄 Manteniendo contexto de incapacidades para pregunta de seguimiento');
+        } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== 'incapacidades') {
+          console.log('✅ Limpiando contexto de incapacidades - nueva categoría:', detectedCategory);
         }
 
         updatedMessages[updatedMessages.length - 1] = botMessage;
