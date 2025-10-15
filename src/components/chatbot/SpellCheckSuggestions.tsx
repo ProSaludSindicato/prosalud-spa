@@ -31,167 +31,145 @@ const commonMisspellings: { [key: string]: string } = {
   'solisitud': 'solicitud',
 };
 
-// Sugerencias inteligentes basadas en el contexto de ProSalud
+// Terminología sindical ProSalud (términos correctos del sindicato)
+const terminologiaSindical: { [key: string]: string } = {
+  // Términos coloquiales -> Términos sindicales correctos
+  'certificado de convenio': 'carta laboral',
+  'prima': 'compensación semestral',
+  'vacaciones': 'compensación anual por descanso',
+  'cesantías': 'compensación anual diferida',
+  'cesantias': 'compensación anual diferida',
+  'intereses': 'rendimientos',
+  'intereses a las cesantías': 'rendimientos',
+  'salario': 'compensación',
+  'liquidación': 'compensación final',
+  'liquidacion': 'compensación final',
+  'caja de compensación': 'comfenalco',
+  'caja de compensacion': 'comfenalco',
+  'caja compensación familiar': 'comfenalco',
+};
+
+// Sugerencias inteligentes basadas en el contexto de ProSalud (3 sugerencias específicas por tema)
 const contextualSuggestions: { [key: string]: string[] } = {
   'incapacidad': [
     '¿Cómo consulto el pago de mi incapacidad?',
-    '¿Cuáles son los requisitos para una incapacidad?',
-    '¿Dónde presento mi incapacidad?',
-    'Estado de mi incapacidad',
-    '¿Cuánto me pagan por incapacidad?',
-    'Documentos para incapacidades'
+    'Requisitos para presentar incapacidad',
+    'Estado de radicado de incapacidad'
+  ],
+  'carta_laboral': [
+    '¿Cómo solicito mi carta laboral?',
+    'Requisitos para carta laboral',
+    'Tiempo de entrega carta laboral'
   ],
   'certificado': [
-    '¿Cómo solicito un certificado de afiliación?',
-    '¿Qué tipos de certificados puedo obtener?',
-    'Necesito un certificado de convenio',
-    'Certificado de seguridad social',
-    '¿Cuánto demora un certificado?',
-    'Renovar mi certificado'
+    'Solicitar certificado de afiliación',
+    'Certificado seguridad social',
+    'Tipos de certificados disponibles'
   ],
   'contacto': [
-    '¿Cuál es el número de contacto?',
-    '¿Dónde están ubicadas las oficinas?',
-    '¿Cuál es el horario de atención?',
-    'Correo electrónico de ProSalud',
-    '¿Tienen WhatsApp?',
-    'Teléfonos de contacto'
-  ],
-  'servicio': [
-    '¿Qué servicios ofrece ProSalud?',
-    '¿Cómo accedo a los servicios?',
-    'Lista de servicios disponibles',
-    'Beneficios para afiliados',
-    'Servicios de bienestar',
-    'Cómo afiliarse'
+    'Número de teléfono de ProSalud',
+    'Ubicación oficinas ProSalud',
+    'Horarios de atención'
   ],
   'convenio': [
-    '¿Qué convenios tienen disponibles?',
-    '¿Cómo puedo usar los convenios?',
-    'Farmacias con convenio',
-    'Descuentos en salud',
-    'Alianzas comerciales',
-    'Convenios con hospitales'
+    'Convenios con farmacias',
+    'Descuentos en servicios de salud',
+    'Cómo usar los convenios'
   ],
   'pago': [
-    'Estado de mi pago',
-    '¿Cuándo recibiré mi pago?',
-    'Verificar pagos pendientes',
-    'Actualizar cuenta bancaria',
-    'Formas de pago',
-    'Consultar pago de incapacidad'
+    'Verificar estado de mi pago',
+    'Actualizar datos bancarios',
+    'Fechas de pago de compensaciones'
   ],
-  'tramite': [
-    '¿Qué trámites puedo realizar?',
-    'Requisitos para trámites',
-    '¿Cómo inicio un trámite?',
-    'Solicitud de descanso',
-    'Cambio de turno',
-    'Permisos laborales'
+  'compensacion_semestral': [
+    '¿Cuándo pagan compensación semestral?',
+    'Monto compensación semestral',
+    'Requisitos para compensación semestral'
+  ],
+  'compensacion_anual_descanso': [
+    'Solicitar compensación anual por descanso',
+    '¿Cuántos días de descanso tengo?',
+    'Cómo se calcula el descanso'
+  ],
+  'compensacion_anual_diferida': [
+    'Solicitar compensación anual diferida',
+    '¿Cuándo se paga la diferida?',
+    'Requisitos para diferida'
+  ],
+  'rendimientos': [
+    '¿Qué son los rendimientos?',
+    'Cómo se calculan los rendimientos',
+    'Fecha de pago de rendimientos'
+  ],
+  'compensacion_final': [
+    'Proceso de compensación final',
+    'Documentos para compensación final',
+    'Tiempo de pago compensación final'
   ],
   'descanso': [
-    '¿Cómo solicito un descanso laboral?',
+    'Solicitar descanso laboral',
     'Requisitos para descanso',
-    'Formato de solicitud de descanso',
-    '¿Cuántos días de descanso tengo?',
-    'Descanso por maternidad',
-    'Descanso por paternidad'
+    'Descanso por maternidad/paternidad'
   ],
   'retiro': [
-    '¿Cómo me retiro del sindicato?',
-    'Proceso de retiro sindical',
-    'Documentos para retiro',
-    'Formato de retiro',
-    'Tiempo de procesamiento del retiro',
-    '¿Puedo retirarme sin causales?'
-  ],
-  'compensacion': [
-    '¿Qué es la compensación anual diferida?',
-    '¿Cómo solicito la compensación?',
-    'Requisitos compensación anual',
-    'Formato de compensación',
-    '¿Cuándo se paga la compensación?',
-    'Monto de compensación'
+    'Proceso de retiro del sindicato',
+    'Documentos necesarios para retiro',
+    'Tiempo de procesamiento del retiro'
   ],
   'cuenta': [
-    '¿Cómo actualizo mi cuenta bancaria?',
-    'Cambiar datos bancarios',
-    'Certificación bancaria',
-    'Requisitos actualizar cuenta',
-    'Formato actualización bancaria',
-    'Tiempo de actualización de cuenta'
+    'Actualizar cuenta bancaria',
+    'Certificación bancaria requisitos',
+    'Cambiar datos bancarios'
   ],
   'microcredito': [
-    '¿Cómo solicito un microcrédito?',
     'Requisitos para microcrédito',
     'Monto máximo de microcrédito',
-    'Tasa de interés microcrédito',
-    'Plazo para pagar microcrédito',
-    'Documentos para microcrédito'
+    'Tasas de interés microcrédito'
   ],
   'turno': [
-    '¿Cómo solicito cambio de turno?',
-    'Permisos de cambio de turno',
-    'Cuadro de turnos',
-    'Formato cambio de turno',
-    '¿Cuántos cambios puedo solicitar?',
+    'Solicitar cambio de turno',
+    'Ver cuadro de turnos',
     'Requisitos cambio de turno'
   ],
   'bienestar': [
-    '¿Qué eventos de bienestar hay?',
-    'Galería de eventos',
-    'Próximas actividades de bienestar',
-    'Cómo participar en eventos',
-    'Encuesta de bienestar',
-    'Programas de recreación'
+    'Próximos eventos de bienestar',
+    'Galería de fotos eventos',
+    'Cómo participar en actividades'
   ],
   'sst': [
-    '¿Qué es SST?',
-    'Seguridad y salud en el trabajo',
-    'Protocolos de emergencia',
-    'Elementos de protección',
-    'Prevención de riesgos',
-    'Reportar accidente de trabajo'
+    'Protocolos de seguridad laboral',
+    'Reportar accidente de trabajo',
+    'Elementos de protección personal'
   ],
   'comfenalco': [
-    '¿Qué es Comfenalco?',
     'Afiliación a Comfenalco',
-    'Servicios de Comfenalco',
-    'Eventos Comfenalco',
-    'Descuentos Comfenalco',
-    'Cómo usar servicios Comfenalco'
+    'Servicios disponibles Comfenalco',
+    'Descuentos en Comfenalco'
   ],
   'prosalud': [
     '¿Qué es ProSalud?',
-    'Historia de ProSalud',
-    'Misión y visión',
-    'Quiénes somos',
-    'Estructura organizacional',
-    'Valores de ProSalud'
+    'Misión y visión de ProSalud',
+    'Estructura organizacional'
   ],
   'afiliacion': [
-    '¿Cómo me afilio a ProSalud?',
-    'Requisitos para afiliación',
-    'Costo de afiliación',
-    'Beneficios de ser afiliado',
-    'Proceso de afiliación',
-    'Documentos para afiliarme'
+    'Requisitos para afiliarse',
+    'Costo de afiliación a ProSalud',
+    'Beneficios de ser afiliado'
+  ],
+  'tramite': [
+    'Trámites disponibles en línea',
+    'Requisitos para trámites',
+    'Cómo iniciar un trámite'
   ],
   'estatuto': [
-    'Estatutos del sindicato',
-    'Reglamento interno',
-    'Derechos y deberes',
-    'Normatividad sindical',
-    'Contrato sindical',
-    'Beneficios estatutarios'
+    'Ver estatutos del sindicato',
+    'Derechos y deberes afiliados',
+    'Reglamento interno ProSalud'
   ],
   'eps': [
-    'Información sobre EPS',
-    'EPS Sura',
-    'Cambio de EPS',
-    'Cobertura de salud',
-    'Consultas médicas',
-    'Autorizaciones EPS'
+    'Información EPS Sura',
+    'Cambiar de EPS',
+    'Autorización procedimientos EPS'
   ]
 };
 
@@ -247,23 +225,43 @@ export const SpellCheckSuggestions: React.FC<SpellCheckSuggestionsProps> = ({
       }
     });
 
-    // Buscar por sinónimos o términos relacionados
+    // Normalizar términos coloquiales a terminología sindical
+    let normalizedText = fullText;
+    Object.entries(terminologiaSindical).forEach(([coloquial, sindical]) => {
+      const regex = new RegExp(coloquial, 'gi');
+      normalizedText = normalizedText.replace(regex, sindical);
+    });
+
+    // Buscar por sinónimos o términos relacionados (ampliado con terminología sindical)
     const keywordRelations: { [key: string]: string[] } = {
-      'incapacidad': ['incapacidad', 'licencia', 'ausencia', 'reposo', 'médico', 'enfermedad'],
-      'certificado': ['certificado', 'constancia', 'documento', 'comprobante', 'acreditación'],
-      'contacto': ['teléfono', 'correo', 'dirección', 'ubicación', 'llamar', 'escribir', 'contactar'],
-      'pago': ['pago', 'dinero', 'transferencia', 'consignación', 'cuenta', 'bancaria', 'plata'],
-      'descanso': ['descanso', 'vacaciones', 'permiso', 'ausencia', 'tiempo libre'],
-      'retiro': ['retiro', 'retirar', 'desafiliar', 'salir', 'desvincular'],
-      'cuenta': ['cuenta', 'banco', 'bancaria', 'actualizar', 'cambiar', 'datos bancarios'],
-      'tramite': ['trámite', 'solicitud', 'proceso', 'gestión', 'procedimiento'],
-      'bienestar': ['bienestar', 'evento', 'actividad', 'recreación', 'galería', 'fotos'],
-      'turno': ['turno', 'cambio', 'horario', 'cuadro', 'cronograma'],
-      'microcredito': ['microcrédito', 'crédito', 'préstamo', 'financiación', 'dinero prestado'],
+      'incapacidad': ['incapacidad', 'incapacidades', 'licencia', 'ausencia', 'reposo', 'médico', 'enfermedad', 'salud', 'ausentismo'],
+      'carta_laboral': ['carta laboral', 'certificado de convenio', 'certificado convenio', 'constancia laboral', 'carta de trabajo', 'certificación laboral'],
+      'certificado': ['certificado', 'constancia', 'documento', 'comprobante', 'acreditación', 'certificación', 'afiliación'],
+      'contacto': ['teléfono', 'correo', 'dirección', 'ubicación', 'llamar', 'escribir', 'contactar', 'celular', 'whatsapp', 'email'],
+      'pago': ['pago', 'dinero', 'transferencia', 'consignación', 'cuenta', 'bancaria', 'plata', 'saldo', 'consignar', 'girar'],
+      'compensacion_semestral': ['prima', 'compensación semestral', 'prima semestral', 'bonificación', 'prima de servicios'],
+      'compensacion_anual_descanso': ['vacaciones', 'compensación anual por descanso', 'descanso anual', 'días de descanso', 'periodo vacacional'],
+      'compensacion_anual_diferida': ['cesantías', 'cesantias', 'compensación anual diferida', 'compensación diferida', 'ahorro', 'cesantes'],
+      'rendimientos': ['intereses', 'intereses a las cesantías', 'rendimientos', 'intereses cesantías', 'rentabilidad'],
+      'compensacion_final': ['liquidación', 'liquidacion', 'compensación final', 'finiquito', 'pago final', 'indemnización'],
+      'descanso': ['descanso', 'vacaciones', 'permiso', 'ausencia', 'tiempo libre', 'licencia', 'días libres'],
+      'retiro': ['retiro', 'retirar', 'desafiliar', 'salir', 'desvincular', 'renuncia', 'desvinculación'],
+      'cuenta': ['cuenta', 'banco', 'bancaria', 'actualizar', 'cambiar', 'datos bancarios', 'número de cuenta', 'consignación'],
+      'tramite': ['trámite', 'tramite', 'solicitud', 'proceso', 'gestión', 'procedimiento', 'requisito', 'documentación'],
+      'bienestar': ['bienestar', 'evento', 'actividad', 'recreación', 'galería', 'fotos', 'actividades', 'integración'],
+      'turno': ['turno', 'cambio', 'horario', 'cuadro', 'cronograma', 'cambio de turno', 'rotación'],
+      'microcredito': ['microcrédito', 'microcredito', 'crédito', 'préstamo', 'financiación', 'dinero prestado', 'préstamo', 'financiamiento'],
+      'comfenalco': ['comfenalco', 'caja de compensación', 'caja compensación', 'subsidio familiar', 'caja', 'compensación familiar'],
+      'sst': ['sst', 'seguridad', 'salud en el trabajo', 'riesgos', 'accidente', 'emergencia', 'protocolos'],
+      'prosalud': ['prosalud', 'sindicato', 'organización', 'quienes somos', 'misión', 'visión'],
+      'afiliacion': ['afiliación', 'afiliacion', 'afiliar', 'inscribir', 'vinculación', 'registro', 'asociarse'],
+      'estatuto': ['estatuto', 'estatutos', 'reglamento', 'normativa', 'normas', 'contrato sindical'],
+      'eps': ['eps', 'salud', 'sura', 'medicina', 'médico', 'consulta', 'autorización'],
     };
 
+    // Buscar en texto normalizado también
     Object.entries(keywordRelations).forEach(([mainKeyword, relatedWords]) => {
-      if (relatedWords.some(word => fullText.includes(word))) {
+      if (relatedWords.some(word => fullText.includes(word) || normalizedText.includes(word))) {
         const suggestions = contextualSuggestions[mainKeyword];
         if (suggestions) {
           foundSuggestions.push(...suggestions);
@@ -271,8 +269,8 @@ export const SpellCheckSuggestions: React.FC<SpellCheckSuggestionsProps> = ({
       }
     });
 
-    // Eliminar duplicados y limitar a 5 sugerencias
-    const uniqueSuggestions = [...new Set(foundSuggestions)].slice(0, 5);
+    // Eliminar duplicados y limitar a 3 sugerencias
+    const uniqueSuggestions = [...new Set(foundSuggestions)].slice(0, 3);
     setSuggestions(uniqueSuggestions);
   }, [inputText, isVisible]);
 
