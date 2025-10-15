@@ -23,6 +23,9 @@ import { chatbotApi } from '@/services/chatbotApi';
 import { ChatbotConversation } from '@/types/chatbot';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { generateChatbotExcelReport } from '@/components/admin/chatbot/utils/chatbotExcelGenerator';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Dialog, 
   DialogContent, 
@@ -44,6 +47,7 @@ type AdminChatbotConversation = ChatbotConversation & {
 };
 
 const AdminChatbotPage: React.FC = () => {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -149,30 +153,77 @@ const AdminChatbotPage: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const csvContent = [
-      ['ID', 'Conversation ID', 'Pregunta', 'Respuesta', 'Feedback', 'IP', 'Fecha'],
-      ...filteredConversations.map(conv => [
-        conv.id,
-        conv.conversation_id || 'N/A',
-        `"${conv.user_question.replace(/"/g, '""')}"`,
-        `"${conv.bot_answer.replace(/"/g, '""')}"`,
-        conv.feedback || 'N/A',
-        conv.user_ip || 'N/A',
-        format(parseISO(conv.created_at), 'dd/MM/yyyy HH:mm', { locale: es })
-      ])
-    ]
-      .map(row => row.join(','))
-      .join('\n');
+    try {
+      const csvContent = [
+        ['ID', 'Conversation ID', 'Pregunta', 'Respuesta', 'Feedback', 'IP', 'Fecha'],
+        ...filteredConversations.map(conv => [
+          conv.id,
+          conv.conversation_id || 'N/A',
+          `"${conv.user_question.replace(/"/g, '""')}"`,
+          `"${conv.bot_answer.replace(/"/g, '""')}"`,
+          conv.feedback || 'N/A',
+          conv.user_ip || 'N/A',
+          format(parseISO(conv.created_at), 'dd/MM/yyyy HH:mm', { locale: es })
+        ])
+      ]
+        .map(row => row.join(','))
+        .join('\n');
 
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `conversaciones-chatbot-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `conversaciones-chatbot-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "CSV exportado",
+        description: "El archivo CSV se ha descargado correctamente.",
+      });
+    } catch (error) {
+      console.error('Error exportando CSV:', error);
+      toast({
+        title: "Error al exportar",
+        description: "No se pudo generar el archivo CSV.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      const dateRange = {
+        includeAll: !fromDate && !toDate,
+        start: fromDate ? new Date(fromDate) : undefined,
+        end: toDate ? new Date(toDate) : undefined
+      };
+
+      const wb = generateChatbotExcelReport(filteredConversations, dateRange);
+      const fileName = `reporte-chatbot-${format(new Date(), 'yyyy-MM-dd-HHmm')}.xlsx`;
+      
+      XLSX.writeFile(wb, fileName);
+
+      toast({
+        title: "Excel exportado",
+        description: `Archivo ${fileName} descargado exitosamente con ${filteredConversations.length} conversaciones.`,
+      });
+
+      console.log('✅ Reporte Excel exportado:', {
+        fileName,
+        totalConversations: filteredConversations.length,
+        dateRange
+      });
+    } catch (error) {
+      console.error('❌ Error exportando Excel:', error);
+      toast({
+        title: "Error al exportar",
+        description: "No se pudo generar el reporte Excel. Intente nuevamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleConversationExpanded = (conversationId: string) => {
@@ -228,14 +279,24 @@ const AdminChatbotPage: React.FC = () => {
                   </CardDescription>
                 </div>
               </div>
-              <Button 
-                onClick={handleExportCSV}
-                variant="outline"
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Exportar CSV
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+                <Button 
+                  onClick={handleExportExcel}
+                  variant="default"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar Excel
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>

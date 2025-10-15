@@ -45,6 +45,7 @@ import {
 import IncapacidadForm from "./IncapacidadForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { consultarIncapacidad } from "@/services/incapacidadService";
+import { SpellCheckSuggestions } from "./SpellCheckSuggestions";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -83,6 +84,7 @@ export default function ChatBot() {
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(true);
   const [currentTooltipMessage, setCurrentTooltipMessage] = useState(0);
+  const [showSpellCheckSuggestions, setShowSpellCheckSuggestions] = useState(false);
 
   // Estado para tracking de tokens y costos
   const [conversationTokens, setConversationTokens] = useState({
@@ -1000,7 +1002,24 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     // Limitar a 500 caracteres
     if (value.length <= MAX_CHARS) {
       setInputMessage(value);
+      
+      // Mostrar sugerencias si hay texto
+      setShowSpellCheckSuggestions(value.trim().length > 0);
+      
       adjustTextareaHeight();
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion) => {
+    setInputMessage(suggestion);
+    setShowSpellCheckSuggestions(false);
+    
+    // Ajustar altura del textarea
+    adjustTextareaHeight();
+    
+    // Enfocar el textarea
+    if (textareaRef.current) {
+      textareaRef.current.focus();
     }
   };
 
@@ -2440,12 +2459,21 @@ ${incapacidad.detalles}
                     }`}
                   >
                     <div className="flex items-end gap-2">
-                      <div className="flex-grow">
+                      <div className="flex-grow relative">
+                        {/* Sugerencias de corrección ortográfica y predictivas */}
+                        <SpellCheckSuggestions
+                          inputText={inputMessage}
+                          onSelectSuggestion={handleSelectSuggestion}
+                          isVisible={showSpellCheckSuggestions && !isTyping}
+                        />
+                        
                         <textarea
                           ref={textareaRef}
                           value={inputMessage}
                           onChange={handleInputChange}
                           onKeyDown={handleKeyDown}
+                          onFocus={() => setShowSpellCheckSuggestions(inputMessage.trim().length > 0)}
+                          onBlur={() => setTimeout(() => setShowSpellCheckSuggestions(false), 200)}
                           className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud ${
                             isFullscreen ? "max-h-[120px] min-h-[3rem] p-3 text-base" : "max-h-[80px] min-h-[2.5rem]"
                           }`}
