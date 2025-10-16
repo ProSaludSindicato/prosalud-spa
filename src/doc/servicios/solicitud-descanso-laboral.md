@@ -11,8 +11,19 @@ Este formulario permite a los afiliados solicitar formalmente la Compensación A
 - Para que proceda la compensación, se deben cumplir todos los requisitos.
 - La solicitud será revisada y, de ser aprobada, se incluirá con la compensación correspondiente.
 - Solo se contactará al solicitante en caso de inconsistencias.
+- **Los documentos deben adjuntarse preferiblemente en formato PDF.**
+- **Solo se reciben solicitudes y anexos de forma digital a través de este formulario web.**
+- **NO se aceptan documentos de forma física o por correo electrónico.**
+- **Ningún coordinador está autorizado para recibir estos documentos de forma física.**
 
-La página también incluye una sección de "Requisitos para la Compensación Anual por Descanso" que se debe consultar.
+## Requisitos para la Compensación Anual por Descanso
+
+Para solicitar la Compensación Anual por Descanso, el afiliado debe cumplir con los siguientes requisitos:
+
+1. **Ser un afiliado activo del sindicato**
+2. **Tener 12 meses consecutivos en el sindicato** al momento de realizar la solicitud
+   - **EJEMPLO IMPORTANTE:** Si su ingreso fue en el mes de enero de 2024, la solicitud debe realizarse en el mes de enero del año 2025 antes del día 24, que es la fecha de corte para que el pago se vea reflejado en la siguiente compensación que se realiza los primeros días de marzo. Si se carga después del día 24, el reconocimiento quedará para el pago que se realiza los primeros días de abril.
+3. **Contar con el visto bueno (V°B°) del coordinador del servicio**
 
 ## Datos del Formulario
 
@@ -50,11 +61,17 @@ La página también incluye una sección de "Requisitos para la Compensación An
 ## Preguntas Frecuentes (FAQ)
 
 **P: ¿Qué debo adjuntar en la solicitud?**
-R: Es obligatorio adjuntar el documento con el Visto Bueno (V°B°) de su coordinador.
+R: Es obligatorio adjuntar el documento con el Visto Bueno (V°B°) de su coordinador, preferiblemente en formato PDF.
+
+**P: ¿Puedo entregar los documentos de forma física?**
+R: No, solo se reciben solicitudes y anexos de forma digital a través del formulario web. Ningún coordinador está autorizado para recibir documentos físicos.
 
 **P: ¿Qué pasa después de enviar la solicitud?**
 R: Su solicitud será revisada. Si es aprobada, el descanso y su compensación serán procesados. Solo lo contactaremos si hay alguna inconsistencia.
 
-**P: ¿El descanso es pagado?**
+**P: ¿Cuánto tiempo debo tener en el sindicato para solicitar la compensación?**
+R: Debe tener 12 meses consecutivos en el sindicato al momento de realizar la solicitud. Por ejemplo, si ingresó en enero de 2024, debe solicitar en enero de 2025 antes del día 24.
+
+**P: ¿La compensación por descanso es pagada?**
 R: Sí, la Compensación Anual por Descanso es remunerada y debe ser pagada por el contratante, siempre que se cumplan los requisitos.
 
