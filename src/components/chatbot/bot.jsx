@@ -1492,7 +1492,43 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     }
 
     if (!validation.isValid) {
-      // Mostrar mensaje de seguridad sin procesar con OpenAI
+      // Verificar si hay rate limit activo antes de mostrar mensaje de seguridad
+      const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
+      const { messagesHour, messagesDay } = rateLimitInfo;
+      
+      // Si el límite está alcanzado, mostrar mensaje de rate limit en lugar del mensaje de seguridad
+      if (messagesHour >= RATE_LIMITS.messagesPerHour || messagesDay >= RATE_LIMITS.messagesPerDay) {
+        const now = Date.now();
+        const oneHourMs = 60 * 60 * 1000;
+        const rateLimitStorage = JSON.parse(localStorage.getItem('chatbot_rate_limit') || '{}');
+        const firstMessageTime = rateLimitStorage.firstMessageTime || now;
+        const timeElapsed = now - firstMessageTime;
+        const timeRemaining = oneHourMs - timeElapsed;
+        const minutesRemaining = Math.ceil(timeRemaining / (60 * 1000));
+        
+        const rateLimitMessage = {
+          role: "assistant",
+          content: `⚠️ Has alcanzado el límite de ${RATE_LIMITS.messagesPerHour} mensajes por hora. Intenta de nuevo en aproximadamente ${minutesRemaining} minutos.`,
+          isBot: true,
+        };
+        
+        const userMessage = {
+          role: "user",
+          content: text,
+          isBot: false,
+        };
+        
+        setMessages((prev) => [...prev, userMessage, rateLimitMessage]);
+        setInputMessage("");
+        setIsSuggestionsExpanded(false);
+        
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
+        return;
+      }
+      
+      // Si no hay rate limit, mostrar mensaje de seguridad normal
       const securityMessage = {
         role: "assistant",
         content: getSecurityMessage(validation.reason),
@@ -1648,9 +1684,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       console.log(`🚀 Enviando ${promptMessages.length} mensajes a OpenAI`);
       console.log(`📏 Prompt total estimado: ~${JSON.stringify(promptMessages).length} caracteres`);
 
-      // Agregar un mensaje temporal para el streaming con contenido vacío
-      setMessages((prev) => [...prev, { role: "assistant", content: "", isBot: true, isStreaming: true }]);
-
+      // NO agregar mensaje temporal vacío aquí - se agregará en el catch si hay error
       // Llama a edge function, recibe la respuesta completa (sin streaming)
       const result = await solicitarRespuestaConOpenAI(promptMessages);
 
@@ -1672,8 +1706,6 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       }
 
       setMessages((prevMessages) => {
-        const updatedMessages = [...prevMessages];
-
         // NUEVO: Solo mantener contexto de incapacidades si la pregunta actual es sobre incapacidades
         const lastIncapContext = prevMessages
           .slice()
@@ -1697,7 +1729,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           console.log('✅ Limpiando contexto de incapacidades - nueva categoría:', detectedCategory);
         }
 
-        updatedMessages[updatedMessages.length - 1] = botMessage;
+        const updatedMessages = [...prevMessages, botMessage];
 
         // Guardar conversación en el backend con client_turn_id (asíncrono, no bloquea UX)
         const clientTurnId = generateClientTurnId();
@@ -1711,11 +1743,13 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             }
           : null;
 
-        // Anexar identificadores al mensaje del bot inmediatamente (id se seteará luego si existe)
-        updatedMessages[updatedMessages.length - 1] = {
+        // Anexar identificadores al mensaje del bot
+        const messageWithId = {
           ...botMessage,
           client_turn_id: clientTurnId,
         };
+        
+        updatedMessages[updatedMessages.length - 1] = messageWithId;
 
         // Disparar POST y, si retorna id, actualizar el mensaje con backend_id
         (async () => {
