@@ -72,9 +72,9 @@ const contextualSuggestions: { [key: string]: string[] } = {
     'Horarios de atención'
   ],
   'convenio': [
-    'Convenios con farmacias',
-    'Descuentos en servicios de salud',
-    'Cómo usar los convenios'
+    'Hospitales con convenio ProSalud',
+    'Convenio con Comfenalco',
+    'Instituciones de salud asociadas'
   ],
   'pago': [
     'Verificar estado de mi pago',

@@ -1247,8 +1247,35 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     e.preventDefault();
     if (inputMessage.trim() === "") return;
 
-    const text = inputMessage.trim();
+    let text = inputMessage.trim();
     if (!text) return;
+
+    // 🔧 Normalizar términos coloquiales a terminología sindical ProSalud
+    const terminologiaSindical = {
+      'certificado de convenio': 'carta laboral',
+      'certificado convenio': 'carta laboral',
+      'prima': 'compensación semestral',
+      'prima semestral': 'compensación semestral',
+      'vacaciones': 'compensación anual por descanso',
+      'cesantías': 'compensación anual diferida',
+      'cesantias': 'compensación anual diferida',
+      'intereses': 'rendimientos',
+      'intereses a las cesantías': 'rendimientos',
+      'intereses cesantías': 'rendimientos',
+      'salario': 'compensación',
+      'liquidación': 'compensación final',
+      'liquidacion': 'compensación final',
+      'caja de compensación': 'comfenalco',
+      'caja de compensacion': 'comfenalco',
+      'caja compensación familiar': 'comfenalco',
+      'caja de compensación familiar': 'comfenalco',
+    };
+
+    // Normalizar el texto del usuario antes de procesarlo
+    Object.entries(terminologiaSindical).forEach(([coloquial, sindical]) => {
+      const regex = new RegExp(coloquial, 'gi');
+      text = text.replace(regex, sindical);
+    });
 
     // Manejo prioritario: selección de incapacidad si hay múltiples resultados previos
     const lastBotMessage = messages
@@ -2502,7 +2529,7 @@ ${incapacidad.detalles}
                           <TooltipTrigger asChild>
                             <button
                               type="submit"
-                              className={`mb-5 transform rounded-lg bg-prosalud-salud p-2 text-white transition-all duration-300 hover:scale-105 hover:bg-prosalud-salud/90 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 ${
+                              className={`transform rounded-lg bg-prosalud-salud p-2 text-white transition-all duration-300 hover:scale-105 hover:bg-prosalud-salud/90 focus:outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0 ${
                                 isFullscreen ? "p-3" : ""
                               }`}
                               disabled={isTyping || inputMessage.trim() === "" || inputMessage.length > MAX_CHARS}
