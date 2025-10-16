@@ -57,8 +57,8 @@ const newServices: Service[] = [
   { 
     icon: CalendarCheck, 
     title: 'Compensación por descanso', 
-    description: 'Solicita la compensación por descanso según tus condiciones actuales.',
-    linkTo: '/servicios/descanso-sindical', 
+    description: 'Solicita tu compensación anual por descanso según tus condiciones actuales.',
+    linkTo: '/servicios/compensacion-descanso',
     category: 'Gestión Personal y Sindical',
     keywords: ['descanso', 'solicitud', 'dias', 'vacaciones', 'permisos', 'ausentismo', 'tiempo libre']
   },

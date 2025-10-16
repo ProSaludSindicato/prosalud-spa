@@ -107,9 +107,9 @@ const contextualSuggestions: { [key: string]: string[] } = {
     'Tiempo de pago compensación final'
   ],
   'descanso': [
-    'Solicitar descanso laboral',
-    'Requisitos para descanso',
-    'Descanso por maternidad/paternidad'
+    'Solicitar compensación por descanso',
+    'Requisitos para compensación por descanso',
+    'Compensación por descanso de maternidad'
   ],
   'retiro': [
     'Proceso de retiro del sindicato',

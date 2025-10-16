@@ -2485,11 +2485,11 @@ ${incapacidad.detalles}
                 {!showIncapacidadForm && (
                   <form
                     onSubmit={handleSendMessage}
-                    className={`relative z-20 border-t border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 ${
+                    className={`relative z-20 border-t border-gray-200 bg-white pb-8 pt-2 px-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 ${
                       isFullscreen ? "p-4" : ""
                     }`}
                   >
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-start gap-2">
                       <div className="flex-grow relative">
                         {/* Sugerencias de corrección ortográfica y predictivas */}
                         <SpellCheckSuggestions
@@ -2498,30 +2498,32 @@ ${incapacidad.detalles}
                           isVisible={showSpellCheckSuggestions && !isTyping}
                         />
                         
-                        <textarea
-                          ref={textareaRef}
-                          value={inputMessage}
-                          onChange={handleInputChange}
-                          onKeyDown={handleKeyDown}
-                          onFocus={() => setShowSpellCheckSuggestions(inputMessage.trim().length > 0)}
-                          onBlur={() => setTimeout(() => setShowSpellCheckSuggestions(false), 200)}
-                          className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud ${
-                            isFullscreen ? "max-h-[120px] min-h-[3rem] p-3 text-base" : "max-h-[80px] min-h-[2.5rem]"
-                          }`}
-                          placeholder="Escribe tu pregunta aquí..."
-                          rows={1}
-                          aria-label="Mensaje"
-                          disabled={isTyping}
-                          maxLength={MAX_CHARS}
-                        />
-                        {/* Contador de caracteres */}
-                        <div className="flex justify-between items-center mt-1 px-1">
-                          <div className={`text-xs ${currentChars >= 490 ? "text-red-500" : "text-gray-500"}`}>
-                            {currentChars}/{MAX_CHARS}
+                        <div className="relative">
+                          <textarea
+                            ref={textareaRef}
+                            value={inputMessage}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => setShowSpellCheckSuggestions(inputMessage.trim().length > 0)}
+                            onBlur={() => setTimeout(() => setShowSpellCheckSuggestions(false), 200)}
+                            className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud ${
+                              isFullscreen ? "max-h-[120px] min-h-[3rem] p-3 text-base" : "max-h-[80px] min-h-[2.5rem]"
+                            }`}
+                            placeholder="Escribe tu pregunta aquí..."
+                            rows={1}
+                            aria-label="Mensaje"
+                            disabled={isTyping}
+                            maxLength={MAX_CHARS}
+                          />
+                          {/* Contador de caracteres */}
+                          <div className="absolute -bottom-5 left-0 right-0 flex justify-between items-center px-1">
+                            <div className={`text-xs ${currentChars >= 490 ? "text-red-500" : "text-gray-500"}`}>
+                              {currentChars}/{MAX_CHARS}
+                            </div>
+                            {currentChars >= 490 && (
+                              <div className="text-xs text-red-500">Límite de caracteres alcanzado</div>
+                            )}
                           </div>
-                          {currentChars >= 490 && (
-                            <div className="text-xs text-red-500">Límite de caracteres alcanzado</div>
-                          )}
                         </div>
                       </div>
                       <TooltipProvider>

@@ -9,11 +9,11 @@ const InformacionImportanteDescansoAlert: React.FC = () => {
       <Alert className="border-blue-200 bg-blue-50">
         <Info className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-blue-800">
-          <strong>Tenga presente los requisitos para solicitar compensación por descanso:</strong>
+          <strong>Tenga presente los requisitos para solicitar Compensación Anual por Descanso:</strong>
           <ul className="mt-2 space-y-2 list-disc list-inside">
             <li>Enviar la solicitud con una antelación de al menos treinta (30) días a la fecha de salida, no mayor a 60 días</li>
             <li>Es muy importante que la solicitud cuente con el V°B° del Coordinador de ProSalud en su sede. Toda solicitud debe de contar con este requisito.</li>
-            <li>Para la Compensación Anual por descanso debe de contar con al menos 12 meses provisionados (6 meses para Tec de RX).</li>
+            <li>Para la Compensación Anual por Descanso debe de contar con al menos 12 meses provisionados (6 meses para Tec de RX).</li>
           </ul>
         </AlertDescription>
       </Alert>

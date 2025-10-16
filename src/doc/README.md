@@ -6,10 +6,10 @@ Esta documentación contiene la información disponible en el sitio web del Sind
 ## Estructura de la Documentación
 
 - **quienes-somos/**: Información institucional, misión, visión, valores y principios
-- **servicios/**: Detalle de los servicios y formularios disponibles.
+  - **servicios/**: Detalle de los servicios y formularios disponibles.
   - Certificado de Convenio Sindical (`certificado-convenio.md`)
   - Solicitud de Retiro Sindical (`solicitud-retiro-sindical.md`)
-  - Solicitud de Compensación por Descanso (`solicitud-descanso-laboral.md`)
+  - Solicitud de Compensación Anual por Descanso (`solicitud-descanso-laboral.md`)
   - Solicitud de Compensación Anual Diferida (`solicitud-compensacion-anual-diferida.md`)
   - Verificación de Pagos / Consulta de Pagos (`verificacion-pagos.md`)
   - Solicitud de Microcrédito CEII (`solicitud-microcredito.md`)
