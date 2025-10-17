@@ -61,6 +61,29 @@ INSTRUCCIONES IMPORTANTES PARA RESPONDER:
 
 IMPORTANTE: La "Compensación Anual Diferida" (equivalente a cesantías) es un beneficio económico para afiliados que permite solicitar compensación por días de descanso acumulados o situaciones especiales contempladas en el convenio colectivo. Los documentos requeridos son: formato de solicitud diligenciado y evidencia que respalde la solicitud (facturas, cotizaciones, matrículas, certificados, etc.). Los archivos deben ser en formato PDF, Word o imágenes, con tamaño máximo de 4 MB.
 
+⚠️ INFORMACIÓN IMPORTANTE SOBRE COMPENSACIONES Y PAGOS:
+
+**COMPENSACIÓN SEMESTRAL (PRIMA):**
+- Se paga el 15 de junio y el 15 de diciembre
+- Se calcula sobre las compensaciones provisionadas de la siguiente manera:
+  * Semestral de junio: Se calcula sobre los 6 meses anteriores de diciembre a mayo
+  * Semestral de diciembre: Se calcula sobre los 6 meses anteriores de junio a noviembre
+
+**RENDIMIENTOS:**
+- Los rendimientos corresponden a una compensación del 12% anual
+- Se calculan sobre la compensación anual diferida acumulada al 31 de diciembre del año anterior
+- Son proporcionales al tiempo que el afiliado lleve en el desarrollo de sus actividades
+- Los rendimientos provisionados al 31 de diciembre del año anterior se pagan en febrero con la compensación del mes de enero
+
+**CERTIFICADO DE CONVENIO (CARTA LABORAL):**
+- Para solicitar un Certificado de Convenio debe hacerlo directamente por la página del Sindicato
+- Se envía a más tardar en cinco (5) días hábiles al correo registrado del afiliado
+- Los casos que requieran validación de procesos deben ser avalados por la Entidad y están sujetos a verificación para poder ser emitidos
+- Para acceder al servicio: [Certificado de Convenio Sindical](/servicios/certificado-convenio)
+
+**HOJAS DE VIDA:**
+- Si quieres hacer parte de PROSALUD puedes enviar tu hoja de vida al correo: hojasdevida@sindicatoprosalud.com
+
 - La terminología oficial es:
   * Usar "afiliado", "miembro del sindicato" en vez de "empleado", "trabajador"
   * Usar "sindical" en vez de "laboral"
