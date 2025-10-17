@@ -1684,11 +1684,49 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       console.log(`🚀 Enviando ${promptMessages.length} mensajes a OpenAI`);
       console.log(`📏 Prompt total estimado: ~${JSON.stringify(promptMessages).length} caracteres`);
 
-      // NO agregar mensaje temporal vacío aquí - se agregará en el catch si hay error
+      // Agregar mensaje temporal con animación de escritura
+      const tempBotMessageId = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "",
+          isBot: true,
+          isStreaming: true,
+          tempId: tempBotMessageId,
+        },
+      ]);
+
       // Llama a edge function, recibe la respuesta completa (sin streaming)
       const result = await solicitarRespuestaConOpenAI(promptMessages);
+      
+      // Simular streaming para mostrar animación de escritura
+      const responseText = result.text;
+      const words = responseText.split(' ');
+      let currentText = '';
+      
+      // Mostrar palabras progresivamente
+      for (let i = 0; i < words.length; i++) {
+        currentText += (i > 0 ? ' ' : '') + words[i];
+        
+        setMessages((prev) => {
+          const updated = [...prev];
+          const tempMsgIndex = updated.findIndex(m => m.tempId === tempBotMessageId);
+          if (tempMsgIndex !== -1) {
+            updated[tempMsgIndex] = {
+              ...updated[tempMsgIndex],
+              content: currentText,
+              isStreaming: i < words.length - 1,
+            };
+          }
+          return updated;
+        });
+        
+        // Pequeño delay para simular escritura (más rápido para mejor UX)
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
 
-      // Actualizar información de rate limiting si está disponible
+      // Actualizar información de rate limiting después del streaming
       if (result.usageInfo) {
         const { messagesHour, messagesDay } = result.usageInfo;
         const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
@@ -1712,24 +1750,31 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           .reverse()
           .find((m) => m.multipleIncapacidades);
 
-        const botMessage = {
-          role: "assistant",
-          content: result.text,
-          isBot: true,
-          isStreaming: false,
-          tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
-        };
+        // Encontrar el mensaje temporal y actualizarlo con la respuesta final
+        const updated = [...prevMessages];
+        const tempMsgIndex = updated.findIndex(m => m.tempId === tempBotMessageId);
+        
+        if (tempMsgIndex !== -1) {
+          // Actualizar el mensaje temporal con la respuesta completa
+          updated[tempMsgIndex] = {
+            role: "assistant",
+            content: result.text,
+            isBot: true,
+            isStreaming: false,
+            tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
+          };
 
-        // Solo mantener contexto de incapacidades si la categoría detectada es "incapacidades"
-        // Esto evita que el bot se quede "atascado" en el modo de selección de incapacidad
-        if (lastIncapContext?.multipleIncapacidades && detectedCategory === 'incapacidades') {
-          botMessage.multipleIncapacidades = lastIncapContext.multipleIncapacidades;
-          console.log('🔄 Manteniendo contexto de incapacidades para pregunta de seguimiento');
-        } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== 'incapacidades') {
-          console.log('✅ Limpiando contexto de incapacidades - nueva categoría:', detectedCategory);
+          // Solo mantener contexto de incapacidades si la categoría detectada es "incapacidades"
+          if (lastIncapContext?.multipleIncapacidades && detectedCategory === 'incapacidades') {
+            updated[tempMsgIndex].multipleIncapacidades = lastIncapContext.multipleIncapacidades;
+            console.log('🔄 Manteniendo contexto de incapacidades para pregunta de seguimiento');
+          } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== 'incapacidades') {
+            console.log('✅ Limpiando contexto de incapacidades - nueva categoría:', detectedCategory);
+          }
         }
 
-        const updatedMessages = [...prevMessages, botMessage];
+        const updatedMessages = updated;
+        const botMessage = updatedMessages[tempMsgIndex];
 
         // Guardar conversación en el backend con client_turn_id (asíncrono, no bloquea UX)
         const clientTurnId = generateClientTurnId();
@@ -1744,12 +1789,12 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           : null;
 
         // Anexar identificadores al mensaje del bot
-        const messageWithId = {
-          ...botMessage,
-          client_turn_id: clientTurnId,
-        };
-        
-        updatedMessages[updatedMessages.length - 1] = messageWithId;
+        if (tempMsgIndex !== -1) {
+          updatedMessages[tempMsgIndex] = {
+            ...updatedMessages[tempMsgIndex],
+            client_turn_id: clientTurnId,
+          };
+        }
 
         // Disparar POST y, si retorna id, actualizar el mensaje con backend_id
         (async () => {
