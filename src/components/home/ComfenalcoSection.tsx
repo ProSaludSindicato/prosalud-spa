@@ -235,7 +235,7 @@ const ComfenalcoSection: React.FC = () => {
 
         {/* Mosaic Grid - Solo mostrar si hay eventos de mosaico */}
         {mosaicEvents.length > 0 && (
-          <div className="grid grid-cols-12 gap-4 h-72 md:h-80">
+          <div className="grid grid-cols-12 gap-4 h-64 md:h-72">
             {mosaicEvents.map((event, index) => {
               const isLarge = index === 0;
               const colSpan = isLarge ? 'col-span-12 md:col-span-8' : 'col-span-12 md:col-span-4';
