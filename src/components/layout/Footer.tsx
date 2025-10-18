@@ -16,10 +16,10 @@ const Footer: React.FC = () => {
               {" "}
               {/* Container for both logos */}
               <Link to="https://www.minsalud.gov.co" target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-28 md:h-32" width={500} height={56} />
+                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-28 md:h-32" width={600} height={56} />
               </Link>
               <Link to="/" className="inline-block">
-                <img src={logoUrl} alt="ProSalud Logo" className="h-20 md:h-24" width={500} height={265} />
+                <img src={logoUrl} alt="ProSalud Logo" className="h-20 md:h-24" width={400} height={265} />
               </Link>
             </div>
             <p className="text-sm text-slate-400">
@@ -93,20 +93,17 @@ const Footer: React.FC = () => {
           {/* Column 4: Síguenos */}
           <div className="lg:col-span-2">
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Síguenos</h3>
-            {/* <div className="flex space-x-4">
-              <a href="#" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors" aria-label="Facebook">
+            <div className="flex space-x-4">
+              <a
+                href="https://www.facebook.com/share/17bJbpKbz1/?mibextid=wwXIfr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors"
+                aria-label="Facebook"
+              >
                 <Facebook size={22} />
               </a>
-              <a href="#" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors" aria-label="Twitter">
-                <Twitter size={22} />
-              </a>
-              <a href="#" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors" aria-label="Instagram">
-                <Instagram size={22} />
-              </a>
-              <a href="#" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors" aria-label="LinkedIn">
-                <Linkedin size={22} />
-              </a>
-            </div> */}
+            </div>
             <p className="text-xs text-slate-500 mt-4">Mantente al día con nuestras novedades y actividades.</p>
           </div>
         </div>
