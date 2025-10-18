@@ -16,7 +16,7 @@ const Footer: React.FC = () => {
               {" "}
               {/* Container for both logos */}
               <Link to="https://www.minsalud.gov.co" target="_blank" rel="noopener noreferrer" className="inline-block">
-                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-28 md:h-32" width={256} height={56} />
+                <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-28 md:h-32" width={500} height={56} />
               </Link>
               <Link to="/" className="inline-block">
                 <img src={logoUrl} alt="ProSalud Logo" className="h-20 md:h-24" width={500} height={265} />
