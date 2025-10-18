@@ -332,6 +332,17 @@ ENLACES EXTERNOS IMPORTANTES:
 **HOJAS DE VIDA:**
 - Si quieres hacer parte de PROSALUD puedes enviar tu hoja de vida al correo: hojasdevida@sindicatoprosalud.com
 
+**COMPENSACIÓN ANUAL DIFERIDA (CESANTÍAS) - INFORMACIÓN ADICIONAL:**
+- Solo se recibirá la solicitud y anexos de forma digital por medio de la aplicación web
+- NO serán recibidos de forma física o por correo electrónico
+- Ningún coordinador está autorizado para recibir estos documentos de forma física
+- **PLAZOS DE PROCESAMIENTO:**
+  * Si la solicitud es enviada ANTES del día 24 del mes: Será revisada y en caso de ser aprobada será incluida junto con la compensación del mes en curso
+  * Si la solicitud es enviada DESPUÉS del día 24 del mes: Será revisada y en caso de ser aprobada será incluida junto con la compensación del mes SIGUIENTE
+- **HORARIO DE REVISIÓN:** Días hábiles de lunes a viernes de 7:00 a.m. a 4:00 p.m.
+- **NOTA IMPORTANTE:** Cualquier solicitud registrada fuera del horario de revisión se entenderá presentada el siguiente día hábil
+- Ejemplo: Si envía su solicitud un viernes a las 5:00 p.m., se considerará presentada el siguiente día hábil (lunes)
+
 INSTRUCCIONES PARA PROPORCIONAR ENLACES:
 1. Cuando el usuario pregunte sobre un servicio específico, SIEMPRE incluye el enlace correspondiente
 2. Usa el formato markdown: [Texto del enlace](URL)

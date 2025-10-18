@@ -82,6 +82,7 @@ type MicrocreditoFormValues = z.infer<typeof microcreditoFormSchema>;
 
 const SolicitudMicrocreditoPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<MicrocreditoFormValues>({
     resolver: zodResolver(microcreditoFormSchema),
     defaultValues: {
@@ -99,6 +100,7 @@ const SolicitudMicrocreditoPage: React.FC = () => {
   });
 
   const onSubmit = async (data: MicrocreditoFormValues) => {
+    setIsSubmitting(true);
     try {
       const requestData = {
         request_type: "microcredito",
@@ -131,6 +133,8 @@ const SolicitudMicrocreditoPage: React.FC = () => {
       toast.error("Error", {
         description: "Error al enviar solicitud. Por favor intente nuevamente.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -293,10 +297,20 @@ const SolicitudMicrocreditoPage: React.FC = () => {
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full sm:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send className="mr-2 h-5 w-5" />
-                  Enviar Solicitud
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-5 w-5" />
+                      Enviar Solicitud
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

@@ -45,6 +45,7 @@ type FormValuesIncapacidades = z.infer<typeof formSchemaIncapacidades>;
 
 const IncapacidadesLicenciasPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<FormValuesIncapacidades>({
     resolver: zodResolver(formSchemaIncapacidades),
     defaultValues: {
@@ -64,6 +65,7 @@ const IncapacidadesLicenciasPage: React.FC = () => {
   });
 
   const onSubmit = async (data: FormValuesIncapacidades) => {
+    setIsSubmitting(true);
     try {
       const files: Record<string, File> = {};
       if (data.certificadoIncapacidad) {
@@ -104,6 +106,8 @@ const IncapacidadesLicenciasPage: React.FC = () => {
       }, 500);
     } catch (error) {
       handleError(error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -156,9 +160,23 @@ const IncapacidadesLicenciasPage: React.FC = () => {
             <AutorizacionDatosSection />
                         
             <div className="flex justify-center mt-10">
-              <Button type="submit" size="lg" className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2">
-                <Send className="h-5 w-5" />
-                Enviar Solicitud
+              <Button 
+                type="submit" 
+                size="lg" 
+                disabled={isSubmitting}
+                className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Enviar Solicitud
+                  </>
+                )}
               </Button>
             </div>
           </form>

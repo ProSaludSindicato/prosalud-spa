@@ -109,6 +109,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const SolicitudCertificadoConvenioPage: React.FC = () => {
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -142,6 +143,7 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
+    setIsSubmitting(true);
     try {
       const files: Record<string, File> = {};
       if (data.actividadesPdf) {
@@ -191,6 +193,8 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
       }, 500);
     } catch (error) {
       handleError();
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -270,9 +274,23 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
             */}
             
             <div className="flex justify-center mt-10">
-              <Button type="submit" size="lg" className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2">
-                <Send className="h-5 w-5" />
-                Enviar Solicitud
+              <Button 
+                type="submit" 
+                size="lg" 
+                disabled={isSubmitting}
+                className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Enviar Solicitud
+                  </>
+                )}
               </Button>
             </div>
           </form>
