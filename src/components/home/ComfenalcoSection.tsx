@@ -125,7 +125,7 @@ const ComfenalcoSection: React.FC = () => {
         {/* Hero Carousel - Solo mostrar si hay eventos de carrusel */}
         {featuredEvents.length > 0 && (
           <div className="relative mb-8">
-            <div className="relative h-96 md:h-[500px] rounded-3xl overflow-hidden shadow-2xl">
+            <div className="relative h-80 md:h-96 rounded-3xl overflow-hidden shadow-2xl">
               {featuredEvents.map((event, index) => (
                 <div
                   key={event.id}
@@ -235,7 +235,7 @@ const ComfenalcoSection: React.FC = () => {
 
         {/* Mosaic Grid - Solo mostrar si hay eventos de mosaico */}
         {mosaicEvents.length > 0 && (
-          <div className="grid grid-cols-12 gap-4 h-80 md:h-96">
+          <div className="grid grid-cols-12 gap-4 h-72 md:h-80">
             {mosaicEvents.map((event, index) => {
               const isLarge = index === 0;
               const colSpan = isLarge ? 'col-span-12 md:col-span-8' : 'col-span-12 md:col-span-4';
