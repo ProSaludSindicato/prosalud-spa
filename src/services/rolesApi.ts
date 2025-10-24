@@ -1,6 +1,6 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = 'https://prosalud-platform-dev.up.railway.app/api';
+const API_BASE_URL = "https://prosalud.test/api";
 
 // Backend types
 interface BackendPermission {
@@ -44,8 +44,8 @@ interface BackendPermissionResponse {
 const rolesApi = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
   timeout: 30000,
 });
@@ -57,9 +57,9 @@ rolesApi.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('[Roles API] Request error:', error);
+    console.error("[Roles API] Request error:", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor
@@ -69,25 +69,25 @@ rolesApi.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('[Roles API] Response error:', error.response?.data || error.message);
-    
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      throw new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet.');
+    console.error("[Roles API] Response error:", error.response?.data || error.message);
+
+    if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+      throw new Error("No se pudo conectar con el servidor. Verifica tu conexión a internet.");
     }
-    
+
     if (error.response) {
-      const message = error.response.data?.message || 'Error en la solicitud';
+      const message = error.response.data?.message || "Error en la solicitud";
       throw new Error(message);
     }
-    
+
     throw error;
-  }
+  },
 );
 
 // API methods
 export const realRolesApi = {
   async getRoles(): Promise<BackendRolesResponse> {
-    const response = await rolesApi.get<BackendRolesResponse>('/roles');
+    const response = await rolesApi.get<BackendRolesResponse>("/roles");
     return response.data;
   },
 
@@ -102,7 +102,7 @@ export const realRolesApi = {
   },
 
   async getPermissions(): Promise<BackendPermissionsResponse> {
-    const response = await rolesApi.get<BackendPermissionsResponse>('/permissions');
+    const response = await rolesApi.get<BackendPermissionsResponse>("/permissions");
     return response.data;
   },
 
