@@ -15,7 +15,7 @@ import {
   User,
   Search,
   CreditCard,
-  CircleMinus,
+  FileText,
   Download,
   ThumbsUp,
   ThumbsDown,
@@ -2660,7 +2660,7 @@ Comunícate al (604) 444 8520 o al WhatsApp +57 317 675 3506
                   <div className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <CircleMinus className="h-5 w-5 text-prosalud-salud" />
+                        <FileText className="h-5 w-5 text-prosalud-salud" />
                         Consultar liquidación pendiente
                       </CardTitle>
                       <button
@@ -2671,7 +2671,7 @@ Comunícate al (604) 444 8520 o al WhatsApp +57 317 675 3506
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <LiquidacionForm onSubmit={handleLiquidacionFormSubmit} onCancel={closeLiquidacionForm} />
+                    <LiquidacionForm onSubmit={handleLiquidacionFormSubmit} isLoading={isConsultingLiquidacion} />
                   </div>
                 ) : (
                   <div
@@ -2812,7 +2812,7 @@ Comunícate al (604) 444 8520 o al WhatsApp +57 317 675 3506
                         onClick={() => setShowLiquidacionForm(true)}
                         className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                       >
-                        <CircleMinus className="h-4 w-4 text-prosalud-salud" />
+                        <FileText className="h-4 w-4 text-prosalud-salud" />
                         Consultar liquidación pendiente
                       </button>
                     </div>

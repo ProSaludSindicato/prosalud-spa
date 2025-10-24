@@ -1,50 +1,82 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface LiquidacionFormProps {
-  onSubmit: (data: { tipoDocumento: string; numeroDocumento: string; fechaExpedicion: string }) => void;
-  onCancel: () => void;
+  onSubmit: (data: FormData) => void;
+  isLoading: boolean;
 }
 
-const LiquidacionForm: React.FC<LiquidacionFormProps> = ({ onSubmit, onCancel }) => {
-  const [formData, setFormData] = useState({
-    tipoDocumento: '',
+interface FormData {
+  tipoDocumento: string;
+  numeroDocumento: string;
+  fechaExpedicion: string;
+}
+
+const documentTypes = [
+    { value: "CC", label: "Cédula de Ciudadanía (CC)" },
+    { value: "CE", label: "Cédula de Extranjería (CE)" },
+    { value: "PP", label: "Pasaporte (PP)" },
+    { value: "PT", label: "Permiso por protección temporal (PT)" },
+];
+
+const getDocumentValidation = (tipo: string) => {
+  const validations = {
+    'CC': { min: 6, max: 10 },
+    'TI': { min: 10, max: 11 },
+    'CE': { min: 6, max: 12 },
+    'PP': { min: 6, max: 20 },
+    'RC': { min: 10, max: 11 }
+  };
+  return validations[tipo as keyof typeof validations] || { min: 6, max: 20 };
+};
+
+// Get today's date in YYYY-MM-DD format for max attribute
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
+export default function LiquidacionForm({ onSubmit, isLoading }: LiquidacionFormProps) {
+  const [formData, setFormData] = useState<FormData>({
+    tipoDocumento: 'CC',
     numeroDocumento: '',
-    fechaExpedicion: '',
+    fechaExpedicion: ''
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<FormData>>({});
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
+  const validateForm = (): boolean => {
+    const newErrors: Partial<FormData> = {};
+    
     if (!formData.tipoDocumento) {
-      newErrors.tipoDocumento = 'Selecciona un tipo de documento';
+      newErrors.tipoDocumento = 'El tipo de documento es requerido';
     }
-
+    
     if (!formData.numeroDocumento) {
-      newErrors.numeroDocumento = 'Ingresa tu número de documento';
-    } else if (!/^\d+$/.test(formData.numeroDocumento)) {
-      newErrors.numeroDocumento = 'Solo se permiten números';
-    }
-
-    if (!formData.fechaExpedicion) {
-      newErrors.fechaExpedicion = 'Selecciona la fecha de expedición';
+      newErrors.numeroDocumento = 'El número de documento es requerido';
     } else {
-      const selectedDate = new Date(formData.fechaExpedicion);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (selectedDate > today) {
+      const validation = getDocumentValidation(formData.tipoDocumento);
+      if (formData.numeroDocumento.length < validation.min || formData.numeroDocumento.length > validation.max) {
+        newErrors.numeroDocumento = `Debe tener entre ${validation.min} y ${validation.max} dígitos`;
+      }
+      if (!/^\d+$/.test(formData.numeroDocumento)) {
+        newErrors.numeroDocumento = 'Solo se permiten números';
+      }
+    }
+    
+    if (!formData.fechaExpedicion) {
+      newErrors.fechaExpedicion = 'La fecha de expedición es requerida';
+    } else {
+      const fechaSeleccionada = new Date(formData.fechaExpedicion);
+      const hoy = new Date();
+      if (fechaSeleccionada > hoy) {
         newErrors.fechaExpedicion = 'La fecha no puede ser futura';
       }
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -56,86 +88,96 @@ const LiquidacionForm: React.FC<LiquidacionFormProps> = ({ onSubmit, onCancel })
     }
   };
 
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
   return (
-    <Card className="border-border bg-card">
-      <CardHeader>
-        <CardTitle className="text-xl">Consultar Liquidación Pendiente</CardTitle>
-        <CardDescription>
-          Ingresa tus datos para consultar el estado de tu proceso de liquidación
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      <CardContent className="py-4">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="tipoDocumento">Tipo de documento *</Label>
-            <Select
-              value={formData.tipoDocumento}
-              onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Tipo de documento *
+            </label>
+            <Select 
+              value={formData.tipoDocumento} 
+              onValueChange={(value) => handleInputChange('tipoDocumento', value)}
             >
-              <SelectTrigger className={errors.tipoDocumento ? 'border-destructive' : ''}>
-                <SelectValue placeholder="Selecciona el tipo" />
+              <SelectTrigger className="w-full">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
-                <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
-                <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
-                <SelectItem value="PP">Pasaporte (PP)</SelectItem>
+                {documentTypes.map((doc) => (
+                  <SelectItem key={doc.value} value={doc.value}>
+                    {doc.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {errors.tipoDocumento && (
-              <p className="text-sm text-destructive">{errors.tipoDocumento}</p>
+              <p className="text-red-500 text-xs mt-1">{errors.tipoDocumento}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="numeroDocumento">Número de documento *</Label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Número de documento *
+            </label>
             <Input
-              id="numeroDocumento"
               type="text"
-              placeholder="Ej: 1234567890"
               value={formData.numeroDocumento}
-              onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
-              className={errors.numeroDocumento ? 'border-destructive' : ''}
+              onChange={(e) => handleInputChange('numeroDocumento', e.target.value)}
+              placeholder="Ingresa tu número de documento"
+              className="w-full"
             />
             {errors.numeroDocumento && (
-              <p className="text-sm text-destructive">{errors.numeroDocumento}</p>
+              <p className="text-red-500 text-xs mt-1">{errors.numeroDocumento}</p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="fechaExpedicion">Fecha de expedición del documento *</Label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Fecha de expedición *
+            </label>
             <Input
-              id="fechaExpedicion"
               type="date"
               value={formData.fechaExpedicion}
-              onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-              max={new Date().toISOString().split('T')[0]}
-              className={errors.fechaExpedicion ? 'border-destructive' : ''}
+              onChange={(e) => handleInputChange('fechaExpedicion', e.target.value)}
+              max={getTodayDate()}
+              className="w-full"
             />
             {errors.fechaExpedicion && (
-              <p className="text-sm text-destructive">{errors.fechaExpedicion}</p>
+              <p className="text-red-500 text-xs mt-1">{errors.fechaExpedicion}</p>
             )}
           </div>
 
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Esta información es confidencial y solo será visible para ti.
-            </AlertDescription>
-          </Alert>
-
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" className="flex-1">
-              Consultar
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-              Cancelar
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-prosalud-salud hover:bg-prosalud-salud/90 text-white"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Consultando...
+              </>
+            ) : (
+              'Consultar Liquidación'
+            )}
+          </Button>
         </form>
+
+        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            🔒 <strong>Privacidad:</strong> Tus datos son tratados de forma segura y confidencial según nuestras políticas de privacidad.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
-};
-
-export default LiquidacionForm;
+}
