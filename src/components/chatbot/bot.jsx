@@ -1916,18 +1916,6 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     };
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
-      user_question: userQueryMessage.content,
-      bot_answer: "Consultando...",
-      metadata: {
-        quick_action: true,
-        action_type: "consultar_incapacidad",
-        form_data: {
-          tipoDocumento: formData.tipoDocumento,
-          numeroDocumento: formData.numeroDocumento,
-          fechaExpedicion: formData.fechaExpedicion
-        }
-      },
-      client_turn_id: userTurnId
     });
 
     try {
