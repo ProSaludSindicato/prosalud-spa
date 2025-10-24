@@ -1911,6 +1911,24 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
 
+    // Guardar la consulta del usuario en el backend
+    const userTurnId = generateClientTurnId();
+    saveConversationToBackend({
+      conversation_id: conversationId,
+      user_question: userQueryMessage.content,
+      bot_answer: "Consultando...",
+      metadata: {
+        quick_action: true,
+        action_type: "consultar_incapacidad",
+        form_data: {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion
+        }
+      },
+      client_turn_id: userTurnId
+    });
+
     try {
       // Usar servicio real de API
       const incapacidades = await consultarIncapacidad(formData);
@@ -1946,6 +1964,21 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         newMessages[newMessages.length - 1] = responseMessage;
         return newMessages;
       });
+
+      // Guardar la respuesta del bot en el backend
+      const botTurnId = generateClientTurnId();
+      saveConversationToBackend({
+        conversation_id: conversationId,
+        user_question: userQueryMessage.content,
+        bot_answer: responseMessage.content,
+        metadata: {
+          quick_action: true,
+          action_type: "consultar_incapacidad",
+          result_count: incapacidades.length,
+          success: true
+        },
+        client_turn_id: botTurnId
+      });
     } catch (error) {
       console.error("Error en consulta de incapacidad:", error);
 
@@ -1969,6 +2002,21 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = errorMessage;
         return newMessages;
+      });
+
+      // Guardar el error en el backend
+      const errorTurnId = generateClientTurnId();
+      saveConversationToBackend({
+        conversation_id: conversationId,
+        user_question: userQueryMessage.content,
+        bot_answer: errorContent,
+        metadata: {
+          quick_action: true,
+          action_type: "consultar_incapacidad",
+          success: false,
+          error_status: error?.response?.status || "unknown"
+        },
+        client_turn_id: errorTurnId
       });
     } finally {
       setIsConsultingIncapacidad(false);
@@ -2185,6 +2233,24 @@ ${incapacidad.detalles}
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
 
+    // Guardar la consulta del usuario en el backend
+    const userTurnId = generateClientTurnId();
+    saveConversationToBackend({
+      conversation_id: conversationId,
+      user_question: userQueryMessage.content,
+      bot_answer: "Consultando...",
+      metadata: {
+        quick_action: true,
+        action_type: "consultar_liquidacion",
+        form_data: {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion
+        }
+      },
+      client_turn_id: userTurnId
+    });
+
     try {
       // Llamar al servicio
       const liquidaciones = await consultarLiquidacion(formData);
@@ -2218,6 +2284,21 @@ ${incapacidad.detalles}
         newMessages[newMessages.length - 1] = responseMessage;
         return newMessages;
       });
+
+      // Guardar la respuesta del bot en el backend
+      const botTurnId = generateClientTurnId();
+      saveConversationToBackend({
+        conversation_id: conversationId,
+        user_question: userQueryMessage.content,
+        bot_answer: responseMessage.content,
+        metadata: {
+          quick_action: true,
+          action_type: "consultar_liquidacion",
+          result_count: liquidaciones.length,
+          success: true
+        },
+        client_turn_id: botTurnId
+      });
     } catch (error) {
       console.error("Error en consulta de liquidación:", error);
 
@@ -2241,6 +2322,21 @@ ${incapacidad.detalles}
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = errorMessage;
         return newMessages;
+      });
+
+      // Guardar el error en el backend
+      const errorTurnId = generateClientTurnId();
+      saveConversationToBackend({
+        conversation_id: conversationId,
+        user_question: userQueryMessage.content,
+        bot_answer: errorContent,
+        metadata: {
+          quick_action: true,
+          action_type: "consultar_liquidacion",
+          success: false,
+          error_status: error?.response?.status || "unknown"
+        },
+        client_turn_id: errorTurnId
       });
     } finally {
       setIsConsultingLiquidacion(false);
@@ -2502,11 +2598,12 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
     });
   };
 
-  const handleScroll = () => {
-    if (!messagesEndRef.current?.parentElement) return;
+  const handleScroll = (e) => {
+    const container = e.target;
+    if (!container) return;
     
-    const { scrollTop, scrollHeight, clientHeight } = messagesEndRef.current.parentElement;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 10;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 50;
     setAutoScroll(atBottom);
     setShowScrollButton(!atBottom);
   };
@@ -2523,6 +2620,17 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
     }
   }, [messages, autoScroll]);
 
+  // Efecto para detectar scroll inicial cuando hay mensajes
+  useEffect(() => {
+    if (messages.length > 0 && messagesEndRef.current?.parentElement) {
+      const container = messagesEndRef.current.parentElement;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setShowScrollButton(!atBottom);
+    }
+  }, [messages]);
+
+  // Agregar listener de scroll al contenedor
   useEffect(() => {
     const messagesContainer = messagesEndRef.current?.parentElement;
     if (messagesContainer) {
