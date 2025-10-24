@@ -89,6 +89,8 @@ export default function ChatBot() {
   const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(true);
   const [currentTooltipMessage, setCurrentTooltipMessage] = useState(0);
   const [showSpellCheckSuggestions, setShowSpellCheckSuggestions] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Estado para tracking de tokens y costos
   const [conversationTokens, setConversationTokens] = useState({
@@ -2148,10 +2150,18 @@ ${incapacidad.detalles}
 
   const closeIncapacidadForm = () => {
     setShowIncapacidadForm(false);
+    // Hacer scroll al final después de cerrar el formulario
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
 
   const closeLiquidacionForm = () => {
     setShowLiquidacionForm(false);
+    // Hacer scroll al final después de cerrar el formulario
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
 
   // Función para manejar la consulta de liquidaciones
@@ -2353,28 +2363,28 @@ Ocurrió un problema al procesar tu solicitud.
 
     // Información personal
     response += `**👤 Tus datos:**
-• Nombre: ${liquidacion.NOMBRE || "N/A"}
-• Documento: ${liquidacion["TIPO DE DOCUMENTO"]} ${liquidacion["N° DOCUMENTO"]}
-• Fecha expedición: ${liquidacion["FECHA EXPEDICION"]}
+- Nombre: ${liquidacion.NOMBRE || "N/A"}
+- Documento: ${liquidacion["TIPO DE DOCUMENTO"]} ${liquidacion["N° DOCUMENTO"]}
+- Fecha expedición: ${liquidacion["FECHA EXPEDICION"]}
 
 `;
 
     // Información laboral
     response += `**🏥 Información laboral:**
-• Hospital: ${liquidacion.HOSPITAL || "N/A"}
-• Cargo: ${liquidacion.PROCESO || "N/A"}
-• Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
-${liquidacion["FECHA RETIRO"] ? `• Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `• Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}`;
+- Hospital: ${liquidacion.HOSPITAL || "N/A"}
+- Cargo: ${liquidacion.PROCESO || "N/A"}
+- Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
+${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `- Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}`;
 
     // Estado del proceso
     const estadoLabel = estado === "Retirado" ? "Retirado" : estado;
-    response += `• Estado del proceso: ${estadoLabel}\n\n`;
+    response += `- Estado del proceso: ${estadoLabel}\n\n`;
 
     // Convenios
     response += `**📑 Convenios:**
-• Total de convenios: ${liquidacion.CONVENIOS || "0"}
-• Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
-• Convenios pendientes: ${conveniosPendientes}
+- Total de convenios: ${liquidacion.CONVENIOS || "0"}
+- Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
+- Convenios pendientes: ${conveniosPendientes}
 
 `;
 
@@ -2415,14 +2425,14 @@ ${liquidacion["FECHA RETIRO"] ? `• Fecha retiro: ${liquidacion["FECHA RETIRO"]
     response += `\n---\n\n**📞 ¿Necesitas ayuda o tienes dudas?**
 
 Puedes comunicarte con nosotros para:
-• Enviar los documentos pendientes
-• Aclarar dudas sobre tu liquidación
-• Conocer los siguientes pasos
+- Enviar los documentos pendientes
+- Aclarar dudas sobre tu liquidación
+- Conocer los siguientes pasos
 
 **Contáctanos por:**
-• Teléfono: (604) 444 8520 - (604) 291 9494
-• WhatsApp: +57 317 675 3506
-• Correo: asistentetalentohumano@prosalud.co
+- Teléfono: (604) 444 8520 - (604) 291 9494
+- WhatsApp: +57 317 675 3506
+- Correo: asistentetalentohumano@prosalud.co
 
 **🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
@@ -2441,17 +2451,17 @@ Puedes comunicarte con nosotros para:
       const estadoLabel = liq["ESTADO BD"] === "Retirado" ? "Retirado" : liq["ESTADO BD"];
 
       response += `**${index + 1}. ${icon} Liquidación - ${liq.HOSPITAL}**
-• Cargo: ${liq.PROCESO}
-• Estado del proceso: ${estadoLabel}
-• Convenios pendientes: ${conveniosPendientes}
-${docsPendientes && docsPendientes !== "OK" ? `• Documentos pendientes: ${docsPendientes}\n` : `• Documentos: Completos\n`}
+- Cargo: ${liq.PROCESO}
+- Estado del proceso: ${estadoLabel}
+- Convenios pendientes: ${conveniosPendientes}
+${docsPendientes && docsPendientes !== "OK" ? `- Documentos pendientes: ${docsPendientes}\n` : `- Documentos: Completos\n`}
 `;
     });
 
     response += `\n---\n\n**📞 Para más información:**
 Comunícate con nosotros para conocer los detalles de cada proceso:
-• Teléfono: (604) 444 8520 - (604) 291 9494
-• WhatsApp: +57 317 675 3506
+- Teléfono: (604) 444 8520 - (604) 291 9494
+- WhatsApp: +57 317 675 3506
 
 **🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
@@ -2493,9 +2503,18 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
   };
 
   const handleScroll = () => {
+    if (!messagesEndRef.current?.parentElement) return;
+    
     const { scrollTop, scrollHeight, clientHeight } = messagesEndRef.current.parentElement;
     const atBottom = scrollHeight - scrollTop - clientHeight < 10;
     setAutoScroll(atBottom);
+    setShowScrollButton(!atBottom);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setAutoScroll(true);
+    setShowScrollButton(false);
   };
 
   useEffect(() => {
@@ -2835,25 +2854,56 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                   </div>
                 )}
 
+                {/* Botón flotante para scroll al final */}
+                {!showIncapacidadForm && !showLiquidacionForm && showScrollButton && (
+                  <button
+                    onClick={scrollToBottom}
+                    className="absolute bottom-4 right-4 z-10 rounded-full bg-prosalud-salud p-3 text-white shadow-lg transition-all duration-300 hover:scale-110 hover:bg-prosalud-salud/90 focus:outline-none"
+                    title="Ir al final de la conversación"
+                    aria-label="Ir al final"
+                  >
+                    <ChevronDown className="h-5 w-5" />
+                  </button>
+                )}
+
                 {/* Consultas rápidas */}
                 {!showIncapacidadForm && !showLiquidacionForm && (
                   <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-                    <div className="px-3 py-3 space-y-2">
+                    <div
+                      className="flex items-center justify-between px-3 py-2 cursor-pointer"
+                      onClick={() => setShowQuickActions(!showQuickActions)}
+                    >
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Trámites rápidos</p>
                       <button
-                        onClick={() => setShowIncapacidadForm(true)}
-                        className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
+                        className="text-gray-600 transition-colors duration-300 hover:text-prosalud-salud focus:outline-none dark:text-gray-400 dark:hover:text-prosalud-salud"
+                        aria-label={showQuickActions ? "Ocultar trámites" : "Mostrar trámites"}
                       >
-                        <CreditCard className="h-4 w-4 text-prosalud-salud" />
-                        Consultar pago de una incapacidad
-                      </button>
-                      <button
-                        onClick={() => setShowLiquidacionForm(true)}
-                        className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
-                      >
-                        <FileText className="h-4 w-4 text-prosalud-salud" />
-                        Consultar liquidación pendiente
+                        {showQuickActions ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
+
+                    {showQuickActions && (
+                      <div className="px-3 pb-3 space-y-2">
+                        <button
+                          onClick={() => setShowIncapacidadForm(true)}
+                          className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
+                        >
+                          <CreditCard className="h-4 w-4 text-prosalud-salud" />
+                          Consultar pago de una incapacidad
+                        </button>
+                        <button
+                          onClick={() => setShowLiquidacionForm(true)}
+                          className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
+                        >
+                          <FileText className="h-4 w-4 text-prosalud-salud" />
+                          Consultar liquidación pendiente
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
