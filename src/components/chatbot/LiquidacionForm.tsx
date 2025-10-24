@@ -68,7 +68,7 @@ export default function LiquidacionForm({ onSubmit, isLoading }: LiquidacionForm
     }
     
     if (!formData.fechaExpedicion) {
-      newErrors.fechaExpedicion = 'La fecha de expedición es requerida';
+      newErrors.fechaExpedicion = 'La fecha de expedición del documento es requerida';
     } else {
       const fechaSeleccionada = new Date(formData.fechaExpedicion);
       const hoy = new Date();
@@ -142,7 +142,7 @@ export default function LiquidacionForm({ onSubmit, isLoading }: LiquidacionForm
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Fecha de expedición *
+              Fecha de expedición del documento *
             </label>
             <Input
               type="date"
