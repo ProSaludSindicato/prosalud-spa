@@ -19,6 +19,7 @@ import {
   Download,
   ThumbsUp,
   ThumbsDown,
+  Zap,
   HelpCircle,
 } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/cjs/light";
@@ -1027,10 +1028,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     // Limitar a 500 caracteres
     if (value.length <= MAX_CHARS) {
       setInputMessage(value);
-      
+
       // Mostrar sugerencias si hay texto
       setShowSpellCheckSuggestions(value.trim().length > 0);
-      
+
       adjustTextareaHeight();
     }
   };
@@ -1038,10 +1039,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
   const handleSelectSuggestion = (suggestion) => {
     setInputMessage(suggestion);
     setShowSpellCheckSuggestions(false);
-    
+
     // Ajustar altura del textarea
     adjustTextareaHeight();
-    
+
     // Enfocar el textarea
     if (textareaRef.current) {
       textareaRef.current.focus();
@@ -1145,11 +1146,11 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           if (errorData.error) {
             errorMessage = errorData.error;
           }
-          
+
           // Manejar rate limit específicamente
           if (response.status === 429 && errorData.rateLimitExceeded) {
             isRateLimitError = true;
-            
+
             // Actualizar información de uso si está disponible
             if (errorData.usageInfo) {
               setRateLimitInfo({
@@ -1200,12 +1201,11 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       if (data.usageInfo) {
         const { messagesHour, messagesDay } = data.usageInfo;
         const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
-        
+
         // Mostrar advertencia si está cerca del límite (80% o más)
-        const showWarning = 
-          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || 
-          messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
-        
+        const showWarning =
+          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
+
         setRateLimitInfo({
           messagesHour,
           messagesDay,
@@ -1277,32 +1277,32 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
     // 🔧 Normalizar términos coloquiales a terminología sindical ProSalud
     const terminologiaSindical = {
-      'certificado de convenio': 'carta laboral',
-      'certificado convenio': 'carta laboral',
-      'prima': 'compensación semestral',
-      'prima semestral': 'compensación semestral',
-      'vacaciones': 'compensación anual por descanso',
-      'cesantías': 'compensación anual diferida',
-      'cesantias': 'compensación anual diferida',
-      'intereses': 'rendimientos',
-      'intereses a las cesantías': 'rendimientos',
-      'intereses cesantías': 'rendimientos',
-      'salario': 'compensación',
-      'liquidación pendiente': 'compensación final pendiente',
-      'liquidacion pendiente': 'compensación final pendiente',
-      'estado de liquidación': 'estado de compensación final',
-      'estado de liquidacion': 'estado de compensación final',
-      'proceso de liquidación': 'proceso de compensación final',
-      'proceso de liquidacion': 'proceso de compensación final',
-      'caja de compensación': 'comfenalco',
-      'caja de compensacion': 'comfenalco',
-      'caja compensación familiar': 'comfenalco',
-      'caja de compensación familiar': 'comfenalco',
+      "certificado de convenio": "carta laboral",
+      "certificado convenio": "carta laboral",
+      prima: "compensación semestral",
+      "prima semestral": "compensación semestral",
+      vacaciones: "compensación anual por descanso",
+      cesantías: "compensación anual diferida",
+      cesantias: "compensación anual diferida",
+      intereses: "rendimientos",
+      "intereses a las cesantías": "rendimientos",
+      "intereses cesantías": "rendimientos",
+      salario: "compensación",
+      "liquidación pendiente": "compensación final pendiente",
+      "liquidacion pendiente": "compensación final pendiente",
+      "estado de liquidación": "estado de compensación final",
+      "estado de liquidacion": "estado de compensación final",
+      "proceso de liquidación": "proceso de compensación final",
+      "proceso de liquidacion": "proceso de compensación final",
+      "caja de compensación": "comfenalco",
+      "caja de compensacion": "comfenalco",
+      "caja compensación familiar": "comfenalco",
+      "caja de compensación familiar": "comfenalco",
     };
 
     // Normalizar el texto del usuario antes de procesarlo
     Object.entries(terminologiaSindical).forEach(([coloquial, sindical]) => {
-      const regex = new RegExp(coloquial, 'gi');
+      const regex = new RegExp(coloquial, "gi");
       text = text.replace(regex, sindical);
     });
 
@@ -1319,22 +1319,55 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       const isNewQuestion = (() => {
         // Si tiene más de 6 palabras, probablemente es una pregunta nueva
         if (trimmedInput.split(/\s+/).length > 6) return true;
-        
+
         // Si contiene palabras clave de otros servicios/temas de ProSalud
         const otherTopicsKeywords = [
-          'certificado', 'descanso', 'compensación', 'retiro', 'afiliación', 'comfenalco',
-          'sst', 'seguridad', 'salud', 'trabajo', 'bienestar', 'eventos', 'galería',
-          'microcrédito', 'permisos', 'turnos', 'cuenta', 'bancaria', 'convenio',
-          'estatutos', 'beneficios', 'contrato', 'sindical', 'quiénes', 'somos',
-          'contacto', 'teléfono', 'correo', 'dirección', 'horario', 'servicio',
-          'eps', 'sura', 'cómo', 'cuándo', 'dónde', 'qué', 'por qué', 'ayuda'
+          "certificado",
+          "descanso",
+          "compensación",
+          "retiro",
+          "afiliación",
+          "comfenalco",
+          "sst",
+          "seguridad",
+          "salud",
+          "trabajo",
+          "bienestar",
+          "eventos",
+          "galería",
+          "microcrédito",
+          "permisos",
+          "turnos",
+          "cuenta",
+          "bancaria",
+          "convenio",
+          "estatutos",
+          "beneficios",
+          "contrato",
+          "sindical",
+          "quiénes",
+          "somos",
+          "contacto",
+          "teléfono",
+          "correo",
+          "dirección",
+          "horario",
+          "servicio",
+          "eps",
+          "sura",
+          "cómo",
+          "cuándo",
+          "dónde",
+          "qué",
+          "por qué",
+          "ayuda",
         ];
-        return otherTopicsKeywords.some(keyword => trimmedInput.includes(keyword));
+        return otherTopicsKeywords.some((keyword) => trimmedInput.includes(keyword));
       })();
 
       // Si es una pregunta nueva, permitir que se procese normalmente (salir del modo selección)
       if (isNewQuestion) {
-        console.log('✅ Detectada pregunta nueva sobre otro tema, saliendo del modo selección de incapacidad');
+        console.log("✅ Detectada pregunta nueva sobre otro tema, saliendo del modo selección de incapacidad");
         // Continuar con el flujo normal sin procesar como selección
       } else {
         // Ver todas
@@ -1370,7 +1403,11 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
         // Selección por índice
         const selectedNumber = parseInt(trimmedInput, 10);
-        if (!isNaN(selectedNumber) && selectedNumber >= 1 && selectedNumber <= lastBotMessage.multipleIncapacidades.length) {
+        if (
+          !isNaN(selectedNumber) &&
+          selectedNumber >= 1 &&
+          selectedNumber <= lastBotMessage.multipleIncapacidades.length
+        ) {
           const selectedIncapacidad = lastBotMessage.multipleIncapacidades[selectedNumber - 1];
           const detailMessage = {
             role: "assistant",
@@ -1391,7 +1428,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
         // Selección por radicado (admite "N° Radicado" o "RADICADO")
         const selectedByRadicado = lastBotMessage.multipleIncapacidades.find((inc) => {
-          const r1 = inc["N° Radicado"]; const r2 = inc["RADICADO"]; 
+          const r1 = inc["N° Radicado"];
+          const r2 = inc["RADICADO"];
           return [r1, r2].some((r) => r && r.toString().toLowerCase() === trimmedInput);
         });
         if (selectedByRadicado) {
@@ -1524,39 +1562,39 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       // Verificar si hay rate limit activo antes de mostrar mensaje de seguridad
       const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
       const { messagesHour, messagesDay } = rateLimitInfo;
-      
+
       // Si el límite está alcanzado, mostrar mensaje de rate limit en lugar del mensaje de seguridad
       if (messagesHour >= RATE_LIMITS.messagesPerHour || messagesDay >= RATE_LIMITS.messagesPerDay) {
         const now = Date.now();
         const oneHourMs = 60 * 60 * 1000;
-        const rateLimitStorage = JSON.parse(localStorage.getItem('chatbot_rate_limit') || '{}');
+        const rateLimitStorage = JSON.parse(localStorage.getItem("chatbot_rate_limit") || "{}");
         const firstMessageTime = rateLimitStorage.firstMessageTime || now;
         const timeElapsed = now - firstMessageTime;
         const timeRemaining = oneHourMs - timeElapsed;
         const minutesRemaining = Math.ceil(timeRemaining / (60 * 1000));
-        
+
         const rateLimitMessage = {
           role: "assistant",
           content: `⚠️ Has alcanzado el límite de ${RATE_LIMITS.messagesPerHour} mensajes por hora. Intenta de nuevo en aproximadamente ${minutesRemaining} minutos.`,
           isBot: true,
         };
-        
+
         const userMessage = {
           role: "user",
           content: text,
           isBot: false,
         };
-        
+
         setMessages((prev) => [...prev, userMessage, rateLimitMessage]);
         setInputMessage("");
         setIsSuggestionsExpanded(false);
-        
+
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";
         }
         return;
       }
-      
+
       // Si no hay rate limit, mostrar mensaje de seguridad normal
       const securityMessage = {
         role: "assistant",
@@ -1728,19 +1766,19 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       // Llama a edge function, recibe la respuesta completa (sin streaming)
       const result = await solicitarRespuestaConOpenAI(promptMessages);
-      
+
       // Simular streaming para mostrar animación de escritura
       const responseText = result.text;
-      const words = responseText.split(' ');
-      let currentText = '';
-      
+      const words = responseText.split(" ");
+      let currentText = "";
+
       // Mostrar palabras progresivamente
       for (let i = 0; i < words.length; i++) {
-        currentText += (i > 0 ? ' ' : '') + words[i];
-        
+        currentText += (i > 0 ? " " : "") + words[i];
+
         setMessages((prev) => {
           const updated = [...prev];
-          const tempMsgIndex = updated.findIndex(m => m.tempId === tempBotMessageId);
+          const tempMsgIndex = updated.findIndex((m) => m.tempId === tempBotMessageId);
           if (tempMsgIndex !== -1) {
             updated[tempMsgIndex] = {
               ...updated[tempMsgIndex],
@@ -1750,21 +1788,20 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           }
           return updated;
         });
-        
+
         // Pequeño delay para simular escritura (más rápido para mejor UX)
-        await new Promise(resolve => setTimeout(resolve, 30));
+        await new Promise((resolve) => setTimeout(resolve, 30));
       }
 
       // Actualizar información de rate limiting después del streaming
       if (result.usageInfo) {
         const { messagesHour, messagesDay } = result.usageInfo;
         const RATE_LIMITS = { messagesPerHour: 15, messagesPerDay: 50 };
-        
+
         // Mostrar advertencia si está cerca del límite (80% o más)
-        const showWarning = 
-          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || 
-          messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
-        
+        const showWarning =
+          messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 || messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
+
         setRateLimitInfo({
           messagesHour,
           messagesDay,
@@ -1781,8 +1818,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
         // Encontrar el mensaje temporal y actualizarlo con la respuesta final
         const updated = [...prevMessages];
-        const tempMsgIndex = updated.findIndex(m => m.tempId === tempBotMessageId);
-        
+        const tempMsgIndex = updated.findIndex((m) => m.tempId === tempBotMessageId);
+
         if (tempMsgIndex !== -1) {
           // Actualizar el mensaje temporal con la respuesta completa
           updated[tempMsgIndex] = {
@@ -1794,11 +1831,11 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           };
 
           // Solo mantener contexto de incapacidades si la categoría detectada es "incapacidades"
-          if (lastIncapContext?.multipleIncapacidades && detectedCategory === 'incapacidades') {
+          if (lastIncapContext?.multipleIncapacidades && detectedCategory === "incapacidades") {
             updated[tempMsgIndex].multipleIncapacidades = lastIncapContext.multipleIncapacidades;
-            console.log('🔄 Manteniendo contexto de incapacidades para pregunta de seguimiento');
-          } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== 'incapacidades') {
-            console.log('✅ Limpiando contexto de incapacidades - nueva categoría:', detectedCategory);
+            console.log("🔄 Manteniendo contexto de incapacidades para pregunta de seguimiento");
+          } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== "incapacidades") {
+            console.log("✅ Limpiando contexto de incapacidades - nueva categoría:", detectedCategory);
           }
         }
 
@@ -1860,9 +1897,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           "⚠️ **Servicio temporalmente no disponible**\n\nEl chatbot ha alcanzado el límite de uso mensual. Por favor, contacta al administrador del sistema para resolver este inconveniente.\n\nPuedes consultar nuestros servicios directamente en el menú o contactarnos para asistencia personalizada.";
       } else if (error.status === 429) {
         // Usar el mensaje específico del error si es rate limit
-        errorMessage = error.isRateLimit && error.message 
-          ? `⚠️ ${error.message}`
-          : "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
+        errorMessage =
+          error.isRateLimit && error.message
+            ? `⚠️ ${error.message}`
+            : "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
       } else if (error.message) {
         // Mostrar el mensaje de error específico si está disponible
         errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
@@ -1951,10 +1989,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         const newMessages = [...prev];
         const finalResponse = {
           ...responseMessage,
-          client_turn_id: generateClientTurnId()
+          client_turn_id: generateClientTurnId(),
         };
         newMessages[newMessages.length - 1] = finalResponse;
-        
+
         // Guardar SOLO la respuesta del bot en el backend (no el mensaje de "consultando")
         (async () => {
           const created = await saveConversationToBackend({
@@ -1966,14 +2004,14 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
               quick_action: true,
               action_type: "consultar_incapacidad",
               result_count: incapacidades.length,
-              success: true
-            }
+              success: true,
+            },
           });
-          
+
           if (created && created.id != null) {
             setMessages((curr) => {
               const copy = [...curr];
-              const idx = copy.findIndex(m => m.client_turn_id === finalResponse.client_turn_id);
+              const idx = copy.findIndex((m) => m.client_turn_id === finalResponse.client_turn_id);
               if (idx >= 0) {
                 copy[idx] = { ...copy[idx], backend_id: created.id };
               }
@@ -1981,7 +2019,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             });
           }
         })();
-        
+
         return newMessages;
       });
     } catch (error) {
@@ -2007,10 +2045,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         const newMessages = [...prev];
         const finalError = {
           ...errorMessage,
-          client_turn_id: generateClientTurnId()
+          client_turn_id: generateClientTurnId(),
         };
         newMessages[newMessages.length - 1] = finalError;
-        
+
         // Guardar SOLO el error en el backend
         (async () => {
           const created = await saveConversationToBackend({
@@ -2022,14 +2060,14 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
               quick_action: true,
               action_type: "consultar_incapacidad",
               success: false,
-              error_status: error?.response?.status || "unknown"
-            }
+              error_status: error?.response?.status || "unknown",
+            },
           });
-          
+
           if (created && created.id != null) {
             setMessages((curr) => {
               const copy = [...curr];
-              const idx = copy.findIndex(m => m.client_turn_id === finalError.client_turn_id);
+              const idx = copy.findIndex((m) => m.client_turn_id === finalError.client_turn_id);
               if (idx >= 0) {
                 copy[idx] = { ...copy[idx], backend_id: created.id };
               }
@@ -2037,7 +2075,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
             });
           }
         })();
-        
+
         return newMessages;
       });
     } finally {
@@ -2287,10 +2325,10 @@ ${incapacidad.detalles}
         const newMessages = [...prev];
         const finalResponse = {
           ...responseMessage,
-          client_turn_id: generateClientTurnId()
+          client_turn_id: generateClientTurnId(),
         };
         newMessages[newMessages.length - 1] = finalResponse;
-        
+
         // Guardar SOLO la respuesta del bot en el backend
         (async () => {
           const created = await saveConversationToBackend({
@@ -2302,14 +2340,14 @@ ${incapacidad.detalles}
               quick_action: true,
               action_type: "consultar_compensacion_final",
               result_count: liquidaciones.length,
-              success: true
-            }
+              success: true,
+            },
           });
-          
+
           if (created && created.id != null) {
             setMessages((curr) => {
               const copy = [...curr];
-              const idx = copy.findIndex(m => m.client_turn_id === finalResponse.client_turn_id);
+              const idx = copy.findIndex((m) => m.client_turn_id === finalResponse.client_turn_id);
               if (idx >= 0) {
                 copy[idx] = { ...copy[idx], backend_id: created.id };
               }
@@ -2317,7 +2355,7 @@ ${incapacidad.detalles}
             });
           }
         })();
-        
+
         return newMessages;
       });
     } catch (error) {
@@ -2343,10 +2381,10 @@ ${incapacidad.detalles}
         const newMessages = [...prev];
         const finalError = {
           ...errorMessage,
-          client_turn_id: generateClientTurnId()
+          client_turn_id: generateClientTurnId(),
         };
         newMessages[newMessages.length - 1] = finalError;
-        
+
         // Guardar SOLO el error en el backend
         (async () => {
           const created = await saveConversationToBackend({
@@ -2358,14 +2396,14 @@ ${incapacidad.detalles}
               quick_action: true,
               action_type: "consultar_compensacion_final",
               success: false,
-              error_status: error?.response?.status || "unknown"
-            }
+              error_status: error?.response?.status || "unknown",
+            },
           });
-          
+
           if (created && created.id != null) {
             setMessages((curr) => {
               const copy = [...curr];
-              const idx = copy.findIndex(m => m.client_turn_id === finalError.client_turn_id);
+              const idx = copy.findIndex((m) => m.client_turn_id === finalError.client_turn_id);
               if (idx >= 0) {
                 copy[idx] = { ...copy[idx], backend_id: created.id };
               }
@@ -2373,7 +2411,7 @@ ${incapacidad.detalles}
             });
           }
         })();
-        
+
         return newMessages;
       });
     } finally {
@@ -2451,13 +2489,13 @@ Ocurrió un problema al procesar tu solicitud.
     const conveniosPendientes = parseInt(liquidacion["N° CONVENIOS PENDIENTES"]) || 0;
     const documentosPendientes = liquidacion["DTOS PENDIENTES"];
     const estado = liquidacion["ESTADO BD"];
-    
+
     // Analizar todos los pendientes
     const pendientesList = [];
     if (conveniosPendientes > 0) {
       pendientesList.push(`${conveniosPendientes} convenio(s) por firmar`);
     }
-    
+
     // Revisar documentos específicos pendientes
     const docsPendientes = [];
     if (liquidacion["SOLICITUD AFILIACION"] !== "OK" && liquidacion["SOLICITUD AFILIACION"]) {
@@ -2472,25 +2510,27 @@ Ocurrió un problema al procesar tu solicitud.
     if (liquidacion["CARTA RETIRO"] !== "OK" && liquidacion["CARTA RETIRO"]) {
       docsPendientes.push("Carta de retiro");
     }
-    
+
     if (docsPendientes.length > 0) {
       pendientesList.push(`Documentos pendientes: ${docsPendientes.join(", ")}`);
     }
-    
+
     // Determinar el estado general y mensaje principal
     let estadoIcon = "";
     let mensajePrincipal = "";
-    
+
     if (pendientesList.length === 0) {
       estadoIcon = "✅";
-      mensajePrincipal = "**¡Tu compensación final está al día!**\n\nNo tienes pendientes. Tu proceso de compensación final se encuentra completo y en orden.";
+      mensajePrincipal =
+        "**¡Tu compensación final está al día!**\n\nNo tienes pendientes. Tu proceso de compensación final se encuentra completo y en orden.";
     } else {
       estadoIcon = "⚠️";
       mensajePrincipal = "**Tienes pendientes en tu compensación final**\n\n**Lo que necesitas completar:**\n";
       pendientesList.forEach((pendiente, index) => {
         mensajePrincipal += `${index + 1}. ${pendiente}\n`;
       });
-      mensajePrincipal += "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de compensación final.*";
+      mensajePrincipal +=
+        "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de compensación final.*";
     }
 
     let response = `${estadoIcon} **Estado de tu Compensación Final**\n\n${mensajePrincipal}\n\n---\n\n`;
@@ -2535,7 +2575,7 @@ ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\
     docs.forEach((doc) => {
       let icon = "❓";
       let estadoTexto = "No aplica";
-      
+
       if (doc.estado === "OK") {
         icon = "✅";
         estadoTexto = "Entregado y completo";
@@ -2543,7 +2583,7 @@ ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\
         icon = "⏳";
         estadoTexto = "Pendiente por entregar";
       }
-      
+
       response += `${icon} ${doc.nombre}: ${estadoTexto}\n`;
     });
 
@@ -2581,7 +2621,7 @@ Puedes comunicarte con nosotros para:
       const docsPendientes = liq["DTOS PENDIENTES"];
       const tienePendientes = conveniosPendientes > 0 || (docsPendientes && docsPendientes !== "OK");
       const icon = tienePendientes ? "⚠️" : "✅";
-      
+
       const estadoLabel = liq["ESTADO BD"] === "Retirado" ? "Retirado" : liq["ESTADO BD"];
 
       response += `**${index + 1}. ${icon} Compensación Final - ${liq.HOSPITAL}**
@@ -2639,7 +2679,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
   const handleScroll = (e) => {
     const container = e.target;
     if (!container) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = container;
     const atBottom = scrollHeight - scrollTop - clientHeight < 50;
     setAutoScroll(atBottom);
@@ -3020,18 +3060,14 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                       onClick={() => setShowQuickActions(!showQuickActions)}
                     >
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-prosalud-salud" />
+                        <Zap className="h-4 w-4 text-prosalud-salud" />
                         Trámites rápidos
                       </p>
                       <button
                         className="text-gray-600 transition-colors duration-300 hover:text-prosalud-salud focus:outline-none dark:text-gray-400 dark:hover:text-prosalud-salud"
                         aria-label={showQuickActions ? "Ocultar trámites" : "Mostrar trámites"}
                       >
-                        {showQuickActions ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
+                        {showQuickActions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
                     </div>
 
@@ -3103,7 +3139,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                         <div>
                           <p className="font-medium">Límite de uso del chatbot</p>
                           <p className="mt-1 text-yellow-700 dark:text-yellow-300">
-                            Has usado {rateLimitInfo.messagesDay}/50 mensajes hoy. 
+                            Has usado {rateLimitInfo.messagesDay}/50 mensajes hoy.
                             {rateLimitInfo.messagesHour >= 12 && ` (${rateLimitInfo.messagesHour}/15 esta hora)`}
                           </p>
                         </div>
@@ -3128,7 +3164,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                           onSelectSuggestion={handleSelectSuggestion}
                           isVisible={showSpellCheckSuggestions && !isTyping}
                         />
-                        
+
                         <div className="relative">
                           <textarea
                             ref={textareaRef}
