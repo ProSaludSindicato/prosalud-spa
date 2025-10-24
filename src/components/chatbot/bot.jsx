@@ -3176,8 +3176,8 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                             onKeyDown={handleKeyDown}
                             onFocus={() => setShowSpellCheckSuggestions(inputMessage.trim().length > 0)}
                             onBlur={() => setTimeout(() => setShowSpellCheckSuggestions(false), 200)}
-                            className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud touch-manipulation ${
-                              isFullscreen ? "max-h-[120px] min-h-[3rem] p-3 text-base" : "max-h-[80px] min-h-[2.5rem]"
+                            className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-base text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud touch-manipulation ${
+                              isFullscreen ? "max-h-[120px] min-h-[3rem] p-3" : "max-h-[80px] min-h-[2.5rem]"
                             }`}
                             placeholder="Escribe tu pregunta aquí..."
                             rows={1}
