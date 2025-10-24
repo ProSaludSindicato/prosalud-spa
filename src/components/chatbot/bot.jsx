@@ -1916,7 +1916,6 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     };
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
-    });
 
     try {
       // Usar servicio real de API
