@@ -2,7 +2,7 @@ import axios from "axios";
 
 // API client for public endpoints (no authentication required)
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://prosalud.test",
   withCredentials: false,
   headers: {
     'Content-Type': 'application/json',
