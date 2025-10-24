@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // API client for requests endpoints (no authentication required)
 const requestsApi = axios.create({
-  baseURL: 'https://prosalud.test/api',
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.test"}/api`,
   withCredentials: false,
   headers: {
     'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ const handleApiError = (error: any) => {
   
   // Handle network errors
   if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {
-    throw new Error('Error de conexión: Verifique que el servidor backend esté ejecutándose en https://prosalud.test');
+    throw new Error('Error de conexión: Verifique que el servidor backend esté ejecutándose');
   }
   
   if (error.response?.data) {

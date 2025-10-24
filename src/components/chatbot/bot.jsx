@@ -2308,60 +2308,78 @@ Ocurrió un problema al procesar tu solicitud.
     const documentosPendientes = liquidacion["DTOS PENDIENTES"];
     const estado = liquidacion["ESTADO BD"];
     
-    // Determinar el estado general
-    let estadoGeneral = "";
-    let estadoIcon = "";
+    // Analizar todos los pendientes
+    const pendientesList = [];
+    if (conveniosPendientes > 0) {
+      pendientesList.push(`${conveniosPendientes} convenio(s) por firmar`);
+    }
     
-    if (estado === "Retirado" && conveniosPendientes === 0 && (!documentosPendientes || documentosPendientes === "OK")) {
-      estadoGeneral = "✅ Tu proceso de liquidación está al día. No tienes pendientes.";
+    // Revisar documentos específicos pendientes
+    const docsPendientes = [];
+    if (liquidacion["SOLICITUD AFILIACION"] !== "OK" && liquidacion["SOLICITUD AFILIACION"]) {
+      docsPendientes.push("Solicitud de afiliación");
+    }
+    if (liquidacion["ACTA DE ENTENDIMIENTO"] !== "OK" && liquidacion["ACTA DE ENTENDIMIENTO"]) {
+      docsPendientes.push("Acta de entendimiento");
+    }
+    if (liquidacion["ACTA DE COMPROMISO"] !== "OK" && liquidacion["ACTA DE COMPROMISO"]) {
+      docsPendientes.push("Acta de compromiso");
+    }
+    if (liquidacion["CARTA RETIRO"] !== "OK" && liquidacion["CARTA RETIRO"]) {
+      docsPendientes.push("Carta de retiro");
+    }
+    
+    if (docsPendientes.length > 0) {
+      pendientesList.push(`Documentos pendientes: ${docsPendientes.join(", ")}`);
+    }
+    
+    // Determinar el estado general y mensaje principal
+    let estadoIcon = "";
+    let mensajePrincipal = "";
+    
+    if (pendientesList.length === 0) {
       estadoIcon = "✅";
-    } else if (conveniosPendientes > 0) {
-      estadoGeneral = `⚠️ Tienes ${conveniosPendientes} convenio(s) pendiente(s) por firmar.`;
-      estadoIcon = "⚠️";
-    } else if (documentosPendientes && documentosPendientes !== "OK") {
-      estadoGeneral = `📋 Tienes documentos pendientes: ${documentosPendientes}`;
-      estadoIcon = "📋";
+      mensajePrincipal = "**¡Tu liquidación está al día!**\n\nNo tienes pendientes. Tu proceso de liquidación se encuentra completo y en orden.";
     } else {
-      estadoGeneral = `📊 Estado actual: ${estado}`;
-      estadoIcon = "📊";
+      estadoIcon = "⚠️";
+      mensajePrincipal = "**Tienes pendientes en tu liquidación**\n\n**Lo que necesitas completar:**\n";
+      pendientesList.forEach((pendiente, index) => {
+        mensajePrincipal += `${index + 1}. ${pendiente}\n`;
+      });
+      mensajePrincipal += "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de liquidación.*";
     }
 
-    let response = `${estadoIcon} **Estado de tu Liquidación**\n\n`;
+    let response = `${estadoIcon} **Estado de tu Liquidación**\n\n${mensajePrincipal}\n\n---\n\n`;
 
     // Información personal
-    response += `**👤 Información personal:**
-- Nombre: ${liquidacion.NOMBRE || "N/A"}
-- Documento: ${liquidacion["TIPO DE DOCUMENTO"]} ${liquidacion["N° DOCUMENTO"]}
-- Fecha expedición: ${liquidacion["FECHA EXPEDICION"]}
+    response += `**👤 Tus datos:**
+• Nombre: ${liquidacion.NOMBRE || "N/A"}
+• Documento: ${liquidacion["TIPO DE DOCUMENTO"]} ${liquidacion["N° DOCUMENTO"]}
+• Fecha expedición: ${liquidacion["FECHA EXPEDICION"]}
 
 `;
 
     // Información laboral
     response += `**🏥 Información laboral:**
-- Hospital: ${liquidacion.HOSPITAL || "N/A"}
-- Proceso: ${liquidacion.PROCESO || "N/A"}
-- Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
-${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `- Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}
-`;
+• Hospital: ${liquidacion.HOSPITAL || "N/A"}
+• Cargo: ${liquidacion.PROCESO || "N/A"}
+• Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
+${liquidacion["FECHA RETIRO"] ? `• Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `• Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}`;
 
     // Estado del proceso
-    response += `**📋 Estado del proceso:**
-- Estado en BD: ${estado}
-${estadoGeneral}
-
-`;
+    const estadoLabel = estado === "Retirado" ? "Retirado" : estado;
+    response += `• Estado del proceso: ${estadoLabel}\n\n`;
 
     // Convenios
     response += `**📑 Convenios:**
-- Total convenios: ${liquidacion.CONVENIOS || "0"}
-- Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
-- Convenios pendientes: ${conveniosPendientes}
+• Total de convenios: ${liquidacion.CONVENIOS || "0"}
+• Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
+• Convenios pendientes: ${conveniosPendientes}
 
 `;
 
-    // Documentos
-    response += `**📄 Estado de documentos:**
-`;
+    // Documentos - solo si hay al menos uno
+    response += `**📄 Estado de tus documentos:**\n`;
 
     const docs = [
       { nombre: "Solicitud de afiliación", estado: liquidacion["SOLICITUD AFILIACION"] },
@@ -2371,51 +2389,71 @@ ${estadoGeneral}
     ];
 
     docs.forEach((doc) => {
-      const icon = doc.estado === "OK" ? "✅" : doc.estado === "PT" ? "⏳" : "❓";
-      const estadoTexto = doc.estado === "OK" ? "Completo" : doc.estado === "PT" ? "Pendiente" : doc.estado || "N/A";
-      response += `- ${icon} ${doc.nombre}: ${estadoTexto}\n`;
+      let icon = "❓";
+      let estadoTexto = "No aplica";
+      
+      if (doc.estado === "OK") {
+        icon = "✅";
+        estadoTexto = "Entregado y completo";
+      } else if (doc.estado === "PT" || doc.estado === "PTE") {
+        icon = "⏳";
+        estadoTexto = "Pendiente por entregar";
+      }
+      
+      response += `${icon} ${doc.nombre}: ${estadoTexto}\n`;
     });
 
     if (documentosPendientes && documentosPendientes !== "OK") {
-      response += `\n**⚠️ Documentos pendientes específicos:**\n${documentosPendientes}\n`;
+      response += `\n**⚠️ Detalle de documentos pendientes:**\n${documentosPendientes}\n`;
     }
 
-    if (liquidacion.OBSERVACIONES) {
-      response += `\n**📝 Observaciones:**\n${liquidacion.OBSERVACIONES}\n`;
+    if (liquidacion.OBSERVACIONES && liquidacion.OBSERVACIONES !== "DOCUMENTOS PENDIENTES") {
+      response += `\n**📝 Observaciones adicionales:**\n${liquidacion.OBSERVACIONES}\n`;
     }
 
     // Información de contacto
-    response += `\n**📞 ¿Necesitas más información?**
+    response += `\n---\n\n**📞 ¿Necesitas ayuda o tienes dudas?**
 
-Para enviar documentos pendientes o aclarar dudas sobre tu liquidación:
-- **Teléfono:** (604) 444 8520 - (604) 291 9494
-- **WhatsApp:** +57 317 675 3506
-- **Correo:** asistentetalentohumano@prosalud.co
+Puedes comunicarte con nosotros para:
+• Enviar los documentos pendientes
+• Aclarar dudas sobre tu liquidación
+• Conocer los siguientes pasos
 
-**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+**Contáctanos por:**
+• Teléfono: (604) 444 8520 - (604) 291 9494
+• WhatsApp: +57 317 675 3506
+• Correo: asistentetalentohumano@prosalud.co
+
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
     return response;
   };
 
   const generateMultipleLiquidacionesResponse = (liquidaciones) => {
-    let response = `📋 **Se encontraron ${liquidaciones.length} registros de liquidación**\n\nA continuación se muestran tus procesos:\n\n`;
+    let response = `📋 **Se encontraron ${liquidaciones.length} registros de liquidación**\n\nA continuación el estado de tus procesos:\n\n`;
 
     liquidaciones.forEach((liq, index) => {
       const conveniosPendientes = parseInt(liq["N° CONVENIOS PENDIENTES"]) || 0;
-      const icon = conveniosPendientes > 0 ? "⚠️" : liq["ESTADO BD"] === "Retirado" ? "✅" : "📊";
+      const docsPendientes = liq["DTOS PENDIENTES"];
+      const tienePendientes = conveniosPendientes > 0 || (docsPendientes && docsPendientes !== "OK");
+      const icon = tienePendientes ? "⚠️" : "✅";
+      
+      const estadoLabel = liq["ESTADO BD"] === "Retirado" ? "Retirado" : liq["ESTADO BD"];
 
       response += `**${index + 1}. ${icon} Liquidación - ${liq.HOSPITAL}**
-- Proceso: ${liq.PROCESO}
-- Estado: ${liq["ESTADO BD"]}
-- Convenios pendientes: ${conveniosPendientes}
-${liq["DTOS PENDIENTES"] && liq["DTOS PENDIENTES"] !== "OK" ? `- Documentos pendientes: ${liq["DTOS PENDIENTES"]}\n` : ""}
+• Cargo: ${liq.PROCESO}
+• Estado del proceso: ${estadoLabel}
+• Convenios pendientes: ${conveniosPendientes}
+${docsPendientes && docsPendientes !== "OK" ? `• Documentos pendientes: ${docsPendientes}\n` : `• Documentos: Completos\n`}
 `;
     });
 
-    response += `\n**📞 Para más información:**
-Comunícate al (604) 444 8520 o al WhatsApp +57 317 675 3506
+    response += `\n---\n\n**📞 Para más información:**
+Comunícate con nosotros para conocer los detalles de cada proceso:
+• Teléfono: (604) 444 8520 - (604) 291 9494
+• WhatsApp: +57 317 675 3506
 
-**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
     return response;
   };

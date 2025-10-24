@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "https://prosalud.test/api";
+const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.test"}/api`;
 
 // Backend types
 interface BackendPermission {

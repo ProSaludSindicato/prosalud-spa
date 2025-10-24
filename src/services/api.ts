@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://prosalud.test",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://prosalud.test",
   withCredentials: true,
 });
 
