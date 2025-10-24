@@ -330,7 +330,9 @@ export default function ChatBot() {
       "accidente trabajo",
       "enfermedad profesional",
     ],
-    liquidaciones: [
+    compensacion_final: [
+      "compensación final",
+      "compensacion final",
       "liquidación",
       "liquidaciones",
       "liquidación pendiente",
@@ -340,8 +342,8 @@ export default function ChatBot() {
       "acta de entendimiento",
       "acta de compromiso",
       "solicitud afiliación",
-      "estado liquidación",
-      "proceso liquidación",
+      "estado compensación",
+      "proceso compensación",
       "retiro sindical",
       "documentación retiro",
       "pendientes retiro",
@@ -1286,8 +1288,12 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       'intereses a las cesantías': 'rendimientos',
       'intereses cesantías': 'rendimientos',
       'salario': 'compensación',
-      'liquidación': 'compensación final',
-      'liquidacion': 'compensación final',
+      'liquidación pendiente': 'compensación final pendiente',
+      'liquidacion pendiente': 'compensación final pendiente',
+      'estado de liquidación': 'estado de compensación final',
+      'estado de liquidacion': 'estado de compensación final',
+      'proceso de liquidación': 'proceso de compensación final',
+      'proceso de liquidacion': 'proceso de compensación final',
       'caja de compensación': 'comfenalco',
       'caja de compensacion': 'comfenalco',
       'caja compensación familiar': 'comfenalco',
@@ -1910,11 +1916,6 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     };
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
-
-    // Guardar la consulta del usuario en el backend
-    const userTurnId = generateClientTurnId();
-    saveConversationToBackend({
-      conversation_id: conversationId,
       user_question: userQueryMessage.content,
       bot_answer: "Consultando...",
       metadata: {
@@ -1961,23 +1962,40 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       setMessages((prev) => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = responseMessage;
+        const finalResponse = {
+          ...responseMessage,
+          client_turn_id: generateClientTurnId()
+        };
+        newMessages[newMessages.length - 1] = finalResponse;
+        
+        // Guardar SOLO la respuesta del bot en el backend (no el mensaje de "consultando")
+        (async () => {
+          const created = await saveConversationToBackend({
+            client_turn_id: finalResponse.client_turn_id,
+            conversation_id: conversationId,
+            user_question: userQueryMessage.content,
+            bot_answer: finalResponse.content,
+            metadata: {
+              quick_action: true,
+              action_type: "consultar_incapacidad",
+              result_count: incapacidades.length,
+              success: true
+            }
+          });
+          
+          if (created && created.id != null) {
+            setMessages((curr) => {
+              const copy = [...curr];
+              const idx = copy.findIndex(m => m.client_turn_id === finalResponse.client_turn_id);
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], backend_id: created.id };
+              }
+              return copy;
+            });
+          }
+        })();
+        
         return newMessages;
-      });
-
-      // Guardar la respuesta del bot en el backend
-      const botTurnId = generateClientTurnId();
-      saveConversationToBackend({
-        conversation_id: conversationId,
-        user_question: userQueryMessage.content,
-        bot_answer: responseMessage.content,
-        metadata: {
-          quick_action: true,
-          action_type: "consultar_incapacidad",
-          result_count: incapacidades.length,
-          success: true
-        },
-        client_turn_id: botTurnId
       });
     } catch (error) {
       console.error("Error en consulta de incapacidad:", error);
@@ -2000,23 +2018,40 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       setMessages((prev) => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = errorMessage;
+        const finalError = {
+          ...errorMessage,
+          client_turn_id: generateClientTurnId()
+        };
+        newMessages[newMessages.length - 1] = finalError;
+        
+        // Guardar SOLO el error en el backend
+        (async () => {
+          const created = await saveConversationToBackend({
+            client_turn_id: finalError.client_turn_id,
+            conversation_id: conversationId,
+            user_question: userQueryMessage.content,
+            bot_answer: errorContent,
+            metadata: {
+              quick_action: true,
+              action_type: "consultar_incapacidad",
+              success: false,
+              error_status: error?.response?.status || "unknown"
+            }
+          });
+          
+          if (created && created.id != null) {
+            setMessages((curr) => {
+              const copy = [...curr];
+              const idx = copy.findIndex(m => m.client_turn_id === finalError.client_turn_id);
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], backend_id: created.id };
+              }
+              return copy;
+            });
+          }
+        })();
+        
         return newMessages;
-      });
-
-      // Guardar el error en el backend
-      const errorTurnId = generateClientTurnId();
-      saveConversationToBackend({
-        conversation_id: conversationId,
-        user_question: userQueryMessage.content,
-        bot_answer: errorContent,
-        metadata: {
-          quick_action: true,
-          action_type: "consultar_incapacidad",
-          success: false,
-          error_status: error?.response?.status || "unknown"
-        },
-        client_turn_id: errorTurnId
       });
     } finally {
       setIsConsultingIncapacidad(false);
@@ -2220,36 +2255,18 @@ ${incapacidad.detalles}
     // Agregar mensaje del usuario mostrando qué consultó
     const userQueryMessage = {
       role: "user",
-      content: `Consultar estado de liquidación\n- Documento: ${formData.tipoDocumento} ${formData.numeroDocumento}\n- Fecha expedición: ${formData.fechaExpedicion}`,
+      content: `Consultar estado de compensación final\n- Documento: ${formData.tipoDocumento} ${formData.numeroDocumento}\n- Fecha expedición: ${formData.fechaExpedicion}`,
       isBot: false,
     };
 
     // Mensaje temporal del bot
     const loadingMessage = {
       role: "assistant",
-      content: "🔍 Consultando tu proceso de liquidación...",
+      content: "🔍 Consultando tu proceso de compensación final...",
       isBot: true,
     };
 
     setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
-
-    // Guardar la consulta del usuario en el backend
-    const userTurnId = generateClientTurnId();
-    saveConversationToBackend({
-      conversation_id: conversationId,
-      user_question: userQueryMessage.content,
-      bot_answer: "Consultando...",
-      metadata: {
-        quick_action: true,
-        action_type: "consultar_liquidacion",
-        form_data: {
-          tipoDocumento: formData.tipoDocumento,
-          numeroDocumento: formData.numeroDocumento,
-          fechaExpedicion: formData.fechaExpedicion
-        }
-      },
-      client_turn_id: userTurnId
-    });
 
     try {
       // Llamar al servicio
@@ -2281,23 +2298,40 @@ ${incapacidad.detalles}
 
       setMessages((prev) => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = responseMessage;
+        const finalResponse = {
+          ...responseMessage,
+          client_turn_id: generateClientTurnId()
+        };
+        newMessages[newMessages.length - 1] = finalResponse;
+        
+        // Guardar SOLO la respuesta del bot en el backend
+        (async () => {
+          const created = await saveConversationToBackend({
+            client_turn_id: finalResponse.client_turn_id,
+            conversation_id: conversationId,
+            user_question: userQueryMessage.content,
+            bot_answer: finalResponse.content,
+            metadata: {
+              quick_action: true,
+              action_type: "consultar_compensacion_final",
+              result_count: liquidaciones.length,
+              success: true
+            }
+          });
+          
+          if (created && created.id != null) {
+            setMessages((curr) => {
+              const copy = [...curr];
+              const idx = copy.findIndex(m => m.client_turn_id === finalResponse.client_turn_id);
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], backend_id: created.id };
+              }
+              return copy;
+            });
+          }
+        })();
+        
         return newMessages;
-      });
-
-      // Guardar la respuesta del bot en el backend
-      const botTurnId = generateClientTurnId();
-      saveConversationToBackend({
-        conversation_id: conversationId,
-        user_question: userQueryMessage.content,
-        bot_answer: responseMessage.content,
-        metadata: {
-          quick_action: true,
-          action_type: "consultar_liquidacion",
-          result_count: liquidaciones.length,
-          success: true
-        },
-        client_turn_id: botTurnId
       });
     } catch (error) {
       console.error("Error en consulta de liquidación:", error);
@@ -2320,23 +2354,40 @@ ${incapacidad.detalles}
 
       setMessages((prev) => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = errorMessage;
+        const finalError = {
+          ...errorMessage,
+          client_turn_id: generateClientTurnId()
+        };
+        newMessages[newMessages.length - 1] = finalError;
+        
+        // Guardar SOLO el error en el backend
+        (async () => {
+          const created = await saveConversationToBackend({
+            client_turn_id: finalError.client_turn_id,
+            conversation_id: conversationId,
+            user_question: userQueryMessage.content,
+            bot_answer: errorContent,
+            metadata: {
+              quick_action: true,
+              action_type: "consultar_compensacion_final",
+              success: false,
+              error_status: error?.response?.status || "unknown"
+            }
+          });
+          
+          if (created && created.id != null) {
+            setMessages((curr) => {
+              const copy = [...curr];
+              const idx = copy.findIndex(m => m.client_turn_id === finalError.client_turn_id);
+              if (idx >= 0) {
+                copy[idx] = { ...copy[idx], backend_id: created.id };
+              }
+              return copy;
+            });
+          }
+        })();
+        
         return newMessages;
-      });
-
-      // Guardar el error en el backend
-      const errorTurnId = generateClientTurnId();
-      saveConversationToBackend({
-        conversation_id: conversationId,
-        user_question: userQueryMessage.content,
-        bot_answer: errorContent,
-        metadata: {
-          quick_action: true,
-          action_type: "consultar_liquidacion",
-          success: false,
-          error_status: error?.response?.status || "unknown"
-        },
-        client_turn_id: errorTurnId
       });
     } finally {
       setIsConsultingLiquidacion(false);
@@ -2344,12 +2395,12 @@ ${incapacidad.detalles}
   };
 
   const generateNoLiquidacionResponse = () => {
-    return `ℹ️ **No se encontraron registros de liquidación**
+    return `ℹ️ **No se encontraron registros de compensación final**
 
-No encontramos información de liquidación asociada al documento consultado.
+No encontramos información de compensación final asociada al documento consultado.
 
 **Posibles razones:**
-• No hay procesos de liquidación registrados con estos datos
+• No hay procesos de compensación final registrados con estos datos
 • La información aún no ha sido procesada en el sistema
 • Los datos ingresados no coinciden con nuestros registros
 
@@ -2357,7 +2408,7 @@ No encontramos información de liquidación asociada al documento consultado.
 Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu proceso.
 
 **📞 Contacto:**
-Para más información sobre tu proceso de liquidación, puedes comunicarte al:
+Para más información sobre tu proceso de compensación final, puedes comunicarte al:
 - **Teléfono:** (604) 444 8520 - (604) 291 9494
 - **WhatsApp:** +57 317 675 3506
 - **Correo:** asistentetalentohumano@prosalud.co
@@ -2368,7 +2419,7 @@ Para más información sobre tu proceso de liquidación, puedes comunicarte al:
   const generateLiquidacionServerErrorResponse = () => {
     return `⚠️ **Servicio temporalmente no disponible**
 
-Lo sentimos, el sistema de consulta de liquidaciones no está disponible en este momento.
+Lo sentimos, el sistema de consulta de compensación final no está disponible en este momento.
 
 **¿Qué puedes hacer?**
 • Intenta nuevamente en unos minutos
@@ -2445,17 +2496,17 @@ Ocurrió un problema al procesar tu solicitud.
     
     if (pendientesList.length === 0) {
       estadoIcon = "✅";
-      mensajePrincipal = "**¡Tu liquidación está al día!**\n\nNo tienes pendientes. Tu proceso de liquidación se encuentra completo y en orden.";
+      mensajePrincipal = "**¡Tu compensación final está al día!**\n\nNo tienes pendientes. Tu proceso de compensación final se encuentra completo y en orden.";
     } else {
       estadoIcon = "⚠️";
-      mensajePrincipal = "**Tienes pendientes en tu liquidación**\n\n**Lo que necesitas completar:**\n";
+      mensajePrincipal = "**Tienes pendientes en tu compensación final**\n\n**Lo que necesitas completar:**\n";
       pendientesList.forEach((pendiente, index) => {
         mensajePrincipal += `${index + 1}. ${pendiente}\n`;
       });
-      mensajePrincipal += "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de liquidación.*";
+      mensajePrincipal += "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de compensación final.*";
     }
 
-    let response = `${estadoIcon} **Estado de tu Liquidación**\n\n${mensajePrincipal}\n\n---\n\n`;
+    let response = `${estadoIcon} **Estado de tu Compensación Final**\n\n${mensajePrincipal}\n\n---\n\n`;
 
     // Información personal
     response += `**👤 Tus datos:**
@@ -2536,7 +2587,7 @@ Puedes comunicarte con nosotros para:
   };
 
   const generateMultipleLiquidacionesResponse = (liquidaciones) => {
-    let response = `📋 **Se encontraron ${liquidaciones.length} registros de liquidación**\n\nA continuación el estado de tus procesos:\n\n`;
+    let response = `📋 **Se encontraron ${liquidaciones.length} registros de compensación final**\n\nA continuación el estado de tus procesos:\n\n`;
 
     liquidaciones.forEach((liq, index) => {
       const conveniosPendientes = parseInt(liq["N° CONVENIOS PENDIENTES"]) || 0;
@@ -2546,7 +2597,7 @@ Puedes comunicarte con nosotros para:
       
       const estadoLabel = liq["ESTADO BD"] === "Retirado" ? "Retirado" : liq["ESTADO BD"];
 
-      response += `**${index + 1}. ${icon} Liquidación - ${liq.HOSPITAL}**
+      response += `**${index + 1}. ${icon} Compensación Final - ${liq.HOSPITAL}**
 - Cargo: ${liq.PROCESO}
 - Estado del proceso: ${estadoLabel}
 - Convenios pendientes: ${conveniosPendientes}
@@ -2826,7 +2877,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     <div className="flex justify-between items-center mb-4">
                       <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <FileText className="h-5 w-5 text-prosalud-salud" />
-                        Consultar liquidación pendiente
+                        Consultar compensación final pendiente
                       </CardTitle>
                       <button
                         onClick={closeLiquidacionForm}
@@ -2974,14 +3025,17 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                   </button>
                 )}
 
-                {/* Consultas rápidas */}
+                {/* Trámites rápidos - Consultar Incapacidad y Compensación Final */}
                 {!showIncapacidadForm && !showLiquidacionForm && (
                   <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                     <div
                       className="flex items-center justify-between px-3 py-2 cursor-pointer"
                       onClick={() => setShowQuickActions(!showQuickActions)}
                     >
-                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Trámites rápidos</p>
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-prosalud-salud" />
+                        Trámites rápidos
+                      </p>
                       <button
                         className="text-gray-600 transition-colors duration-300 hover:text-prosalud-salud focus:outline-none dark:text-gray-400 dark:hover:text-prosalud-salud"
                         aria-label={showQuickActions ? "Ocultar trámites" : "Mostrar trámites"}
@@ -3008,7 +3062,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <FileText className="h-4 w-4 text-prosalud-salud" />
-                          Consultar liquidación pendiente
+                          Consultar compensación final pendiente
                         </button>
                       </div>
                     )}
