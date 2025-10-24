@@ -19,7 +19,7 @@ import {
   Download,
   ThumbsUp,
   ThumbsDown,
-  Zap,
+  GitPullRequestDraft,
   HelpCircle,
 } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/cjs/light";
@@ -3060,7 +3060,9 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                       onClick={() => setShowQuickActions(!showQuickActions)}
                     >
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-prosalud-salud" />
+                        <span className="p-1.5 border border-current rounded-md flex items-center justify-center text-prosalud-salud">
+                          <GitPullRequestDraft className="h-4 w-4 text-prosalud-salud" />
+                        </span>
                         Trámites rápidos
                       </p>
                       <button
