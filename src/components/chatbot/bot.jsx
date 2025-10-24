@@ -3060,8 +3060,8 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                       onClick={() => setShowQuickActions(!showQuickActions)}
                     >
                       <p className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <span className="p-1.5 border border-current rounded-md flex items-center justify-center text-prosalud-primary">
-                          <GitPullRequestDraft className="h-4 w-4 text-prosalud-primary" />
+                        <span className="p-1.5 border border-current rounded-md flex items-center justify-center text-primary-prosalud-dark">
+                          <GitPullRequestDraft className="h-4 w-4 text-primary-prosalud-dark" />
                         </span>
                         Trámites rápidos
                       </p>
