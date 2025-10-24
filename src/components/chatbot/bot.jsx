@@ -43,8 +43,10 @@ import {
 } from "@/utils/inputValidator";
 
 import IncapacidadForm from "./IncapacidadForm";
+import LiquidacionForm from "./LiquidacionForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { consultarIncapacidad } from "@/services/incapacidadService";
+import { consultarLiquidacion } from "@/services/liquidacionService";
 import { SpellCheckSuggestions } from "./SpellCheckSuggestions";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -68,6 +70,8 @@ export default function ChatBot() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showIncapacidadForm, setShowIncapacidadForm] = useState(false);
   const [isConsultingIncapacidad, setIsConsultingIncapacidad] = useState(false);
+  const [showLiquidacionForm, setShowLiquidacionForm] = useState(false);
+  const [isConsultingLiquidacion, setIsConsultingLiquidacion] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const suggestionsRef = useRef(null);
@@ -290,6 +294,7 @@ export default function ChatBot() {
   const tooltipMessages = [
     "¡Hola! Soy tu asistente virtual de ProSalud. ¿En qué puedo ayudarte hoy?",
     "Consulta el pago de una incapacidad aquí",
+    "Consulta el estado de tu liquidación pendiente",
     "Puedo responder preguntas sobre incapacidades, servicios y más.",
     "Si tienes preguntas, no dudes en consultarme.",
     "¿Necesitas ayuda? Haz clic y hablamos.",
@@ -322,6 +327,22 @@ export default function ChatBot() {
       "rehabilitación",
       "accidente trabajo",
       "enfermedad profesional",
+    ],
+    liquidaciones: [
+      "liquidación",
+      "liquidaciones",
+      "liquidación pendiente",
+      "documentos pendientes",
+      "convenios pendientes",
+      "carta de retiro",
+      "acta de entendimiento",
+      "acta de compromiso",
+      "solicitud afiliación",
+      "estado liquidación",
+      "proceso liquidación",
+      "retiro sindical",
+      "documentación retiro",
+      "pendientes retiro",
     ],
     certificados: [
       "certificado",
@@ -2129,6 +2150,276 @@ ${incapacidad.detalles}
     setShowIncapacidadForm(false);
   };
 
+  const closeLiquidacionForm = () => {
+    setShowLiquidacionForm(false);
+  };
+
+  // Función para manejar la consulta de liquidaciones
+  const handleLiquidacionFormSubmit = async (formData) => {
+    setIsConsultingLiquidacion(true);
+    setShowLiquidacionForm(false);
+
+    // Agregar mensaje del usuario mostrando qué consultó
+    const userQueryMessage = {
+      role: "user",
+      content: `Consultar estado de liquidación\n- Documento: ${formData.tipoDocumento} ${formData.numeroDocumento}\n- Fecha expedición: ${formData.fechaExpedicion}`,
+      isBot: false,
+    };
+
+    // Mensaje temporal del bot
+    const loadingMessage = {
+      role: "assistant",
+      content: "🔍 Consultando tu proceso de liquidación...",
+      isBot: true,
+    };
+
+    setMessages((prev) => [...prev, userQueryMessage, loadingMessage]);
+
+    try {
+      // Llamar al servicio
+      const liquidaciones = await consultarLiquidacion(formData);
+
+      let responseMessage;
+      if (!liquidaciones || liquidaciones.length === 0) {
+        // No se encontraron liquidaciones
+        responseMessage = {
+          role: "assistant",
+          content: generateNoLiquidacionResponse(),
+          isBot: true,
+        };
+      } else if (liquidaciones.length === 1) {
+        // Una sola liquidación encontrada
+        responseMessage = {
+          role: "assistant",
+          content: generateLiquidacionResponse(liquidaciones[0]),
+          isBot: true,
+        };
+      } else {
+        // Múltiples liquidaciones - mostrar lista
+        responseMessage = {
+          role: "assistant",
+          content: generateMultipleLiquidacionesResponse(liquidaciones),
+          isBot: true,
+        };
+      }
+
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = responseMessage;
+        return newMessages;
+      });
+    } catch (error) {
+      console.error("Error en consulta de liquidación:", error);
+
+      // Mensaje de error según el tipo
+      let errorContent;
+      if (error?.response?.status === 500) {
+        errorContent = generateLiquidacionServerErrorResponse();
+      } else if (error?.response?.status === 422) {
+        errorContent = generateLiquidacionValidationErrorResponse(error?.response?.data?.errors);
+      } else {
+        errorContent = generateLiquidacionGenericErrorResponse();
+      }
+
+      const errorMessage = {
+        role: "assistant",
+        content: errorContent,
+        isBot: true,
+      };
+
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = errorMessage;
+        return newMessages;
+      });
+    } finally {
+      setIsConsultingLiquidacion(false);
+    }
+  };
+
+  const generateNoLiquidacionResponse = () => {
+    return `ℹ️ **No se encontraron registros de liquidación**
+
+No encontramos información de liquidación asociada al documento consultado.
+
+**Posibles razones:**
+• No hay procesos de liquidación registrados con estos datos
+• La información aún no ha sido procesada en el sistema
+• Los datos ingresados no coinciden con nuestros registros
+
+**¿Necesitas ayuda?**
+Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu proceso.
+
+**📞 Contacto:**
+Para más información sobre tu proceso de liquidación, puedes comunicarte al:
+- **Teléfono:** (604) 444 8520 - (604) 291 9494
+- **WhatsApp:** +57 317 675 3506
+- **Correo:** asistentetalentohumano@prosalud.co
+
+**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+  };
+
+  const generateLiquidacionServerErrorResponse = () => {
+    return `⚠️ **Servicio temporalmente no disponible**
+
+Lo sentimos, el sistema de consulta de liquidaciones no está disponible en este momento.
+
+**¿Qué puedes hacer?**
+• Intenta nuevamente en unos minutos
+• Comunícate con nosotros para consultar directamente
+• Visita nuestra oficina para obtener información
+
+**📞 Contacto:**
+- **Teléfono:** (604) 444 8520 - (604) 291 9494
+- **WhatsApp:** +57 317 675 3506
+
+Lamentamos el inconveniente.
+
+**🔒 Nota:** Tus datos están seguros y no se han compartido.`;
+  };
+
+  const generateLiquidacionValidationErrorResponse = (errors) => {
+    return `❌ **Error en los datos ingresados**
+
+Hay un problema con la información proporcionada. Por favor verifica los datos e intenta nuevamente.
+
+Si el problema persiste, comunícate con nosotros para asistencia.
+
+**📞 Contacto:** (604) 444 8520`;
+  };
+
+  const generateLiquidacionGenericErrorResponse = () => {
+    return `❌ **Error en la consulta**
+
+Ocurrió un problema al procesar tu solicitud. 
+
+**¿Qué hacer?**
+• Verifica tu conexión a internet
+• Intenta nuevamente en unos momentos
+• Comunícate con nosotros si el problema persiste
+
+**📞 Contacto:** (604) 444 8520 - WhatsApp: +57 317 675 3506
+
+**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+  };
+
+  const generateLiquidacionResponse = (liquidacion) => {
+    const conveniosPendientes = parseInt(liquidacion["N° CONVENIOS PENDIENTES"]) || 0;
+    const documentosPendientes = liquidacion["DTOS PENDIENTES"];
+    const estado = liquidacion["ESTADO BD"];
+    
+    // Determinar el estado general
+    let estadoGeneral = "";
+    let estadoIcon = "";
+    
+    if (estado === "Retirado" && conveniosPendientes === 0 && (!documentosPendientes || documentosPendientes === "OK")) {
+      estadoGeneral = "✅ Tu proceso de liquidación está al día. No tienes pendientes.";
+      estadoIcon = "✅";
+    } else if (conveniosPendientes > 0) {
+      estadoGeneral = `⚠️ Tienes ${conveniosPendientes} convenio(s) pendiente(s) por firmar.`;
+      estadoIcon = "⚠️";
+    } else if (documentosPendientes && documentosPendientes !== "OK") {
+      estadoGeneral = `📋 Tienes documentos pendientes: ${documentosPendientes}`;
+      estadoIcon = "📋";
+    } else {
+      estadoGeneral = `📊 Estado actual: ${estado}`;
+      estadoIcon = "📊";
+    }
+
+    let response = `${estadoIcon} **Estado de tu Liquidación**\n\n`;
+
+    // Información personal
+    response += `**👤 Información personal:**
+- Nombre: ${liquidacion.NOMBRE || "N/A"}
+- Documento: ${liquidacion["TIPO DE DOCUMENTO"]} ${liquidacion["N° DOCUMENTO"]}
+- Fecha expedición: ${liquidacion["FECHA EXPEDICION"]}
+
+`;
+
+    // Información laboral
+    response += `**🏥 Información laboral:**
+- Hospital: ${liquidacion.HOSPITAL || "N/A"}
+- Proceso: ${liquidacion.PROCESO || "N/A"}
+- Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
+${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `- Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}
+`;
+
+    // Estado del proceso
+    response += `**📋 Estado del proceso:**
+- Estado en BD: ${estado}
+${estadoGeneral}
+
+`;
+
+    // Convenios
+    response += `**📑 Convenios:**
+- Total convenios: ${liquidacion.CONVENIOS || "0"}
+- Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
+- Convenios pendientes: ${conveniosPendientes}
+
+`;
+
+    // Documentos
+    response += `**📄 Estado de documentos:**
+`;
+
+    const docs = [
+      { nombre: "Solicitud de afiliación", estado: liquidacion["SOLICITUD AFILIACION"] },
+      { nombre: "Acta de entendimiento", estado: liquidacion["ACTA DE ENTENDIMIENTO"] },
+      { nombre: "Acta de compromiso", estado: liquidacion["ACTA DE COMPROMISO"] },
+      { nombre: "Carta de retiro", estado: liquidacion["CARTA RETIRO"] },
+    ];
+
+    docs.forEach((doc) => {
+      const icon = doc.estado === "OK" ? "✅" : doc.estado === "PT" ? "⏳" : "❓";
+      const estadoTexto = doc.estado === "OK" ? "Completo" : doc.estado === "PT" ? "Pendiente" : doc.estado || "N/A";
+      response += `- ${icon} ${doc.nombre}: ${estadoTexto}\n`;
+    });
+
+    if (documentosPendientes && documentosPendientes !== "OK") {
+      response += `\n**⚠️ Documentos pendientes específicos:**\n${documentosPendientes}\n`;
+    }
+
+    if (liquidacion.OBSERVACIONES) {
+      response += `\n**📝 Observaciones:**\n${liquidacion.OBSERVACIONES}\n`;
+    }
+
+    // Información de contacto
+    response += `\n**📞 ¿Necesitas más información?**
+
+Para enviar documentos pendientes o aclarar dudas sobre tu liquidación:
+- **Teléfono:** (604) 444 8520 - (604) 291 9494
+- **WhatsApp:** +57 317 675 3506
+- **Correo:** asistentetalentohumano@prosalud.co
+
+**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+
+    return response;
+  };
+
+  const generateMultipleLiquidacionesResponse = (liquidaciones) => {
+    let response = `📋 **Se encontraron ${liquidaciones.length} registros de liquidación**\n\nA continuación se muestran tus procesos:\n\n`;
+
+    liquidaciones.forEach((liq, index) => {
+      const conveniosPendientes = parseInt(liq["N° CONVENIOS PENDIENTES"]) || 0;
+      const icon = conveniosPendientes > 0 ? "⚠️" : liq["ESTADO BD"] === "Retirado" ? "✅" : "📊";
+
+      response += `**${index + 1}. ${icon} Liquidación - ${liq.HOSPITAL}**
+- Proceso: ${liq.PROCESO}
+- Estado: ${liq["ESTADO BD"]}
+- Convenios pendientes: ${conveniosPendientes}
+${liq["DTOS PENDIENTES"] && liq["DTOS PENDIENTES"] !== "OK" ? `- Documentos pendientes: ${liq["DTOS PENDIENTES"]}\n` : ""}
+`;
+    });
+
+    response += `\n**📞 Para más información:**
+Comunícate al (604) 444 8520 o al WhatsApp +57 317 675 3506
+
+**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+
+    return response;
+  };
+
   const handleFeedback = async (messageIndex, isPositive) => {
     console.log(`Feedback ${isPositive ? "positivo" : "negativo"} para el mensaje ${messageIndex}`);
 
@@ -2365,6 +2656,23 @@ ${incapacidad.detalles}
                     </div>
                     <IncapacidadForm onSubmit={handleIncapacidadFormSubmit} isLoading={isConsultingIncapacidad} />
                   </div>
+                ) : showLiquidacionForm ? (
+                  <div className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                      <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <CircleMinus className="h-5 w-5 text-prosalud-salud" />
+                        Consultar liquidación pendiente
+                      </CardTitle>
+                      <button
+                        onClick={closeLiquidacionForm}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        title="Volver al chatbot"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <LiquidacionForm onSubmit={handleLiquidacionFormSubmit} onCancel={closeLiquidacionForm} />
+                  </div>
                 ) : (
                   <div
                     className={`flex-grow space-y-3 overflow-y-auto bg-gray-100 px-3 pb-4 pt-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 dark:bg-gray-900 dark:scrollbar-thumb-gray-700 ${
@@ -2489,10 +2797,10 @@ ${incapacidad.detalles}
                   </div>
                 )}
 
-                {/* Consulta de Incapacidad Button - A nivel principal */}
-                {!showIncapacidadForm && (
+                {/* Consultas rápidas */}
+                {!showIncapacidadForm && !showLiquidacionForm && (
                   <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-                    <div className="px-3 py-3">
+                    <div className="px-3 py-3 space-y-2">
                       <button
                         onClick={() => setShowIncapacidadForm(true)}
                         className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
@@ -2500,12 +2808,19 @@ ${incapacidad.detalles}
                         <CreditCard className="h-4 w-4 text-prosalud-salud" />
                         Consultar pago de una incapacidad
                       </button>
+                      <button
+                        onClick={() => setShowLiquidacionForm(true)}
+                        className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
+                      >
+                        <CircleMinus className="h-4 w-4 text-prosalud-salud" />
+                        Consultar liquidación pendiente
+                      </button>
                     </div>
                   </div>
                 )}
 
                 {/* Suggestions Section */}
-                {!showIncapacidadForm && showSuggestions && (
+                {!showIncapacidadForm && !showLiquidacionForm && showSuggestions && (
                   <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                     <div
                       className="flex items-center justify-between px-3 py-2 cursor-pointer"
@@ -2543,7 +2858,7 @@ ${incapacidad.detalles}
                 )}
 
                 {/* Rate Limit Warning - Solo se muestra cerca del límite */}
-                {!showIncapacidadForm && rateLimitInfo.showWarning && (
+                {!showIncapacidadForm && !showLiquidacionForm && rateLimitInfo.showWarning && (
                   <div className="flex-shrink-0 border-t border-yellow-200 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20">
                     <div className="px-3 py-2">
                       <div className="flex items-start gap-2 text-xs text-yellow-800 dark:text-yellow-200">
@@ -2561,7 +2876,7 @@ ${incapacidad.detalles}
                 )}
 
                 {/* Input Form */}
-                {!showIncapacidadForm && (
+                {!showIncapacidadForm && !showLiquidacionForm && (
                   <form
                     onSubmit={handleSendMessage}
                     className={`relative z-20 border-t border-gray-200 bg-white pb-8 pt-2 px-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 ${
