@@ -6,6 +6,8 @@ export interface BackendUser {
   name: string;
   email: string;
   is_active: boolean;
+  role?: string;
+  roles?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -40,12 +42,16 @@ export interface CreateUserRequest {
   email: string;
   password: string;
   password_confirmation: string;
+  role: string;
   is_active?: boolean;
 }
 
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
+  password?: string;
+  password_confirmation?: string;
+  role?: string;
   is_active?: boolean;
 }
 
@@ -133,17 +139,9 @@ export const realUsersApi = {
     }
   },
 
-  async createUser(data: { name: string; email: string }): Promise<BackendUser> {
+  async createUser(data: CreateUserRequest): Promise<BackendUser> {
     try {
-      const createData: CreateUserRequest = {
-        name: data.name,
-        email: data.email,
-        password: 'ProSalud2024.*',
-        password_confirmation: 'ProSalud2024.*',
-        is_active: true,
-      };
-      
-      const response = await backendApi.post<BackendResponse<BackendUser>>('/users', createData);
+      const response = await backendApi.post<BackendResponse<BackendUser>>('/users', data);
       return response.data.data;
     } catch (error) {
       console.error('Error creating user:', error);

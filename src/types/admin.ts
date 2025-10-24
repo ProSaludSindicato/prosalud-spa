@@ -4,6 +4,8 @@ export interface User {
   name: string;
   email: string;
   isActive: boolean;
+  role?: string;
+  roles?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -69,10 +71,36 @@ export interface PaginatedResponse<T> {
 export interface CreateUserData {
   name: string;
   email: string;
+  password: string;
+  password_confirmation: string;
+  role: string;
+  isActive?: boolean;
 }
 
-export interface UpdateUserData extends Partial<CreateUserData> {
+export interface UpdateUserData {
+  name?: string;
+  email?: string;
+  password?: string;
+  password_confirmation?: string;
+  role?: string;
   isActive?: boolean;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+  guard_name: string;
+  permissions: Permission[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Permission {
+  id: number;
+  name: string;
+  guard_name?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateConvenioData {

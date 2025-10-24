@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,16 +8,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types/admin';
 import { usersApi } from '@/services/adminApi';
+import { rolesApiAdapter } from '@/services/rolesApiAdapter';
 import { nameValidation, emailValidation } from '@/hooks/useFormValidation';
 import AdminModal from '@/components/admin/common/AdminModal';
 
 const formSchema = z.object({
   name: nameValidation,
   email: emailValidation,
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').optional().or(z.literal('')),
+  password_confirmation: z.string().optional().or(z.literal('')),
+  role: z.string().min(1, 'El rol es requerido'),
   isActive: z.boolean().optional(),
+}).refine((data) => {
+  if (data.password && data.password.length > 0) {
+    return data.password === data.password_confirmation;
+  }
+  return true;
+}, {
+  message: 'Las contraseñas no coinciden',
+  path: ['password_confirmation'],
 });
 
 interface UserFormModalProps {
@@ -39,11 +52,20 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     defaultValues: {
       name: '',
       email: '',
+      password: '',
+      password_confirmation: '',
+      role: '',
       isActive: true,
     },
   });
 
-  const { register, handleSubmit, formState: { errors }, reset } = form;
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
+
+  // Fetch available roles
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesApiAdapter.getRoles,
+  });
 
   // Update form values when user prop changes
   useEffect(() => {
@@ -51,12 +73,18 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       form.reset({
         name: user.name,
         email: user.email,
+        password: '',
+        password_confirmation: '',
+        role: user.role || user.roles?.[0] || '',
         isActive: user.isActive,
       });
     } else {
       form.reset({
         name: '',
         email: '',
+        password: '',
+        password_confirmation: '',
+        role: '',
         isActive: true,
       });
     }
@@ -104,7 +132,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     const userData: any = {
       name: data.name,
       email: data.email,
-      ...(user && { isActive: data.isActive })
+      role: data.role,
+      ...(user && { isActive: data.isActive }),
+      ...(data.password && data.password.length > 0 && {
+        password: data.password,
+        password_confirmation: data.password_confirmation,
+      }),
+      ...(!user && {
+        password: data.password || 'ProSalud2024.*',
+        password_confirmation: data.password_confirmation || 'ProSalud2024.*',
+      }),
     };
 
     if (user) {
@@ -185,14 +222,93 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="role">Rol</Label>
+              <Select value={watch('role')} onValueChange={(value) => setValue('role', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.name}>
+                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.role && (
+                <p className="text-sm text-red-500">{errors.role.message}</p>
+              )}
+            </div>
+
+            {!user && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    {...register('password')}
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                  {errors.password && (
+                    <p className="text-sm text-red-500">{errors.password.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password_confirmation">Confirmar Contraseña</Label>
+                  <Input
+                    id="password_confirmation"
+                    type="password"
+                    {...register('password_confirmation')}
+                    placeholder="Repita la contraseña"
+                  />
+                  {errors.password_confirmation && (
+                    <p className="text-sm text-red-500">{errors.password_confirmation.message}</p>
+                  )}
+                </div>
+              </>
+            )}
+
             {user && (
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isActive"
-                  {...register('isActive')}
-                />
-                <Label htmlFor="isActive">Usuario activo</Label>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Nueva Contraseña (opcional)</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    {...register('password')}
+                    placeholder="Dejar en blanco para mantener la actual"
+                  />
+                  {errors.password && (
+                    <p className="text-sm text-red-500">{errors.password.message}</p>
+                  )}
+                </div>
+
+                {watch('password') && watch('password').length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="password_confirmation">Confirmar Nueva Contraseña</Label>
+                    <Input
+                      id="password_confirmation"
+                      type="password"
+                      {...register('password_confirmation')}
+                      placeholder="Repita la nueva contraseña"
+                    />
+                    {errors.password_confirmation && (
+                      <p className="text-sm text-red-500">{errors.password_confirmation.message}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isActive"
+                    {...register('isActive')}
+                  />
+                  <Label htmlFor="isActive">Usuario activo</Label>
+                </div>
+              </>
             )}
           </div>
         </div>

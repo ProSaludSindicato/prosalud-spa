@@ -8,6 +8,8 @@ function adaptBackendUserToFrontend(backendUser: BackendUser): User {
     name: backendUser.name,
     email: backendUser.email,
     isActive: backendUser.is_active,
+    role: backendUser.role,
+    roles: backendUser.roles,
     createdAt: backendUser.created_at.split('T')[0], // Convert to YYYY-MM-DD format
     updatedAt: backendUser.updated_at.split('T')[0], // Convert to YYYY-MM-DD format
   };
@@ -40,15 +42,35 @@ export const usersApiAdapter = {
   },
 
   async createUser(userData: CreateUserData): Promise<User> {
-    const backendUser = await realUsersApi.createUser(userData);
+    const createData = {
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      password_confirmation: userData.password_confirmation,
+      role: userData.role,
+      is_active: userData.isActive,
+    };
+    const backendUser = await realUsersApi.createUser(createData);
     return adaptBackendUserToFrontend(backendUser);
   },
 
   async updateUser(id: string, userData: UpdateUserData): Promise<User> {
-    const updateData: { name?: string; email?: string; is_active?: boolean } = {};
+    const updateData: { 
+      name?: string; 
+      email?: string; 
+      password?: string;
+      password_confirmation?: string;
+      role?: string;
+      is_active?: boolean;
+    } = {};
     
     if (userData.name !== undefined) updateData.name = userData.name;
     if (userData.email !== undefined) updateData.email = userData.email;
+    if (userData.password !== undefined) {
+      updateData.password = userData.password;
+      updateData.password_confirmation = userData.password_confirmation;
+    }
+    if (userData.role !== undefined) updateData.role = userData.role;
     if (userData.isActive !== undefined) updateData.is_active = userData.isActive;
 
     const backendUser = await realUsersApi.updateUser(id, updateData);

@@ -19,6 +19,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 // Admin Pages
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminUsuariosPage from '@/pages/AdminUsuariosPage';
+import AdminRolesPage from '@/pages/AdminRolesPage';
 import AdminSolicitudesPage from '@/pages/AdminSolicitudesPage';
 import AdminInventarioPage from '@/pages/AdminInventarioPage';
 import AdminBienestarPage from '@/pages/AdminBienestarPage';
@@ -97,6 +98,7 @@ function App() {
 
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
+            <Route path="/admin/roles" element={<AdminRolesPage />} />
             <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/admin/inventario" element={<AdminInventarioPage />} />
             <Route path="/admin/bienestar" element={<AdminBienestarPage />} />

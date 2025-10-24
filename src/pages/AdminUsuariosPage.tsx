@@ -220,6 +220,11 @@ const AdminUsuariosPage: React.FC = () => {
                             <Badge variant={user.isActive ? "secondary" : "destructive"}>
                               {user.isActive ? "Activo" : "Inactivo"}
                             </Badge>
+                            {(user.role || user.roles?.[0]) && (
+                              <Badge variant="outline" className="bg-primary-prosalud/10 text-primary-prosalud border-primary-prosalud/20">
+                                {(user.role || user.roles?.[0] || '').charAt(0).toUpperCase() + (user.role || user.roles?.[0] || '').slice(1)}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-text-gray text-sm">{user.email}</p>
                           <p className="text-xs text-gray-500">
