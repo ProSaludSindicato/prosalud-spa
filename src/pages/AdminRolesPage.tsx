@@ -11,6 +11,30 @@ import { rolesApiAdapter } from '@/services/rolesApiAdapter';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 
+const translatePermission = (permissionName: string): string => {
+  const modules: Record<string, string> = {
+    'request_forms': 'Formularios de Solicitudes',
+    'wellness_events': 'Eventos de Bienestar',
+    'comfenalco_events': 'Eventos de Comfenalco',
+    'users': 'Usuarios',
+    'roles': 'Roles',
+    'permissions': 'Permisos'
+  };
+
+  const actions: Record<string, string> = {
+    'view': 'Ver',
+    'create': 'Crear',
+    'edit': 'Editar',
+    'delete': 'Eliminar'
+  };
+
+  const [module, action] = permissionName.split('.');
+  const translatedModule = modules[module] || module;
+  const translatedAction = actions[action] || action;
+
+  return `${translatedAction} ${translatedModule}`;
+};
+
 const AdminRolesPage: React.FC = () => {
   const [expandedRoles, setExpandedRoles] = useState<number[]>([]);
 
@@ -164,9 +188,9 @@ const AdminRolesPage: React.FC = () => {
                                   <Badge
                                     key={permission.id}
                                     variant="outline"
-                                    className="justify-start py-2 px-3 text-xs font-mono"
+                                    className="justify-start py-2 px-3 text-xs"
                                   >
-                                    {permission.name}
+                                    {translatePermission(permission.name)}
                                   </Badge>
                                 ))}
                               </div>
