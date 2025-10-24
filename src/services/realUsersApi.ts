@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Backend API types
 export interface BackendUser {
@@ -61,10 +61,10 @@ export interface UpdateUserStatusRequest {
 
 // Create axios instance for the backend API
 const backendApi = axios.create({
-  baseURL: `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.test"}/api`,
+  baseURL: `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.laravel.cloud"}/api`,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
   timeout: 10000,
   withCredentials: false, // Disable credentials to avoid CORS issues in development
@@ -75,56 +75,59 @@ backendApi.interceptors.request.use(
   (config) => {
     console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
       params: config.params,
-      data: config.data
+      data: config.data,
     });
     return config;
   },
   (error) => {
-    console.error('❌ API Request Error:', error);
+    console.error("❌ API Request Error:", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // Add response interceptor to handle errors consistently
 backendApi.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data);
+    console.log(
+      `✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`,
+      response.data,
+    );
     return response;
   },
   (error) => {
-    console.error('❌ API Response Error:', {
+    console.error("❌ API Response Error:", {
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
       message: error.message,
-      url: error.config?.url
+      url: error.config?.url,
     });
-    
+
     // Handle CORS errors
-    if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {
-      throw new Error('Error de conexión: Verifique que el servidor backend esté ejecutándose');
+    if (error.code === "ERR_NETWORK" || error.message.includes("CORS")) {
+      throw new Error("Error de conexión: Verifique que el servidor backend esté ejecutándose");
     }
-    
+
     if (error.response?.data) {
-      throw new Error(error.response.data.message || 'Error en la comunicación con el servidor');
+      throw new Error(error.response.data.message || "Error en la comunicación con el servidor");
     }
-    
-    throw new Error('Error de conexión con el servidor');
-  }
+
+    throw new Error("Error de conexión con el servidor");
+  },
 );
 
 export const realUsersApi = {
-  async getUsers(page = 1, search = '', status = ''): Promise<BackendPaginatedResponse<BackendUser>> {
+  async getUsers(page = 1, search = "", status = ""): Promise<BackendPaginatedResponse<BackendUser>> {
     try {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (status) params.append('is_active', status === 'active' ? 'true' : 'false');
-      params.append('per_page', '15');
-      
+      if (search) params.append("search", search);
+      if (status) params.append("is_active", status === "active" ? "true" : "false");
+      params.append("per_page", "15");
+
       const response = await backendApi.get<BackendPaginatedResponse<BackendUser>>(`/users?${params}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
       throw error;
     }
   },
@@ -141,10 +144,10 @@ export const realUsersApi = {
 
   async createUser(data: CreateUserRequest): Promise<BackendUser> {
     try {
-      const response = await backendApi.post<BackendResponse<BackendUser>>('/users', data);
+      const response = await backendApi.post<BackendResponse<BackendUser>>("/users", data);
       return response.data.data;
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
       throw error;
     }
   },
@@ -163,11 +166,11 @@ export const realUsersApi = {
     try {
       // First get the current user to know their current status
       const currentUser = await this.getUserById(id);
-      
+
       const updateData: UpdateUserStatusRequest = {
         is_active: !currentUser.is_active,
       };
-      
+
       const response = await backendApi.patch<BackendResponse<BackendUser>>(`/users/${id}/status`, updateData);
       return response.data.data;
     } catch (error) {
