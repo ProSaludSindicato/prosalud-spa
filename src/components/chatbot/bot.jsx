@@ -3154,9 +3154,10 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                 {!showIncapacidadForm && !showLiquidacionForm && (
                   <form
                     onSubmit={handleSendMessage}
-                    className={`relative z-20 border-t border-gray-200 bg-white pb-8 pt-2 px-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 ${
+                    className={`relative z-20 border-t border-gray-200 bg-white pb-safe pt-2 px-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 safe-area-inset-bottom ${
                       isFullscreen ? "p-4" : ""
                     }`}
+                    style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 2rem)' }}
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-grow relative">
@@ -3175,7 +3176,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                             onKeyDown={handleKeyDown}
                             onFocus={() => setShowSpellCheckSuggestions(inputMessage.trim().length > 0)}
                             onBlur={() => setTimeout(() => setShowSpellCheckSuggestions(false), 200)}
-                            className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud ${
+                            className={`w-full resize-none overflow-hidden rounded-lg border border-gray-300 bg-gray-100 p-2 text-sm text-gray-900 placeholder-gray-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-prosalud-salud dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:ring-prosalud-salud touch-manipulation ${
                               isFullscreen ? "max-h-[120px] min-h-[3rem] p-3 text-base" : "max-h-[80px] min-h-[2.5rem]"
                             }`}
                             placeholder="Escribe tu pregunta aquí..."

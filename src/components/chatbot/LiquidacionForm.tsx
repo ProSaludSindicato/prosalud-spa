@@ -142,7 +142,7 @@ export default function LiquidacionForm({ onSubmit, isLoading }: LiquidacionForm
               value={formData.fechaExpedicion}
               onChange={(e) => handleInputChange("fechaExpedicion", e.target.value)}
               max={getTodayDate()}
-              className="w-full"
+              className="w-full min-w-0"
             />
             {errors.fechaExpedicion && <p className="text-red-500 text-xs mt-1">{errors.fechaExpedicion}</p>}
           </div>
