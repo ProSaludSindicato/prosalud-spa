@@ -129,24 +129,24 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    const userData: any = {
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      ...(user && { isActive: data.isActive }),
-      ...(data.password && data.password.length > 0 && {
-        password: data.password,
-        password_confirmation: data.password_confirmation,
-      }),
-      ...(!user && {
-        password: data.password || 'ProSalud2024.*',
-        password_confirmation: data.password_confirmation || 'ProSalud2024.*',
-      }),
-    };
-
     if (user) {
+      // En edición, solo actualizar nombre, email, rol y estado activo
+      const userData = {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        isActive: data.isActive,
+      };
       updateMutation.mutate({ id: user.id, data: userData });
     } else {
+      // En creación, incluir contraseña
+      const userData = {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        password: data.password || 'ProSalud2024.*',
+        password_confirmation: data.password_confirmation || 'ProSalud2024.*',
+      };
       createMutation.mutate(userData);
     }
   };
@@ -272,43 +272,14 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             )}
 
             {user && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Nueva Contraseña (opcional)</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    {...register('password')}
-                    placeholder="Dejar en blanco para mantener la actual"
-                  />
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password.message}</p>
-                  )}
-                </div>
-
-                {watch('password') && watch('password').length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="password_confirmation">Confirmar Nueva Contraseña</Label>
-                    <Input
-                      id="password_confirmation"
-                      type="password"
-                      {...register('password_confirmation')}
-                      placeholder="Repita la nueva contraseña"
-                    />
-                    {errors.password_confirmation && (
-                      <p className="text-sm text-red-500">{errors.password_confirmation.message}</p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="isActive"
-                    {...register('isActive')}
-                  />
-                  <Label htmlFor="isActive">Usuario activo</Label>
-                </div>
-              </>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isActive"
+                  checked={watch('isActive')}
+                  onCheckedChange={(checked) => setValue('isActive', checked)}
+                />
+                <Label htmlFor="isActive">Usuario activo</Label>
+              </div>
             )}
           </div>
         </div>
