@@ -92,6 +92,7 @@ export default function ChatBot() {
   const [showSpellCheckSuggestions, setShowSpellCheckSuggestions] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [userMessageCount, setUserMessageCount] = useState(0);
 
   // Estado para tracking de tokens y costos
   const [conversationTokens, setConversationTokens] = useState({
@@ -1010,6 +1011,13 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       .finally(() => {});
   }, []);
 
+  // Efecto para cerrar trámites rápidos después de 3 mensajes del usuario
+  useEffect(() => {
+    if (userMessageCount >= 3) {
+      setShowQuickActions(false);
+    }
+  }, [userMessageCount]);
+
   const toggleChat = () => {
     setIsFullscreen(false);
     setIsOpen(!isOpen);
@@ -1274,6 +1282,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
     let text = inputMessage.trim();
     if (!text) return;
+
+    // Incrementar contador de mensajes del usuario
+    setUserMessageCount(prev => prev + 1);
 
     // 🔧 Normalizar términos coloquiales a terminología sindical ProSalud
     const terminologiaSindical = {
@@ -1935,6 +1946,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
   };
 
   const handleIncapacidadFormSubmit = async (formData) => {
+    // Incrementar contador de mensajes por uso de trámite rápido
+    setUserMessageCount(prev => prev + 1);
+    
     setIsConsultingIncapacidad(true);
     setShowIncapacidadForm(false);
 
@@ -2274,6 +2288,9 @@ ${incapacidad.detalles}
 
   // Función para manejar la consulta de liquidaciones
   const handleLiquidacionFormSubmit = async (formData) => {
+    // Incrementar contador de mensajes por uso de trámite rápido
+    setUserMessageCount(prev => prev + 1);
+    
     setIsConsultingLiquidacion(true);
     setShowLiquidacionForm(false);
 
@@ -2853,7 +2870,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                   </button>
                   <button
                     onClick={toggleFullscreen}
-                    className="text-gray-500 transition-colors duration-300 hover:text-primary-500 focus:outline-none dark:text-gray-400 dark:hover:text-primary-400"
+                    className="hidden md:block text-gray-500 transition-colors duration-300 hover:text-primary-500 focus:outline-none dark:text-gray-400 dark:hover:text-primary-400"
                     title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                     aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                   >
@@ -3076,14 +3093,42 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     {showQuickActions && (
                       <div className="px-3 pb-3 space-y-2">
                         <button
-                          onClick={() => setShowIncapacidadForm(true)}
+                          onClick={async () => {
+                            // Verificar límite antes de abrir el formulario
+                            const { chatbotApi } = await import("@/services/chatbotApi");
+                            const limitCheck = await chatbotApi.checkMessageLimit();
+                            if (!limitCheck.allowed) {
+                              const limitMessage = {
+                                role: "assistant",
+                                content: limitCheck.message || "Has alcanzado el límite de consultas. Por favor, intenta más tarde.",
+                                isBot: true,
+                              };
+                              setMessages((prev) => [...prev, limitMessage]);
+                              return;
+                            }
+                            setShowIncapacidadForm(true);
+                          }}
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <CreditCard className="h-4 w-4 text-prosalud-salud" />
                           Consultar pago de una incapacidad
                         </button>
                         <button
-                          onClick={() => setShowLiquidacionForm(true)}
+                          onClick={async () => {
+                            // Verificar límite antes de abrir el formulario
+                            const { chatbotApi } = await import("@/services/chatbotApi");
+                            const limitCheck = await chatbotApi.checkMessageLimit();
+                            if (!limitCheck.allowed) {
+                              const limitMessage = {
+                                role: "assistant",
+                                content: limitCheck.message || "Has alcanzado el límite de consultas. Por favor, intenta más tarde.",
+                                isBot: true,
+                              };
+                              setMessages((prev) => [...prev, limitMessage]);
+                              return;
+                            }
+                            setShowLiquidacionForm(true);
+                          }}
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <FileText className="h-4 w-4 text-prosalud-salud" />
