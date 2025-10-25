@@ -1285,7 +1285,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     if (!text) return;
 
     // Incrementar contador de mensajes del usuario
-    setUserMessageCount(prev => prev + 1);
+    setUserMessageCount((prev) => prev + 1);
 
     // 🔧 Normalizar términos coloquiales a terminología sindical ProSalud
     const terminologiaSindical = {
@@ -1948,8 +1948,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
   const handleIncapacidadFormSubmit = async (formData) => {
     // Incrementar contador de mensajes por uso de trámite rápido
-    setUserMessageCount(prev => prev + 1);
-    
+    setUserMessageCount((prev) => prev + 1);
+
     setIsConsultingIncapacidad(true);
     setShowIncapacidadForm(false);
 
@@ -2284,7 +2284,7 @@ ${incapacidad.detalles}
     // Hacer scroll al inicio del formulario
     setTimeout(() => {
       if (formContainerRef.current) {
-        formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        formContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
     }, 100);
   };
@@ -2302,7 +2302,7 @@ ${incapacidad.detalles}
     // Hacer scroll al inicio del formulario
     setTimeout(() => {
       if (formContainerRef.current) {
-        formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        formContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
     }, 100);
   };
@@ -2310,8 +2310,8 @@ ${incapacidad.detalles}
   // Función para manejar la consulta de liquidaciones
   const handleLiquidacionFormSubmit = async (formData) => {
     // Incrementar contador de mensajes por uso de trámite rápido
-    setUserMessageCount(prev => prev + 1);
-    
+    setUserMessageCount((prev) => prev + 1);
+
     setIsConsultingLiquidacion(true);
     setShowLiquidacionForm(false);
 
@@ -2942,7 +2942,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     <div className="flex justify-between items-center mb-4">
                       <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <FileText className="h-5 w-5 text-prosalud-salud" />
-                        Consultar compensación final pendiente
+                        Consultar estado de compensación final
                       </CardTitle>
                       <button
                         onClick={closeLiquidacionForm}
@@ -3125,7 +3125,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <FileText className="h-4 w-4 text-prosalud-salud" />
-                          Consultar compensación final pendiente
+                          Consultar estado de compensación final
                         </button>
                       </div>
                     )}
@@ -3195,7 +3195,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     className={`relative z-20 border-t border-gray-200 bg-white pb-safe pt-2 px-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0 safe-area-inset-bottom ${
                       isFullscreen ? "p-4" : ""
                     }`}
-                    style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 2rem)' }}
+                    style={{ paddingBottom: "max(env(safe-area-inset-bottom), 2rem)" }}
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-grow relative">
