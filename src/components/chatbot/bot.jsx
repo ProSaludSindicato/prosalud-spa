@@ -932,7 +932,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       console.error("Error generating initial message:", error);
       setMessages([
         {
-          text: "¡Hola! Soy tu asistente de ProSalud. ¿Cómo puedo ayudarte hoy?",
+          role: "assistant",
+          content: "¡Hola! Soy tu asistente de ProSalud. ¿Cómo puedo ayudarte hoy?",
           isBot: true,
         },
       ]);
@@ -1323,7 +1324,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       .slice()
       .reverse()
       .find((m) => m.isBot);
-    if (lastBotMessage && lastBotMessage.multipleIncapacidades) {
+    if (lastBotMessage && Array.isArray(lastBotMessage.multipleIncapacidades) && lastBotMessage.multipleIncapacidades.length > 0) {
       const trimmedInput = text.trim().toLowerCase();
       const allWords = ["todas", "todos", "all", "todo"];
 
@@ -1383,7 +1384,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         // Continuar con el flujo normal sin procesar como selección
       } else {
         // Ver todas
-        if (allWords.includes(trimmedInput)) {
+        if (allWords.includes(trimmedInput) && Array.isArray(lastBotMessage.multipleIncapacidades) && lastBotMessage.multipleIncapacidades.length > 0) {
           const firstIncapacidad = lastBotMessage.multipleIncapacidades[0];
           const nombreAfiliado = firstIncapacidad?.Nombres || "";
 
@@ -3008,7 +3009,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                                       <span>{message.content}</span>
                                     </div>
                                   ) : (
-                                    <ReactMarkdown components={renderers}>{message.content}</ReactMarkdown>
+                                    <ReactMarkdown components={renderers}>{String(message.content ?? "")}</ReactMarkdown>
                                   )}
                                 </div>
 
