@@ -45,7 +45,7 @@ const ComfenalcoEventCard: React.FC<ComfenalcoEventCardProps> = ({ event }) => {
       {/* Banner Image */}
       <div className="relative">
         <img 
-          src={event.bannerImage} 
+          src={event.banner_image} 
           alt={event.title}
           className="w-full h-48 object-cover"
           loading="lazy"
@@ -53,11 +53,6 @@ const ComfenalcoEventCard: React.FC<ComfenalcoEventCardProps> = ({ event }) => {
           height={192}
         />
         <div className="absolute top-3 left-3 flex gap-2">
-          {event.isNew && (
-            <Badge className="bg-red-500 text-white font-semibold">
-              ¡NUEVO!
-            </Badge>
-          )}
           <Badge className={getCategoryColor(event.category)}>
             {getCategoryLabel(event.category)}
           </Badge>
@@ -78,25 +73,25 @@ const ComfenalcoEventCard: React.FC<ComfenalcoEventCardProps> = ({ event }) => {
 
         {/* Dates */}
         <div className="space-y-2 mb-4">
-          {event.eventDate && (
+          {event.event_date && (
             <div className="flex items-center text-sm text-gray-600">
               <Calendar className="h-4 w-4 mr-2 text-green-600" />
-              <span>Evento: {formatDate(event.eventDate)}</span>
+              <span>Evento: {formatDate(event.event_date)}</span>
             </div>
           )}
-          {event.registrationDeadline && (
+          {event.registration_deadline && (
             <div className="flex items-center text-sm text-gray-600">
               <Clock className="h-4 w-4 mr-2 text-orange-600" />
-              <span>Inscripción hasta: {formatDate(event.registrationDeadline)}</span>
+              <span>Inscripción hasta: {formatDate(event.registration_deadline)}</span>
             </div>
           )}
         </div>
 
         {/* Action Button */}
-        {event.registrationLink && (
+        {event.registration_link && (
           <Button 
             className="w-full bg-[#00529B] hover:bg-[#003A70] text-white"
-            onClick={() => window.open(event.registrationLink, '_blank')}
+            onClick={() => window.open(event.registration_link, '_blank')}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             Ver más información

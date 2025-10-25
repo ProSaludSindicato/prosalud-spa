@@ -1418,6 +1418,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         if (
           !isNaN(selectedNumber) &&
           selectedNumber >= 1 &&
+          lastBotMessage.multipleIncapacidades &&
+          Array.isArray(lastBotMessage.multipleIncapacidades) &&
           selectedNumber <= lastBotMessage.multipleIncapacidades.length
         ) {
           const selectedIncapacidad = lastBotMessage.multipleIncapacidades[selectedNumber - 1];
