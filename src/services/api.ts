@@ -1,8 +1,9 @@
 import axios from "axios";
+import { API_CONFIG } from "../config/api";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "https://prosalud.laravel.cloud",
-  withCredentials: true,
+    baseURL: API_CONFIG.PUBLIC_BASE_URL,
+    withCredentials: true,
 });
 
 api.defaults.xsrfCookieName = "XSRF-TOKEN";

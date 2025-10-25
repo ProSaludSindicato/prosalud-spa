@@ -55,7 +55,6 @@ const AdminSolicitudesPage: React.FC = () => {
 
   const { toast } = useToast();
 
-  // Fetch all requests from API
   const {
     data: allSolicitudes = [],
     isLoading,
@@ -67,11 +66,9 @@ const AdminSolicitudesPage: React.FC = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Filter and sort requests locally for better performance
   const filteredSolicitudes = useMemo(() => {
     let filtered = [...allSolicitudes];
 
-    // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -84,17 +81,14 @@ const AdminSolicitudesPage: React.FC = () => {
       );
     }
 
-    // Apply status filter
     if (selectedStatus !== "all") {
       filtered = filtered.filter((request) => request.status === selectedStatus);
     }
 
-    // Apply type filter
     if (selectedType !== "all") {
       filtered = filtered.filter((request) => request.request_type === selectedType);
     }
 
-    // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === "name") {
         const nameA = `${a.name} ${a.last_name}`.toLowerCase();
@@ -110,7 +104,6 @@ const AdminSolicitudesPage: React.FC = () => {
     return filtered;
   }, [allSolicitudes, searchTerm, selectedStatus, selectedType, sortBy, sortOrder]);
 
-  // Fetch stats - computed from allSolicitudes for real-time accuracy
   const stats = useMemo(() => {
     if (!allSolicitudes || allSolicitudes.length === 0) {
       return {
@@ -188,7 +181,7 @@ const AdminSolicitudesPage: React.FC = () => {
 
   const handleChangeStatus = async (id: string, newStatus: Request["status"]) => {
     try {
-      const updatedRequest = await requestsService.updateRequestStatus(id, newStatus);
+      await requestsService.updateRequestStatus(id, newStatus);
 
       const statusLabels = {
         in_progress: "Marcada en Revisión",
@@ -201,9 +194,13 @@ const AdminSolicitudesPage: React.FC = () => {
         description: `La solicitud #${id} ha sido ${statusLabels[newStatus].toLowerCase()} exitosamente.`,
       });
 
-      // Update selected request if it's being viewed
       if (selectedSolicitud?.id === id) {
-        setSelectedSolicitud(updatedRequest);
+        setSelectedSolicitud(prev => prev ? {
+          ...prev, 
+          status: newStatus,
+          processed_at: new Date().toISOString(),
+          resolved_at: newStatus === 'resolved' ? new Date().toISOString() : prev.resolved_at
+        } : null);
       }
 
       refetch();

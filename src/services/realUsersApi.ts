@@ -59,9 +59,11 @@ export interface UpdateUserStatusRequest {
   is_active: boolean;
 }
 
+import { API_CONFIG } from "../config/api";
+
 // Create axios instance for the backend API
 const backendApi = axios.create({
-  baseURL: `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.laravel.cloud"}/api`,
+  baseURL: `${API_CONFIG.ADMIN_BASE_URL}/api`,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

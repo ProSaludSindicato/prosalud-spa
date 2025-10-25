@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || "https://prosalud.laravel.cloud"}/api`;
+import { API_CONFIG } from "../config/api";
+
+const API_BASE_URL = `${API_CONFIG.ADMIN_BASE_URL}/api`;
 
 // Backend types
 interface BackendPermission {

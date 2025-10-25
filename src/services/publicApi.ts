@@ -1,8 +1,9 @@
 import axios from "axios";
+import { API_CONFIG } from "../config/api";
 
 // API client for public endpoints (no authentication required)
 const publicApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "https://prosalud.laravel.cloud",
+  baseURL: API_CONFIG.PUBLIC_BASE_URL,
   withCredentials: false,
   headers: {
     "Content-Type": "application/json",

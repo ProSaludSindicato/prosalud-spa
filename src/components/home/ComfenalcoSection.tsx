@@ -1,6 +1,6 @@
-
 import React, { useRef, useState, useEffect } from 'react';
-import { comfenalcoEventsMock } from '@/data/comfenalcoEventsMock';
+import { useQuery } from '@tanstack/react-query';
+import { publicComfenalcoApi } from '@/services/publicComfenalcoApi';
 import useIntersectionObserver from '@/hooks/useIntersectionObserver';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Gift, Sparkles, Calendar, Clock, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -15,8 +15,82 @@ const ComfenalcoSection: React.FC = () => {
   });
 
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [featuredEvents] = useState(comfenalcoEventsMock.filter(event => event.displaySize === 'carousel'));
-  const [mosaicEvents] = useState(comfenalcoEventsMock.filter(event => event.displaySize === 'mosaic'));
+  const [sortOrder, setSortOrder] = useState<'upcoming' | 'recent'>('upcoming');
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Check screen size
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // Fetch real events data
+  const { data: events = [], isLoading, error } = useQuery({
+    queryKey: ['public-comfenalco-events'],
+    queryFn: publicComfenalcoApi.getPublicEvents,
+    enabled: isVisible, // Only fetch when section is visible
+  });
+
+  // Helper function to check if event date has passed
+  const isEventDatePassed = (eventDate: string) => {
+    if (!eventDate) return false;
+    
+    try {
+      // Parse event date in Colombia timezone (UTC-5)
+      const eventDateTime = new Date(eventDate + 'T00:00:00-05:00');
+      
+      // Get current date in Colombia timezone
+      const now = new Date();
+      const colombiaOffset = -5 * 60; // UTC-5 in minutes
+      const colombiaTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (colombiaOffset * 60000));
+      
+      // Reset to start of day for comparison
+      const today = new Date(colombiaTime.getFullYear(), colombiaTime.getMonth(), colombiaTime.getDate());
+      const eventDateOnly = new Date(eventDateTime.getFullYear(), eventDateTime.getMonth(), eventDateTime.getDate());
+      
+      // Only filter out events that are BEFORE today (not including today)
+      return eventDateOnly < today;
+    } catch (error) {
+      return false; // Don't filter out events with invalid dates
+    }
+  };
+
+  // Helper function to sort events by date
+  const sortEventsByDate = (events: any[], order: 'upcoming' | 'recent') => {
+    return [...events].sort((a, b) => {
+      const dateA = new Date(a.event_date || a.created_at);
+      const dateB = new Date(b.event_date || b.created_at);
+      
+      if (order === 'upcoming') {
+        return dateA.getTime() - dateB.getTime(); // Ascending (upcoming first)
+      } else {
+        return dateB.getTime() - dateA.getTime(); // Descending (recent first)
+      }
+    });
+  };
+
+  // Filter and sort events
+  const filteredEvents = events.filter(event => {
+    // If no event_date, don't filter out
+    if (!event.event_date) {
+      return true;
+    }
+    
+    const hasPassed = isEventDatePassed(event.event_date);
+    return !hasPassed;
+  });
+  
+  const sortedEvents = sortEventsByDate(filteredEvents, sortOrder);
+  
+  const featuredEvents = sortedEvents.filter(event => event.display_size === 'carousel');
+  const mosaicEvents = sortedEvents.filter(event => event.display_size === 'mosaic');
 
   useEffect(() => {
     if (!isVisible) return;
@@ -38,31 +112,28 @@ const ComfenalcoSection: React.FC = () => {
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      curso: 'bg-blue-500',
-      experiencia: 'bg-purple-500',
-      beneficio: 'bg-green-500',
-      regalo: 'bg-pink-500',
-      recreacion: 'bg-orange-500'
+      'Deportes': 'bg-blue-500',
+      'Cultura': 'bg-purple-500',
+      'Educación': 'bg-green-500',
+      'Recreación': 'bg-orange-500',
+      'Bienestar': 'bg-pink-500',
+      'Familia': 'bg-indigo-500'
     };
     return colors[category as keyof typeof colors] || 'bg-gray-500';
   };
 
   const getCategoryLabel = (category: string) => {
-    const labels = {
-      curso: 'Curso',
-      experiencia: 'Experiencia',
-      beneficio: 'Beneficio',
-      regalo: 'Regalo',
-      recreacion: 'Recreación'
-    };
-    return labels[category as keyof typeof labels] || category;
+    return category; // API already returns proper labels
   };
 
   const handleEventClick = (event: any) => {
-    window.open(event.formLink, '_blank');
+    if (event.registration_link) {
+      window.open(event.registration_link, '_blank');
+    }
   };
 
-  if (!isVisible) {
+  // Early returns for different states
+  if (!isVisible || isLoading) {
     return (
       <section ref={sectionRef} className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -79,6 +150,33 @@ const ComfenalcoSection: React.FC = () => {
         </div>
       </section>
     );
+  }
+
+  if (error) {
+    console.error('ComfenalcoSection Error:', error);
+    return (
+      <section ref={sectionRef} className="py-16 md:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-2xl md:text-3xl font-bold text-primary-prosalud mb-4">
+              Experiencias que transforman
+            </h2>
+            <p className="text-gray-600 mb-4">
+              No se pudieron cargar los eventos en este momento. Por favor, intenta más tarde.
+            </p>
+            <div className="text-left bg-gray-100 p-4 rounded-lg max-w-2xl mx-auto">
+              <p className="text-sm text-gray-600">
+                Error: {error?.message || 'Error desconocido'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (events.length === 0) {
+    return null;
   }
 
   return (
@@ -100,7 +198,7 @@ const ComfenalcoSection: React.FC = () => {
                 }}
               />
             </div>
-            <div className="text-left">
+            <div className="text-left flex-1">
               <h2 className="text-2xl md:text-3xl font-bold text-primary-prosalud leading-tight">
                 Experiencias que transforman
               </h2>
@@ -110,14 +208,28 @@ const ComfenalcoSection: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Badge className="bg-green-100 text-green-700 font-semibold px-3 py-1.5 pointer-events-none">
-              <Gift className="h-4 w-4 mr-2" />
-              Beneficios Activos
-            </Badge>
-            <div className="hidden md:flex items-center text-sm text-primary-prosalud">
-              <Sparkles className="h-4 w-4 mr-1 text-yellow-500" />
-              ¡No te los pierdas!
+          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOrder(prev => prev === 'upcoming' ? 'recent' : 'upcoming')}
+              className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white transition-colors"
+              title={sortOrder === 'upcoming' ? 'Cambiar a más recientes' : 'Cambiar a próximos'}
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">{sortOrder === 'upcoming' ? 'Próximos' : 'Recientes'}</span>
+              <span className="sm:hidden">{sortOrder === 'upcoming' ? 'Próx.' : 'Recientes'}</span>
+            </Button>
+            
+            <div className="flex items-center gap-3">
+              <Badge className="bg-green-100 text-green-700 font-semibold px-3 py-1.5 pointer-events-none">
+                <Gift className="h-4 w-4 mr-2" />
+                Beneficios Activos
+              </Badge>
+              <div className="hidden md:flex items-center text-sm text-primary-prosalud">
+                <Sparkles className="h-4 w-4 mr-1 text-yellow-500" />
+                ¡No te los pierdas!
+              </div>
             </div>
           </div>
         </div>
@@ -138,61 +250,60 @@ const ComfenalcoSection: React.FC = () => {
                 >
                   <div 
                     className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${event.bannerImage})` }}
+                    style={{ backgroundImage: `url(${event.banner_image})` }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
                   
                   {/* Content Overlay */}
                   <div className="absolute inset-0 flex items-center">
                     <div className="container mx-auto px-8">
-                      <div className="max-w-2xl text-white">
-                        <div className="flex items-center gap-3 mb-4">
-                          {event.isNew && (
-                            <Badge className="bg-red-500 text-white font-semibold animate-pulse">
-                              ¡NUEVO!
+                      <div className="max-w-2xl text-white flex flex-col h-full justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Badge className={`${getCategoryColor(event.category)} text-white`}>
+                              {getCategoryLabel(event.category)}
                             </Badge>
+                          </div>
+                          
+                          <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold mb-4 line-clamp-2">
+                            {event.title}
+                          </h3>
+                          
+                          {event.description && (
+                            <p className="text-base md:text-lg lg:text-xl mb-4 text-gray-200 line-clamp-3">
+                              {event.description}
+                            </p>
                           )}
-                          <Badge className={`${getCategoryColor(event.category)} text-white`}>
-                            {getCategoryLabel(event.category)}
-                          </Badge>
-                        </div>
-                        
-                        <h3 className="text-3xl md:text-5xl font-bold mb-4">
-                          {event.title}
-                        </h3>
-                        
-                        {event.description && (
-                          <p className="text-lg md:text-xl mb-6 text-gray-200">
-                            {event.description}
-                          </p>
-                        )}
 
-                        <div className="flex flex-wrap gap-4 mb-6">
-                          {event.eventDate && (
-                            <div className="flex items-center text-white/90">
-                              <Calendar className="h-5 w-5 mr-2" />
-                              <span>{formatDate(event.eventDate)}</span>
-                            </div>
-                          )}
-                          {event.registrationDeadline && (
-                            <div className="flex items-center text-white/90">
-                              <Clock className="h-5 w-5 mr-2" />
-                              <span>Hasta: {formatDate(event.registrationDeadline)}</span>
-                            </div>
-                          )}
+                          <div className="flex flex-wrap gap-4 mb-4">
+                            {event.event_date && (
+                              <div className="flex items-center text-white/90 text-sm md:text-base">
+                                <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                                <span>{formatDate(event.event_date)}</span>
+                              </div>
+                            )}
+                            {event.registration_deadline && (
+                              <div className="flex items-center text-white/90 text-sm md:text-base">
+                                <Clock className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                                <span>Hasta: {formatDate(event.registration_deadline)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <Button 
-                          size="lg"
-                          className="bg-white text-black hover:bg-gray-100 font-semibold"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEventClick(event);
-                          }}
-                        >
-                          <ExternalLink className="h-5 w-5 mr-2" />
-                          Inscríbete aquí
-                        </Button>
+                        <div className="flex-shrink-0">
+                          <Button 
+                            size="lg"
+                            className="bg-white text-black hover:bg-gray-100 font-semibold w-full sm:w-auto"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEventClick(event);
+                            }}
+                          >
+                            <ExternalLink className="h-5 w-5 mr-2" />
+                            Inscríbete aquí
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -235,62 +346,101 @@ const ComfenalcoSection: React.FC = () => {
 
         {/* Mosaic Grid - Solo mostrar si hay eventos de mosaico */}
         {mosaicEvents.length > 0 && (
-          <div className="grid grid-cols-12 gap-4 h-64 md:h-72">
-            {mosaicEvents.map((event, index) => {
-              const isLarge = index === 0;
-              const colSpan = isLarge ? 'col-span-12 md:col-span-8' : 'col-span-12 md:col-span-4';
-              const height = isLarge ? 'h-full' : index === 1 ? 'h-3/4' : 'h-3/4 md:mt-2';
-              
-              // Dimensiones para las imágenes de fondo
-              const imgWidth = isLarge ? 800 : 400;
-              const imgHeight = isLarge ? 600 : 300;
-              
-              return (
+          <>
+            {/* Layout responsivo mejorado */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Límites responsivos: 4 en móvil/tablet, 6 en desktop */}
+              {mosaicEvents.slice(0, showAllEvents ? mosaicEvents.length : isDesktop ? 6 : 4).map((event, index) => (
                 <div
                   key={event.id}
-                  className={`${colSpan} ${height} group cursor-pointer`}
-                  style={{ animationDelay: `${index * 0.2}s` }}
+                  className="group cursor-pointer h-48 md:h-56"
+                  style={{ animationDelay: `${index * 0.1}s` }}
                   onClick={() => handleEventClick(event)}
                 >
                   <div className="relative h-full rounded-2xl overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-300 group-hover:scale-[1.02]">
                     <div 
                       className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-                      style={{ backgroundImage: `url(${event.bannerImage})` }}
+                      style={{ backgroundImage: `url(${event.banner_image})` }}
                       role="img"
                       aria-label={event.title}
-                      data-width={imgWidth}
-                      data-height={imgHeight}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                     
                     <div className="absolute inset-0 p-4 flex flex-col justify-end text-white">
                       <div className="flex items-center gap-2 mb-2">
-                        {event.isNew && (
-                          <Badge className="bg-red-500 text-white text-xs">
-                            ¡NUEVO!
-                          </Badge>
-                        )}
                         <Badge className={`${getCategoryColor(event.category)} text-white text-xs`}>
                           {getCategoryLabel(event.category)}
                         </Badge>
                       </div>
                       
-                      <h4 className={`font-bold mb-2 ${isLarge ? 'text-xl md:text-2xl' : 'text-sm md:text-lg'}`}>
+                      <h4 className="font-bold mb-2 text-lg md:text-xl line-clamp-2">
                         {event.title}
                       </h4>
                       
-                      {event.eventDate && (
-                        <div className="flex items-center text-white/90 text-xs md:text-sm">
-                          <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-                          <span>{formatDate(event.eventDate)}</span>
-                        </div>
+                      {/* Agregar descripción para mejor UX */}
+                      {event.description && (
+                        <p className="text-sm text-white/90 mb-2 line-clamp-2">
+                          {event.description}
+                        </p>
                       )}
+                      
+                      <div className="flex items-center justify-between">
+                        {event.event_date && (
+                          <div className="flex items-center text-white/90 text-xs md:text-sm">
+                            <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                            <span>{formatDate(event.event_date)}</span>
+                          </div>
+                        )}
+                        
+                        <Button
+                          size="sm"
+                          className="bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 border border-white/30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEventClick(event);
+                          }}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Ver más
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+            
+            {/* Mostrar mensaje si hay más eventos */}
+            {mosaicEvents.length > (isDesktop ? 6 : 4) && !showAllEvents && (
+              <div className="text-center py-4">
+                <p className="text-gray-600 text-sm mb-3">
+                  Y {mosaicEvents.length - (isDesktop ? 6 : 4)} eventos más disponibles
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowAllEvents(true)}
+                  className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white"
+                >
+                  Ver todos los eventos
+                </Button>
+              </div>
+            )}
+            
+            {/* Botón para ocultar eventos adicionales */}
+            {showAllEvents && mosaicEvents.length > (isDesktop ? 6 : 4) && (
+              <div className="text-center py-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowAllEvents(false)}
+                  className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white"
+                >
+                  Mostrar menos eventos
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

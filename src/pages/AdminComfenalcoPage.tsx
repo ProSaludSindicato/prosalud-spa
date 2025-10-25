@@ -28,16 +28,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
-import { comfenalcoEventsMock } from '@/data/comfenalcoEventsMock';
-import { ComfenalcoEvent } from '@/types/comfenalco';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { DatePicker } from "@/components/ui/date-picker";
+import { ComfenalcoEvent, CreateComfenalcoEventData, UpdateComfenalcoEventData } from '@/types/comfenalco';
+import { comfenalcoEventsApi, ComfenalcoEventsApiError } from '@/services/comfenalcoEventsApi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useComfenalcoEventValidation, ValidationErrors } from '@/hooks/useComfenalcoEventValidation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { FieldError } from '@/components/ui/field-error';
 import DeleteComfenalcoEventDialog from '@/components/admin/comfenalco/DeleteComfenalcoEventDialog';
 
 const AdminComfenalcoPage: React.FC = () => {
@@ -51,33 +51,151 @@ const AdminComfenalcoPage: React.FC = () => {
     category: 'all',
     displaySize: 'all',
   });
-  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { errors: validationErrors, validateCreateEvent, validateUpdateEvent, clearErrors, setFieldError, clearFieldError } = useComfenalcoEventValidation();
+  const [backendErrors, setBackendErrors] = useState<ValidationErrors>({});
 
-  const [formValues, setFormValues] = useState<Omit<ComfenalcoEvent, 'id'>>({
+  // Debug logging for errors
+  console.log('Validation errors:', validationErrors);
+  console.log('Backend errors:', backendErrors);
+
+  // Helper function to get field error
+  const getFieldError = (field: keyof ValidationErrors): string | undefined => {
+    const frontendError = validationErrors[field];
+    const backendError = backendErrors[field];
+    const error = frontendError || backendError;
+    
+    // Debug logging
+    if (error) {
+      console.log(`Error for field ${field}:`, error);
+    }
+    
+    return error;
+  };
+
+  const [formValues, setFormValues] = useState<Omit<ComfenalcoEvent, 'id' | 'created_at' | 'updated_at'>>({
     title: '',
-    bannerImage: '',
+    banner_image: '',
     description: '',
-    publishDate: new Date().toISOString().split('T')[0],
-    registrationDeadline: new Date().toISOString().split('T')[0],
-    eventDate: new Date().toISOString().split('T')[0],
-    registrationLink: '',
-    formLink: '',
-    isNew: false,
-    category: 'curso',
-    displaySize: 'carousel',
-    isVisible: true,
+    registration_deadline: '',
+    event_date: '',
+    registration_link: '',
+    category: 'Deportes',
+    display_size: 'carousel',
+    is_visible: true,
   });
 
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
 
-  const filteredEvents = comfenalcoEventsMock.filter(event => {
+  // React Query hooks
+  const { data: events = [], isLoading, error } = useQuery({
+    queryKey: ['comfenalco-events'],
+    queryFn: comfenalcoEventsApi.getEvents,
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: comfenalcoEventsApi.createEvent,
+    onSuccess: async (data) => {
+      // Close modal and reset form first
+      setEventFormOpen(false);
+      resetForm();
+      clearErrors();
+      setBackendErrors({});
+      
+      // Show success toast
+      toast.success("Evento Creado", {
+        description: "El evento ha sido creado exitosamente.",
+      });
+      
+      // Reload the page to ensure fresh data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000); // Small delay to show the toast
+    },
+    onError: (error: ComfenalcoEventsApiError) => {
+      if (error.status === 422 && error.errors) {
+        // Handle validation errors from backend
+        setBackendErrors(error.errors);
+        toast.error("Error de validación", {
+          description: "Por favor corrige los errores en el formulario.",
+        });
+      } else {
+        toast.error("Error al crear evento", {
+          description: error.message,
+        });
+      }
+    },
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateComfenalcoEventData }) => 
+      comfenalcoEventsApi.updateEvent(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comfenalco-events'] });
+      toast.success("Evento Actualizado", {
+        description: "El evento ha sido actualizado exitosamente.",
+      });
+      setEventFormOpen(false);
+      resetForm();
+      clearErrors();
+      setBackendErrors({});
+    },
+    onError: (error: ComfenalcoEventsApiError) => {
+      if (error.status === 422 && error.errors) {
+        // Handle validation errors from backend
+        setBackendErrors(error.errors);
+        toast.error("Error de validación", {
+          description: "Por favor corrige los errores en el formulario.",
+        });
+      } else {
+        toast.error("Error al actualizar evento", {
+          description: error.message,
+        });
+      }
+    },
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: comfenalcoEventsApi.deleteEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comfenalco-events'] });
+      toast.success("Evento Eliminado", {
+        description: "El evento ha sido eliminado exitosamente.",
+      });
+      setDeleteEventOpen(false);
+      setSelectedEvent(null);
+    },
+    onError: (error: ComfenalcoEventsApiError) => {
+      toast.error("Error al eliminar evento", {
+        description: error.message,
+      });
+    },
+  });
+
+  const updateVisibilityMutation = useMutation({
+    mutationFn: ({ id, isVisible }: { id: number; isVisible: boolean }) =>
+      comfenalcoEventsApi.updateEventVisibility(id, isVisible),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comfenalco-events'] });
+      toast.success("Visibilidad Actualizada", {
+        description: "La visibilidad del evento ha sido actualizada.",
+      });
+    },
+    onError: (error: ComfenalcoEventsApiError) => {
+      toast.error("Error al actualizar visibilidad", {
+        description: error.message,
+      });
+    },
+  });
+
+  const filteredEvents = events.filter(event => {
     const searchTermLower = searchTerm.toLowerCase();
     const titleLower = event.title.toLowerCase();
   
     const matchesSearchTerm = titleLower.includes(searchTermLower);
     const matchesCategory = filters.category === 'all' || event.category === filters.category;
-    const matchesDisplaySize = filters.displaySize === 'all' || event.displaySize === filters.displaySize;
+    const matchesDisplaySize = filters.displaySize === 'all' || event.display_size === filters.displaySize;
   
     return matchesSearchTerm && matchesCategory && matchesDisplaySize;
   });
@@ -121,6 +239,11 @@ const AdminComfenalcoPage: React.FC = () => {
       ...prevValues,
       [name]: value
     }));
+    
+    // Clear field error when user starts typing
+    if (name in validationErrors || name in backendErrors) {
+      clearFieldError(name as keyof ValidationErrors);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,20 +251,16 @@ const AdminComfenalcoPage: React.FC = () => {
     if (file) {
       // Validar tamaño del archivo
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Archivo muy grande",
+        toast.error("Archivo muy grande", {
           description: "La imagen debe ser menor a 5MB.",
-          variant: "destructive"
         });
         return;
       }
 
       // Validar tipo de archivo
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        toast({
-          title: "Formato no válido",
+        toast.error("Formato no válido", {
           description: "Solo se permiten archivos JPG, PNG o WebP.",
-          variant: "destructive"
         });
         return;
       }
@@ -172,102 +291,140 @@ const AdminComfenalcoPage: React.FC = () => {
   const handleCategoryChange = (value: string) => {
     setFormValues(prevValues => ({
       ...prevValues,
-      category: value as ComfenalcoEvent['category']
+      category: value
     }));
+    
+    // Clear category error when user selects a category
+    if ('category' in validationErrors || 'category' in backendErrors) {
+      clearFieldError('category');
+    }
   };
 
   const handleDisplaySizeChange = (value: string) => {
     setFormValues(prevValues => ({
       ...prevValues,
-      displaySize: value as ComfenalcoEvent['displaySize']
+      display_size: value as ComfenalcoEvent['display_size']
+    }));
+    
+    // Clear display_size error when user selects a size
+    if ('display_size' in validationErrors || 'display_size' in backendErrors) {
+      clearFieldError('display_size');
+    }
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    // Clear field error when user changes the date
+    if (name in validationErrors || name in backendErrors) {
+      clearFieldError(name as keyof ValidationErrors);
+    }
+    
+    // If registration deadline is set and it's after the event date, clear the event date
+    if (name === 'registration_deadline' && value && formValues.event_date) {
+      const registrationDate = new Date(value);
+      const eventDate = new Date(formValues.event_date);
+      
+      if (registrationDate > eventDate) {
+        setFormValues(prev => ({
+          ...prev,
+          [name]: value,
+          event_date: '',
+        }));
+        if ('event_date' in validationErrors || 'event_date' in backendErrors) {
+          clearFieldError('event_date');
+        }
+        return; // Exit early to avoid double update
+      }
+    }
+    
+    // Update form values
+    setFormValues(prevValues => ({
+      ...prevValues,
+      [name]: value
     }));
   };
 
-  const handlePublishDateChange = (date: Date | undefined) => {
-    if (date) {
-      setFormValues(prevValues => ({
-        ...prevValues,
-        publishDate: format(date, 'yyyy-MM-dd', { locale: es }),
-      }));
-    }
-  };
-
-  const handleRegistrationDeadlineChange = (date: Date | undefined) => {
-    if (date) {
-      setFormValues(prevValues => ({
-        ...prevValues,
-        registrationDeadline: format(date, 'yyyy-MM-dd', { locale: es }),
-      }));
-    }
-  };
-
-  const handleEventDateChange = (date: Date | undefined) => {
-    if (date) {
-      setFormValues(prevValues => ({
-        ...prevValues,
-        eventDate: format(date, 'yyyy-MM-dd', { locale: es }),
-      }));
-    }
-  };
-
   const handleSubmit = () => {
-    if (!isEditing && !bannerImageFile && !imagePreview) {
-      toast({
-        title: "Imagen requerida",
-        description: "Debes subir una imagen banner.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Clear previous errors
+    clearErrors();
+    setBackendErrors({});
 
     if (isEditing && selectedEvent) {
       // Update existing event
-      const updatedEvents = comfenalcoEventsMock.map(event =>
-        event.id === selectedEvent.id ? { ...selectedEvent, ...formValues } : event
-      );
-      // Here you would typically call an API to update the event
-      toast({
-        title: "Evento Actualizado",
-        description: "El evento ha sido actualizado exitosamente.",
-      });
+      const updateData: UpdateComfenalcoEventData = {
+        title: formValues.title,
+        category: formValues.category,
+        description: formValues.description,
+        display_size: formValues.display_size,
+        event_date: formValues.event_date,
+        registration_deadline: formValues.registration_deadline,
+        registration_link: formValues.registration_link,
+        is_visible: formValues.is_visible,
+      };
+
+      // Validate update data
+      const validation = validateUpdateEvent(updateData);
+      if (!validation.isValid) {
+        console.log('Validation errors:', validation.errors);
+        toast.error("Error de validación", {
+          description: "Por favor corrige los errores en el formulario.",
+        });
+        return;
+      }
+
+      updateEventMutation.mutate({ id: selectedEvent.id, data: updateData });
     } else {
       // Create new event
-      const newEvent: ComfenalcoEvent = {
-        id: `event-${Date.now()}`,
-        ...formValues,
-        bannerImage: imagePreview || formValues.bannerImage,
-      };
-      comfenalcoEventsMock.push(newEvent);
-      // Here you would typically call an API to create the event
-      toast({
-        title: "Evento Creado",
-        description: "El evento ha sido creado exitosamente.",
-      });
-    }
+      if (!bannerImageFile) {
+        setFieldError('banner_image', 'La imagen del banner es obligatoria');
+        toast.error("Imagen requerida", {
+          description: "Debes subir una imagen banner.",
+        });
+        return;
+      }
 
-    setEventFormOpen(false);
-    setSelectedEvent(null);
-    setIsEditing(false);
-    resetForm();
+      const createData: CreateComfenalcoEventData = {
+        title: formValues.title,
+        banner_image: bannerImageFile,
+        category: formValues.category,
+        description: formValues.description,
+        display_size: formValues.display_size,
+        event_date: formValues.event_date,
+        registration_deadline: formValues.registration_deadline,
+        registration_link: formValues.registration_link,
+        is_visible: formValues.is_visible,
+      };
+
+      // Validate create data
+      const validation = validateCreateEvent(createData);
+      console.log('Validation result:', validation);
+      if (!validation.isValid) {
+        console.log('Validation errors:', validation.errors);
+        toast.error("Error de validación", {
+          description: "Por favor corrige los errores en el formulario.",
+        });
+        return;
+      }
+
+      createEventMutation.mutate(createData);
+    }
   };
 
   const handleEdit = (event: ComfenalcoEvent) => {
     setSelectedEvent(event);
     setFormValues({
       title: event.title,
-      bannerImage: event.bannerImage,
+      banner_image: event.banner_image,
       description: event.description || '',
-      publishDate: event.publishDate,
-      registrationDeadline: event.registrationDeadline || '',
-      eventDate: event.eventDate || '',
-      registrationLink: event.registrationLink || '',
-      formLink: event.formLink,
-      isNew: event.isNew,
+      registration_deadline: event.registration_deadline || '',
+      event_date: event.event_date || '',
+      registration_link: event.registration_link || '',
       category: event.category,
-      displaySize: event.displaySize,
-      isVisible: event.isVisible || true,
+      display_size: event.display_size,
+      is_visible: event.is_visible,
     });
-    setImagePreview(event.bannerImage);
+    setImagePreview(event.banner_image);
     setBannerImageFile(null);
     setIsEditing(true);
     setEventFormOpen(true);
@@ -280,38 +437,28 @@ const AdminComfenalcoPage: React.FC = () => {
 
   const confirmDelete = () => {
     if (selectedEvent) {
-      const eventIndex = comfenalcoEventsMock.findIndex(e => e.id === selectedEvent.id);
-      if (eventIndex > -1) {
-        comfenalcoEventsMock.splice(eventIndex, 1);
-        toast({
-          title: "Evento Eliminado",
-          description: "El evento ha sido eliminado exitosamente.",
-        });
-      }
+      deleteEventMutation.mutate(selectedEvent.id);
     }
-    setDeleteEventOpen(false);
-    setSelectedEvent(null);
   };
 
   const resetForm = () => {
     setFormValues({
       title: '',
-      bannerImage: '',
+      banner_image: '',
       description: '',
-      publishDate: new Date().toISOString().split('T')[0],
-      registrationDeadline: new Date().toISOString().split('T')[0],
-      eventDate: new Date().toISOString().split('T')[0],
-      registrationLink: '',
-      formLink: '',
-      isNew: false,
-      category: 'curso',
-      displaySize: 'carousel',
-      isVisible: true,
+      registration_deadline: '',
+      event_date: '',
+      registration_link: '',
+      category: 'Deportes',
+      display_size: 'carousel',
+      is_visible: true,
     });
     setBannerImageFile(null);
     setImagePreview('');
     setIsEditing(false);
     setSelectedEvent(null);
+    clearErrors();
+    setBackendErrors({});
   };
 
   return (
@@ -383,11 +530,12 @@ const AdminComfenalcoPage: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas las categorías</SelectItem>
-                      <SelectItem value="curso">Curso</SelectItem>
-                      <SelectItem value="experiencia">Experiencia</SelectItem>
-                      <SelectItem value="beneficio">Beneficio</SelectItem>
-                      <SelectItem value="regalo">Regalo</SelectItem>
-                      <SelectItem value="recreacion">Recreación</SelectItem>
+                      <SelectItem value="Deportes">Deportes</SelectItem>
+                      <SelectItem value="Cultura">Cultura</SelectItem>
+                      <SelectItem value="Educación">Educación</SelectItem>
+                      <SelectItem value="Recreación">Recreación</SelectItem>
+                      <SelectItem value="Bienestar">Bienestar</SelectItem>
+                      <SelectItem value="Familia">Familia</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -425,91 +573,110 @@ const AdminComfenalcoPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {paginatedEvents.map((event) => (
-                    <Card key={event.id} className="hover:shadow-lg transition-shadow duration-300">
-                      <CardHeader className="p-0">
-                        <img
-                          src={event.bannerImage}
-                          alt={event.title}
-                          className="w-full h-48 object-cover rounded-t-lg"
-                        />
-                      </CardHeader>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            {event.category}
-                          </Badge>
-                          <div className="flex gap-1">
-                            {event.isNew && (
-                              <Badge className="bg-green-100 text-green-800 text-xs">
-                                Nuevo
-                              </Badge>
-                            )}
-                            <Badge variant={event.isVisible ? "default" : "secondary"} className="text-xs">
-                              {event.isVisible ? "Visible" : "Oculto"}
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-prosalud mx-auto mb-4"></div>
+                      <p className="text-gray-600">Cargando eventos...</p>
+                    </div>
+                  </div>
+                ) : error ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <p className="text-red-600 mb-4">Error al cargar los eventos</p>
+                      <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['comfenalco-events'] })}>
+                        Reintentar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {paginatedEvents.map((event) => (
+                      <Card key={event.id} className="hover:shadow-lg transition-shadow duration-300 flex flex-col h-full">
+                        <CardHeader className="p-0">
+                          <img
+                            src={event.banner_image}
+                            alt={event.title}
+                            className="w-full h-48 object-cover rounded-t-lg"
+                          />
+                        </CardHeader>
+                        <CardContent className="p-4 flex flex-col flex-grow">
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge variant="outline" className="text-xs">
+                              {event.category}
                             </Badge>
+                            <div className="flex gap-1">
+                              <Badge variant={event.is_visible ? "default" : "secondary"} className="text-xs">
+                                {event.is_visible ? "Visible" : "Oculto"}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex-grow">
+                            <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">
+                              {event.title}
+                            </CardTitle>
+                            {event.description && (
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                {event.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1 mb-4">
+                            <p className="text-xs text-gray-500">
+                              Creado: {new Date(event.created_at).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Visualización: {event.display_size === 'carousel' ? 'Carrusel' : 'Mosaico'}
+                            </p>
+                          </div>
+                        </CardContent>
+                        <div className="px-4 pb-4">
+                          <div className="flex items-center justify-between">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEvent(event);
+                                setViewEventOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <div className="flex items-center gap-1">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => handleEdit(event)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDelete(event)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              {event.registration_link && (
+                                <a href={event.registration_link} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="sm">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <CardTitle className="text-lg font-semibold mb-2 line-clamp-2">
-                          {event.title}
-                        </CardTitle>
-                        {event.description && (
-                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                            {event.description}
-                          </p>
-                        )}
-                        <div className="space-y-1 mb-4">
-                          <p className="text-xs text-gray-500">
-                            Publicado: {event.publishDate}
-                          </p>
-                          <Badge variant="secondary" className="text-xs">
-                            {event.displaySize === 'carousel' ? 'Carrusel' : 'Mosaico'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEvent(event);
-                              setViewEventOpen(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <div className="flex items-center gap-1">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEdit(event)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => handleDelete(event)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <a href={event.formLink} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="sm">
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </a>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 {/* Pagination */}
                 <DataPagination
@@ -559,15 +726,15 @@ const AdminComfenalcoPage: React.FC = () => {
                           <Badge variant="outline" className="text-xs ml-2">{selectedEvent.category}</Badge>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600 block mb-2">Tamaño de Visualización</label>
-                          <Badge variant="secondary" className="text-xs ml-2">
-                            {selectedEvent.displaySize === 'carousel' ? 'Carrusel' : 'Mosaico'}
-                          </Badge>
+                          <label className="text-sm font-medium text-gray-600">Tamaño de Visualización</label>
+                          <p className="text-sm text-gray-700 mt-1">
+                            {selectedEvent.display_size === 'carousel' ? 'Carrusel' : 'Mosaico'}
+                          </p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600 block mb-2">Estado</label>
-                          <Badge variant={selectedEvent.isVisible ? "default" : "secondary"} className="ml-2">
-                            {selectedEvent.isVisible ? "Visible en web" : "Oculto en web"}
+                          <Badge variant={selectedEvent.is_visible ? "default" : "secondary"} className="ml-2">
+                            {selectedEvent.is_visible ? "Visible en web" : "Oculto en web"}
                           </Badge>
                         </div>
                       </div>
@@ -584,32 +751,34 @@ const AdminComfenalcoPage: React.FC = () => {
                     <CardContent className="space-y-4 flex-grow">
                       <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium text-gray-600">Fecha de Publicación</label>
-                          <p className="text-sm">{selectedEvent.publishDate}</p>
+                          <label className="text-sm font-medium text-gray-600">Fecha de Creación</label>
+                          <p className="text-sm">{new Date(selectedEvent.created_at).toLocaleDateString()}</p>
                         </div>
-                        {selectedEvent.registrationDeadline && (
+                        {selectedEvent.registration_deadline && (
                           <div>
                             <label className="text-sm font-medium text-gray-600">Fecha Límite de Registro</label>
-                            <p className="text-sm">{selectedEvent.registrationDeadline}</p>
+                            <p className="text-sm">{selectedEvent.registration_deadline}</p>
                           </div>
                         )}
-                        {selectedEvent.eventDate && (
+                        {selectedEvent.event_date && (
                           <div>
                             <label className="text-sm font-medium text-gray-600">Fecha del Evento</label>
-                            <p className="text-sm">{selectedEvent.eventDate}</p>
+                            <p className="text-sm">{selectedEvent.event_date}</p>
                           </div>
                         )}
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">Enlace del Formulario</label>
-                          <a
-                            href={selectedEvent.formLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-500 hover:underline flex items-center gap-1"
-                          >
-                            Ver formulario <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </div>
+                        {selectedEvent.registration_link && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-600">Enlace de Registro</label>
+                            <a
+                              href={selectedEvent.registration_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-500 hover:underline flex items-center gap-1"
+                            >
+                              Ver enlace <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -626,23 +795,32 @@ const AdminComfenalcoPage: React.FC = () => {
                 <DialogDescription>
                   {isEditing ? 'Edita los detalles del evento.' : 'Crea un nuevo evento para mostrar a los afiliados.'}
                 </DialogDescription>
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-medium">Nota:</span> Los campos marcados con <span className="text-red-500 font-bold">*</span> son obligatorios.
+                  </p>
+                </div>
               </DialogHeader>
+              
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <Label htmlFor="title">Título</Label>
+                    <Label htmlFor="title">Título <span className="text-red-500">*</span></Label>
                     <Input
                       type="text"
                       id="title"
                       name="title"
                       value={formValues.title}
                       onChange={handleInputChange}
+                      className={getFieldError('title') ? 'border-red-500' : ''}
+                      placeholder="Ingresa el título del evento"
                     />
+                    <FieldError error={getFieldError('title')} />
                   </div>
                   
                   {/* Banner Image Upload */}
                   <div>
-                    <Label htmlFor="bannerImage">Imagen del Banner</Label>
+                    <Label htmlFor="bannerImage">Imagen del Banner <span className="text-red-500">*</span></Label>
                     <div className="space-y-4">
                       {!imagePreview ? (
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
@@ -681,87 +859,102 @@ const AdminComfenalcoPage: React.FC = () => {
                         </div>
                       )}
                     </div>
+                    <FieldError error={getFieldError('banner_image')} />
                   </div>
                 </div>
                 
                 <div>
-                  <Label htmlFor="description">Descripción</Label>
+                  <Label htmlFor="description">Descripción <span className="text-red-500">*</span></Label>
                   <Textarea
                     id="description"
                     name="description"
                     value={formValues.description}
                     onChange={handleInputChange}
+                    className={getFieldError('description') ? 'border-red-500' : ''}
+                    placeholder="Describe el evento y sus beneficios"
                   />
+                  <FieldError error={getFieldError('description')} />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="publishDate">Fecha de Publicación</Label>
-                    <DatePicker
-                      value={formValues.publishDate ? new Date(formValues.publishDate) : undefined}
-                      onChange={handlePublishDateChange}
-                      placeholder="Seleccionar fecha"
+                    <Label htmlFor="registrationDeadline">Fecha Límite de Registro <span className="text-red-500">*</span></Label>
+                    <Input
+                      type="date"
+                      id="registrationDeadline"
+                      name="registration_deadline"
+                      value={formValues.registration_deadline}
+                      onChange={handleDateChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      className={getFieldError('registration_deadline') ? 'border-red-500' : ''}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Última fecha para que los usuarios se registren
+                    </p>
+                    <FieldError error={getFieldError('registration_deadline')} />
                   </div>
                   <div>
-                    <Label htmlFor="registrationDeadline">Fecha Límite de Registro</Label>
-                    <DatePicker
-                      value={formValues.registrationDeadline ? new Date(formValues.registrationDeadline) : undefined}
-                      onChange={handleRegistrationDeadlineChange}
-                      placeholder="Seleccionar fecha"
+                    <Label htmlFor="eventDate">Fecha del Evento <span className="text-red-500">*</span></Label>
+                    <Input
+                      type="date"
+                      id="eventDate"
+                      name="event_date"
+                      value={formValues.event_date}
+                      onChange={handleDateChange}
+                      min={formValues.registration_deadline || new Date().toISOString().split('T')[0]}
+                      className={getFieldError('event_date') ? 'border-red-500' : ''}
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="eventDate">Fecha del Evento</Label>
-                    <DatePicker
-                      value={formValues.eventDate ? new Date(formValues.eventDate) : undefined}
-                      onChange={handleEventDateChange}
-                      placeholder="Seleccionar fecha"
-                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Fecha en que se realizará el evento
+                    </p>
+                    <FieldError error={getFieldError('event_date')} />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label htmlFor="registrationLink">Enlace de Registro</Label>
-                    <Input
-                      type="text"
-                      id="registrationLink"
-                      name="registrationLink"
-                      value={formValues.registrationLink}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="formLink">Enlace del Formulario</Label>
-                    <Input
-                      type="text"
-                      id="formLink"
-                      name="formLink"
-                      value={formValues.formLink}
-                      onChange={handleInputChange}
-                    />
+                    <div className="relative mt-1">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <ExternalLink className="h-4 w-4 text-gray-400" />
+                      </div>
+                      <Input
+                        type="url"
+                        id="registrationLink"
+                        name="registration_link"
+                        value={formValues.registration_link}
+                        onChange={handleInputChange}
+                        className={`pl-10 ${getFieldError('registration_link') ? 'border-red-500' : ''}`}
+                        placeholder="https://ejemplo.com/registro"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      URL donde los usuarios pueden registrarse al evento
+                    </p>
+                    <FieldError error={getFieldError('registration_link')} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="category">Categoría</Label>
+                    <Label htmlFor="category">Categoría <span className="text-red-500">*</span></Label>
                     <Select value={formValues.category} onValueChange={handleCategoryChange}>
-                      <SelectTrigger>
+                      <SelectTrigger className={getFieldError('category') ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="curso">Curso</SelectItem>
-                        <SelectItem value="experiencia">Experiencia</SelectItem>
-                        <SelectItem value="beneficio">Beneficio</SelectItem>
-                        <SelectItem value="regalo">Regalo</SelectItem>
-                        <SelectItem value="recreacion">Recreación</SelectItem>
+                        <SelectItem value="Deportes">Deportes</SelectItem>
+                        <SelectItem value="Cultura">Cultura</SelectItem>
+                        <SelectItem value="Educación">Educación</SelectItem>
+                        <SelectItem value="Recreación">Recreación</SelectItem>
+                        <SelectItem value="Bienestar">Bienestar</SelectItem>
+                        <SelectItem value="Familia">Familia</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FieldError error={getFieldError('category')} />
                   </div>
                   <div>
-                    <Label htmlFor="displaySize">Tamaño de Visualización</Label>
-                    <Select value={formValues.displaySize} onValueChange={handleDisplaySizeChange}>
-                      <SelectTrigger>
+                    <Label htmlFor="displaySize">Tamaño de Visualización <span className="text-red-500">*</span></Label>
+                    <Select value={formValues.display_size} onValueChange={handleDisplaySizeChange}>
+                      <SelectTrigger className={getFieldError('display_size') ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Selecciona un tamaño" />
                       </SelectTrigger>
                       <SelectContent>
@@ -769,24 +962,17 @@ const AdminComfenalcoPage: React.FC = () => {
                         <SelectItem value="mosaic">Mosaico</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FieldError error={getFieldError('display_size')} />
                   </div>
                 </div>
                 
                 <Separator className="my-4" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isNew"
-                      checked={formValues.isNew}
-                      onCheckedChange={(checked) => handleSwitchChange('isNew', checked)}
-                    />
-                    <Label htmlFor="isNew">Es Nuevo</Label>
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isVisible"
-                      checked={formValues.isVisible}
-                      onCheckedChange={(checked) => handleSwitchChange('isVisible', checked)}
+                      checked={formValues.is_visible}
+                      onCheckedChange={(checked) => handleSwitchChange('is_visible', checked)}
                     />
                     <Label htmlFor="isVisible">Visible en la web</Label>
                   </div>
@@ -796,8 +982,18 @@ const AdminComfenalcoPage: React.FC = () => {
                 <Button variant="outline" onClick={() => setEventFormOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleSubmit}>
-                  {isEditing ? 'Actualizar Evento' : 'Crear Evento'}
+                <Button 
+                  onClick={handleSubmit}
+                  disabled={createEventMutation.isPending || updateEventMutation.isPending}
+                >
+                  {createEventMutation.isPending || updateEventMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {isEditing ? 'Actualizando...' : 'Creando...'}
+                    </>
+                  ) : (
+                    isEditing ? 'Actualizar Evento' : 'Crear Evento'
+                  )}
                 </Button>
               </div>
             </DialogContent>

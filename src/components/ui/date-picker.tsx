@@ -20,10 +20,11 @@ interface DatePickerProps {
   className?: string
   minDate?: Date
   maxDate?: Date
+  error?: boolean
 }
 
 const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
-  ({ value, onChange, placeholder = "Seleccionar fecha", disabled, className, minDate, maxDate, ...props }, ref) => {
+  ({ value, onChange, placeholder = "Seleccionar fecha", disabled, className, minDate, maxDate, error, ...props }, ref) => {
     const [open, setOpen] = React.useState(false)
 
     const isDateDisabled = React.useCallback((date: Date) => {
@@ -42,6 +43,7 @@ const DatePicker = React.forwardRef<HTMLButtonElement, DatePickerProps>(
             className={cn(
               "w-full justify-start text-left font-normal",
               !value && "text-muted-foreground",
+              error && "border-red-500 focus:border-red-500 focus:ring-red-500",
               className
             )}
             {...props}

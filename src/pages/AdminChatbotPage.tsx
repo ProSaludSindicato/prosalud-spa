@@ -152,46 +152,6 @@ const AdminChatbotPage: React.FC = () => {
     setIsDetailOpen(true);
   };
 
-  const handleExportCSV = () => {
-    try {
-      const csvContent = [
-        ['ID', 'Conversation ID', 'Pregunta', 'Respuesta', 'Feedback', 'IP', 'Fecha'],
-        ...filteredConversations.map(conv => [
-          conv.id,
-          conv.conversation_id || 'N/A',
-          `"${conv.user_question.replace(/"/g, '""')}"`,
-          `"${conv.bot_answer.replace(/"/g, '""')}"`,
-          conv.feedback || 'N/A',
-          conv.user_ip || 'N/A',
-          format(parseISO(conv.created_at), 'dd/MM/yyyy HH:mm', { locale: es })
-        ])
-      ]
-        .map(row => row.join(','))
-        .join('\n');
-
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `conversaciones-chatbot-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "CSV exportado",
-        description: "El archivo CSV se ha descargado correctamente.",
-      });
-    } catch (error) {
-      console.error('Error exportando CSV:', error);
-      toast({
-        title: "Error al exportar",
-        description: "No se pudo generar el archivo CSV.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleExportExcel = () => {
     try {
@@ -279,15 +239,7 @@ const AdminChatbotPage: React.FC = () => {
                   </CardDescription>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleExportCSV}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Exportar CSV
-                </Button>
+              <div>
                 <Button 
                   onClick={handleExportExcel}
                   variant="default"
@@ -365,37 +317,71 @@ const AdminChatbotPage: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar en preguntas y respuestas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+        <Card className="border shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Filter className="h-5 w-5" />
+              Filtros
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Filtra las conversaciones por búsqueda y rango de fechas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <div className="md:col-span-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar en preguntas y respuestas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 h-10"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  placeholder="Fecha desde"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="pl-10"
-                />
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Fecha desde
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="pl-10 h-10"
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  placeholder="Fecha hasta"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="pl-10"
-                />
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Fecha hasta
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="pl-10 h-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                  className="h-10 w-full flex items-center gap-2"
+                >
+                  <Filter className="w-4 h-4" />
+                  Limpiar Filtros
+                </Button>
               </div>
             </div>
           </CardContent>
