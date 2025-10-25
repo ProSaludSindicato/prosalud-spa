@@ -74,6 +74,7 @@ export default function ChatBot() {
   const [showLiquidacionForm, setShowLiquidacionForm] = useState(false);
   const [isConsultingLiquidacion, setIsConsultingLiquidacion] = useState(false);
   const messagesEndRef = useRef(null);
+  const formContainerRef = useRef(null);
   const textareaRef = useRef(null);
   const suggestionsRef = useRef(null);
   const suggestionsContentRef = useRef(null);
@@ -2278,11 +2279,31 @@ ${incapacidad.detalles}
     }, 100);
   };
 
+  const openIncapacidadForm = () => {
+    setShowIncapacidadForm(true);
+    // Hacer scroll al inicio del formulario
+    setTimeout(() => {
+      if (formContainerRef.current) {
+        formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
   const closeLiquidacionForm = () => {
     setShowLiquidacionForm(false);
     // Hacer scroll al final después de cerrar el formulario
     setTimeout(() => {
       scrollToBottom();
+    }, 100);
+  };
+
+  const openLiquidacionForm = () => {
+    setShowLiquidacionForm(true);
+    // Hacer scroll al inicio del formulario
+    setTimeout(() => {
+      if (formContainerRef.current) {
+        formContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }, 100);
   };
 
@@ -2899,7 +2920,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
               {/* Messages Container */}
               <div className="relative flex flex-grow flex-col overflow-hidden min-h-0">
                 {showIncapacidadForm ? (
-                  <div className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
+                  <div ref={formContainerRef} className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Search className="h-5 w-5 text-prosalud-salud" />
@@ -2917,7 +2938,7 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     <IncapacidadForm onSubmit={handleIncapacidadFormSubmit} isLoading={isConsultingIncapacidad} />
                   </div>
                 ) : showLiquidacionForm ? (
-                  <div className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
+                  <div ref={formContainerRef} className="flex-grow bg-gray-100 dark:bg-gray-900 p-4 overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                       <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <FileText className="h-5 w-5 text-prosalud-salud" />
@@ -3093,42 +3114,14 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
                     {showQuickActions && (
                       <div className="px-3 pb-3 space-y-2">
                         <button
-                          onClick={async () => {
-                            // Verificar límite antes de abrir el formulario
-                            const { chatbotApi } = await import("@/services/chatbotApi");
-                            const limitCheck = await chatbotApi.checkMessageLimit();
-                            if (!limitCheck.allowed) {
-                              const limitMessage = {
-                                role: "assistant",
-                                content: limitCheck.message || "Has alcanzado el límite de consultas. Por favor, intenta más tarde.",
-                                isBot: true,
-                              };
-                              setMessages((prev) => [...prev, limitMessage]);
-                              return;
-                            }
-                            setShowIncapacidadForm(true);
-                          }}
+                          onClick={openIncapacidadForm}
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <CreditCard className="h-4 w-4 text-prosalud-salud" />
                           Consultar pago de una incapacidad
                         </button>
                         <button
-                          onClick={async () => {
-                            // Verificar límite antes de abrir el formulario
-                            const { chatbotApi } = await import("@/services/chatbotApi");
-                            const limitCheck = await chatbotApi.checkMessageLimit();
-                            if (!limitCheck.allowed) {
-                              const limitMessage = {
-                                role: "assistant",
-                                content: limitCheck.message || "Has alcanzado el límite de consultas. Por favor, intenta más tarde.",
-                                isBot: true,
-                              };
-                              setMessages((prev) => [...prev, limitMessage]);
-                              return;
-                            }
-                            setShowLiquidacionForm(true);
-                          }}
+                          onClick={openLiquidacionForm}
                           className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-center gap-2"
                         >
                           <FileText className="h-4 w-4 text-prosalud-salud" />
