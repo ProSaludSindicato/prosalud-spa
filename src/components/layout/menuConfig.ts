@@ -72,7 +72,6 @@ export const menuItems: MenuItemType[] = [
         submenu: [
           { name: 'Formatos de dotación', path: '/documentos-formatos/documentos-publicos/formatos-dotacion' },
           { name: 'Listados de asistencia', path: '/documentos-formatos/documentos-publicos/listados-asistencia' },
-          { name: 'MIPRES', path: '/documentos-formatos/documentos-publicos/mipres' },
           { name: 'Retefuente: documentos Requeridos', path: '/documentos-formatos/documentos-publicos/retefuente-documentos-requeridos' },
         ]
       },

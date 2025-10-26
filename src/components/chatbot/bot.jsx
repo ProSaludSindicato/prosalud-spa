@@ -1388,7 +1388,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           const firstIncapacidad = lastBotMessage.multipleIncapacidades[0];
           const nombreAfiliado = firstIncapacidad?.Nombres || "";
 
-          const datosPersonales = `**👤 Datos personales:**\n- Nombre: ${firstIncapacidad?.Nombres || "N/A"}\n${firstIncapacidad?.Cargo ? `- Cargo: ${firstIncapacidad.Cargo}\n` : ""}- Tipo documento: ${firstIncapacidad?.Tipo || "N/A"}\n- Número documento: ${firstIncapacidad?.["Numero Documento"] || "N/A"}\n\n`;
+          const datosPersonales = `**👤 Datos personales:**\n- Nombre: ${firstIncapacidad?.Nombres || "N/A"}\n${firstIncapacidad?.Cargo ? `- Proceso: ${firstIncapacidad.Cargo}\n` : ""}- Tipo documento: ${firstIncapacidad?.Tipo || "N/A"}\n- Número documento: ${firstIncapacidad?.["Numero Documento"] || "N/A"}\n\n`;
 
           const allDetailsResponse = lastBotMessage.multipleIncapacidades
             .map((inc, index) => `**Incapacidad #${index + 1}**\n\n${generateIncapacidadResponse(inc, false, false)}`)
@@ -2218,24 +2218,20 @@ ${inc["valor Incapacidad Recibido"] ? `- Valor: ${inc["valor Incapacidad Recibid
     if (includePersonalData) {
       response += `**👤 Datos personales:**
 - Nombre: ${incapacidad.Nombres || "N/A"}
-${incapacidad.Cargo ? `- Cargo: ${incapacidad.Cargo}\n` : ""}- Tipo documento: ${incapacidad.Tipo || "N/A"}
+${incapacidad.Cargo ? `- Proceso: ${incapacidad.Cargo}\n` : ""}- Tipo documento: ${incapacidad.Tipo || "N/A"}
 - Número documento: ${incapacidad["Numero Documento"] || "N/A"}
+${incapacidad.Hospital ? `- Hospital: ${incapacidad.Hospital}\n` : ""}
 
 `;
     }
 
-    // Período de incapacidad
-    response += `**📅 Período de incapacidad:**
+    // Información de incapacidad
+    response += `**📅 Información de incapacidad:**
 ${incapacidad["fecha recibido"] ? `- Fecha recibido: ${incapacidad["fecha recibido"]}\n` : ""}- Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"] || "N/A"}
 - Fecha fin: ${incapacidad["Fecha Fin Incapacidad"] || "N/A"}
 - Total días: ${incapacidad["Dias Incapacidad"] || "N/A"}
 ${incapacidad["TIPO INCAPACIDAD"] ? `- Tipo: ${incapacidad["TIPO INCAPACIDAD"]}\n` : ""}${incapacidad.CLASIFICACION ? `- Clasificación: ${incapacidad.CLASIFICACION}\n` : ""}
-`;
-
-    // Información médica
-    response += `**🏥 Información médica:**
-- Código CIE-10: ${incapacidad["CODIGO CIE-10"] || "N/A"}
-${incapacidad.Hospital ? `- Hospital: ${incapacidad.Hospital}\n` : ""}${incapacidad.ADMINISTRADORA ? `- Administradora: ${incapacidad.ADMINISTRADORA}\n` : ""}
+${incapacidad.ADMINISTRADORA ? `- Administradora: ${incapacidad.ADMINISTRADORA}\n` : ""}
 `;
 
     // Información administrativa
@@ -2475,9 +2471,7 @@ Si crees que debería haber información disponible, por favor comunícate con n
 
 **📞 Contacto:**
 Para más información sobre tu proceso de compensación final, puedes comunicarte al:
-- **Teléfono:** (604) 444 8520 - (604) 291 9494
-- **WhatsApp:** +57 317 675 3506
-- **Correo:** asistentetalentohumano@prosalud.co
+- **Correo:** talentohumano@sindicatoprosalud.com
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
   };
@@ -2568,10 +2562,12 @@ Ocurrió un problema al procesar tu solicitud.
       estadoIcon = "⚠️";
       mensajePrincipal = "**Tienes pendientes en tu compensación final**\n\n**Lo que necesitas completar:**\n";
       pendientesList.forEach((pendiente, index) => {
-        mensajePrincipal += `${index + 1}. ${pendiente}\n`;
+        mensajePrincipal += `• ${pendiente}\n`;
       });
       mensajePrincipal +=
-        "\n💡 *Es importante que completes estos documentos para finalizar tu proceso de compensación final.*";
+        "\n💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*\n\n" +
+          "*Si la cartera ya fue recaudada pero la persona tiene documentación pendiente, el proceso se detiene hasta completarlos.*\n\n" +
+          "*Mantén tu documentación al día para que el pago se realice apenas se confirme el recaudo.*";
     }
 
     let response = `${estadoIcon} **Estado de tu Compensación Final**\n\n${mensajePrincipal}\n\n---\n\n`;
@@ -2584,16 +2580,11 @@ Ocurrió un problema al procesar tu solicitud.
 
 `;
 
-    // Información laboral
-    response += `**🏥 Información laboral:**
+    // Información del Proceso
+    response += `**🏥 Información del Proceso:**
 - Hospital: ${liquidacion.HOSPITAL || "N/A"}
-- Cargo: ${liquidacion.PROCESO || "N/A"}
-- Fecha ingreso: ${liquidacion["FECHA INGRESO"] || "N/A"}
-${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}${liquidacion["MOTIVO DE RETIRO"] ? `- Motivo de retiro: ${liquidacion["MOTIVO DE RETIRO"]}\n` : ""}`;
-
-    // Estado del proceso
-    const estadoLabel = estado === "Retirado" ? "Retirado" : estado;
-    response += `- Estado del proceso: ${estadoLabel}\n\n`;
+- Proceso: ${liquidacion.PROCESO || "N/A"}
+${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}`;
 
     // Convenios
     response += `**📑 Convenios:**
@@ -2637,17 +2628,13 @@ ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\
     }
 
     // Información de contacto
-    response += `\n---\n\n**📞 ¿Necesitas ayuda o tienes dudas?**
+    response += `\n---\n\n**📩 ¿Necesitas ayuda o tienes dudas?**
 
 Puedes comunicarte con nosotros para:
 - Enviar los documentos pendientes
-- Aclarar dudas sobre tu liquidación
-- Conocer los siguientes pasos
+- Aclarar dudas sobre tu compensación final
 
-**Contáctanos por:**
-- Teléfono: (604) 444 8520 - (604) 291 9494
-- WhatsApp: +57 317 675 3506
-- Correo: asistentetalentohumano@prosalud.co
+Contáctanos vía correo electrónico: **talentohumano@sindicatoprosalud.com**
 
 **🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
@@ -2663,11 +2650,8 @@ Puedes comunicarte con nosotros para:
       const tienePendientes = conveniosPendientes > 0 || (docsPendientes && docsPendientes !== "OK");
       const icon = tienePendientes ? "⚠️" : "✅";
 
-      const estadoLabel = liq["ESTADO BD"] === "Retirado" ? "Retirado" : liq["ESTADO BD"];
-
       response += `**${index + 1}. ${icon} Compensación Final - ${liq.HOSPITAL}**
-- Cargo: ${liq.PROCESO}
-- Estado del proceso: ${estadoLabel}
+- Proceso: ${liq.PROCESO}
 - Convenios pendientes: ${conveniosPendientes}
 ${docsPendientes && docsPendientes !== "OK" ? `- Documentos pendientes: ${docsPendientes}\n` : `- Documentos: Completos\n`}
 `;
