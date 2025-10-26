@@ -55,13 +55,13 @@ export const consultarLiquidacion = async (
 
     // Manejo de respuesta exitosa
     if (response.data.status === 'success' && response.data.data) {
-      console.log('✅ Liquidaciones encontradas:', response.data.data.length);
+      console.log('✅ compensaciones finales encontradas:', response.data.data.length);
       return response.data.data;
     }
 
     // No se encontraron registros
     if (response.data.status === 'not_found') {
-      console.log('ℹ️ No se encontraron liquidaciones para el documento consultado');
+      console.log('ℹ️ No se encontraron compensaciones finales para el documento consultado');
       return null;
     }
 
@@ -71,7 +71,7 @@ export const consultarLiquidacion = async (
 
   } catch (error: any) {
     // Log detallado del error para soporte
-    console.error('❌ Error consultando liquidaciones:', {
+    console.error('❌ Error consultando compensaciones finales:', {
       status: error?.response?.status,
       message: error?.response?.data?.message,
       errors: error?.response?.data?.errors,

@@ -299,7 +299,7 @@ export default function ChatBot() {
   const tooltipMessages = [
     "¡Hola! Soy tu asistente virtual de ProSalud. ¿En qué puedo ayudarte hoy?",
     "Consulta el pago de una incapacidad aquí",
-    "Consulta el estado de tu liquidación pendiente",
+    "Consulta el estado de tu compensación final",
     "Puedo responder preguntas sobre incapacidades, servicios y más.",
     "Si tienes preguntas, no dudes en consultarme.",
     "¿Necesitas ayuda? Haz clic y hablamos.",
@@ -2426,7 +2426,7 @@ ${incapacidad.detalles}
         return newMessages;
       });
     } catch (error) {
-      console.error("Error en consulta de liquidación:", error);
+      console.error("Error en consulta de compensación final:", error);
 
       // Mensaje de error según el tipo
       let errorContent;

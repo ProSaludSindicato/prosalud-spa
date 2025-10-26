@@ -1,12 +1,18 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// @ts-ignore
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+// @ts-ignore
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+// @ts-ignore
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Variable de entorno para habilitar/deshabilitar rate limiting (por defecto: habilitado)
+// @ts-ignore
 const ENABLE_RATE_LIMITING = Deno.env.get('ENABLE_CHATBOT_RATE_LIMITING') !== 'false';
 
 const RATE_LIMITS = {
@@ -263,7 +269,7 @@ INSTRUCCIONES IMPORTANTES PARA RESPONDER:
    Recuerda que los días hábiles de revisión son de lunes a viernes, de 7:00 a.m. a 4:00 p.m. Cualquier solicitud registrada fuera de este horario se considerará presentada el siguiente día hábil."
 
 ⚠️ IMPORTANTE - TERMINOLOGÍA SINDICAL CORRECTA:
-- NUNCA uses términos relacionados con "trabajo" o "empleo" como "laboral", "trabajador", "empleado"
+- NUNCA uses términos relacionados con "trabajo" o "empleo" como "laboral", "trabajador", "empleado", "cargo"
 - En su lugar usa: "sindical", "afiliado", "proceso", "servicio"
 - Ejemplo: Di "afiliado" en vez de "trabajador" o "empleado"
 - **IMPORTANTE**: El descanso se conoce oficialmente como "Compensación por Descanso" o "Compensación Anual por Descanso", NO como "descanso sindical" ni "descanso laboral"

@@ -25,7 +25,7 @@ Proporcione detalles sobre su trabajo actual:
 - Ubicación donde realiza el proceso
 
 ### 3. Descargar y Diligenciar el Formato
-- Descargue el formato oficial de retiro y liquidación desde el formulario
+- Descargue el formato oficial de retiro y compensación final desde el formulario
 - Diligencie completamente el formato
 - Firme el documento según corresponda
 
@@ -41,7 +41,7 @@ Proporcione detalles sobre su trabajo actual:
 
 ## Documentos Requeridos
 
-- **Formato de Retiro y Liquidación (Obligatorio):** Debe ser descargado desde el formulario, diligenciado completamente y adjuntado al envío.
+- **Formato de Retiro y compensación final (Obligatorio):** Debe ser descargado desde el formulario, diligenciado completamente y adjuntado al envío.
 
 ## Tipos de Archivo Permitidos
 

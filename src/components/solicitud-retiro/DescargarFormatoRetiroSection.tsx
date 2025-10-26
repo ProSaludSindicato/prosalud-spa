@@ -15,7 +15,7 @@ const DescargarFormatoRetiroSection: React.FC = () => {
     <div className="mb-6 p-6 border-2 border-primary-prosalud rounded-lg shadow-lg bg-primary-prosalud/5 text-center">
       <h2 className="text-xl font-semibold text-primary-prosalud mb-4">Descargar Formato de Retiro</h2>
       <p className="text-gray-700 mb-4">
-        Haga clic en el botón de abajo para descargar el formato oficial de solicitud de retiro y liquidación.
+        Haga clic en el botón de abajo para descargar el formato oficial de solicitud de retiro y compensación final.
       </p>
       <Button
         type="button"

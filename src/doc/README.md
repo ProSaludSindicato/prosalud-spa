@@ -17,7 +17,7 @@ Esta documentación contiene la información disponible en el sitio web del Sind
   - Actualización de Cuenta Bancaria (`actualizar-cuenta-bancaria.md`)
   - Incapacidades y Licencias (`incapacidades-licencias.md`)
   - Seguridad y Salud en el Trabajo (SST) (`sst.md`)
-  - Encuesta de Bienestar Laboral (`encuesta-bienestar-laboral.md`)
+  - Encuesta de Bienestar (`encuesta-bienestar-laboral.md`)
   - Galería de Bienestar (`galeria-bienestar.md`)
   - Formato de Permisos y Cambio de Turnos (`permisos-cambio-turnos.md`)
   - Cuadro de Turnos (`cuadro-turnos.md`)

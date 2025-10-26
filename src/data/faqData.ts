@@ -148,7 +148,7 @@ export const faqData: FAQItem[] = [
   {
     id: "contrato-sindical-definicion",
     question: "¿Qué es un contrato sindical?",
-    answer: "El contrato sindical es el que celebran uno o varios sindicatos de trabajadores con uno o varios empleadores para la prestación de servicios o ejecución de una obra por medio de sus afiliados. Es de naturaleza colectiva laboral y los afiliados partícipes tienen derecho a compensaciones por su participación.",
+    answer: "El contrato sindical es el que celebran uno o varios sindicatos de trabajadores con uno o varios empleadores para la prestación de servicios o ejecución de una obra por medio de sus afiliados. Es de naturaleza colectiva y los afiliados partícipes tienen derecho a compensaciones por su participación.",
     category: "beneficios",
     keywords: ["contrato", "sindical", "definicion", "naturaleza"],
     redirectUrl: "/nosotros/contrato-sindical",

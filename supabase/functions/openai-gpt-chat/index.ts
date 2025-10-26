@@ -1,7 +1,9 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// @ts-ignore
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
@@ -57,6 +59,7 @@ INSTRUCCIONES IMPORTANTES PARA RESPONDER:
   * "cesantías" → "Compensación Anual Diferida"
   * "prima" / "compensación semestral" → "Compensación Semestral"
   * "salario" / "sueldo" → "Compensación"
+  * "cargo" / "Cargo" → "Proceso"
   * "liquidación" / "finiquito" → "Compensación Final"
 
 IMPORTANTE: La "Compensación Anual Diferida" (equivalente a cesantías) es un beneficio económico para afiliados que permite solicitar compensación por días de descanso acumulados o situaciones especiales contempladas en el convenio colectivo. Los documentos requeridos son: formato de solicitud diligenciado y evidencia que respalde la solicitud (facturas, cotizaciones, matrículas, certificados, etc.). Los archivos deben ser en formato PDF, Word o imágenes, con tamaño máximo de 4 MB.

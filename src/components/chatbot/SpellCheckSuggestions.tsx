@@ -74,7 +74,7 @@ const contextualSuggestions: { [key: string]: string[] } = {
   'convenio': [
     'Hospitales con convenio ProSalud',
     'Convenio con Comfenalco',
-    'Instituciones de salud asociadas'
+    'Certificado de convenio sindical'
   ],
   'pago': [
     'Verificar estado de mi pago',
@@ -89,7 +89,7 @@ const contextualSuggestions: { [key: string]: string[] } = {
   'compensacion_anual_descanso': [
     'Solicitar compensación anual por descanso',
     '¿Cuántos días de descanso tengo?',
-    'Cómo se calcula el descanso'
+    '¿Cómo se calcula el descanso?'
   ],
   'compensacion_anual_diferida': [
     'Solicitar compensación anual diferida',
@@ -98,7 +98,7 @@ const contextualSuggestions: { [key: string]: string[] } = {
   ],
   'rendimientos': [
     '¿Qué son los rendimientos?',
-    'Cómo se calculan los rendimientos',
+    '¿Cómo se calculan los rendimientos?',
     'Fecha de pago de rendimientos'
   ],
   'compensacion_final': [
