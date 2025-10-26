@@ -748,7 +748,7 @@ export default function ChatBot() {
         const getDocs = (files.docs || []).map((fp) => {
           const key = `/src/doc/${fp}`;
           if (!docsModules[key]) {
-            throw new Error(`No encuentro el módulo para la ruta ${key}`);
+            throw new Error("Error cargando documentación");
           }
           return docsModules[key](); // devuelve el contenido raw
         });
@@ -1150,13 +1150,19 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       console.log("Response raw text:", responseText);
 
       if (!response.ok) {
-        // Intentar parsear el error del servidor
-        let errorMessage = `Error del servidor: ${response.status}`;
+        // Usar mensaje genérico sin exponer detalles técnicos
+        let errorMessage = "Error del servidor";
         let isRateLimitError = false;
         try {
           const errorData = JSON.parse(responseText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
+          // Solo usar mensajes de error seguros y genéricos
+          if (errorData.error && typeof errorData.error === 'string') {
+            // Solo permitir mensajes de error específicos y seguros
+            if (errorData.error.includes('rate limit') || errorData.error.includes('Rate limit')) {
+              errorMessage = "Demasiadas solicitudes. Por favor, espera un momento.";
+            } else {
+              errorMessage = "Error del servidor";
+            }
           }
 
           // Manejar rate limit específicamente
@@ -1186,7 +1192,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       }
 
       if (!responseText || responseText.trim() === "") {
-        throw new Error("El servidor retornó una respuesta vacía");
+        throw new Error("Error del servidor");
       }
 
       // Intentar parsear como JSON
@@ -1196,7 +1202,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       } catch (parseError) {
         console.error("Error parseando JSON:", parseError);
         console.error("Texto recibido:", responseText);
-        throw new Error("La respuesta del servidor no es JSON válido: " + responseText.substring(0, 200));
+        throw new Error("Error del servidor");
       }
 
       console.log("Datos parseados:", data);
@@ -1207,7 +1213,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       if (!data.generatedText || typeof data.generatedText !== 'string') {
         console.error("❌ Respuesta inválida del servidor:", data);
-        throw new Error("La respuesta del servidor no contiene texto válido");
+        throw new Error("Error del servidor");
       }
 
       // Actualizar información de uso de rate limiting si está disponible
@@ -1789,7 +1795,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
 
       // Validar que la respuesta tenga contenido
       if (!result || !result.text) {
-        throw new Error("La respuesta del servidor no contiene texto válido");
+        throw new Error("Error del servidor");
       }
 
       // Simular streaming para mostrar animación de escritura
@@ -1936,11 +1942,8 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           error.isRateLimit && error.message
             ? `⚠️ ${error.message}`
             : "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
-      } else if (error.message && typeof error.message === 'string') {
-        // Mostrar el mensaje de error específico si está disponible
-        errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
       } else {
-        // Error genérico si no hay mensaje específico
+        // Error genérico para cualquier otro tipo de error
         errorMessage = "Lo siento, ocurrió un error inesperado. Por favor, intenta de nuevo.";
       }
 
