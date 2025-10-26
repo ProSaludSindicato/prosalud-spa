@@ -561,6 +561,8 @@ export default function ChatBot() {
 
   // Función mejorada para clasificar la pregunta por categoría con contexto conversacional
   const classifyQuestion = (question, conversationHistory = []) => {
+    const safeHistory = Array.isArray(conversationHistory) ? conversationHistory : [];
+    
     const questionLower = question.toLowerCase();
 
     // Detectar preguntas de seguimiento o contextuales
@@ -607,7 +609,7 @@ export default function ChatBot() {
     const hasFollowUpIndicator = followUpIndicators.some((indicator) => questionLower.includes(indicator));
 
     // Si es una pregunta de seguimiento y hay contexto previo, usar la categoría anterior
-    if (hasFollowUpIndicator && conversationContext.lastCategory && conversationHistory.length > 0) {
+    if (hasFollowUpIndicator && conversationContext.lastCategory && safeHistory.length > 0) {
       console.log(`🔄 Pregunta de seguimiento detectada, manteniendo categoría: ${conversationContext.lastCategory}`);
       return conversationContext.lastCategory;
     }
@@ -622,7 +624,7 @@ export default function ChatBot() {
     }
 
     // Si no hay coincidencia directa pero hay contexto previo, considerar la categoría anterior
-    if (conversationContext.lastCategory && conversationHistory.length > 0) {
+    if (conversationContext.lastCategory && safeHistory.length > 0) {
       // Verificar si la pregunta podría estar relacionada con el contexto previo
       const contextualWords = ["esto", "eso", "lo anterior", "lo que dijiste", "la información"];
       const hasContextualReference = contextualWords.some((word) => questionLower.includes(word));
@@ -1203,8 +1205,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
         throw new Error(data.error);
       }
 
-      if (!data.generatedText) {
-        throw new Error("La respuesta no contiene el campo generatedText: " + JSON.stringify(data));
+      if (!data.generatedText || typeof data.generatedText !== 'string') {
+        console.error("❌ Respuesta inválida del servidor:", data);
+        throw new Error("La respuesta del servidor no contiene texto válido");
       }
 
       // Actualizar información de uso de rate limiting si está disponible
@@ -1680,7 +1683,9 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
     try {
       // NUEVO: Clasificar pregunta y cargar contexto selectivo con mejora conversacional
       console.log("🔍 Iniciando clasificación temática para:", text);
-      const detectedCategory = classifyQuestion(text, chatMessages);
+      // Asegurar que chatMessages no sea null antes de pasarlo
+      const safeChatMessages = chatMessages || [];
+      const detectedCategory = classifyQuestion(text, safeChatMessages);
       const selectiveContext = await loadSelectiveContext(detectedCategory);
 
       // Actualizar contexto conversacional
@@ -1782,6 +1787,11 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       // Llama a edge function, recibe la respuesta completa (sin streaming)
       const result = await solicitarRespuestaConOpenAI(promptMessages);
 
+      // Validar que la respuesta tenga contenido
+      if (!result || !result.text) {
+        throw new Error("La respuesta del servidor no contiene texto válido");
+      }
+
       // Simular streaming para mostrar animación de escritura
       const responseText = result.text;
       const words = responseText.split(" ");
@@ -1839,7 +1849,7 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           // Actualizar el mensaje temporal con la respuesta completa
           updated[tempMsgIndex] = {
             role: "assistant",
-            content: result.text,
+            content: result.text || "",
             isBot: true,
             isStreaming: false,
             tokens: result.tokens, // 🔧 TEMPORAL: Almacenar tokens por mensaje (ELIMINAR EN PRODUCCIÓN)
@@ -1852,10 +1862,20 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           } else if (lastIncapContext?.multipleIncapacidades && detectedCategory !== "incapacidades") {
             console.log("✅ Limpiando contexto de incapacidades - nueva categoría:", detectedCategory);
           }
+        } else {
+          // Si no se encuentra el mensaje temporal, agregar la respuesta al final
+          console.warn("⚠️ No se encontró el mensaje temporal, agregando respuesta al final");
+          updated.push({
+            role: "assistant",
+            content: result.text || "",
+            isBot: true,
+            isStreaming: false,
+            tokens: result.tokens,
+          });
         }
 
         const updatedMessages = updated;
-        const botMessage = updatedMessages[tempMsgIndex];
+        const botMessage = tempMsgIndex !== -1 ? updatedMessages[tempMsgIndex] : updatedMessages[updatedMessages.length - 1];
 
         // Guardar conversación en el backend con client_turn_id (asíncrono, no bloquea UX)
         const clientTurnId = generateClientTurnId();
@@ -1916,9 +1936,12 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
           error.isRateLimit && error.message
             ? `⚠️ ${error.message}`
             : "⚠️ **Demasiadas solicitudes**\n\nHemos recibido muchas consultas en este momento. Por favor, espera unos segundos e intenta de nuevo.";
-      } else if (error.message) {
+      } else if (error.message && typeof error.message === 'string') {
         // Mostrar el mensaje de error específico si está disponible
         errorMessage = `Lo siento, ocurrió un error: ${error.message}`;
+      } else {
+        // Error genérico si no hay mensaje específico
+        errorMessage = "Lo siento, ocurrió un error inesperado. Por favor, intenta de nuevo.";
       }
 
       setMessages((prev) => [
