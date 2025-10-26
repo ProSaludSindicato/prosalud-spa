@@ -35,17 +35,17 @@ const HeroSection: React.FC = () => {
     { src: "/images/avatar_hero/avatar2.webp", fallback: "P1", alt: "Profesional 1" },
   ];
 
-  /*const collageImages = [
+  const collageImages = [
     "/images/collage/image_collage_1_.webp",
     "/images/collage/image_collage_3_.webp",
     "/images/collage/image_collage_2_.webp",
-  ];*/
+  ];
 
-  const collageImages = [
+  /*const collageImages = [
     "/images/collage/c1.webp",
     "/images/collage/c3.webp",
     "/images/collage/c2.webp",
-  ];
+  ];*/
 
   return (
     <section

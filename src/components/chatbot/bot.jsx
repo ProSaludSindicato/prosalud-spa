@@ -2098,6 +2098,10 @@ Recuerda: No inventes información. Solo responde según los recursos/documentos
       });
     } finally {
       setIsConsultingIncapacidad(false);
+      // Hacer scroll al final después de completar la consulta
+      setTimeout(() => {
+        scrollToBottomWithRetry();
+      }, 300);
     }
   };
 
@@ -2274,7 +2278,7 @@ ${incapacidad.detalles}
     setShowIncapacidadForm(false);
     // Hacer scroll al final después de cerrar el formulario
     setTimeout(() => {
-      scrollToBottom();
+      scrollToBottomWithRetry();
     }, 100);
   };
 
@@ -2292,7 +2296,7 @@ ${incapacidad.detalles}
     setShowLiquidacionForm(false);
     // Hacer scroll al final después de cerrar el formulario
     setTimeout(() => {
-      scrollToBottom();
+      scrollToBottomWithRetry();
     }, 100);
   };
 
@@ -2453,6 +2457,10 @@ ${incapacidad.detalles}
       });
     } finally {
       setIsConsultingLiquidacion(false);
+      // Hacer scroll al final después de completar la consulta
+      setTimeout(() => {
+        scrollToBottomWithRetry();
+      }, 300);
     }
   };
 
@@ -2560,9 +2568,9 @@ Ocurrió un problema al procesar tu solicitud.
         "**¡Tu compensación final está al día!**\n\nNo tienes pendientes. Tu proceso de compensación final se encuentra completo y en orden.";
     } else {
       estadoIcon = "⚠️";
-      mensajePrincipal = "**Tienes pendientes en tu compensación final**\n\n**Lo que necesitas completar:**\n";
+      mensajePrincipal = "**Tienes pendientes en tu compensación final**\n\n**Lo que necesitas completar:**\n\n";
       pendientesList.forEach((pendiente, index) => {
-        mensajePrincipal += `• ${pendiente}\n`;
+        mensajePrincipal += `• ${pendiente}\n\n`;
       });
       mensajePrincipal +=
         "\n💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*\n\n" +
@@ -2584,10 +2592,9 @@ Ocurrió un problema al procesar tu solicitud.
     response += `**🏥 Información del Proceso:**
 - Hospital: ${liquidacion.HOSPITAL || "N/A"}
 - Proceso: ${liquidacion.PROCESO || "N/A"}
-${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}`;
+${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}
 
-    // Convenios
-    response += `**📑 Convenios:**
+**📑 Convenios:**
 - Total de convenios: ${liquidacion.CONVENIOS || "0"}
 - Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
 - Convenios pendientes: ${conveniosPendientes}
@@ -2595,7 +2602,7 @@ ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\
 `;
 
     // Documentos - solo si hay al menos uno
-    response += `**📄 Estado de tus documentos:**\n`;
+    response += `**📄 Estado de tus documentos:**\n\n`;
 
     const docs = [
       { nombre: "Solicitud de afiliación", estado: liquidacion["SOLICITUD AFILIACION"] },
@@ -2616,7 +2623,7 @@ ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\
         estadoTexto = "Pendiente por entregar";
       }
 
-      response += `${icon} ${doc.nombre}: ${estadoTexto}\n`;
+      response += `${icon} ${doc.nombre}: ${estadoTexto}\n\n`;
     });
 
     if (documentosPendientes && documentosPendientes !== "OK") {
@@ -2715,6 +2722,16 @@ Comunícate con nosotros para conocer los detalles de cada proceso:
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setAutoScroll(true);
     setShowScrollButton(false);
+  };
+
+  const scrollToBottomWithRetry = () => {
+    // Intentar scroll inmediatamente
+    scrollToBottom();
+    
+    // Intentar nuevamente después de un breve delay para asegurar que el DOM se haya actualizado
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
 
   useEffect(() => {
