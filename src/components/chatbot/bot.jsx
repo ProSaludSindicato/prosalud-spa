@@ -2176,8 +2176,13 @@ Si el problema persiste, comunícate con nosotros para asistencia.`;
 Ocurrió un problema al procesar tu solicitud. 
 
 **¿Qué hacer?**
+
+• Verifica que los datos registrados sean correctos
+
 • Verifica tu conexión a internet
+
 • Intenta nuevamente en unos momentos
+
 • Comunícate con nosotros si el problema persiste
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
@@ -2222,7 +2227,16 @@ ${inc["valor Incapacidad Recibido"] ? `- Valor: ${inc["valor Incapacidad Recibid
 
   // Generar respuesta completa de incapacidad (con datos personales y nota confidencial)
   const generateIncapacidadResponse = (incapacidad, includePersonalData = true, includeConfidentialNote = true) => {
-    const estado = incapacidad.estado || "DESCONOCIDO";
+    // Intentar determinar el estado desde diferentes campos posibles
+    const estado = incapacidad.estado || 
+                  incapacidad["Estado"] || 
+                  incapacidad["ESTADO"] || 
+                  incapacidad["estado_pago"] ||
+                  incapacidad["Estado Pago"] ||
+                  "DESCONOCIDO";
+    
+    // Debug: verificar el estado
+    console.log("🔍 Estado de incapacidad:", estado, "Objeto completo:", incapacidad);
 
     // Generar iconos según el estado
     const getStatusIcon = (status) => {
@@ -2244,12 +2258,16 @@ ${inc["valor Incapacidad Recibido"] ? `- Valor: ${inc["valor Incapacidad Recibid
 
     let response = `${statusIcon} **Detalle de tu incapacidad - ${estado}**\n\n`;
 
+    // Mensaje aclaratorio sobre EPS
+    response += `💡 *Cuando la EPS es Sura o Colmena, el pago se realiza a través de ProSalud, quien reconoce y transfiere la incapacidad al afiliado.*\n\n*Si la EPS es otra, el afiliado debe gestionar el trámite directamente con su EPS por los canales que esta tenga disponibles para el reconocimiento y pago de la incapacidad.*\n\n`;
+
     // Datos personales (solo si se requiere)
     if (includePersonalData) {
       response += `**👤 Datos personales:**
 - Nombre: ${incapacidad.Nombres || "N/A"}
-${incapacidad.Cargo ? `- Proceso: ${incapacidad.Cargo}\n` : ""}- Tipo documento: ${incapacidad.Tipo || "N/A"}
+- Tipo documento: ${incapacidad.Tipo || "N/A"}
 - Número documento: ${incapacidad["Numero Documento"] || "N/A"}
+${incapacidad.Cargo ? `- Proceso: ${incapacidad.Cargo}\n` : ""}
 ${incapacidad.Hospital ? `- Hospital: ${incapacidad.Hospital}\n` : ""}
 
 `;
@@ -2545,8 +2563,13 @@ Si el problema persiste, comunícate con nosotros para asistencia.
 Ocurrió un problema al procesar tu solicitud. 
 
 **¿Qué hacer?**
-• Verifica tu conexión a internet
+
+• Verifica que los datos registrados sean correctos
+
+• Comprueba tu conexión a internet
+
 • Intenta nuevamente en unos momentos
+
 • Comunícate con nosotros si el problema persiste
 
 **📞 Contacto:** (604) 444 8520 - WhatsApp: +57 317 675 3506
