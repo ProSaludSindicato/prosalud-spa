@@ -2621,7 +2621,7 @@ Ocurrió un problema al procesar tu solicitud.
 ${liquidacion["FECHA RETIRO"] ? `- Fecha retiro: ${liquidacion["FECHA RETIRO"]}\n` : ""}
 
 **📑 Convenios:**
-- Total de convenios: ${liquidacion.CONVENIOS || "0"}
+- Total de convenios: ${liquidacion["# CONVENIOS"] || "0"}
 - Convenios firmados: ${liquidacion["N° CONVENIOS FIRMADOS"] || "0"}
 - Convenios pendientes: ${conveniosPendientes}
 
