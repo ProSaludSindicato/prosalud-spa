@@ -28,7 +28,7 @@ const PreparacionEmergenciaCard: React.FC<PreparacionEmergenciaCardProps> = ({
             <div className="md:w-1/3 mb-6 md:mb-0">
               <div 
                 className="relative group cursor-pointer"
-                onClick={() => setSelectedImage("/images/sst/infografia_de_preparacion.png")}
+                onClick={() => setSelectedImage("/images/sst/infografia_de_preparacion.webp")}
               >
                 <img 
                   src="/images/sst/infografia_de_preparacion.webp" 
