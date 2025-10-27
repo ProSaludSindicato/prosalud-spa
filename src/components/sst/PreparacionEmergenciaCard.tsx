@@ -24,8 +24,8 @@ const PreparacionEmergenciaCard: React.FC<PreparacionEmergenciaCardProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-          <div className="md:flex md:items-start md:gap-6">
-            <div className="md:w-3/3 space-y-4">
+          <div className="w-full">
+            <div className="w-full space-y-4">
               <Collapsible open={openCollapsible['q1']} onOpenChange={() => toggleCollapsible('q1')} className="border rounded-md p-4 shadow-sm">
                 <CollapsibleTrigger className="flex justify-between items-center w-full font-semibold text-lg text-primary-prosalud hover:underline">
                 ¿Qué hacer en casos de emergencias?
