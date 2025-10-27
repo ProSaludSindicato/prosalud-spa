@@ -266,6 +266,12 @@ Tienes pendientes en tu compensación final
 
 Tu compensación final está en proceso
 
+💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*
+
+*Si la cartera ya fue recaudada pero la persona tiene documentación pendiente, el proceso se detiene hasta completarlos.*
+
+*Mantén tu documentación al día para que el pago se realice apenas se confirme el recaudo.*
+
 `;
   }
 
