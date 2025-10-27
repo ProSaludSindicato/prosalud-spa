@@ -13,7 +13,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Variable de entorno para habilitar/deshabilitar rate limiting (por defecto: habilitado)
 // @ts-ignore
-const ENABLE_RATE_LIMITING = Deno.env.get('ENABLE_CHATBOT_RATE_LIMITING') !== 'false';
+// TEMPORALMENTE DESHABILITADO - Rate limiting
+const ENABLE_RATE_LIMITING = false; // Deno.env.get('ENABLE_CHATBOT_RATE_LIMITING') !== 'false';
 
 const RATE_LIMITS = {
   messagesPerHour: 15,
