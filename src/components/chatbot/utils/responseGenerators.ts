@@ -255,12 +255,6 @@ Tienes pendientes en tu compensación final
 
 • Documentos pendientes: ${documentosPendientes}
 
-💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*
-
-*Si la cartera ya fue recaudada pero la persona tiene documentación pendiente, el proceso se detiene hasta completarlos.*
-
-*Mantén tu documentación al día para que el pago se realice apenas se confirme el recaudo.*
-
 `;
   } else {
     response += `${statusIcon} **Estado de tu Compensación Final**
@@ -269,6 +263,15 @@ Tu compensación final está en proceso
 
 `;
   }
+
+  // Nota aclaratoria (siempre presente)
+  response += `💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*
+
+*Si la cartera ya fue recaudada pero la persona tiene documentación pendiente, el proceso se detiene hasta completarlos.*
+
+*Mantén tu documentación al día para que el pago se realice apenas se confirme el recaudo.*
+
+`;
 
   // Datos del afiliado
   response += `**👤 Tus datos:**
@@ -312,7 +315,15 @@ ${liquidacion["N° CONVENIOS PENDIENTES"] ? `- Convenios pendientes: ${liquidaci
   const actaCompromiso = liquidacion["ACTA DE COMPROMISO"];
   const cartaRetiro = liquidacion["CARTA RETIRO"];
 
-  response += `${solicitudAfiliacion && solicitudAfiliacion !== "N/A" ? "✅" : "⏳"} Solicitud de afiliación: ${solicitudAfiliacion && solicitudAfiliacion !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaEntendimiento && actaEntendimiento !== "N/A" ? "✅" : "⏳"} Acta de entendimiento: ${actaEntendimiento && actaEntendimiento !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaCompromiso && actaCompromiso !== "N/A" ? "✅" : "⏳"} Acta de compromiso: ${actaCompromiso && actaCompromiso !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${cartaRetiro && cartaRetiro !== "N/A" ? "✅" : "⏳"} Carta de retiro: ${cartaRetiro && cartaRetiro !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n`;
+  // Función auxiliar para determinar si un documento está completo
+  const isDocumentoCompleto = (valor: string | undefined | null): boolean => {
+    if (!valor) return false;
+    const valorUpper = valor.toUpperCase().trim();
+    // Solo considerar completo si es "OK" o valores similares, no "PT" (pendiente), "N/A", etc.
+    return valorUpper === "OK" || valorUpper === "COMPLETO" || valorUpper === "ENTREGADO";
+  };
+
+  response += `${isDocumentoCompleto(solicitudAfiliacion) ? "✅" : "⏳"} Solicitud de afiliación: ${isDocumentoCompleto(solicitudAfiliacion) ? "Entregado y completo" : "Pendiente por entregar"}\n\n${isDocumentoCompleto(actaEntendimiento) ? "✅" : "⏳"} Acta de entendimiento: ${isDocumentoCompleto(actaEntendimiento) ? "Entregado y completo" : "Pendiente por entregar"}\n\n${isDocumentoCompleto(actaCompromiso) ? "✅" : "⏳"} Acta de compromiso: ${isDocumentoCompleto(actaCompromiso) ? "Entregado y completo" : "Pendiente por entregar"}\n\n${isDocumentoCompleto(cartaRetiro) ? "✅" : "⏳"} Carta de retiro: ${isDocumentoCompleto(cartaRetiro) ? "Entregado y completo" : "Pendiente por entregar"}\n\n`;
 
   // Detalle de documentos pendientes
   if (tieneDocumentosPendientes) {
