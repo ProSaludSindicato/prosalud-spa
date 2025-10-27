@@ -426,15 +426,26 @@ export default function ChatBot() {
         // Si hay incapacidades múltiples en el estado, verificar si el usuario está seleccionando una
         if (state.currentMultipleIncapacidades && state.currentMultipleIncapacidades.length > 0) {
           const incapacidades = state.currentMultipleIncapacidades;
-          const userSelection = text.trim().toLowerCase();
+          const userSelection = text.trim();
+          const userSelectionLower = userSelection.toLowerCase();
+          
+          console.log('🔍 DEBUG - Usuario respondiendo a múltiples incapacidades:', {
+            userSelection,
+            incapacidadesCount: incapacidades.length,
+            radicados: incapacidades.map(inc => inc["N° Radicado"])
+          });
           
           // Verificar si es una selección por número (1, 2, 3, etc.)
           const numberMatch = userSelection.match(/^(\d+)$/);
           if (numberMatch) {
             const selectedIndex = parseInt(numberMatch[1]) - 1;
+            console.log('🔍 DEBUG - Detectado número:', { selectedIndex, max: incapacidades.length });
+            
             if (selectedIndex >= 0 && selectedIndex < incapacidades.length) {
               // Usuario seleccionó una incapacidad por número
               const selectedIncapacidad = incapacidades[selectedIndex];
+              console.log('✅ DEBUG - Mostrando incapacidad por número:', selectedIndex + 1);
+              
               const responseMessage = {
                 role: "assistant",
                 content: generateIncapacidadResponse(selectedIncapacidad),
@@ -448,12 +459,23 @@ export default function ChatBot() {
             }
           }
           
-          // Verificar si es una selección por radicado
-          const radicadoMatch = incapacidades.find(inc => 
-            inc["N° Radicado"] && inc["N° Radicado"].toString().toLowerCase().includes(userSelection)
-          );
+          // Verificar si es una selección por radicado (búsqueda más flexible)
+          const radicadoMatch = incapacidades.find(inc => {
+            const radicado = inc["N° Radicado"];
+            if (!radicado) return false;
+            
+            const radicadoStr = radicado.toString().toLowerCase();
+            const userSelectionClean = userSelection.toLowerCase().replace(/\s+/g, '');
+            const radicadoClean = radicadoStr.replace(/\s+/g, '');
+            
+            // Buscar coincidencia exacta o parcial
+            return radicadoClean.includes(userSelectionClean) || userSelectionClean.includes(radicadoClean);
+          });
+          
           if (radicadoMatch) {
             // Usuario seleccionó una incapacidad por radicado
+            console.log('✅ DEBUG - Mostrando incapacidad por radicado:', radicadoMatch["N° Radicado"]);
+            
             const responseMessage = {
               role: "assistant",
               content: generateIncapacidadResponse(radicadoMatch),
@@ -467,7 +489,9 @@ export default function ChatBot() {
           }
           
           // Verificar si quiere ver todas
-          if (userSelection === "todas") {
+          if (userSelectionLower === "todas" || userSelectionLower === "todos") {
+            console.log('✅ DEBUG - Mostrando todas las incapacidades');
+            
             let allIncapacidadesResponse = `📋 **Detalle completo de todas tus incapacidades**\n\n`;
             
             incapacidades.forEach((inc, index) => {
@@ -490,6 +514,11 @@ export default function ChatBot() {
             scrollToBottomWithRetry(state.messagesEndRef);
             return;
           }
+          
+          // Si el usuario escribe algo que no es una selección válida pero hay incapacidades activas,
+          // limpiar el estado de múltiples incapacidades para permitir continuar con la conversación normal
+          console.log('⚠️ DEBUG - Entrada no reconocida como selección, limpiando estado de múltiples incapacidades');
+          state.setCurrentMultipleIncapacidades(null);
         }
 
         // Clasificar pregunta y cargar contexto selectivo
