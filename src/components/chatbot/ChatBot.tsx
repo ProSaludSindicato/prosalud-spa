@@ -69,6 +69,8 @@ import {
   DEFAULT_SUGGESTIONS,
   WELCOME_TOOLTIP_DURATION,
   TOOLTIP_ROTATION_INTERVAL,
+  RATE_LIMITS,
+  RATE_LIMIT_STORAGE_KEY,
 } from "./constants/chatbotConstants";
 
 // Importar componentes UI
@@ -217,6 +219,27 @@ export default function ChatBot() {
       const text = state.inputMessage.trim();
       if (!text || state.isTyping) {
         console.log("❌ Early return:", { text, isTyping: state.isTyping });
+        return;
+      }
+
+      // Bloqueo inmediato si ya se alcanzó el rate limit
+      const alreadyExceeded =
+        state.rateLimitInfo.messagesHour >= RATE_LIMITS.messagesPerHour ||
+        state.rateLimitInfo.messagesDay >= RATE_LIMITS.messagesPerDay;
+      if (alreadyExceeded) {
+        const now = Date.now();
+        const oneHourMs = 60 * 60 * 1000;
+        const rateLimitStorage = JSON.parse(localStorage.getItem(RATE_LIMIT_STORAGE_KEY) || "{}");
+        const firstMessageTime = rateLimitStorage.firstMessageTime || now;
+        const timeElapsed = now - firstMessageTime;
+        const timeRemaining = Math.max(oneHourMs - timeElapsed, 0);
+        const minutesRemaining = Math.ceil(timeRemaining / (60 * 1000));
+
+        state.setRateLimitInfo({
+          ...state.rateLimitInfo,
+          showWarning: true,
+          timeRemaining: minutesRemaining,
+        });
         return;
       }
 
@@ -574,6 +597,36 @@ export default function ChatBot() {
           total: inputTokens + outputTokens,
           cost: `$${cost.toFixed(6)}`,
         });
+
+        // Actualizar estado de rate limit si backend envía usageInfo
+        if (result.usageInfo && (result.usageInfo.messagesHour != null || result.usageInfo.messagesDay != null)) {
+          const messagesHour = Number(result.usageInfo.messagesHour ?? state.rateLimitInfo.messagesHour);
+          const messagesDay = Number(result.usageInfo.messagesDay ?? state.rateLimitInfo.messagesDay);
+          const showWarning =
+            messagesDay >= RATE_LIMITS.messagesPerDay * 0.8 ||
+            messagesHour >= RATE_LIMITS.messagesPerHour * 0.8;
+          const limitExceeded =
+            messagesHour >= RATE_LIMITS.messagesPerDay ||
+            messagesDay >= RATE_LIMITS.messagesPerDay;
+
+          let minutesRemaining: number | undefined = undefined;
+          if (limitExceeded) {
+            const now = Date.now();
+            const oneHourMs = 60 * 60 * 1000;
+            const rateLimitStorage = JSON.parse(localStorage.getItem(RATE_LIMIT_STORAGE_KEY) || "{}");
+            const firstMessageTime = rateLimitStorage.firstMessageTime || now;
+            const timeElapsed = now - firstMessageTime;
+            const timeRemaining = Math.max(oneHourMs - timeElapsed, 0);
+            minutesRemaining = Math.ceil(timeRemaining / (60 * 1000));
+          }
+
+          state.setRateLimitInfo({
+            messagesHour,
+            messagesDay,
+            showWarning: showWarning || !!limitExceeded,
+            ...(minutesRemaining != null ? { timeRemaining: minutesRemaining } : {}),
+          });
+        }
 
         // Actualizar mensaje temporal con la respuesta
         state.setMessages((prev: Message[]) => {
@@ -1538,6 +1591,7 @@ export default function ChatBot() {
                   onToggle={() => state.setShowQuickActions(!state.showQuickActions)}
                   onOpenIncapacidadForm={openIncapacidadForm}
                   onOpenLiquidacionForm={openLiquidacionForm}
+                  isDisabled={state.rateLimitInfo.messagesHour >= RATE_LIMITS.messagesPerHour || state.rateLimitInfo.messagesDay >= RATE_LIMITS.messagesPerDay}
                 />
               )}
 

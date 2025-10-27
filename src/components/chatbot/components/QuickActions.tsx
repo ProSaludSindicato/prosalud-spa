@@ -10,6 +10,7 @@ interface QuickActionsProps {
   onToggle: () => void;
   onOpenIncapacidadForm: () => void;
   onOpenLiquidacionForm: () => void;
+  isDisabled?: boolean;
 }
 
 export const QuickActions: React.FC<QuickActionsProps> = ({
@@ -17,6 +18,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
   onToggle,
   onOpenIncapacidadForm,
   onOpenLiquidacionForm,
+  isDisabled,
 }) => {
   return (
     <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
@@ -42,7 +44,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
         <div className="px-3 pb-3 space-y-2">
           <button
             onClick={onOpenIncapacidadForm}
-            className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-start gap-2"
+            disabled={isDisabled}
+            className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-start gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-disabled={isDisabled}
           >
             <CreditCard className="h-4 w-4 text-prosalud-salud mt-0.5 flex-shrink-0" />
             <div className="flex flex-col">
@@ -54,7 +58,9 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
           </button>
           <button
             onClick={onOpenLiquidacionForm}
-            className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-start gap-2"
+            disabled={isDisabled}
+            className="w-full text-left rounded-lg bg-white px-3 py-2 text-xs text-gray-700 shadow-sm transition-all duration-300 hover:bg-prosalud-salud/10 hover:text-gray-900 hover:shadow-md dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-prosalud-salud/20 border border-gray-200 dark:border-gray-500 flex items-start gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-disabled={isDisabled}
           >
             <FileText className="h-4 w-4 text-prosalud-salud mt-0.5 flex-shrink-0" />
             <div className="flex flex-col">
