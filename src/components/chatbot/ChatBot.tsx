@@ -1457,7 +1457,7 @@ export default function ChatBot() {
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mt-4">
+                  <div className="flex-1 overflow-y-auto p-4">
                     <IncapacidadForm
                       onSubmit={handleIncapacidadFormSubmit}
                       isLoading={state.isConsultingIncapacidad}

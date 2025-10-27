@@ -152,12 +152,7 @@ export default function IncapacidadForm({ onSubmit, isLoading }: IncapacidadForm
               value={formData.fechaExpedicion}
               onChange={(e) => handleInputChange('fechaExpedicion', e.target.value)}
               max={getTodayDate()}
-              className="w-full max-w-full overflow-hidden"
-              style={{ 
-                minWidth: '0',
-                maxWidth: '100%',
-                boxSizing: 'border-box'
-              }}
+              className="w-full"
             />
             {errors.fechaExpedicion && (
               <p className="text-red-500 text-xs mt-1">{errors.fechaExpedicion}</p>
