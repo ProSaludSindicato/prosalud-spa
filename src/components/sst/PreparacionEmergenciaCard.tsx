@@ -25,23 +25,7 @@ const PreparacionEmergenciaCard: React.FC<PreparacionEmergenciaCardProps> = ({
       </CardHeader>
       <CardContent className="space-y-6">
           <div className="md:flex md:items-start md:gap-6">
-            <div className="md:w-1/3 mb-6 md:mb-0">
-              <div 
-                className="relative group cursor-pointer"
-                onClick={() => setSelectedImage("/images/sst/infografia_de_preparacion.webp")}
-              >
-                <img 
-                  src="/images/sst/infografia_de_preparacion.webp" 
-                  alt="Preparación para emergencias" 
-                  className="rounded-lg shadow-md bg-gray-200 aspect-[3/4] object-contain w-full h-auto" 
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 flex items-center justify-center transition-opacity duration-300 rounded-lg">
-                  <ZoomIn size={48} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-              </div>
-              <p className="text-xs text-center text-muted-foreground mt-2">Infografía de preparación (clic para ampliar)</p>
-            </div>
-            <div className="md:w-2/3 space-y-4">
+            <div className="md:w-3/3 space-y-4">
               <Collapsible open={openCollapsible['q1']} onOpenChange={() => toggleCollapsible('q1')} className="border rounded-md p-4 shadow-sm">
                 <CollapsibleTrigger className="flex justify-between items-center w-full font-semibold text-lg text-primary-prosalud hover:underline">
                 ¿Qué hacer en casos de emergencias?
