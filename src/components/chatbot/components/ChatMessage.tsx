@@ -6,6 +6,7 @@ import React from "react";
 import { Bot, User, Check, ThumbsUp, ThumbsDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Message } from "../utils/categoryClassifier";
+import { IncapacidadSelectionButtons } from "./IncapacidadSelectionButtons";
 
 interface ChatMessageProps {
   message: Message;
@@ -15,6 +16,7 @@ interface ChatMessageProps {
   isTyping: boolean;
   renderers: any;
   onFeedback: (index: number, isLike: boolean) => void;
+  onIncapacidadSelect?: (selection: "todas" | number) => void;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -25,6 +27,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   isTyping,
   renderers,
   onFeedback,
+  onIncapacidadSelect,
 }) => {
   // Si es un mensaje del bot con contenido vacío y está en proceso de streaming, no lo mostramos
   if (message.isBot && message.content === "" && isTyping) {
@@ -66,6 +69,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </ReactMarkdown>
             )}
           </div>
+
+          {/* Botones de selección de incapacidad */}
+          {message.incapacidadSelectionOptions && onIncapacidadSelect && (
+            <IncapacidadSelectionButtons
+              options={message.incapacidadSelectionOptions}
+              onSelect={onIncapacidadSelect}
+            />
+          )}
 
           {/* Botones de rating para mensajes del bot */}
           {message.isBot && !message.isStreaming && message.content && (

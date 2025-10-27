@@ -2,6 +2,15 @@
  * Tipos y interfaces para el chatbot
  */
 
+export interface IncapacidadSelectionOption {
+  index: number;
+  radicado: string;
+  periodo: string;
+  dias: string;
+  estado: string;
+  valor?: string;
+}
+
 export interface Message {
   role: string;
   content: string;
@@ -18,6 +27,7 @@ export interface Message {
     cost: number;
   };
   multipleIncapacidades?: any[];
+  incapacidadSelectionOptions?: IncapacidadSelectionOption[];
   [key: string]: any;
 }
 

@@ -72,41 +72,27 @@ No pudimos procesar tu solicitud en este momento.
 /**
  * Genera respuesta con múltiples incapacidades
  */
-export const generateMultipleIncapacidadesResponse = (incapacidades: any[]): string => {
+export const generateMultipleIncapacidadesResponse = (incapacidades: any[]): { content: string; selectionOptions: any[] } => {
   let response = `📋 **Se encontraron ${incapacidades.length} incapacidades registradas**
 
-A continuación se muestran tus incapacidades:\n\n`;
+A continuación se muestran tus incapacidades:`;
 
-  incapacidades.forEach((inc, index) => {
-    const statusIcon =
-      inc.estado === "PAGADA"
-        ? "✅"
-        : inc.estado === "EN_PROCESO"
-          ? "🔄"
-          : inc.estado === "PENDIENTE_DOCUMENTOS"
-            ? "📋"
-            : inc.estado === "RECHAZADA"
-              ? "❌"
-              : "ℹ️";
+  // Preparar opciones de selección para los botones
+  const selectionOptions = incapacidades.map((inc, index) => ({
+    index,
+    radicado: inc["N° Radicado"] || "N/A",
+    periodo: `${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}`,
+    dias: inc["Dias Incapacidad"],
+    estado: inc.estado,
+    valor: inc["valor Incapacidad Recibido"],
+  }));
 
-    response += `**${index + 1}. ${statusIcon} Incapacidad**
-- Radicado: ${inc["N° Radicado"] || "N/A"}
-- Período: ${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}
-- Días: ${inc["Dias Incapacidad"]}
-- Estado: ${inc.estado}
-${inc["valor Incapacidad Recibido"] ? `- Valor: ${inc["valor Incapacidad Recibido"]}` : ""}
+  response += `\n\n**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
 
-`;
-  });
-
-  response += `**¿Qué deseas hacer?**
-- Escribe el **número** de la incapacidad que deseas ver en detalle (ejemplo: 1, 2, 3...)
-- Escribe el **número de radicado** de la incapacidad que deseas consultar
-- O escribe **"todas"** para ver el detalle completo de todas
-
-**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
-
-  return response;
+  return {
+    content: response,
+    selectionOptions,
+  };
 };
 
 /**

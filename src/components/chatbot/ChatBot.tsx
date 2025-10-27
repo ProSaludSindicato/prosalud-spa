@@ -830,6 +830,95 @@ export default function ChatBot() {
   }, [state, scrollToBottomWithRetry]);
 
   /**
+   * Maneja la selección de una incapacidad específica desde los botones
+   */
+  const handleIncapacidadSelection = useCallback(
+    async (selection: "todas" | number) => {
+      const incapacidades = state.currentMultipleIncapacidades;
+      
+      if (!incapacidades || incapacidades.length === 0) {
+        console.error("No hay incapacidades en el estado");
+        return;
+      }
+
+      let userMessage: string;
+      let responseContent: string;
+
+      if (selection === "todas") {
+        userMessage = "Ver todas las incapacidades en detalle";
+        
+        let allIncapacidadesResponse = `📋 **Detalle completo de todas tus incapacidades**\n\n`;
+        
+        incapacidades.forEach((inc, index) => {
+          allIncapacidadesResponse += generateIncapacidadResponse(inc, true, false);
+          if (index < incapacidades.length - 1) {
+            allIncapacidadesResponse += "\n---\n\n";
+          }
+        });
+        
+        allIncapacidadesResponse += `\n**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+        responseContent = allIncapacidadesResponse;
+      } else {
+        // Selección por índice
+        const selectedIncapacidad = incapacidades[selection];
+        userMessage = `Ver detalle de incapacidad #${selection + 1} (Radicado: ${selectedIncapacidad["N° Radicado"] || "N/A"})`;
+        responseContent = generateIncapacidadResponse(selectedIncapacidad);
+      }
+
+      // Agregar mensaje del usuario
+      const userMsg: Message = {
+        role: "user",
+        content: userMessage,
+        isBot: false,
+      };
+
+      // Agregar mensaje de respuesta del bot
+      const botMsg: Message = {
+        role: "assistant",
+        content: responseContent,
+        isBot: true,
+        client_turn_id: generateClientTurnId(),
+      };
+
+      state.setMessages((prev: Message[]) => [...prev, userMsg, botMsg]);
+      
+      // Limpiar el estado de múltiples incapacidades
+      state.setCurrentMultipleIncapacidades(null);
+
+      // Guardar en backend de forma asíncrona
+      (async () => {
+        const created = await saveConversationToBackend({
+          client_turn_id: botMsg.client_turn_id,
+          conversation_id: state.conversationId,
+          user_question: userMessage,
+          bot_answer: responseContent,
+          metadata: {
+            selection_type: selection === "todas" ? "all" : "single",
+            selected_index: selection === "todas" ? undefined : selection,
+          },
+        });
+
+        if (created && created.id != null) {
+          state.setMessages((curr: Message[]) => {
+            const copy = [...curr];
+            const idx = copy.findIndex((m) => m.client_turn_id === botMsg.client_turn_id);
+            if (idx >= 0) {
+              copy[idx] = { ...copy[idx], backend_id: created.id };
+            }
+            return copy;
+          });
+        }
+      })();
+
+      // Hacer scroll al final
+      setTimeout(() => {
+        scrollToBottomWithRetry(state.messagesEndRef);
+      }, 100);
+    },
+    [state, saveConversationToBackend, scrollToBottomWithRetry]
+  );
+
+  /**
    * Maneja el envío del formulario de incapacidad
    */
   const handleIncapacidadFormSubmit = useCallback(
@@ -880,11 +969,13 @@ export default function ChatBot() {
           // Guardar las incapacidades múltiples en el estado
           state.setCurrentMultipleIncapacidades(incapacidades);
           
+          const multipleResponse = generateMultipleIncapacidadesResponse(incapacidades);
           responseMessage = {
             role: "assistant",
-            content: generateMultipleIncapacidadesResponse(incapacidades),
+            content: multipleResponse.content,
             isBot: true,
             multipleIncapacidades: incapacidades,
+            incapacidadSelectionOptions: multipleResponse.selectionOptions,
           };
         }
 
@@ -1387,6 +1478,7 @@ export default function ChatBot() {
                           isTyping={state.isTyping}
                           renderers={markdownRenderers}
                           onFeedback={handleFeedback}
+                          onIncapacidadSelect={handleIncapacidadSelection}
                         />
                       );
                     })}
