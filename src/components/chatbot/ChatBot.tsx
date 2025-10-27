@@ -880,10 +880,16 @@ export default function ChatBot() {
         client_turn_id: generateClientTurnId(),
       };
 
+      // Si no es "todas", mantener los botones disponibles para consultar otras
+      if (selection !== "todas" && incapacidades.length > 1) {
+        const responseData = generateMultipleIncapacidadesResponse(incapacidades);
+        botMsg.incapacidadSelectionOptions = responseData.selectionOptions;
+        botMsg.multipleIncapacidades = incapacidades;
+      }
+
       state.setMessages((prev: Message[]) => [...prev, userMsg, botMsg]);
       
-      // Limpiar el estado de múltiples incapacidades
-      state.setCurrentMultipleIncapacidades(null);
+      // No limpiar el estado de múltiples incapacidades para mantener los botones disponibles
 
       // Guardar en backend de forma asíncrona
       (async () => {
@@ -928,7 +934,9 @@ export default function ChatBot() {
 
       const userQueryMessage = {
         role: "user",
-        content: `Consultar pago de incapacidad para documento ${formData.tipoDocumento} ${formData.numeroDocumento}`,
+        content: formData.radicado 
+          ? `Consultar pago de incapacidad para documento ${formData.tipoDocumento} ${formData.numeroDocumento} - Radicado: ${formData.radicado}`
+          : `Consultar pago de incapacidad para documento ${formData.tipoDocumento} ${formData.numeroDocumento}`,
         isBot: false,
       };
 
@@ -959,24 +967,48 @@ export default function ChatBot() {
             content: generateNoDataResponse(),
             isBot: true,
           };
-        } else if (incapacidades.length === 1) {
-          responseMessage = {
-            role: "assistant",
-            content: generateIncapacidadResponse(incapacidades[0]),
-            isBot: true,
-          };
         } else {
-          // Guardar las incapacidades múltiples en el estado
-          state.setCurrentMultipleIncapacidades(incapacidades);
-          
-          const multipleResponse = generateMultipleIncapacidadesResponse(incapacidades);
-          responseMessage = {
-            role: "assistant",
-            content: multipleResponse.content,
-            isBot: true,
-            multipleIncapacidades: incapacidades,
-            incapacidadSelectionOptions: multipleResponse.selectionOptions,
-          };
+          // Si se proporcionó un radicado, buscar esa incapacidad específica
+          if (formData.radicado && formData.radicado.trim() !== "") {
+            const radicadoBuscado = formData.radicado.trim().replace(/\s/g, "");
+            const incapacidadEspecifica = incapacidades.find((inc) => {
+              const radicadoInc = (inc["N° Radicado"] || "").replace(/\s/g, "");
+              return radicadoInc.includes(radicadoBuscado) || radicadoBuscado.includes(radicadoInc);
+            });
+
+            if (incapacidadEspecifica) {
+              responseMessage = {
+                role: "assistant",
+                content: generateIncapacidadResponse(incapacidadEspecifica),
+                isBot: true,
+              };
+            } else {
+              responseMessage = {
+                role: "assistant",
+                content: `❌ No se encontró ninguna incapacidad con el radicado "${formData.radicado}".\n\n**Sugerencia:** Verifica que el número de radicado sea correcto. Puedes consultar sin el radicado para ver todas tus incapacidades disponibles.`,
+                isBot: true,
+              };
+            }
+          } else if (incapacidades.length === 1) {
+            // Una sola incapacidad
+            responseMessage = {
+              role: "assistant",
+              content: generateIncapacidadResponse(incapacidades[0]),
+              isBot: true,
+            };
+          } else {
+            // Múltiples incapacidades - guardar en estado y mostrar botones de selección
+            state.setCurrentMultipleIncapacidades(incapacidades);
+            
+            const multipleResponse = generateMultipleIncapacidadesResponse(incapacidades);
+            responseMessage = {
+              role: "assistant",
+              content: multipleResponse.content,
+              isBot: true,
+              multipleIncapacidades: incapacidades,
+              incapacidadSelectionOptions: multipleResponse.selectionOptions,
+            };
+          }
         }
 
         state.setMessages((prev: Message[]) => {

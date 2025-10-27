@@ -35,5 +35,6 @@ export interface ChatbotFormData {
   tipoDocumento: string;
   numeroDocumento: string;
   fechaExpedicion: string;
+  radicado?: string;
 }
 

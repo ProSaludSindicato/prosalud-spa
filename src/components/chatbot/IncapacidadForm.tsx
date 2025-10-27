@@ -15,6 +15,7 @@ interface FormData {
   tipoDocumento: string;
   numeroDocumento: string;
   fechaExpedicion: string;
+  radicado?: string;
 }
 
 const documentTypes = [
@@ -45,7 +46,8 @@ export default function IncapacidadForm({ onSubmit, isLoading }: IncapacidadForm
   const [formData, setFormData] = useState<FormData>({
     tipoDocumento: 'CC',
     numeroDocumento: '',
-    fechaExpedicion: ''
+    fechaExpedicion: '',
+    radicado: ''
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
 
@@ -160,6 +162,22 @@ export default function IncapacidadForm({ onSubmit, isLoading }: IncapacidadForm
             {errors.fechaExpedicion && (
               <p className="text-red-500 text-xs mt-1">{errors.fechaExpedicion}</p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Número de radicado (opcional)
+            </label>
+            <Input
+              type="text"
+              value={formData.radicado}
+              onChange={(e) => handleInputChange('radicado', e.target.value)}
+              placeholder="Ej: 004252"
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Si conoces el número de radicado, ingrésalo para ver solo esa incapacidad
+            </p>
           </div>
 
           <Button
