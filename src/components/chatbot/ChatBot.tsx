@@ -344,7 +344,8 @@ export default function ChatBot() {
       }
 
       if (!validation.isValid) {
-        // Verificar rate limit
+        // TEMPORALMENTE DESHABILITADO - Verificar rate limit
+        /* 
         const rateLimitCheck = checkRateLimit(text, state.rateLimitInfo, state.setRateLimitInfo);
 
         if (rateLimitCheck.exceeded) {
@@ -369,6 +370,7 @@ export default function ChatBot() {
           }
           return;
         }
+        */
 
         // Mostrar mensaje de seguridad
         const securityMessage = {
@@ -1591,7 +1593,7 @@ export default function ChatBot() {
                   onToggle={() => state.setShowQuickActions(!state.showQuickActions)}
                   onOpenIncapacidadForm={openIncapacidadForm}
                   onOpenLiquidacionForm={openLiquidacionForm}
-                  isDisabled={state.rateLimitInfo.messagesHour >= RATE_LIMITS.messagesPerHour || state.rateLimitInfo.messagesDay >= RATE_LIMITS.messagesPerDay}
+                  isDisabled={false} // TEMPORALMENTE DESHABILITADO - Rate limit: state.rateLimitInfo.messagesHour >= RATE_LIMITS.messagesPerHour || state.rateLimitInfo.messagesDay >= RATE_LIMITS.messagesPerDay
                 />
               )}
 

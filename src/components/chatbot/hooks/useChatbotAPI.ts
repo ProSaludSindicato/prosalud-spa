@@ -139,6 +139,7 @@ export const useChatbotAPI = () => {
 
   /**
    * Verifica el rate limit
+   * TEMPORALMENTE DESHABILITADO
    */
   const checkRateLimit = useCallback(
     (
@@ -146,6 +147,10 @@ export const useChatbotAPI = () => {
       rateLimitInfo: RateLimitInfo,
       setRateLimitInfo: (info: RateLimitInfo) => void
     ): { exceeded: boolean; message?: string } => {
+      // TEMPORALMENTE DESHABILITADO - Siempre retorna no excedido
+      return { exceeded: false };
+      
+      /* CÓDIGO ORIGINAL COMENTADO
       const { messagesHour, messagesDay } = rateLimitInfo;
 
       if (
@@ -175,6 +180,7 @@ export const useChatbotAPI = () => {
       }
 
       return { exceeded: false };
+      */
     },
     []
   );

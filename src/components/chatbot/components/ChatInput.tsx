@@ -39,7 +39,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSubmit,
 }) => {
   const currentChars = inputMessage.length;
-  const isRateLimitExceeded = rateLimitInfo.messagesHour >= 15 || rateLimitInfo.messagesDay >= 50;
+  // TEMPORALMENTE DESHABILITADO - Rate limit
+  const isRateLimitExceeded = false; // rateLimitInfo.messagesHour >= 15 || rateLimitInfo.messagesDay >= 50;
 
   return (
     <form
