@@ -162,9 +162,15 @@ export const useChatbotAPI = () => {
         const timeRemaining = oneHourMs - timeElapsed;
         const minutesRemaining = Math.ceil(timeRemaining / (60 * 1000));
 
+        // Actualizar el rateLimitInfo con el tiempo restante
+        setRateLimitInfo({
+          ...rateLimitInfo,
+          timeRemaining: minutesRemaining,
+        });
+
         return {
           exceeded: true,
-          message: `⚠️ Has alcanzado el límite de ${RATE_LIMITS.messagesPerHour} mensajes por hora. Intenta de nuevo en aproximadamente ${minutesRemaining} minutos.`,
+          message: `⚠️ Has alcanzado el límite de mensajes. Intenta de nuevo en aproximadamente ${minutesRemaining} minutos.`,
         };
       }
 

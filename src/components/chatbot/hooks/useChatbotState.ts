@@ -11,6 +11,7 @@ export interface RateLimitInfo {
   messagesHour: number;
   messagesDay: number;
   showWarning: boolean;
+  timeRemaining?: number; // minutos restantes hasta poder enviar de nuevo
 }
 
 export const useChatbotState = () => {

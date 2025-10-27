@@ -880,13 +880,6 @@ export default function ChatBot() {
         client_turn_id: generateClientTurnId(),
       };
 
-      // Si no es "todas", mantener los botones disponibles para consultar otras
-      if (selection !== "todas" && incapacidades.length > 1) {
-        const responseData = generateMultipleIncapacidadesResponse(incapacidades);
-        botMsg.incapacidadSelectionOptions = responseData.selectionOptions;
-        botMsg.multipleIncapacidades = incapacidades;
-      }
-
       state.setMessages((prev: Message[]) => [...prev, userMsg, botMsg]);
       
       // No limpiar el estado de múltiples incapacidades para mantener los botones disponibles
@@ -1570,6 +1563,7 @@ export default function ChatBot() {
                   isTyping={state.isTyping}
                   isFullscreen={state.isFullscreen}
                   showSpellCheckSuggestions={state.showSpellCheckSuggestions}
+                  rateLimitInfo={state.rateLimitInfo}
                   textareaRef={state.textareaRef}
                   onInputChange={handleInputChange}
                   onKeyDown={handleKeyDown}
