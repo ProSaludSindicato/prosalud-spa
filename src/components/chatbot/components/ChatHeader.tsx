@@ -35,7 +35,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         <h3 className="font-semibold text-base">Asistente Virtual ProSalud</h3>
       </div>
       <div className="flex items-center space-x-1">
-        {/* Botón para exportar conversación (TEMPORAL) */}
+        {/* Botón para exportar conversación (TEMPORAL)
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -50,7 +50,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <p className="text-xs">Exportar conversación (temporal)</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
+        </TooltipProvider> */}
 
         {/* Botón para nueva conversación */}
         <TooltipProvider>
