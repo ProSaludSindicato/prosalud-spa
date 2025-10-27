@@ -9,7 +9,7 @@
 - **Cuadro de Turnos**: Consulta y gestión de programación laboral
 
 ### Gestión de Incapacidades
-- **Incapacidades y Licencias**: Reporte y seguimiento de incapacidades médicas
+- **Incapacidades y Licencias**: Trámite web exclusivo para reporte y seguimiento de incapacidades médicas
 
 ### Servicios de Afiliación
 - **Actualizar Cuenta Bancaria**: Cambio de datos bancarios para pagos
@@ -49,4 +49,4 @@
 
 ### Correo Electrónico
 - General: comunicaciones@sindicatoprosalud.com
-- Incapacidades: incapacidades@sindicatoprosalud.com
+- **Nota:** Las incapacidades y licencias solo se reciben a través del trámite web oficial

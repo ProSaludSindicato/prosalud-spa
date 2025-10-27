@@ -17,8 +17,8 @@ Colombia
 ## Correos Especializados
 
 ### Incapacidades y Licencias
-**Correo**: incapacidades@sindicatoprosalud.com
-- Exclusivo para: Reporte de incapacidades médicas y licencias
+**Trámite web:** Disponible en el sitio web de ProSalud para solicitudes directas
+- **Importante:** Las solicitudes solo se reciben a través del trámite web oficial
 - Formato: Solo archivos PDF
 - Tiempo de respuesta: 3 días hábiles
 

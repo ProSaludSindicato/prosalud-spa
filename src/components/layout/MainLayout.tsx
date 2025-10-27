@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import Header from './Header';
 import Footer from './Footer';
-import Bot from '@/components/chatbot/bot';
+import Bot from '@/components/chatbot/ChatBot';
 
 interface MainLayoutProps {
   children: React.ReactNode;

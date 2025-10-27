@@ -6,20 +6,17 @@ Esta guía orienta a los afiliados sobre el proceso para reportar incapacidades 
 
 **Enlace a la página informativa en el sitio web:** [`/servicios/incapacidad-maternidad`](/servicios/incapacidad-maternidad)
 
-## Proceso de Envío
+## Proceso de Solicitud
 
-### Canal de Envío
-- **Correo electrónico exclusivo:** `incapacidades@sindicatoprosalud.com`
-- Este es el único canal para la recepción de incapacidades y licencias.
-
-### Asunto del Correo
-- Debe indicar: **Nombre completo y número de cédula del afiliado**.
-- Ejemplo: `Incapacidad María Pérez CC 123456789`
+### Canal de Solicitud
+- **Trámite web:** Disponible en el sitio web de ProSalud para solicitudes directas
+- **Importante:** Las solicitudes solo se reciben a través del trámite web oficial
+- El trámite web garantiza mayor eficiencia, seguimiento y procesamiento adecuado de tu solicitud.
 
 ### Archivos Adjuntos
 - **Formato:** Únicamente archivos en formato **PDF**.
 - **Calidad:** El documento debe ser **legible y completo**.
-- Si tiene incapacidades por diferentes diagnósticos, envíe un correo por cada incapacidad.
+- Si tiene incapacidades por diferentes diagnósticos, envíe una solicitud por cada incapacidad.
 
 ## Recomendaciones Importantes
 - El afiliado garantiza que los documentos (incapacidades, licencias) son originales, sin alteraciones ni enmendaduras.
@@ -29,7 +26,7 @@ Esta guía orienta a los afiliados sobre el proceso para reportar incapacidades 
 
 ## Respuesta del Sindicato ProSalud
 - ProSalud enviará una respuesta sobre la información recibida en un plazo de **3 días hábiles**.
-- La respuesta se enviará únicamente desde el correo `incapacidades@sindicatoprosalud.com` al mismo correo desde donde se recibió la solicitud.
+- La respuesta se enviará al correo electrónico registrado en el trámite web.
 - Las incapacidades/licencias remitidas no se entienden como aprobadas ni aceptadas para pago hasta su validación.
 
 ## Consideraciones Adicionales
@@ -38,8 +35,11 @@ Esta guía orienta a los afiliados sobre el proceso para reportar incapacidades 
 
 ## Preguntas Frecuentes (FAQ)
 
-**P: ¿A qué correo debo enviar mi incapacidad?**
-R: Al correo `incapacidades@sindicatoprosalud.com`.
+**P: ¿Cómo puedo solicitar mi incapacidad o licencia?**
+R: Debes usar el trámite web disponible en el sitio de ProSalud. Las solicitudes solo se reciben a través del trámite web oficial.
+
+**P: ¿Puedo enviar mi solicitud por correo electrónico?**
+R: No, las solicitudes de incapacidades y licencias solo se reciben a través del trámite web oficial de ProSalud.
 
 **P: ¿Qué formato debe tener el archivo adjunto?**
 R: Debe ser en formato PDF, legible y completo.
