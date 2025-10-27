@@ -31,7 +31,7 @@ const PreparacionEmergenciaCard: React.FC<PreparacionEmergenciaCardProps> = ({
                 onClick={() => setSelectedImage("/images/sst/infografia_de_preparacion.png")}
               >
                 <img 
-                  src="/images/sst/infografia_de_preparacion.png" 
+                  src="/images/sst/infografia_de_preparacion.webp" 
                   alt="Preparación para emergencias" 
                   className="rounded-lg shadow-md bg-gray-200 aspect-[3/4] object-contain w-full h-auto" 
                 />
