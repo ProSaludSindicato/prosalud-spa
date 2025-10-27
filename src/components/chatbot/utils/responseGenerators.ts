@@ -72,9 +72,7 @@ No pudimos procesar tu solicitud en este momento.
 /**
  * Genera respuesta con múltiples incapacidades
  */
-export const generateMultipleIncapacidadesResponse = (
-  incapacidades: any[]
-): string => {
+export const generateMultipleIncapacidadesResponse = (incapacidades: any[]): string => {
   let response = `📋 **Se encontraron ${incapacidades.length} incapacidades registradas**
 
 A continuación se muestran tus incapacidades:\n\n`;
@@ -135,7 +133,7 @@ const getStatusIcon = (estado: string): string => {
 export const generateIncapacidadResponse = (
   incapacidad: any,
   includePersonalData: boolean = true,
-  includeConfidentialNote: boolean = true
+  includeConfidentialNote: boolean = true,
 ): string => {
   // Intentar determinar el estado desde diferentes campos posibles
   const estado =
@@ -226,7 +224,7 @@ export const generateLiquidacionResponse = (liquidacion: any): string => {
   console.log("🔍 DEBUG - Objeto liquidacion recibido:", liquidacion);
   console.log("🔍 DEBUG - Tipo de liquidacion:", typeof liquidacion);
   console.log("🔍 DEBUG - Keys del objeto:", Object.keys(liquidacion || {}));
-  
+
   // Mapear los campos de la API a los campos esperados
   const estado = liquidacion["ESTADO BD"] || liquidacion.estado || "DESCONOCIDO";
   const statusIcon = getStatusIcon(estado);
@@ -234,13 +232,14 @@ export const generateLiquidacionResponse = (liquidacion: any): string => {
   console.log("🔍 DEBUG - Estado encontrado:", estado);
 
   // Determinar si hay documentos pendientes
-  const documentosPendientes = liquidacion["DTOS PENDIENTES"] && 
-    liquidacion["DTOS PENDIENTES"] !== "N/A" && 
-    liquidacion["DTOS PENDIENTES"] !== "" ? 
-    liquidacion["DTOS PENDIENTES"] : null;
+  const documentosPendientes =
+    liquidacion["DTOS PENDIENTES"] && liquidacion["DTOS PENDIENTES"] !== "N/A" && liquidacion["DTOS PENDIENTES"] !== ""
+      ? liquidacion["DTOS PENDIENTES"]
+      : null;
 
-  const tieneDocumentosPendientes = documentosPendientes && 
-    documentosPendientes.trim() !== "" && 
+  const tieneDocumentosPendientes =
+    documentosPendientes &&
+    documentosPendientes.trim() !== "" &&
     documentosPendientes.trim().toUpperCase() !== "NINGUNO";
 
   // Generar respuesta según el estado
@@ -333,11 +332,7 @@ ${liquidacion["OBSERVACIONES"]}
   // Mensaje de ayuda
   response += `**📩 ¿Necesitas ayuda o tienes dudas?**
 
-Puedes comunicarte con nosotros para:
-
-• Solicitar y enviar los documentos pendientes
-
-Contáctanos vía correo electrónico: **talentohumano@sindicatoprosalud.com**
+Contáctanos vía correo electrónico para solicitar y enviar los documentos pendientes: **talentohumano@sindicatoprosalud.com**
 
 `;
 
