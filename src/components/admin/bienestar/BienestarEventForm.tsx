@@ -66,24 +66,40 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: event?.title || "",
-      date: event?.date || "",
-      category: event?.category || "",
-      description: event?.description || "",
-      location: event?.location || "",
-      attendees: event?.attendees || undefined,
-      gift: event?.gift || "",
-      provider: event?.provider || "ProSalud",
+      title: "",
+      date: "",
+      category: "",
+      description: "",
+      location: "",
+      attendees: undefined,
+      gift: "",
+      provider: "ProSalud",
     },
   });
 
   useEffect(() => {
-    if (event && event.images.length > 0) {
-      const previews = event.images.map((img) => img.url);
-      setImagePreviews(previews);
-      setMainImageIndex(event.images.findIndex((img) => img.isMain));
+    if (event) {
+      // Actualizar los valores del formulario cuando cambia el evento
+      form.reset({
+        title: event.title || "",
+        date: event.date || "",
+        category: event.category || "",
+        description: event.description || "",
+        location: event.location || "",
+        attendees: event.attendees || undefined,
+        gift: event.gift || "",
+        provider: event.provider || "ProSalud",
+      });
+
+      // Cargar las imágenes existentes
+      if (event.images && event.images.length > 0) {
+        const previews = event.images.map((img) => img.url);
+        setImagePreviews(previews);
+        const mainIndex = event.images.findIndex((img) => img.isMain);
+        setMainImageIndex(mainIndex >= 0 ? mainIndex : 0);
+      }
     }
-  }, [event]);
+  }, [event, form]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateWellnessEventData) => wellnessEventsApi.createEvent(data),
@@ -251,17 +267,20 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         title: data.title,
         date: data.date,
         category: data.category,
-        location: data.location || "",
-        description: data.description,
+        location: data.location,
+        description: data.description || "",
         attendees: data.attendees,
-        gift: data.gift,
-        provider: data.provider,
+        gift: data.gift || "",
+        provider: data.provider || "ProSalud",
         images: images.length > 0 ? images : undefined,
       };
       
       console.log('🔄 Enviando datos de actualización:', {
         eventId: event.id,
-        updateData,
+        updateData: {
+          ...updateData,
+          images: updateData.images ? `${updateData.images.length} imágenes` : 'sin nuevas imágenes'
+        },
         formData: data,
         hasNewImages: images.length > 0
       });

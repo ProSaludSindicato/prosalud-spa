@@ -336,13 +336,13 @@ ENLACES EXTERNOS IMPORTANTES:
   * Semestral de junio: Se calcula sobre los 6 meses anteriores de diciembre a mayo
   * Semestral de diciembre: Se calcula sobre los 6 meses anteriores de junio a noviembre
 
-**RENDIMIENTOS:**
-- Los rendimientos corresponden a una compensación del 12% anual
-- Se calculan sobre la compensación anual diferida acumulada al 31 de diciembre del año anterior
-- Son proporcionales al tiempo que el afiliado lleve en el desarrollo de sus actividades
-
-**¿CUÁNDO SE PAGAN LOS RENDIMIENTOS?**
-- Los rendimientos provisionados al 31 de diciembre del año anterior se pagan en febrero con la compensación del mes de enero
+**RENDIMIENTOS (INTERESES DE CESANTÍAS):**
+⚠️ IMPORTANTE: Los RENDIMIENTOS son DIFERENTES de las CESANTÍAS (Compensación Anual Diferida)
+- **¿Qué son los rendimientos?** Son los intereses del 12% anual que se generan sobre el saldo acumulado de la Compensación Anual Diferida (cesantías)
+- **¿Cómo se calculan?** Se calculan sobre la compensación anual diferida acumulada al 31 de diciembre del año anterior
+- **¿Cuándo se pagan?** Los rendimientos provisionados al 31 de diciembre del año anterior se pagan en febrero con la compensación del mes de enero
+- **Proporcionalidad:** Son proporcionales al tiempo que el afiliado lleve en el desarrollo de sus actividades
+- **Diferencia clave:** Los rendimientos NO son las cesantías, son los INTERESES que generan las cesantías acumuladas
 
 **CERTIFICADO DE CONVENIO (CARTA LABORAL):**
 - Para solicitar un Certificado de Convenio debe hacerlo directamente por la página del Sindicato
@@ -354,6 +354,10 @@ ENLACES EXTERNOS IMPORTANTES:
 - Si quieres hacer parte de PROSALUD puedes enviar tu hoja de vida al correo: hojasdevida@sindicatoprosalud.com
 
 **COMPENSACIÓN ANUAL DIFERIDA (CESANTÍAS) - INFORMACIÓN ADICIONAL:**
+⚠️ DIFERENCIA CRÍTICA: Las CESANTÍAS (Compensación Anual Diferida) son DIFERENTES de los RENDIMIENTOS (intereses)
+- **¿Qué son las cesantías?** Es la compensación anual diferida que se acumula y puede retirarse bajo ciertas condiciones
+- **Retiro de cesantías:** Para retirar las cesantías acumuladas, debes hacer la solicitud a través de: [Compensación Anual Diferida](/servicios/compensacion-anual)
+- **Rendimientos:** Son los INTERESES del 12% anual que generan las cesantías acumuladas (ver sección de RENDIMIENTOS arriba)
 - Solo se recibirá la solicitud y anexos de forma digital por medio de la aplicación web
 - NO serán recibidos de forma física o por correo electrónico
 - Ningún coordinador está autorizado para recibir estos documentos de forma física

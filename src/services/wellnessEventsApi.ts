@@ -328,16 +328,34 @@ export async function updateWellnessEvent(
     
     const formData = new FormData();
     
-    // Agregar campos principales (siempre se envían)
-    if (data.title !== undefined) formData.append('title', data.title);
-    if (data.date !== undefined) formData.append('date', data.date);
-    if (data.category !== undefined) formData.append('category', data.category);
-    if (data.location !== undefined) formData.append('location', data.location);
-    if (data.description !== undefined) formData.append('description', data.description);
-    if (data.attendees !== undefined) formData.append('attendees', String(data.attendees));
-    if (data.gift !== undefined) formData.append('gift', data.gift);
-    if (data.provider !== undefined) formData.append('provider', data.provider);
-    if (data.is_visible !== undefined) formData.append('is_visible', String(data.is_visible));
+    // Agregar campos principales (siempre se envían si están definidos)
+    if (data.title !== undefined && data.title !== null) {
+      formData.append('title', data.title);
+    }
+    if (data.date !== undefined && data.date !== null) {
+      formData.append('date', data.date);
+    }
+    if (data.category !== undefined && data.category !== null) {
+      formData.append('category', data.category);
+    }
+    if (data.location !== undefined && data.location !== null) {
+      formData.append('location', data.location);
+    }
+    if (data.description !== undefined && data.description !== null) {
+      formData.append('description', data.description);
+    }
+    if (data.attendees !== undefined && data.attendees !== null) {
+      formData.append('attendees', String(data.attendees));
+    }
+    if (data.gift !== undefined && data.gift !== null) {
+      formData.append('gift', data.gift);
+    }
+    if (data.provider !== undefined && data.provider !== null) {
+      formData.append('provider', data.provider);
+    }
+    if (data.is_visible !== undefined && data.is_visible !== null) {
+      formData.append('is_visible', String(data.is_visible));
+    }
     
     // Agregar nuevas imágenes si existen (reemplazarán las anteriores)
     if (data.images && data.images.length > 0) {
