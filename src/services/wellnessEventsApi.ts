@@ -426,7 +426,7 @@ export async function toggleWellnessEventVisibility(
       url: `/api/wellness-events/${id}/visibility`
     });
     
-    const response = await api.patch<WellnessEventResponse>(
+    const response = await api.patch<{ id: number; is_visible: boolean }>(
       `/api/wellness-events/${id}/visibility`,
       { is_visible: isVisible },
       {
@@ -441,7 +441,9 @@ export async function toggleWellnessEventVisibility(
       data: response.data
     });
     
-    return mapToBienestarEvent(response.data);
+    // Después de cambiar la visibilidad, obtener el evento completo
+    const fullEvent = await getWellnessEvent(id);
+    return fullEvent;
   } catch (error: any) {
     console.error('❌ [PATCH] Error al cambiar visibilidad:', {
       message: error.message,
