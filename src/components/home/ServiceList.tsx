@@ -105,7 +105,7 @@ const newServices: Service[] = [
   { 
     icon: BriefcaseMedical, 
     title: 'Seguridad y salud en el trabajo (S.S.T)', 
-    description: 'Accede a recursos y reportes relacionados con SST.', 
+    description: 'Accede a recursos y reportes relacionados con Seguridad y Salud en el Trabajo (SST).', 
     linkTo: '/servicios/sst', 
     category: 'Bienestar y SST',
     keywords: ['seguridad', 'salud', 'trabajo', 'sst', 'recursos', 'reportes', 'riesgos', 'prevencion']
@@ -128,15 +128,15 @@ const newServices: Service[] = [
   },
   { 
     icon: Calendar, 
-    title: 'Formato de permisos y cambio de turnos', 
-    description: 'Diligencia el formato para solicitudes de permisos sindicales o ajustes en tus turnos.', 
+    title: 'Permisos y cambio de turnos', 
+    description: 'Diligencia el formato para solicitudes de permisos o ajustes en tus turnos.', 
     linkTo: '/servicios/permisos-turnos', 
     category: 'Certificados y Documentos',
     keywords: ['permisos', 'turnos', 'formato', 'diligenciar', 'solicitudes', 'cambio', 'ajustes', 'horario']
   },
   { 
     icon: CalendarDays, 
-    title: 'Cuadro de turnos', 
+    title: 'Consulta Cuadro de turnos', 
     description: 'Consulta tu calendario de turnos asignados.', 
     linkTo: 'https://www.prosanet.com/#/shifts-employees/index', 
     category: 'Gestión Personal y Sindical',
@@ -151,20 +151,20 @@ const newServices: Service[] = [
     keywords: ['microcredito', 'solicitud', 'aplicar', 'credito', 'prestamo', 'condiciones', 'afiliados']
   },
   { 
+    icon: UserPlus, 
+    title: 'Afiliación a Comfenalco', 
+    description: 'Conoce el proceso para afiliarte a Comfenalco Antioquia como beneficiario.', 
+    linkTo: '/servicios/afiliacion-comfenalco', 
+    category: 'Gestión Personal y Sindical',
+    keywords: ['comfenalco', 'afiliacion', 'beneficio', 'proceso', 'vinculacion', 'registro', 'caja', 'compensacion']
+  },
+  { 
     icon: LogOut, 
     title: 'Solicitud de retiro sindical', 
     description: 'Inicia el proceso para retirarte del sindicato.', 
     linkTo: '/servicios/retiro-sindical', 
     category: 'Gestión Personal y Sindical',
     keywords: ['retiro', 'sindical', 'proceso', 'iniciar', 'salida', 'desvinculacion', 'abandono']
-  },
-  { 
-    icon: UserPlus, 
-    title: 'Afiliación a Comfenalco', 
-    description: 'Conoce el proceso para afiliarte a Comfenalco Antioquia como beneficiario del sindicato.', 
-    linkTo: '/servicios/afiliacion-comfenalco', 
-    category: 'Gestión Personal y Sindical',
-    keywords: ['comfenalco', 'afiliacion', 'beneficio', 'proceso', 'vinculacion', 'registro', 'caja', 'compensacion']
   },
 ];
 

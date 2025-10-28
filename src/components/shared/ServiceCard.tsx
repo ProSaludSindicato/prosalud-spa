@@ -25,10 +25,11 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   const isExternalLink = linkTo.startsWith('http://') || linkTo.startsWith('https://');
 
   const cardContent = (
-    <div className="flex flex-col h-full">
-      <div className="mb-4 flex justify-center md:justify-start">
+    <div className="flex flex-col h-full min-h-[180px]">
+      {/* Header con icono y título */}
+      <div className="mb-3 flex items-start gap-3 min-h-[3rem]">
         {imageUrl ? (
-          <Avatar className="h-12 w-12 overflow-hidden">
+          <Avatar className="h-10 w-10 overflow-hidden flex-shrink-0 mt-1">
             <img 
               src={imageUrl} 
               alt={title} 
@@ -36,12 +37,33 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             />
           </Avatar>
         ) : Icon && (
-          <Icon className="h-12 w-12 text-primary-prosalud group-hover:text-secondary-prosaludgreen transition-colors duration-200" />
+          <Icon className="h-10 w-10 text-primary-prosalud group-hover:text-secondary-prosaludgreen transition-colors duration-200 flex-shrink-0 mt-1" />
+        )}
+        <h3 className="text-lg font-semibold text-text-dark group-hover:text-primary-prosalud transition-colors duration-200 leading-tight overflow-hidden" style={{
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          lineHeight: '1.4',
+          maxHeight: '2.8em'
+        }}>{title}</h3>
+      </div>
+      
+      {/* Descripción con altura fija */}
+      <div className="mb-4 flex-grow min-h-[3rem]">
+        {description ? (
+          <p className="text-sm text-text-gray overflow-hidden" style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: '1.4',
+            maxHeight: '4.2em'
+          }}>{description}</p>
+        ) : (
+          <div className="min-h-[3rem]"></div>
         )}
       </div>
-      <h3 className="text-xl font-semibold text-text-dark mb-2 group-hover:text-primary-prosalud transition-colors duration-200">{title}</h3>
-      {description && <p className="text-sm text-text-gray mb-4 flex-grow">{description}</p>}
-      {!description && <div className="flex-grow"></div>} {/* Ensure consistent height if no description */}
+      
+      {/* Footer fijo */}
       <div className="mt-auto">
         <span className="text-sm font-medium text-secondary-prosaludgreen group-hover:text-primary-prosalud flex items-center transition-colors duration-200">
           Acceder al servicio

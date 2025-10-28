@@ -50,43 +50,50 @@ const HeroSection: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      className="bg-gradient-to-br from-primary-prosalud-light via-primary-prosalud-dark to-primary-prosalud-dark text-text-light py-16 md:py-20 lg:py-24"
+      className="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-primary-prosalud-light text-text-dark py-16 md:py-20 lg:py-24 overflow-hidden"
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Elementos decorativos de fondo */}
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {isVisible ? (
           <div className="grid md:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left Column: Textual Content & Buttons */}
             <div className="md:text-left text-center transform transition-all duration-4000 opacity-0 translate-y-8 animate-[fadeInUp_0.8s_ease-out_forwards]">
-              <h1 className="font-bold mb-8">
-                <span className="inline-flex items-center gap-2 bg-secondary-prosaludgreen/20 text-secondary-prosaludgreen px-3 py-1 text-sm font-medium rounded-full mb-4">
+              <h1 className="font-bold mb-6">
+                <span className="inline-flex items-center gap-2 bg-gradient-to-r from-secondary-prosaludgreen/20 to-secondary-prosaludgreen/10 text-secondary-prosaludgreen px-4 py-2 text-sm font-medium rounded-full mb-4 border border-secondary-prosaludgreen/20 backdrop-blur-sm shadow-lg">
                   <HeartPulse className="h-4 w-4" />
                   Tu Bienestar, Nuestra Prioridad
                 </span>
-                <span className="block text-7xl md:text-7xl lg:text-7xl leading-tight drop-shadow-lg">
-                  <span className="text-prosalud-pro drop-shadow-lg">Pro</span><span className="text-prosalud-salud drop-shadow-lg">Salud</span>
+                <span className="block text-6xl md:text-7xl lg:text-8xl  font-bold mb-4">
+                  <span className="text-prosalud-pro drop-shadow-lg">Pro</span>
+                  <span className="text-prosalud-salud drop-shadow-lg">Salud</span>
                 </span>
                 <span className="block text-5xl md:text-6xl lg:text-6xl mt-2 md:mt-3 leading-snug">
-                  Cuidamos de ti,<br />
-                  como tú cuidas de los demás
+                  Cuidamos de ti, como tú cuidas de los demás
                 </span>
               </h1>
-              <p className="text-lg md:text-xl text-primary-prosalud-light/90 mb-10 max-w-2xl mx-auto md:mx-0">
-                Tu portal de autogestión para acceder a servicios, trámites y beneficios de manera ágil y segura. Simplificamos tu día a día.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 md:justify-start justify-center">
+               {/* Descripción médica */}
+               <p className="text-lg md:text-xl text-text-gray mb-20 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                 Tu portal de autogestión para acceder a servicios, trámites y beneficios de manera ágil y segura.
+                 <span className="ml-2 text-primary-prosalud font-medium">Simplificamos tu día a día.</span>
+               </p>
+              {/* Botones médicos */}
+              <div className="flex flex-col sm:flex-row gap-4 md:justify-start justify-center mb-10">
                 <Button
-                  size="lg"
-                  className="bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white text-base shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 px-8 py-6"
-                  onClick={handleScrollToServices}
+                    size="lg"
+                    className="bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 px-8 py-4 rounded-xl"
+                    onClick={handleScrollToServices}
                 >
-                  Trámites Rápidos
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <span className="flex items-center gap-3">
+                    <span>Trámites Rápidos</span>
+                    <ArrowRight className="h-5 w-5" />
+                  </span>
                 </Button>
                 <Link to="/nosotros" aria-label="Conocer más sobre ProSalud">
                   <Button
-                    variant="outline"
-                    size="lg"
-                    className="text-primary-prosalud border-text-light/70 hover:bg-text-light px-8 py-3 hover:text-primary-prosalud hover:underline w-full sm:w-auto transition-all duration-300 transform hover:scale-105 px-8 py-6"
+                      variant="outline"
+                      size="lg"
+                      className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white text-lg font-semibold px-8 py-4 rounded-xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
                   >
                     Conoce Más
                   </Button>
@@ -97,29 +104,33 @@ const HeroSection: React.FC = () => {
               <div className="mt-10 flex items-center justify-center md:justify-start">
                 <div className="flex -space-x-3">
                   {avatarPlaceholders.map((avatar, index) => (
-                    <Avatar key={index} className="h-10 w-10 border-2 border-white">
-                      <AvatarImage
-                        src={avatar.src}
-                        alt={avatar.alt}
-                        className="object-cover"
-                        width={40}
-                        height={40}
-                      />
-                      <AvatarFallback className="bg-secondary-prosaludgreen text-white">{avatar.fallback}</AvatarFallback>
-                    </Avatar>
+                      <Avatar key={index} className="h-12 w-12 border-2 border-white shadow-lg">
+                        <AvatarImage
+                            src={avatar.src}
+                            alt={avatar.alt}
+                            className="object-cover"
+                            width={48}
+                            height={48}
+                        />
+                        <AvatarFallback className="bg-secondary-prosaludgreen text-white font-semibold">{avatar.fallback}</AvatarFallback>
+                      </Avatar>
                   ))}
                 </div>
-                <p className="ml-4 text-sm text-text-light font-medium">
-                  +1.500 profesionales ya confían en nosotros
-                </p>
+                <div className="ml-2 text-left">
+                  <p className="text-text-dark font-semibold text-lg">+1.500 profesionales</p>
+                  <p className="text-text-gray text-sm">de la salud confían en nosotros</p>
+                </div>
               </div>
             </div>
 
             {/* Right Column: Image Collage */}
             <div className="hidden md:block">
-              <div className="grid grid-cols-2 gap-8 p-4 bg-slate-800/30 rounded-xl shadow-xl">
+              <div className="grid grid-cols-2 gap-8 p-6 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/30 relative overflow-hidden">
+                {/* Efecto de brillo sutil */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-primary-prosalud-light/10 rounded-2xl"></div>
+                <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-gradient-to-tr from-secondary-prosaludgreen/15 to-transparent rounded-full blur-2xl"></div>
                 {/* Imagen superior izquierda */}
-                <div className="relative bg-muted rounded-md aspect-square overflow-hidden">
+                <div className="relative bg-muted rounded-lg aspect-square overflow-hidden z-10 shadow-lg">
                   {!imagesLoaded[0] && (
                     <Skeleton className="absolute inset-0 rounded-md aspect-square" />
                   )}
@@ -135,7 +146,7 @@ const HeroSection: React.FC = () => {
                 </div>
 
                 {/* Imagen derecha ocupando 2 filas */}
-                <div className="relative bg-muted rounded-md row-span-2 overflow-hidden">
+                <div className="relative bg-muted rounded-lg row-span-2 overflow-hidden z-10 shadow-lg">
                   {!imagesLoaded[2] && (
                     <Skeleton className="absolute inset-0 rounded-md aspect-square" />
                   )}
@@ -151,7 +162,7 @@ const HeroSection: React.FC = () => {
                 </div>
 
                 {/* Imagen inferior izquierda */}
-                <div className="relative bg-muted rounded-md aspect-square overflow-hidden">
+                <div className="relative bg-muted rounded-lg aspect-square overflow-hidden z-10 shadow-lg">
                   {!imagesLoaded[1] && (
                     <Skeleton className="absolute inset-0 rounded-md aspect-square" />
                   )}
