@@ -52,7 +52,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   );
 
   const commonClasses = cn(
-    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-shadow duration-300 transition-transform duration-200 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02]",
+    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02] hover:bg-accent/10",
     className
   );
 

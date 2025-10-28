@@ -197,7 +197,7 @@ const ServiceList: React.FC<ServiceListProps> = ({ searchTerm, selectedCategory 
       {filteredServices.length > 0 ? (
         <div 
           key={`${selectedCategory}-${searchTerm}`} // Key to re-trigger animation on filter/search change
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 animate-fadeIn"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-6 md:gap-8 animate-fadeIn"
         >
           {filteredServices.map((service, index) => (
             <ServiceCard

@@ -118,7 +118,7 @@ export const comfenalcoEventsApi = {
       return events.map(event => ({
         id: event.id,
         title: event.title,
-        banner_image: buildImageUrl(event.banner_image), // Build correct image URL
+        banner_image: event.banner_image_url || event.banner_image, // Use banner_image_url from API
         description: event.description,
         registration_deadline: event.registration_deadline,
         event_date: event.event_date,
@@ -163,7 +163,7 @@ export const comfenalcoEventsApi = {
       return {
         id: event.id,
         title: event.title,
-        banner_image: buildImageUrl(event.banner_image), // Build correct image URL
+        banner_image: event.banner_image_url || event.banner_image, // Use banner_image_url from API
         description: event.description,
         registration_deadline: event.registration_deadline,
         event_date: event.event_date,
@@ -211,7 +211,7 @@ export const comfenalcoEventsApi = {
       return {
         id: event.id,
         title: event.title,
-        banner_image: buildImageUrl(event.banner_image), // Build correct image URL
+        banner_image: event.banner_image_url || event.banner_image, // Use banner_image_url from API
         description: event.description,
         registration_deadline: event.registration_deadline,
         event_date: event.event_date,
@@ -259,7 +259,7 @@ export const comfenalcoEventsApi = {
       return {
         id: event.id,
         title: event.title,
-        banner_image: buildImageUrl(event.banner_image), // Build correct image URL
+        banner_image: event.banner_image_url || event.banner_image, // Use banner_image_url from API
         description: event.description,
         registration_deadline: event.registration_deadline,
         event_date: event.event_date,
@@ -306,7 +306,7 @@ export const comfenalcoEventsApi = {
       return {
         id: event.id,
         title: event.title,
-        banner_image: buildImageUrl(event.banner_image), // Build correct image URL
+        banner_image: event.banner_image_url || event.banner_image, // Use banner_image_url from API
         description: event.description,
         registration_deadline: event.registration_deadline,
         event_date: event.event_date,
