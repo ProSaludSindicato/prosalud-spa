@@ -865,20 +865,27 @@ const AdminComfenalcoPage: React.FC = () => {
                 
                 <div>
                   <Label htmlFor="description">Descripción <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formValues.description}
-                    onChange={handleInputChange}
-                    className={getFieldError('description') ? 'border-red-500' : ''}
-                    placeholder="Describe el evento y sus beneficios"
-                  />
+                  <div className="relative">
+                    <Textarea
+                      id="description"
+                      name="description"
+                      value={formValues.description}
+                      onChange={handleInputChange}
+                      className={`${getFieldError('description') ? 'border-red-500' : ''} pr-16`}
+                      placeholder="Describe el evento y sus beneficios"
+                      maxLength={200}
+                      rows={3}
+                    />
+                    <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-white px-1 rounded">
+                      {formValues.description.length}/200
+                    </div>
+                  </div>
                   <FieldError error={getFieldError('description')} />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="registrationDeadline">Fecha Límite de Registro <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="registrationDeadline">Fecha Límite de Registro</Label>
                     <Input
                       type="date"
                       id="registrationDeadline"
@@ -889,12 +896,12 @@ const AdminComfenalcoPage: React.FC = () => {
                       className={getFieldError('registration_deadline') ? 'border-red-500' : ''}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Última fecha para que los usuarios se registren
+                      Última fecha para que los usuarios se registren (opcional)
                     </p>
                     <FieldError error={getFieldError('registration_deadline')} />
                   </div>
                   <div>
-                    <Label htmlFor="eventDate">Fecha del Evento <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="eventDate">Fecha del Evento</Label>
                     <Input
                       type="date"
                       id="eventDate"
@@ -905,7 +912,7 @@ const AdminComfenalcoPage: React.FC = () => {
                       className={getFieldError('event_date') ? 'border-red-500' : ''}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Fecha en que se realizará el evento
+                      Fecha en que se realizará el evento (opcional)
                     </p>
                     <FieldError error={getFieldError('event_date')} />
                   </div>

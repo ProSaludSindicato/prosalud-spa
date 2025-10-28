@@ -3,11 +3,12 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import MainLayout from "@/components/layout/MainLayout"
 import EventsGrid from "@/components/galeria-bienestar/EventsGrid"
 import EventFilters from "@/components/galeria-bienestar/EventFilters"
 import DataPagination from "@/components/ui/data-pagination"
-import { mockEvents } from "@/data/eventosMock"
+import { getWellnessEvents } from "@/services/wellnessEventsApi"
 import { Link } from "react-router-dom"
 import {
   Breadcrumb,
@@ -20,35 +21,42 @@ import {
 import { Image, GalleryVertical, Home } from "lucide-react"
 import { usePagination } from "@/hooks/usePagination"
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import ApiConnectivityTest from "@/components/debug/ApiConnectivityTest";
 
 const GaleriaBienestarPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"date-desc" | "date-asc">("date-desc")
   const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch events from API
+  const { data: events = [], isLoading, error } = useQuery({
+    queryKey: ['wellness-events-public'],
+    queryFn: () => getWellnessEvents({ is_visible: true }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
 
   const uniqueCategories = useMemo(() => {
-    const categories = new Set(mockEvents.map((event) => event.category).filter(Boolean) as string[])
+    const categories = new Set(events.map((event) => event.category).filter(Boolean) as string[])
     return ["all", ...Array.from(categories).sort((a, b) => a.localeCompare(b))]
-  }, [])
+  }, [events])
 
   const processedEvents = useMemo(() => {
-    let events = mockEvents.map((event) => ({ ...event }))
+    let filteredEvents = events.map((event) => ({ ...event }))
 
     if (filterCategory !== "all") {
-      events = events.filter((event) => event.category === filterCategory)
+      filteredEvents = filteredEvents.filter((event) => event.category === filterCategory)
     }
 
     if (sortOrder === "date-desc") {
-      events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      filteredEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     } else if (sortOrder === "date-asc") {
-      events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      filteredEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     }
 
-    return events.map((event, index) => ({
+    return filteredEvents.map((event, index) => ({
       ...event,
       _sortKey: `${sortOrder}-${filterCategory}-${index}`,
     }))
-  }, [sortOrder, filterCategory])
+  }, [events, sortOrder, filterCategory])
 
   const {
     currentPage,
@@ -64,12 +72,6 @@ const GaleriaBienestarPage: React.FC = () => {
   })
 
   useEffect(() => {
-    // Simular carga inicial
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
     window.scrollTo(0, 0)
     goToPage(1) // Reset to first page when filters change
   }, [sortOrder, filterCategory, goToPage])
@@ -83,6 +85,24 @@ const GaleriaBienestarPage: React.FC = () => {
     return (
       <MainLayout>
         <PageLoadingSkeleton />
+      </MainLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto pt-6 pb-20 px-4 md:px-6 lg:px-8 py-10">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Error al cargar eventos</h2>
+            <p className="text-muted-foreground">
+              No se pudieron cargar los eventos de bienestar. Por favor, intenta de nuevo más tarde.
+            </p>
+          </div>
+          
+          {/* Componente de diagnóstico temporal */}
+          <ApiConnectivityTest />
+        </div>
       </MainLayout>
     )
   }

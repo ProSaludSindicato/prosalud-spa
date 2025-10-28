@@ -1,4 +1,5 @@
 import api from './api';
+import { API_CONFIG } from '../config/api';
 import { BienestarEvent } from '@/types/admin';
 
 export interface WellnessEventImage {
@@ -26,12 +27,12 @@ export interface WellnessEventResponse {
 
 export interface PaginatedWellnessEvents {
   data: WellnessEventResponse[];
-  links: {
-    first: string;
-    last: string;
-    prev: string | null;
-    next: string | null;
-  };
+  links: Array<{
+    url: string | null;
+    label: string;
+    page: number | null;
+    active: boolean;
+  }>;
   meta: {
     current_page: number;
     from: number;
@@ -41,6 +42,11 @@ export interface PaginatedWellnessEvents {
     to: number;
     total: number;
   };
+  // Campos adicionales que devuelve Laravel
+  first_page_url: string;
+  last_page_url: string;
+  next_page_url: string | null;
+  prev_page_url: string | null;
 }
 
 export interface WellnessEventFilters {
@@ -79,6 +85,13 @@ export interface UpdateWellnessEventData {
  * Convierte la respuesta de la API al formato BienestarEvent usado en el frontend
  */
 function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
+  console.log('🔄 Mapeando evento:', apiEvent);
+  
+  // Validate required fields
+  if (!apiEvent.id || !apiEvent.title || !apiEvent.date || !apiEvent.category) {
+    throw new Error('Datos del evento incompletos en la respuesta del servidor');
+  }
+  
   return {
     id: String(apiEvent.id),
     title: apiEvent.title,
@@ -89,11 +102,21 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
     attendees: apiEvent.attendees,
     gift: apiEvent.gift,
     provider: apiEvent.provider || 'ProSalud',
-    images: apiEvent.images.map(img => ({
-      url: img.image_url,
-      alt: apiEvent.title,
-      isMain: img.is_main
-    })),
+    images: (apiEvent.images || []).map(img => {
+      // Normalizar URLs de imágenes
+      let imageUrl = img.image_url;
+      
+      // Si la URL es relativa, convertirla a absoluta
+      if (imageUrl.startsWith('/storage/')) {
+        imageUrl = `${API_CONFIG.PUBLIC_BASE_URL}${imageUrl}`;
+      }
+      
+      return {
+        url: imageUrl,
+        alt: apiEvent.title,
+        isMain: Boolean(img.is_main)
+      };
+    }),
     isVisible: apiEvent.is_visible,
     createdAt: apiEvent.created_at || new Date().toISOString().split('T')[0]
   };
@@ -104,15 +127,25 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
  */
 export async function getWellnessEvents(filters?: WellnessEventFilters): Promise<BienestarEvent[]> {
   try {
-    console.log('🔍 [GET] Solicitando eventos de bienestar:', { filters, url: '/api/wellness-events' });
+    console.log('🔍 [GET] Solicitando eventos de bienestar:', { 
+      filters, 
+      url: '/api/wellness-events',
+      baseURL: api.defaults.baseURL,
+      fullURL: `${api.defaults.baseURL}/api/wellness-events`
+    });
+    
+    // Primero hacer una prueba simple de conectividad
+    console.log('🧪 Probando conectividad básica...');
     
     const response = await api.get<PaginatedWellnessEvents>('/api/wellness-events', {
-      params: filters
+      params: filters,
+      timeout: 15000 // Aumentar timeout para debugging
     });
     
     console.log('✅ [GET] Respuesta exitosa:', { 
       status: response.status, 
       statusText: response.statusText,
+      headers: response.headers,
       data: response.data 
     });
     
@@ -136,6 +169,9 @@ export async function getWellnessEvents(filters?: WellnessEventFilters): Promise
       url: error.config?.url,
       method: error.config?.method,
       baseURL: error.config?.baseURL,
+      fullURL: error.config?.baseURL + error.config?.url,
+      timeout: error.config?.timeout,
+      withCredentials: error.config?.withCredentials,
       fullError: error
     });
     
@@ -145,7 +181,12 @@ export async function getWellnessEvents(filters?: WellnessEventFilters): Promise
     } else if (error.response?.status === 500) {
       console.error('🔴 Error del servidor al obtener eventos.');
     } else if (error.code === 'ERR_NETWORK') {
-      console.error('🔴 Error de red: No se pudo conectar al servidor. Verifica la URL base:', error.config?.baseURL);
+      console.error('🔴 Error de red: No se pudo conectar al servidor.');
+      console.error('🔧 Verifica que:');
+      console.error('   - El servidor backend esté ejecutándose');
+      console.error('   - La URL base sea correcta:', error.config?.baseURL);
+      console.error('   - No haya problemas de CORS');
+      console.error('   - La red esté funcionando');
     }
     
     // Retornar array vacío en caso de error para evitar crashes
@@ -218,6 +259,11 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       statusText: response.statusText,
       data: response.data
     });
+    
+    // Validate response data before mapping
+    if (!response.data) {
+      throw new Error('La respuesta del servidor no contiene datos válidos');
+    }
     
     const mappedEvent = mapToBienestarEvent(response.data);
     console.log('📦 Evento mapeado:', mappedEvent);
@@ -401,6 +447,47 @@ export async function deleteWellnessEventImage(
   }
 }
 
+/**
+ * Función de prueba para verificar conectividad básica
+ */
+export async function testApiConnectivity(): Promise<{ success: boolean; message: string; details?: any }> {
+  try {
+    console.log('🧪 Probando conectividad básica con el API...');
+    
+    const response = await api.get('/api/wellness-events', {
+      timeout: 5000,
+      params: { per_page: 1 } // Solo pedir 1 elemento para prueba rápida
+    });
+    
+    console.log('✅ Conectividad exitosa:', response.status);
+    
+    return {
+      success: true,
+      message: `API responde correctamente (${response.status})`,
+      details: {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : []
+      }
+    };
+  } catch (error: any) {
+    console.error('❌ Error de conectividad:', error);
+    
+    return {
+      success: false,
+      message: `Error de conectividad: ${error.message}`,
+      details: {
+        code: error.code,
+        message: error.message,
+        baseURL: error.config?.baseURL,
+        url: error.config?.url,
+        fullURL: error.config?.baseURL + error.config?.url
+      }
+    };
+  }
+}
+
 // API wrapper para mantener compatibilidad con el código existente
 export const wellnessEventsApi = {
   getEvents: getWellnessEvents,
@@ -410,4 +497,5 @@ export const wellnessEventsApi = {
   toggleVisibility: toggleWellnessEventVisibility,
   addImages: addImagesToWellnessEvent,
   deleteImage: deleteWellnessEventImage,
+  testConnectivity: testApiConnectivity,
 };

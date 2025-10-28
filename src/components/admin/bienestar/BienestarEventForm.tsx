@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
 import {
@@ -62,7 +62,6 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [images, setImages] = useState<File[]>([]);
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const form = useForm<FormData>({
@@ -91,10 +90,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     mutationFn: (data: CreateWellnessEventData) => wellnessEventsApi.createEvent(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
-      toast({
-        title: "Evento creado",
+      toast.success("Evento creado", {
         description: "El evento de bienestar ha sido creado exitosamente.",
-        variant: "default",
       });
       onClose();
     },
@@ -108,31 +105,23 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           .map(([field, messages]: [string, any]) => `${field}: ${messages.join(", ")}`)
           .join("\n");
 
-        toast({
-          title: "Error de validación",
+        toast.error("Error de validación", {
           description: errorMessages || error.response?.data?.message,
-          variant: "destructive",
         });
       } else if (error.response?.status === 404) {
-        toast({
-          title: "Endpoint no encontrado",
+        toast.error("Endpoint no encontrado", {
           description: "La ruta del API no existe. Verifica la configuración del backend.",
-          variant: "destructive",
         });
       } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-        toast({
-          title: "Error de conexión",
+        toast.error("Error de conexión", {
           description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
-          variant: "destructive",
         });
       } else {
-        toast({
-          title: "Error al crear evento",
+        toast.error("Error al crear evento", {
           description:
             error.response?.data?.message ||
             error.message ||
             "No se pudo crear el evento. Verifica los datos e inténtalo de nuevo.",
-          variant: "destructive",
         });
       }
     },
@@ -146,10 +135,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     mutationFn: (data: UpdateWellnessEventData) => wellnessEventsApi.updateEvent(event!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
-      toast({
-        title: "Evento actualizado",
+      toast.success("Evento actualizado", {
         description: "El evento de bienestar ha sido actualizado exitosamente.",
-        variant: "default",
       });
       onClose();
     },
@@ -163,31 +150,23 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           .map(([field, messages]: [string, any]) => `${field}: ${messages.join(", ")}`)
           .join("\n");
 
-        toast({
-          title: "Error de validación",
+        toast.error("Error de validación", {
           description: errorMessages || error.response?.data?.message,
-          variant: "destructive",
         });
       } else if (error.response?.status === 404) {
-        toast({
-          title: "Evento no encontrado",
+        toast.error("Evento no encontrado", {
           description: "El evento que intentas actualizar no existe.",
-          variant: "destructive",
         });
       } else if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-        toast({
-          title: "Error de conexión",
+        toast.error("Error de conexión", {
           description: "No se pudo conectar con el servidor. Verifica tu conexión o la configuración del backend.",
-          variant: "destructive",
         });
       } else {
-        toast({
-          title: "Error al actualizar evento",
+        toast.error("Error al actualizar evento", {
           description:
             error.response?.data?.message ||
             error.message ||
             "No se pudo actualizar el evento. Verifica los datos e inténtalo de nuevo.",
-          variant: "destructive",
         });
       }
     },
@@ -200,10 +179,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     const files = Array.from(e.target.files || []);
 
     if (images.length + files.length > 20) {
-      toast({
-        title: "Límite excedido",
+      toast.error("Límite excedido", {
         description: "Máximo 20 imágenes permitidas.",
-        variant: "destructive",
       });
       return;
     }
@@ -212,37 +189,29 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     const allowedTypes = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/webp"];
     for (const file of files) {
       if (!file || !(file instanceof File)) {
-        toast({
-          title: "Archivo inválido",
+        toast.error("Archivo inválido", {
           description: "Cada elemento debe ser un archivo válido.",
-          variant: "destructive",
         });
         return;
       }
 
       if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Archivo inválido",
+        toast.error("Archivo inválido", {
           description: "Cada archivo debe ser una imagen válida.",
-          variant: "destructive",
         });
         return;
       }
 
       if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Formato no válido",
+        toast.error("Formato no válido", {
           description: "Las imágenes deben ser de tipo: jpeg, png, jpg, gif, webp.",
-          variant: "destructive",
         });
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "Archivo muy grande",
+        toast.error("Archivo muy grande", {
           description: `Cada imagen no puede exceder 5MB. ${file.name} es muy grande.`,
-          variant: "destructive",
         });
         return;
       }
@@ -271,10 +240,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
   const onSubmit = (data: FormData) => {
     if (!event && images.length === 0) {
-      toast({
-        title: "Imágenes requeridas",
+      toast.error("Imágenes requeridas", {
         description: "Debes subir al menos una imagen.",
-        variant: "destructive",
       });
       return;
     }
@@ -312,7 +279,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const categories = ["Salud", "Bienestar", "Capacitación", "Recreación", "Cultura", "Deporte"];
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0 bg-white">
         <div className="p-6 space-y-6">
           {/* Header */}
