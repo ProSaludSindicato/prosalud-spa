@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
-import { mockEvents } from '@/data/eventosMock';
-import { EventData } from '@/types/eventos';
+import { getWellnessEvent, getWellnessEvents } from '@/services/wellnessEventsApi';
 import { CalendarDays, MapPin, Users, Gift, Briefcase, ChevronLeft, Maximize, Home, LayoutGrid, GalleryVertical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -17,11 +17,26 @@ import {
 } from "@/components/ui/carousel";
 import ImagePreviewDialog from '@/components/sst/ImagePreviewDialog';
 import { Button } from '@/components/ui/button';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 const EventoDetallePage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const event = mockEvents.find(e => e.id === eventId);
+  
+  // Obtener el evento específico
+  const { data: event, isLoading, error } = useQuery({
+    queryKey: ['wellness-event', eventId],
+    queryFn: () => getWellnessEvent(eventId!),
+    enabled: !!eventId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Obtener todos los eventos para la navegación
+  const { data: allEvents = [] } = useQuery({
+    queryKey: ['wellness-events-public'],
+    queryFn: () => getWellnessEvents({ is_visible: true }),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageAlt, setSelectedImageAlt] = useState<string | undefined>(undefined);
@@ -62,7 +77,15 @@ const EventoDetallePage: React.FC = () => {
     return () => clearInterval(autoScroll);
   }, [api]);
 
-  if (!event) {
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <PageLoadingSkeleton />
+      </MainLayout>
+    );
+  }
+
+  if (error || !event) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 text-center">
@@ -76,7 +99,8 @@ const EventoDetallePage: React.FC = () => {
     );
   }
 
-  const allImages = event.additionalImages ? [event.mainImage, ...event.additionalImages] : [event.mainImage];
+  // Preparar imágenes del evento
+  const allImages = event.images || [];
   const hasMultipleImages = allImages.length > 1;
 
   const handleImageClick = (imageSrc: string, imageAlt?: string) => {
@@ -91,9 +115,9 @@ const EventoDetallePage: React.FC = () => {
   };
 
   // Navigation for previous/next event
-  const currentEventIndex = mockEvents.findIndex(e => e.id === eventId);
-  const previousEvent = currentEventIndex > 0 ? mockEvents[currentEventIndex - 1] : null;
-  const nextEvent = currentEventIndex < mockEvents.length - 1 ? mockEvents[currentEventIndex + 1] : null;
+  const currentEventIndex = allEvents.findIndex(e => e.id === eventId);
+  const previousEvent = currentEventIndex > 0 ? allEvents[currentEventIndex - 1] : null;
+  const nextEvent = currentEventIndex < allEvents.length - 1 ? allEvents[currentEventIndex + 1] : null;
 
   return (
     <MainLayout>
@@ -140,16 +164,16 @@ const EventoDetallePage: React.FC = () => {
           <div className="grid md:grid-cols-3 gap-8">
             {/* Columna Izquierda: Imágenes */}
             <div className="md:col-span-2">
-              {!hasMultipleImages || allImages.length <= 1 ? (
+              {!hasMultipleImages ? (
                 <div className="relative group">
                   <img
-                    src={event.mainImage.src}
-                    alt={event.mainImage.alt}
+                    src={allImages[0]?.url || ''}
+                    alt={allImages[0]?.alt || event.title}
                     className="w-full h-auto max-h-[500px] object-contain rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleImageClick(event.mainImage.src, event.mainImage.alt)}
+                    onClick={() => handleImageClick(allImages[0]?.url || '', allImages[0]?.alt)}
                   />
                   <button
-                    onClick={() => handleImageClick(event.mainImage.src, event.mainImage.alt)}
+                    onClick={() => handleImageClick(allImages[0]?.url || '', allImages[0]?.alt)}
                     className="absolute bottom-2 right-2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
                     aria-label="Ampliar imagen"
                   >
@@ -168,18 +192,18 @@ const EventoDetallePage: React.FC = () => {
                         <CarouselItem key={index} className="relative group">
                           <div className="p-0 w-full h-full flex items-center justify-center">
                             <img 
-                              src={image.src} 
+                              src={image.url} 
                               alt={image.alt || `${event.title} - Imagen ${index + 1}`} 
                               className="w-auto h-auto max-w-full max-h-full object-contain rounded-md shadow-sm cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation(); 
-                                handleImageClick(image.src, image.alt || `${event.title} - Imagen ${index + 1}`);
+                                handleImageClick(image.url, image.alt || `${event.title} - Imagen ${index + 1}`);
                               }}
                             />
                              <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleImageClick(image.src, image.alt || `${event.title} - Imagen ${index + 1}`);
+                                  handleImageClick(image.url, image.alt || `${event.title} - Imagen ${index + 1}`);
                                 }}
                                 className="absolute bottom-2 right-2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100"
                                 aria-label="Ampliar imagen"
@@ -202,7 +226,7 @@ const EventoDetallePage: React.FC = () => {
                       Imagen {current} de {count}
                     </div>
                   )}
-                  {hasMultipleImages && allImages.length > 1 && (
+                  {hasMultipleImages && (
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
                       {allImages.map((image, index) => (
                         <button
@@ -213,7 +237,7 @@ const EventoDetallePage: React.FC = () => {
                           aria-label={`Ver imagen ${index + 1}`}
                         >
                           <img
-                            src={image.src}
+                            src={image.url}
                             alt={`Miniatura ${index + 1} de ${event.title}`}
                             className="w-full h-full object-cover"
                           />
