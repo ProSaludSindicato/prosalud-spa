@@ -227,7 +227,7 @@ const AdminBienestarPage: React.FC = () => {
                       animate="visible"
                       transition={{ delay: index * 0.1 }}
                     >
-                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white">
+                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white h-[420px] flex flex-col">
                         <div className="relative h-48 overflow-hidden">
                           <img
                             src={event.images.find(img => img.isMain)?.url || event.images[0]?.url || '/placeholder.svg'}
@@ -238,14 +238,16 @@ const AdminBienestarPage: React.FC = () => {
                             <Badge variant={event.isVisible ? "default" : "secondary"}>
                               {event.isVisible ? 'Visible' : 'Oculto'}
                             </Badge>
-                            <Badge variant="outline">{event.category}</Badge>
+                            <Badge className="bg-white/90 text-gray-800 border-white/20 backdrop-blur-sm">
+                              {event.category}
+                            </Badge>
                           </div>
                         </div>
-                        <CardContent className="p-4">
-                          <h3 className="font-semibold text-lg text-text-dark mb-2 line-clamp-2">
+                        <CardContent className="p-4 flex-1 flex flex-col">
+                          <h3 className="font-semibold text-lg text-text-dark mb-2 line-clamp-2 min-h-[3.5rem]">
                             {event.title}
                           </h3>
-                          <div className="space-y-1 text-sm text-text-gray">
+                          <div className="space-y-1 text-sm text-text-gray flex-1">
                             <p className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
                               {new Date(event.date).toLocaleDateString('es-ES')}

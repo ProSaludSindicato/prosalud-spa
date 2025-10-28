@@ -1,10 +1,10 @@
 
 import React from 'react';
 import EventCard from '@/components/galeria-bienestar/EventCard';
-import { EventData } from '@/types/eventos';
+import { BienestarEvent } from '@/types/admin';
 
 interface EventsGridProps {
-  events: EventData[];
+  events: BienestarEvent[];
 }
 
 const EventsGrid: React.FC<EventsGridProps> = ({ events }) => {

@@ -47,7 +47,6 @@ const formSchema = z.object({
   provider: z
     .string()
     .max(255, "El proveedor no puede exceder 255 caracteres")
-    .refine((val) => !val || val === "ProSalud", "El proveedor seleccionado no es válido")
     .optional(),
 });
 
@@ -256,8 +255,17 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         description: data.description,
         attendees: data.attendees,
         gift: data.gift,
+        provider: data.provider,
         images: images.length > 0 ? images : undefined,
       };
+      
+      console.log('🔄 Enviando datos de actualización:', {
+        eventId: event.id,
+        updateData,
+        formData: data,
+        hasNewImages: images.length > 0
+      });
+      
       updateMutation.mutate(updateData);
     } else {
       // Creación de nuevo evento

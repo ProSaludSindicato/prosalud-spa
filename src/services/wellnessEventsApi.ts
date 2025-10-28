@@ -77,6 +77,7 @@ export interface UpdateWellnessEventData {
   description?: string;
   attendees?: number;
   gift?: string;
+  provider?: string;
   is_visible?: boolean;
   images?: File[];
 }
@@ -106,9 +107,22 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
       // Normalizar URLs de imágenes
       let imageUrl = img.image_url;
       
+      console.log('🖼️ Procesando imagen:', {
+        originalUrl: imageUrl,
+        isRelative: imageUrl.startsWith('/storage/'),
+        isCloudflare: imageUrl.includes('cloudflarestorage.com'),
+        baseUrl: API_CONFIG.PUBLIC_BASE_URL
+      });
+      
       // Si la URL es relativa, convertirla a absoluta
       if (imageUrl.startsWith('/storage/')) {
         imageUrl = `${API_CONFIG.PUBLIC_BASE_URL}${imageUrl}`;
+        console.log('🔗 URL convertida a absoluta:', imageUrl);
+      }
+      
+      // Si la URL es de Cloudflare R2, mantenerla como está (ya es absoluta)
+      if (imageUrl.includes('cloudflarestorage.com')) {
+        console.log('☁️ URL de Cloudflare R2 detectada:', imageUrl);
       }
       
       return {
@@ -299,16 +313,30 @@ export async function updateWellnessEvent(
       url: `/api/wellness-events/${id}`
     });
     
+    console.log('🔍 Datos recibidos para actualización:', {
+      title: data.title,
+      date: data.date,
+      category: data.category,
+      location: data.location,
+      description: data.description,
+      attendees: data.attendees,
+      gift: data.gift,
+      provider: data.provider,
+      is_visible: data.is_visible,
+      hasImages: data.images && data.images.length > 0
+    });
+    
     const formData = new FormData();
     
-    // Agregar solo los campos que se van a actualizar
-    if (data.title) formData.append('title', data.title);
-    if (data.date) formData.append('date', data.date);
-    if (data.category) formData.append('category', data.category);
-    if (data.location) formData.append('location', data.location);
+    // Agregar campos principales (siempre se envían)
+    if (data.title !== undefined) formData.append('title', data.title);
+    if (data.date !== undefined) formData.append('date', data.date);
+    if (data.category !== undefined) formData.append('category', data.category);
+    if (data.location !== undefined) formData.append('location', data.location);
     if (data.description !== undefined) formData.append('description', data.description);
     if (data.attendees !== undefined) formData.append('attendees', String(data.attendees));
     if (data.gift !== undefined) formData.append('gift', data.gift);
+    if (data.provider !== undefined) formData.append('provider', data.provider);
     if (data.is_visible !== undefined) formData.append('is_visible', String(data.is_visible));
     
     // Agregar nuevas imágenes si existen (reemplazarán las anteriores)
@@ -319,10 +347,21 @@ export async function updateWellnessEvent(
       console.log('📸 Actualizando imágenes:', data.images.length);
     }
     
-    console.log('📋 FormData enviado:', Array.from(formData.entries()).map(([key, value]) => ({
-      key,
-      value: value instanceof File ? `File: ${value.name}` : value
-    })));
+    // Logging detallado del FormData
+    const formDataEntries = Array.from(formData.entries());
+    console.log('📋 FormData construido:', {
+      totalEntries: formDataEntries.length,
+      entries: formDataEntries.map(([key, value]) => ({
+        key,
+        value: value instanceof File ? `File: ${value.name}` : value,
+        type: typeof value
+      }))
+    });
+    
+    if (formDataEntries.length === 0) {
+      console.error('❌ FormData está vacío! No se agregaron campos.');
+      throw new Error('No hay datos para actualizar');
+    }
     
     const response = await api.put<WellnessEventResponse>(
       `/api/wellness-events/${id}`,
