@@ -21,7 +21,6 @@ import {
 import { Image, GalleryVertical, Home } from "lucide-react"
 import { usePagination } from "@/hooks/usePagination"
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeleton";
-import ApiConnectivityTest from "@/components/debug/ApiConnectivityTest";
 
 const GaleriaBienestarPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"date-desc" | "date-asc">("date-desc")
@@ -93,15 +92,19 @@ const GaleriaBienestarPage: React.FC = () => {
     return (
       <MainLayout>
         <div className="container mx-auto pt-6 pb-20 px-4 md:px-6 lg:px-8 py-10">
-          <div className="text-center mb-8">
+          <div className="text-center">
             <h2 className="text-2xl font-bold text-red-600 mb-4">Error al cargar eventos</h2>
             <p className="text-muted-foreground">
               No se pudieron cargar los eventos de bienestar. Por favor, intenta de nuevo más tarde.
             </p>
+            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-left">
+              <h3 className="font-semibold mb-2">Información de debugging:</h3>
+              <p className="text-sm text-gray-600">
+                Revisa la consola del navegador para ver los logs detallados del error.
+                Los logs incluyen información sobre la URL, configuración y detalles del error.
+              </p>
+            </div>
           </div>
-          
-          {/* Componente de diagnóstico temporal */}
-          <ApiConnectivityTest />
         </div>
       </MainLayout>
     )
