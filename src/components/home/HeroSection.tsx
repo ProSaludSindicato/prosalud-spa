@@ -1,4 +1,4 @@
-Herosection 1  import React, {useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {ArrowRight, HeartPulse} from 'lucide-react';
@@ -40,17 +40,10 @@ const HeroSection: React.FC = () => {
         "/images/collage/image_collage_2_.webp",
     ];
 
-    /*const collageImages = [
-      "/images/collage/c1.webp",
-      "/images/collage/c3.webp",
-      "/images/collage/c2.webp",
-    ];*/
-
     return (
         <section
             ref={sectionRef}
             className="bg-gradient-to-br from-primary-prosalud-dark via-primary-prosalud-dark to-primary-prosalud-light text-text-light py-16 md:py-20 lg:py-24">
-            {/* className="bg-gradient-to-br from-primary-prosalud-light via-primary-prosalud-dark to-primary-prosalud-dark text-text-light py-16 md:py-20 lg:py-24"> */}
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 {isVisible ? (
                     <div className="grid md:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -214,4 +207,3 @@ const HeroSection: React.FC = () => {
 };
 
 export default HeroSection;
-
