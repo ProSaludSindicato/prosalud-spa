@@ -50,7 +50,7 @@ const HeroSection: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      className="bg-gradient-to-br from-primary-prosalud-dark via-primary-prosalud-dark to-primary-prosalud-light text-text-light py-16 md:py-20 lg:py-24"
+      className="bg-gradient-to-br from-primary-prosalud-light via-primary-prosalud-dark to-primary-prosalud-dark text-text-light py-16 md:py-20 lg:py-24"
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {isVisible ? (
