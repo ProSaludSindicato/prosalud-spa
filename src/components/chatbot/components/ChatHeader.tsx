@@ -3,14 +3,7 @@
  */
 
 import React from "react";
-import {
-  X,
-  Maximize2,
-  Minimize2,
-  PlusCircle,
-  Download,
-  MessageSquare,
-} from "lucide-react";
+import { X, Maximize2, Minimize2, PlusCircle, Download, MessageSquare } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ChatHeaderProps {
@@ -35,7 +28,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         <h3 className="font-semibold text-base">Asistente Virtual ProSalud</h3>
       </div>
       <div className="flex items-center space-x-1">
-        {/* Botón para exportar conversación (TEMPORAL)
+        {/* Botón para exportar conversación (TEMPORAL) */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -50,7 +43,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               <p className="text-xs">Exportar conversación (temporal)</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider> */}
+        </TooltipProvider>
 
         {/* Botón para nueva conversación */}
         <TooltipProvider>
@@ -108,4 +101,3 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     </div>
   );
 };
-
