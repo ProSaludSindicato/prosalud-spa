@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { toast } from 'sonner';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 
 interface AfiliadoAuthModalProps {
   open: boolean;
@@ -45,66 +45,107 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader className="space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <ShieldCheck className="w-8 h-8 text-primary" />
+      <DialogContent className="sm:max-w-lg p-0 gap-0 bg-white [&>button]:hidden">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none z-10"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Cerrar</span>
+        </button>
+        
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <div className="flex flex-col items-center mb-4">
+            <img 
+              src="/images/logo_prosalud.webp" 
+              alt="ProSalud Logo" 
+              className="h-16 w-auto mb-4"
+            />
           </div>
-          <DialogTitle className="text-center text-2xl">Autenticación requerida</DialogTitle>
-          <DialogDescription className="text-center text-base">
+          <DialogTitle className="text-2xl font-bold text-center text-gray-900">
+            Autenticación requerida
+          </DialogTitle>
+          <DialogDescription className="text-center text-gray-600 mt-2 text-base">
             Para acceder a este trámite, por favor ingresa tus datos de identificación.
           </DialogDescription>
+          <div className="h-px bg-gray-200 mt-4"></div>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-5 mt-2">
-          <div className="space-y-2">
-            <Label htmlFor="tipoDocumento">Tipo de documento</Label>
-            <Select
-              value={formData.tipoDocumento}
-              onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
+        <form onSubmit={handleSubmit} className="px-6 pb-6 pt-4">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
+                Tipo de documento
+              </Label>
+              <Select
+                value={formData.tipoDocumento}
+                onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
+                disabled={loading}
+              >
+                <SelectTrigger className="bg-indigo-50 border-indigo-200">
+                  <SelectValue placeholder="Seleccione un tipo de documento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CC">Cédula de Ciudadania (CC)</SelectItem>
+                  <SelectItem value="CE">Cédula de Extrangería (CE)</SelectItem>
+                  <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
+                Número de documento
+              </Label>
+              <Input
+                id="numeroDocumento"
+                type="text"
+                value={formData.numeroDocumento}
+                onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
+                placeholder="Ingrese su número de documento"
+                disabled={loading}
+                className="w-full bg-indigo-50 border-indigo-200"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
+                Fecha de expedición
+              </Label>
+              <Input
+                id="fechaExpedicion"
+                type="date"
+                value={formData.fechaExpedicion}
+                onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                disabled={loading}
+                className="w-full bg-indigo-50 border-indigo-200"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
               disabled={loading}
+              className="min-w-[100px] bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CC">Cédula de Ciudadania (CC)</SelectItem>
-                <SelectItem value="CE">Cédula de Extrangería (CE)</SelectItem>
-                <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="numeroDocumento">Número de documento</Label>
-            <Input
-              id="numeroDocumento"
-              type="text"
-              value={formData.numeroDocumento}
-              onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
-              placeholder="Ingresa tu número de documento"
-              disabled={loading}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fechaExpedicion">Fecha de expedición</Label>
-            <Input
-              id="fechaExpedicion"
-              type="date"
-              value={formData.fechaExpedicion}
-              onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="flex-1 sm:flex-none">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="flex-1 sm:flex-none">
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Autenticar
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="min-w-[140px] bg-primary-prosalud-dark hover:bg-primary-prosalud-dark/90 text-white"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Autenticando...
+                </>
+              ) : (
+                'Autenticar'
+              )}
             </Button>
           </div>
         </form>

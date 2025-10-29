@@ -20,16 +20,14 @@ const ConfirmacionCorreoSection = () => {
             <p className="font-normal text-sm text-gray-700">
               Recibirá una confirmación automática del envío de esta solicitud al correo electrónico{' '}
               {obfuscatedEmail && <span className="font-semibold">{obfuscatedEmail}</span>}
-              {obfuscatedPhone && (
-                <>
-                  {' '}y al celular <span className="font-semibold">{obfuscatedPhone}</span>
-                </>
-              )}
               {' '}que indicó en sus datos personales.
+              {obfuscatedPhone && (
+                <> El número de celular <span className="font-semibold">{obfuscatedPhone}</span> solo se utilizará para contactarlo en caso de ser necesario.</>
+              )}
             </p>
             <p className="font-normal text-sm text-gray-700">
-              La respuesta a su solicitud será enviada a ese correo registrado. Si la información de contacto no es correcta, 
-              por favor actualícela en{' '}
+              La respuesta a su solicitud será enviada al correo registrado. <span className="font-semibold">Si la información de contacto no es correcta,
+              se debe actualizar antes de realizar la solicitud</span>. Esto se puede hacer en{' '}
               <Link to="/servicios/actualizar-cuenta" className="text-primary hover:underline font-medium">
                 Actualizar cuenta bancaria
               </Link>.

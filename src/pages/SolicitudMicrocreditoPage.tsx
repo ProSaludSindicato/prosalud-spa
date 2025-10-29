@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle, DollarSign } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { submitRequest } from "@/services/requestsService";
 import RequireAfiliadoAuth from "@/components/auth/RequireAfiliadoAuth";
@@ -144,8 +144,7 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
       </div>
 
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          <header className="mb-8 text-center">
+        <header className="mb-8 text-center">
             <div className="flex justify-center items-center gap-3 mb-4">
               <CreditCard className="h-8 w-8 text-primary-prosalud-dark" />
               <h1 className="text-3xl font-bold text-primary-prosalud-dark">Solicitud - Microcrédito CEII</h1>
@@ -156,49 +155,45 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
             </p>
           </header>
 
-          <section className="mt-10 mb-8 p-6 border rounded-lg shadow-sm bg-blue-50 border-blue-200">
-            <h2 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
-              <Info className="mr-3 h-6 w-6 text-blue-700" /> Información importante
-            </h2>
-            <div className="space-y-3 text-blue-700">
-              <p>
+          <div className="space-y-4 mb-8">
+            <Alert className="border-blue-200 bg-blue-50">
+              <Info className="h-5 w-5 text-blue-600" />
+              <AlertDescription className="text-blue-800">
                 Por favor diligencie los datos solicitados. Los datos enviados son solo de manera informativa. No
-                garantiza o autoriza ningún proceso.
-              </p>
+                garantiza o autoriza ningún proceso. Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas
+                S.A.S. desde el correo <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong>.
+              </AlertDescription>
+            </Alert>
 
-              <Alert className="border-blue-300 bg-blue-100">
-                <Mail className="h-5 w-5 text-blue-600" />
-                <AlertDescription className="text-blue-800">
-                  Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo{" "}
-                  <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado
-                  y a la lista de contactos.
-                </AlertDescription>
-              </Alert>
+            <Alert className="border-blue-200 bg-blue-50">
+              <Mail className="h-5 w-5 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                Para evitar que los correos que se le envíen lleguen a SPAM sugerimos agregar la cuenta de correo{" "}
+                <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong> al correo deseado
+                y a la lista de contactos.
+              </AlertDescription>
+            </Alert>
 
-              <p>
-                Si la solicitud es aprobada recibirá un correo de continuidad del proceso por parte de Capital & Ideas
-                S.A.S. desde el correo{" "}
-                <strong className="font-mono bg-blue-200 px-1 rounded">ceiisas@hotmail.com</strong>.
-              </p>
-
-              <Alert className="border-amber-300 bg-amber-50">
-                <Clock className="h-5 w-5 text-amber-600" />
-                <AlertDescription className="text-amber-800">
-                  El horario de revisión de solicitudes es de lunes a viernes de 8:00 a.m. a 4:00 p.m., cualquier
-                  registro vencido el citado horario, se entenderá presentado el siguiente día hábil. Se registran y
-                  asigna su revisión por orden de registro.
-                </AlertDescription>
-              </Alert>
-            </div>
-          </section>
+            <Alert className="border-amber-200 bg-amber-50">
+              <Clock className="h-5 w-5 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                <strong>Horario de revisión:</strong> Lunes a viernes de 8:00 a.m. a 4:00 p.m. Cualquier
+                registro vencido el citado horario, se entenderá presentado el siguiente día hábil. Se registran y
+                asigna su revisión por orden de registro.
+              </AlertDescription>
+            </Alert>
+          </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <DatosPersonalesReadOnly />
 
               <section className="p-6 border rounded-lg shadow-sm bg-white">
-                <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark">Información del Microcrédito</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark flex items-center">
+                  <DollarSign className="mr-2 h-6 w-6" />
+                  Información del Microcrédito
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
                     name="sedeProceso"
@@ -298,7 +293,6 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
               </div>
             </form>
           </Form>
-        </div>
       </div>
     </MainLayout>
   );

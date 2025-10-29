@@ -34,15 +34,15 @@ const InformacionProcesoAuth = <TFieldValues extends FieldValues>({
   const isClienteDisabled = activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR';
 
   return (
-    <Card className="border-l-4 border-l-secondary">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Briefcase className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-xl font-semibold text-primary-prosalud-dark">
+          <Briefcase className="h-6 w-6" />
           Información del Proceso
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <FormField
             control={control}
             name={'proceso' as Path<TFieldValues>}
@@ -50,7 +50,7 @@ const InformacionProcesoAuth = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Proceso *</FormLabel>
                 <FormControl>
-                  <Input {...field} disabled className="bg-muted" />
+                  <Input {...field} disabled className="bg-gray-50/80 text-foreground" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -69,7 +69,7 @@ const InformacionProcesoAuth = <TFieldValues extends FieldValues>({
                   disabled={isClienteDisabled}
                 >
                   <FormControl>
-                    <SelectTrigger className={isClienteDisabled ? 'bg-muted' : ''}>
+                    <SelectTrigger className={isClienteDisabled ? 'bg-gray-50/80 text-foreground' : ''}>
                       <SelectValue placeholder="Selecciona una opción" />
                     </SelectTrigger>
                   </FormControl>

@@ -20,7 +20,7 @@ const DatosPersonalesVerificacionSection = <TFieldValues extends FieldValues>({
       <h2 className="text-xl font-semibold mb-4 text-primary-prosalud-dark flex items-center">
         <User className="mr-2 h-6 w-6" /> Datos Personales
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <FormField
           control={control}
           name={"tipoIdentificacion" as any}

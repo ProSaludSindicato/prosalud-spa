@@ -14,7 +14,7 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-ce
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
-import DatosPersonalesVerificacionSectionReadOnly from '@/components/verificacion-pagos/DatosPersonalesVerificacionSectionReadOnly';
+import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import InformacionProcesoSectionAuth from '@/components/verificacion-pagos/InformacionProcesoSectionAuth';
 import DetalleNovedadSection from '@/components/verificacion-pagos/DetalleNovedadSection';
 import ArchivoAnexoSection from '@/components/verificacion-pagos/ArchivoAnexoSection';
@@ -153,7 +153,7 @@ const VerificacionPagosPageContent: React.FC = () => {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
-            <DatosPersonalesVerificacionSectionReadOnly />
+            <DatosPersonalesReadOnly />
             <InformacionProcesoSectionAuth control={form.control} setValue={form.setValue} />
             <DetalleNovedadSection control={form.control} />
             <ArchivoAnexoSection control={form.control} />

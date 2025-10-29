@@ -46,7 +46,7 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
       <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark">Datos Personales del Solicitante</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <FormField
           control={control}
           name={"tipoIdentificacion" as FieldPath<TFieldValues>}

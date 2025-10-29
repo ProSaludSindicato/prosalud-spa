@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileText } from 'lucide-react';
 import FileUploadField from './FileUploadField'; // Assuming FormValues type is defined elsewhere or passed
 
 interface InformacionCertificadoSectionProps<TFieldValues extends FieldValues> {
@@ -20,7 +21,10 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
 
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
-      <h2 className="text-xl font-semibold mb-2 text-primary-prosalud-dark">Información Requerida en el Certificado</h2>
+      <h2 className="text-xl font-semibold mb-2 text-primary-prosalud-dark flex items-center">
+        <FileText className="mr-2 h-6 w-6" />
+        Información Requerida en el Certificado
+      </h2>
       <p className="text-sm text-muted-foreground mb-6">Lea cuidadosamente y seleccione únicamente la información que necesita incluir en su certificado.</p>
       
       <div className="space-y-4">

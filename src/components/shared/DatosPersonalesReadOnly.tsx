@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User } from 'lucide-react';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { obfuscateEmail, obfuscatePhone } from '@/utils/obfuscate';
 
 const DatosPersonalesReadOnly: React.FC = () => {
   const { afiliado } = useAfiliadoAuth();
@@ -21,13 +22,13 @@ const DatosPersonalesReadOnly: React.FC = () => {
   return (
     <Card className="border-l-4 border-l-primary">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <User className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-xl font-semibold text-primary-prosalud-dark">
+          <User className="h-6 w-6" />
           Datos Personales del Solicitante
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
             <label className="text-sm font-medium text-muted-foreground">Tipo de identificación</label>
             <p className="mt-1 text-foreground font-medium">{formatDocType(afiliado.tipo_documento)}</p>
@@ -46,11 +47,11 @@ const DatosPersonalesReadOnly: React.FC = () => {
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Correo electrónico</label>
-            <p className="mt-1 text-foreground font-medium">{afiliado.correo_personal}</p>
+            <p className="mt-1 text-foreground font-medium">{obfuscateEmail(afiliado.correo_personal)}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">Número de celular</label>
-            <p className="mt-1 text-foreground font-medium">{afiliado.celular}</p>
+            <p className="mt-1 text-foreground font-medium">{obfuscatePhone(afiliado.celular)}</p>
           </div>
         </div>
       </CardContent>

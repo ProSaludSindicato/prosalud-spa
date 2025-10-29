@@ -14,6 +14,7 @@ export const API_CONFIG = {
     ROLES: '/api/roles',
     INVENTORY: '/api/inventory',
     CHATBOT: '/api/chatbot',
+    AFILIADOS_AUTHENTICATE: '/api/afiliados/authenticate',
   },
 } as const;
 
