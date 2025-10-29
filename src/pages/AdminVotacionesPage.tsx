@@ -9,9 +9,12 @@ import { StatisticsFiltersComponent } from "@/components/admin/votaciones/Statis
 import { AuditTrailTable } from "@/components/admin/votaciones/AuditTrailTable";
 import { CandidatesTable } from "@/components/admin/votaciones/CandidatesTable";
 import { votacionesApi } from "@/services/votacionesApi";
+import { generateVotacionesExcelReport } from "@/components/admin/votaciones/utils/votacionesExcelGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vote, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Vote, BarChart3, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
 
 export default function AdminVotacionesPage() {
@@ -111,6 +114,62 @@ export default function AdminVotacionesPage() {
     setCurrentPage(page);
   };
 
+  const handleExportStatistics = () => {
+    try {
+      if (!statsData?.statistics) {
+        toast.error("No hay datos de estadísticas para exportar");
+        return;
+      }
+
+      if (!auditData?.votes) {
+        toast.error("No hay datos de auditoría para exportar");
+        return;
+      }
+
+      const wb = generateVotacionesExcelReport(
+        statsData.statistics,
+        auditData.votes,
+        statisticsFilters.hospital
+      );
+
+      const fileName = `Reporte_Votaciones_Asamblea_ProSalud_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.success("Reporte Excel generado exitosamente");
+    } catch (error) {
+      console.error("Error al exportar:", error);
+      toast.error("Error al generar el reporte Excel");
+    }
+  };
+
+  const handleExportAudit = () => {
+    try {
+      if (!statsData?.statistics) {
+        toast.error("No hay datos de estadísticas para exportar");
+        return;
+      }
+
+      if (!auditData?.votes) {
+        toast.error("No hay datos de auditoría para exportar");
+        return;
+      }
+
+      const wb = generateVotacionesExcelReport(
+        statsData.statistics,
+        filteredVotes.length > 0 ? filteredVotes : auditData.votes,
+        auditFilters.hospital
+      );
+
+      const fileName = `Reporte_Auditoria_Votaciones_ProSalud_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.success("Reporte Excel generado exitosamente");
+    } catch (error) {
+      console.error("Error al exportar:", error);
+      toast.error("Error al generar el reporte Excel");
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6 p-6">
@@ -134,11 +193,25 @@ export default function AdminVotacionesPage() {
           </TabsList>
 
           <TabsContent value="statistics" className="space-y-6 mt-6">
-            <StatisticsFiltersComponent 
-              onFilterChange={handleStatisticsFilterChange}
-              currentFilters={statisticsFilters}
-              isLoading={statsLoading || statsFetching}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Estadísticas de Votación</h2>
+                <Button
+                  onClick={handleExportStatistics}
+                  disabled={!statsData || statsLoading || statsFetching || !auditData}
+                  className="gap-2"
+                  variant="default"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Exportar a Excel
+                </Button>
+              </div>
+              <StatisticsFiltersComponent 
+                onFilterChange={handleStatisticsFilterChange}
+                currentFilters={statisticsFilters}
+                isLoading={statsLoading || statsFetching}
+              />
+            </div>
             
             {statsData ? (
               <>
@@ -188,10 +261,24 @@ export default function AdminVotacionesPage() {
           </TabsContent>
 
           <TabsContent value="audit" className="space-y-6 mt-6">
-            <AuditFiltersComponent 
-              onFilterChange={handleAuditFilterChange}
-              isLoading={auditLoading}
-            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Auditoría de Votación</h2>
+                <Button
+                  onClick={handleExportAudit}
+                  disabled={!auditData || auditLoading || !statsData}
+                  className="gap-2"
+                  variant="default"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Exportar a Excel
+                </Button>
+              </div>
+              <AuditFiltersComponent 
+                onFilterChange={handleAuditFilterChange}
+                isLoading={auditLoading}
+              />
+            </div>
 
             {auditData && (
               <AuditTrailTable
