@@ -70,7 +70,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [expiresAt]);
 
   const authenticate = useCallback(async (tipoDoc: string, numDoc: string, fechaExp: string): Promise<AfiliadoData> => {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/afiliados/authenticate`, {
+    const response = await fetch('https://prosalud.laravel.cloud/api/afiliados/authenticate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
