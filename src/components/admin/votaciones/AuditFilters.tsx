@@ -65,15 +65,15 @@ export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFilter
           <div className="space-y-2">
             <Label htmlFor="hospital">Hospital</Label>
             <Select
-              value={filters.hospital || ''}
-              onValueChange={(value) => handleFilterChange('hospital', value)}
+              value={filters.hospital || 'all'}
+              onValueChange={(value) => handleFilterChange('hospital', value === 'all' ? '' : value)}
               disabled={isLoading}
             >
               <SelectTrigger id="hospital">
-                <SelectValue placeholder="Todos" />
+                <SelectValue placeholder="Todos los hospitales" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="Bello">Bello</SelectItem>
                 <SelectItem value="La Maria">La Maria</SelectItem>
                 <SelectItem value="Rionegro">Rionegro</SelectItem>
@@ -85,15 +85,15 @@ export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFilter
           <div className="space-y-2">
             <Label htmlFor="document_type">Tipo de Documento</Label>
             <Select
-              value={filters.voter_document_type || ''}
-              onValueChange={(value) => handleFilterChange('voter_document_type', value)}
+              value={filters.voter_document_type || 'all'}
+              onValueChange={(value) => handleFilterChange('voter_document_type', value === 'all' ? '' : value)}
               disabled={isLoading}
             >
               <SelectTrigger id="document_type">
-                <SelectValue placeholder="Todos" />
+                <SelectValue placeholder="Todos los tipos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="CC">CC</SelectItem>
                 <SelectItem value="CE">CE</SelectItem>
                 <SelectItem value="PT">PT</SelectItem>
