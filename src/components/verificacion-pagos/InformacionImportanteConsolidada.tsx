@@ -15,10 +15,9 @@ const InformacionImportanteConsolidada: React.FC = () => {
 
   return (
     <div className="mb-8">
-      <Tabs defaultValue="incapacidad" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-muted/30">
+      <Tabs defaultValue="tiempos" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-muted/30">
           <TabsTrigger value="tiempos">Tiempos</TabsTrigger>
-          <TabsTrigger value="incapacidad">Incapacidades</TabsTrigger>
           <TabsTrigger value="importante">Información</TabsTrigger>
         </TabsList>
 
@@ -35,22 +34,6 @@ const InformacionImportanteConsolidada: React.FC = () => {
                   <strong>Horario de revisión:</strong> Lunes a viernes de 7:00 a.m. a 5:00 p.m. 
                   Cualquier registro fuera de este horario se entenderá presentado el día hábil siguiente. 
                   Se registran y asignan por orden de llegada.
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </TabsContent>
-        
-        <TabsContent value="incapacidad">
-          <Alert className="border-green-200 bg-green-50">
-            <MessageCircle className="h-5 w-5 text-green-600" />
-            <AlertDescription className="text-green-800">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <strong>¿Consultas sobre el pago de una incapacidad?</strong>
-                  <br />
-                  Usa nuestro chatbot especializado en la esquina inferior derecha. 
-                  Selecciona la opción habilitada y sigue el paso a paso.
                 </div>
               </div>
             </AlertDescription>

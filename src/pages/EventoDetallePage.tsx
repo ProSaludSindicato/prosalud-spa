@@ -91,7 +91,7 @@ const EventoDetallePage: React.FC = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 text-center">
           <h1 className="text-3xl font-bold text-destructive">Evento no encontrado</h1>
           <p className="mt-4 text-muted-foreground">El evento que buscas no existe o fue removido.</p>
-          <Link to="/servicios/galeria-bienestar" className="mt-6 inline-block text-primary-prosalud hover:underline">
+           <Link to="/servicios/galeria-bienestar" className="mt-6 inline-block text-primary-prosalud hover:underline">
             Volver a la Galería
           </Link>
         </div>
@@ -138,7 +138,7 @@ const EventoDetallePage: React.FC = () => {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                <Link to="/servicios/galeria-bienestar"><GalleryVertical size={16} className="mr-1" />Galería de Bienestar</Link>
+                <Link to="/servicios/galeria-bienestar"><GalleryVertical size={16} className="mr-1" />Bienestar</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />

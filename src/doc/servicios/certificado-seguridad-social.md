@@ -1,8 +1,8 @@
 
-# Certificado de Aportes a la Seguridad Social - ProSalud
+# Comprobante de Aportes a la Seguridad Social - ProSalud
 
 ## Descripción del Servicio
-Este servicio permite a los afiliados de ProSalud obtener su certificado de aportes a la seguridad social de manera autónoma a través de portales externos, dependiendo del período de consulta.
+Este servicio permite a los afiliados de ProSalud obtener su comprobante de aportes a la seguridad social de manera autónoma a través de portales externos, dependiendo del período de consulta.
 
 **Enlace al trámite en el sitio web:** [`/servicios/certificado-seguridad-social`](/servicios/certificado-seguridad-social)
 
@@ -41,7 +41,8 @@ Para obtener el certificado, los afiliados deben:
 ## Preguntas Frecuentes (FAQ)
 
 **P: ¿ProSalud emite directamente este certificado?**
-R: No, ProSalud guía al afiliado hacia los portales externos correspondientes (Aportes en Línea o ARUS SUAPORTE), que son las entidades encargadas de generar y emitir el certificado de aportes a la seguridad social.
+**P: ¿ProSalud emite el comprobante de aportes a la seguridad social directamente?**
+R: No, ProSalud guía al afiliado hacia los portales externos correspondientes (Aportes en Línea o ARUS SUAPORTE), que son las entidades encargadas de generar y emitir el comprobante de aportes a la seguridad social.
 
 **P: ¿Qué necesito para obtener el certificado?**
 R: Necesitará su documento de identidad y seguir los pasos indicados en el portal correspondiente según la fecha que desea consultar.
@@ -50,5 +51,5 @@ R: Necesitará su documento de identidad y seguir los pasos indicados en el port
 R: Si necesita consultar aportes hasta agosto de 2022, use Aportes en Línea. Si necesita consultar desde septiembre de 2022 en adelante, use ARUS SUAPORTE.
 
 **P: ¿El servicio tiene algún costo?**
-R: Generalmente, la consulta y descarga del certificado de aportes a la seguridad social a través de estos portales es gratuita. Sin embargo, verifique las condiciones en cada portal.
+R: Generalmente, la consulta y descarga del comprobante de aportes a la seguridad social a través de estos portales es gratuita. Sin embargo, verifique las condiciones en cada portal.
 

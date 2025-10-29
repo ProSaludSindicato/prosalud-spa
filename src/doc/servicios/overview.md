@@ -5,7 +5,7 @@
 
 ### Certificados y Documentos
 - **Certificado de Convenio**: Solicitud en línea de certificados laborales
-- **Certificado de Seguridad Social**: Gestión de certificados de seguridad social
+- **Comprobante de Aportes Seguridad Social**: Obtención de comprobantes de seguridad social
 - **Cuadro de Turnos**: Consulta y gestión de programación laboral
 
 ### Gestión de Incapacidades
@@ -23,7 +23,7 @@
 - **Permisos y Cambio de Turnos**: Gestión de cambios en programación
 
 ### Bienestar y Recreación
-- **Galería de Bienestar**: Eventos y actividades para afiliados
+- **Bienestar**: Eventos y actividades para afiliados
 - **Encuesta de Bienestar**: Evaluación de servicios y sugerencias
 
 ### Seguridad y Salud en el Trabajo

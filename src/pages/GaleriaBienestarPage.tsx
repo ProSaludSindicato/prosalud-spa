@@ -130,7 +130,7 @@ const GaleriaBienestarPage: React.FC = () => {
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 font-medium text-foreground">
                 <GalleryVertical className="h-4 w-4" />
-                Galería de Bienestar
+                Bienestar
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -141,7 +141,7 @@ const GaleriaBienestarPage: React.FC = () => {
           <div className="flex justify-center items-center gap-3 mb-4">
             <Image className="h-8 w-8 text-primary-prosalud-dark" />
             <h1 className="text-3xl md:text-4xl font-bold text-primary-prosalud-dark tracking-tight">
-              Galería de Bienestar
+              Bienestar
             </h1>
           </div>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4 mb-4">

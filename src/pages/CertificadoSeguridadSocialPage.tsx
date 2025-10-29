@@ -25,7 +25,7 @@ const CertificadoSeguridadSocialPage: React.FC = () => {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbPage>
-                <FileText className="h-4 w-4 mr-1 inline-block" /> Certificado de Seguridad Social
+                <FileText className="h-4 w-4 mr-1 inline-block" /> Comprobante de Aportes Seguridad Social
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -37,7 +37,7 @@ const CertificadoSeguridadSocialPage: React.FC = () => {
             <div className="flex justify-center items-center gap-3 mb-2">
               <ShieldCheck className="h-8 w-8 text-primary-prosalud-dark" />
               <h1 className="text-3xl font-bold text-primary-prosalud-dark">
-                Certificado de Aportes a la Seguridad Social
+                Comprobante de Aportes a la Seguridad Social
               </h1>
             </div>
             <p className="text-lg text-muted-foreground">
@@ -50,7 +50,7 @@ const CertificadoSeguridadSocialPage: React.FC = () => {
               <Info className="h-5 w-5 text-blue-600" />
               <AlertTitle className="font-semibold text-blue-800">Instrucciones Importantes</AlertTitle>
               <AlertDescription className="text-blue-700">
-                Para obtener tu certificado de aportes a la seguridad social, selecciona la opción correspondiente según el período de tus aportes y completa la información personal solicitada en el portal externo.
+                Obtén tu comprobante de aportes a la seguridad social de forma autónoma a través de los portales externos. Selecciona la opción correspondiente según el período de consulta y completa la información solicitada.
               </AlertDescription>
             </Alert>
           </section>

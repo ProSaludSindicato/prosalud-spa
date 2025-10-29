@@ -63,7 +63,7 @@ const contextualSuggestions: { [key: string]: string[] } = {
   ],
   'certificado': [
     'Solicitar certificado de afiliación',
-    'Certificado seguridad social',
+    'Certificado aportes seguridad social',
     'Tipos de certificados disponibles'
   ],
   'contacto': [

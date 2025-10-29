@@ -98,8 +98,8 @@ export const searchData: SearchItem[] = [
   },
   {
     id: "certificado-seguridad-social",
-    title: "Certificado de Seguridad Social",
-    description: "Obtén tu certificado de seguridad social",
+    title: "Comprobante de Aportes Seguridad Social",
+    description: "Obtén tu comprobante de aportes a la seguridad social",
     path: "/servicios/certificado-seguridad-social",
     category: "Servicios",
     keywords: ["seguridad", "social", "certificado", "salud", "pensiones", "afiliacion"]
@@ -130,7 +130,7 @@ export const searchData: SearchItem[] = [
   },
   {
     id: "galeria-bienestar",
-    title: "Galería de Bienestar",
+    title: "Bienestar",
     description: "Eventos y actividades de bienestar",
     path: "/servicios/galeria-bienestar",
     category: "Servicios",

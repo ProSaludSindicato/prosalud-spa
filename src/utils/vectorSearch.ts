@@ -41,7 +41,7 @@ export async function getQuestionEmbedding(text: string): Promise<number[]> {
 function expandQuery(query: string): string {
   const expansions = {
     // Servicios y trámites
-    'certificado': 'certificado convenio seguridad social ProSalud',
+    'certificado': 'certificado convenio comprobante aportes seguridad social ProSalud',
     'incapacidad': 'incapacidad licencia maternidad paternidad ProSalud',
     'cuenta bancaria': 'actualizar cuenta bancaria compensaciones pagos ProSalud',
     'turnos': 'cuadro turnos ProSanet programación ProSalud',

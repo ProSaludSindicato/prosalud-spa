@@ -80,9 +80,9 @@ const newServices: Service[] = [
   }, 
   { 
     icon: ShieldCheck, 
-    title: 'Certificado de seguridad social', 
-    description: 'Genera tu certificado de aportes a la seguridad social.', 
-    linkTo: '/servicios/certificado-seguridad-social', 
+    title: 'Comprobante de aportes Seguridad social', 
+    description: 'Obtén tu comprobante de aportes a la seguridad social de forma autónoma.', 
+    linkTo: '/servicios/certificado-seguridad-social',
     category: 'Certificados y Documentos',
     keywords: ['seguridad', 'social', 'aportes', 'certificado', 'generar', 'salud', 'pensiones', 'arl']
   },
@@ -120,7 +120,7 @@ const newServices: Service[] = [
   },
   { 
     icon: Image, 
-    title: 'Galería de bienestar', 
+    title: 'Bienestar', 
     description: 'Explora fotos y eventos organizados para tu bienestar.', 
     linkTo: '/servicios/galeria-bienestar', 
     category: 'Bienestar y SST',

@@ -134,7 +134,7 @@ const AdminBienestarPage: React.FC = () => {
                     </div>
                     <div>
                       <CardTitle className="text-3xl font-bold text-primary-prosalud">
-                        Galería de Bienestar
+                        Bienestar
                       </CardTitle>
                       <CardDescription className="text-base mt-2">
                         Administra los eventos y actividades de bienestar de ProSalud

@@ -118,8 +118,8 @@ export const faqData: FAQItem[] = [
   },
   {
     id: "seguridad-social",
-    question: "¿Cómo obtener el certificado de seguridad social?",
-    answer: "El certificado de aportes a la seguridad social se obtiene de manera autónoma a través del portal de ARUS SUAPORTE. En nuestra página encontrará el enlace directo y las instrucciones para acceder al sistema externo donde podrá generar su certificado.",
+    question: "¿Cómo obtener el comprobante de aportes a la seguridad social?",
+    answer: "El comprobante de aportes a la seguridad social se obtiene de manera autónoma a través del portal de ARUS SUAPORTE. En nuestra página encontrará el enlace directo y las instrucciones para acceder al sistema externo donde podrá generar su comprobante.",
     category: "servicios",
     keywords: ["seguridad", "social", "aportes", "certificado", "arus"],
     redirectUrl: "/servicios/certificado-seguridad-social",

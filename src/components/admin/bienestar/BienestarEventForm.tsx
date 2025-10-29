@@ -315,7 +315,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
               {event ? "Editar Evento" : "Nuevo Evento"} de Bienestar
             </DialogTitle>
             <DialogDescription className="text-slate-600">
-              {event ? "Modifica los detalles del evento" : "Crea un nuevo evento para la galería de bienestar"}
+              {event ? "Modifica los detalles del evento" : "Crea un nuevo evento para bienestar"}
             </DialogDescription>
           </div>
 

@@ -83,27 +83,27 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <div className="mt-2 flex items-center gap-1 border-t border-gray-200 dark:border-gray-600 pt-2">
               <button
                 onClick={() => onFeedback(index, true)}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1.5 rounded-md transition-all ${
                   message.rating === "like"
-                    ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-                    : "text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-600 scale-110"
+                    : "hover:bg-primary/10 hover:scale-105 text-primary/70 hover:text-primary"
                 }`}
-                title="Me gusta"
+                aria-label="Me fue útil"
               >
-                <ThumbsUp className="h-3 w-3" />
+                <ThumbsUp className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => onFeedback(index, false)}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1.5 rounded-md transition-all ${
                   message.rating === "dislike"
-                    ? "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300"
-                    : "text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    ? "bg-red-100 dark:bg-red-900/30 text-red-600 scale-110"
+                    : "hover:bg-primary/10 hover:scale-105 text-primary/70 hover:text-primary"
                 }`}
-                title="No me gusta"
+                aria-label="No me fue útil"
               >
-                <ThumbsDown className="h-3 w-3" />
+                <ThumbsDown className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">
+              <span className="text-[11px] font-medium text-primary/80 ml-1">
                 ¿Te fue útil?
               </span>
             </div>
