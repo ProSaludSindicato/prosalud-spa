@@ -1,29 +1,29 @@
-
-import React, { useMemo } from 'react';
-import ServiceCard from '@/components/shared/ServiceCard';
-import { 
+import React, { useMemo } from "react";
+import ServiceCard from "@/components/shared/ServiceCard";
+import {
   Search as SearchIconLucide, // Renamed to avoid conflict with Search component/icon if any
-  FileText, 
-  BedDouble, 
-  Banknote, 
-  ShieldCheck, 
-  HardHat, 
-  Landmark, 
-  Image, 
-  Coins, 
-  Award as Certificate, 
+  FileText,
+  BedDouble,
+  Banknote,
+  ShieldCheck,
+  HardHat,
+  Landmark,
+  Image,
+  Coins,
+  Award as Certificate,
   CalendarCheck,
   DollarSign,
   Hospital,
-  BriefcaseMedical, 
-  Users as Poll, 
+  BriefcaseMedical,
+  Users as Poll,
+  UserCog,
   Store,
   Calendar,
   CalendarDays,
   CreditCard,
   LogOut,
-  UserPlus
-} from 'lucide-react';
+  UserPlus,
+} from "lucide-react";
 
 // Definición de categorías (debe coincidir con QuickLinksSection)
 export const serviceCategories = [
@@ -31,10 +31,10 @@ export const serviceCategories = [
   "Certificados y Documentos",
   "Gestión Personal y Sindical",
   "Pagos",
-  "Bienestar y SST"
+  "Bienestar y SST",
 ] as const;
 
-export type ServiceCategory = typeof serviceCategories[number];
+export type ServiceCategory = (typeof serviceCategories)[number];
 
 interface Service {
   icon: React.ElementType;
@@ -46,125 +46,138 @@ interface Service {
 }
 
 const newServices: Service[] = [
-  { 
-    icon: Certificate, 
-    title: 'Certificado de convenio sindical', 
-    description: 'Descarga tu constancia de afiliación al convenio sindical.', 
-    linkTo: '/servicios/certificado-convenio', 
-    category: 'Certificados y Documentos',
-    keywords: ['certificado', 'convenio', 'sindical', 'afiliacion', 'constancia', 'documento', 'descarga']
+  {
+    icon: Certificate,
+    title: "Certificado de convenio sindical",
+    description: "Descarga tu constancia de afiliación al convenio sindical.",
+    linkTo: "/servicios/certificado-convenio",
+    category: "Certificados y Documentos",
+    keywords: ["certificado", "convenio", "sindical", "afiliacion", "constancia", "documento", "descarga"],
   },
-  { 
-    icon: CalendarCheck, 
-    title: 'Compensación por descanso', 
-    description: 'Solicita tu compensación anual por descanso según tus condiciones actuales.',
-    linkTo: '/servicios/compensacion-descanso',
-    category: 'Gestión Personal y Sindical',
-    keywords: ['descanso', 'solicitud', 'dias', 'vacaciones', 'permisos', 'ausentismo', 'tiempo libre']
+  {
+    icon: CalendarCheck,
+    title: "Compensación por descanso",
+    description: "Solicita tu compensación anual por descanso según tus condiciones actuales.",
+    linkTo: "/servicios/compensacion-descanso",
+    category: "Gestión Personal y Sindical",
+    keywords: ["descanso", "solicitud", "dias", "vacaciones", "permisos", "ausentismo", "tiempo libre"],
   },
-  { 
-    icon: DollarSign, 
-    title: 'Compensación anual diferida', 
-    description: 'Gestiona el pago correspondiente a tu compensación anual.', 
-    linkTo: '/servicios/compensacion-anual', 
-    category: 'Pagos',
-    keywords: ['compensacion', 'anual', 'diferida', 'pago', 'gestion', 'prima', 'bono', 'beneficio']
+  {
+    icon: DollarSign,
+    title: "Compensación anual diferida",
+    description: "Gestiona el pago correspondiente a tu compensación anual.",
+    linkTo: "/servicios/compensacion-anual",
+    category: "Pagos",
+    keywords: ["compensacion", "anual", "diferida", "pago", "gestion", "prima", "bono", "beneficio"],
   },
-  { 
-    icon: SearchIconLucide, 
-    title: 'Consulta de pagos', 
-    description: 'Verifica los pagos realizados por concepto sindical.', 
-    linkTo: '/servicios/consulta-pagos', 
-    category: 'Pagos',
-    keywords: ['consulta', 'pagos', 'verificacion', 'sindical', 'concepto', 'salario', 'nomina', 'estado']
-  }, 
-  { 
-    icon: ShieldCheck, 
-    title: 'Certificado de seguridad social', 
-    description: 'Genera tu certificado de aportes a la seguridad social.', 
-    linkTo: '/servicios/certificado-seguridad-social', 
-    category: 'Certificados y Documentos',
-    keywords: ['seguridad', 'social', 'aportes', 'certificado', 'generar', 'salud', 'pensiones', 'arl']
+  {
+    icon: SearchIconLucide,
+    title: "Consulta de pagos",
+    description: "Verifica los pagos realizados por concepto sindical.",
+    linkTo: "/servicios/consulta-pagos",
+    category: "Pagos",
+    keywords: ["consulta", "pagos", "verificacion", "sindical", "concepto", "salario", "nomina", "estado"],
   },
-  { 
-    icon: Banknote, 
-    title: 'Actualizar cuenta bancaria', 
-    description: 'Notifica un cambio en tu cuenta para recibir pagos.', 
-    linkTo: '/servicios/actualizar-cuenta', 
-    category: 'Pagos',
-    keywords: ['cuenta', 'bancaria', 'actualizar', 'cambio', 'banco', 'pagos', 'datos', 'informacion']
+  {
+    icon: ShieldCheck,
+    title: "Comprobante de aportes Seguridad social",
+    description: "Genera tu certificado de aportes a la seguridad social.",
+    linkTo: "/servicios/certificado-seguridad-social",
+    category: "Certificados y Documentos",
+    keywords: ["seguridad", "social", "aportes", "certificado", "generar", "salud", "pensiones", "arl"],
   },
-  { 
-    icon: Hospital, 
-    title: 'Incapacidades y licencias', 
-    description: 'Reporta tu incapacidad o licencia de maternidad al sindicato.', 
-    linkTo: '/servicios/incapacidad-maternidad', 
-    category: 'Gestión Personal y Sindical',
-    keywords: ['incapacidades', 'licencias', 'maternidad', 'reportar', 'salud', 'ausencia', 'medica']
+  {
+    icon: UserCog,
+    title: "Actualizar datos personales",
+    description: "Actualiza tu información personal, como correo, dirección, teléfono o cuenta bancaria.",
+    linkTo: "/servicios/actualizar-cuenta",
+    category: "Gestión personal",
+    keywords: [
+      "actualizar",
+      "datos",
+      "personales",
+      "correo",
+      "dirección",
+      "telefono",
+      "cuenta",
+      "bancaria",
+      "informacion",
+      "contacto",
+      "cambio",
+      "perfil",
+    ],
   },
-  { 
-    icon: BriefcaseMedical, 
-    title: 'Seguridad y salud en el trabajo (S.S.T)', 
-    description: 'Accede a recursos y reportes relacionados con Seguridad y Salud en el Trabajo (SST).', 
-    linkTo: '/servicios/sst', 
-    category: 'Bienestar y SST',
-    keywords: ['seguridad', 'salud', 'trabajo', 'sst', 'recursos', 'reportes', 'riesgos', 'prevencion']
+  {
+    icon: Hospital,
+    title: "Incapacidades y licencias",
+    description: "Reporta tu incapacidad o licencia de maternidad al sindicato.",
+    linkTo: "/servicios/incapacidad-maternidad",
+    category: "Gestión Personal y Sindical",
+    keywords: ["incapacidades", "licencias", "maternidad", "reportar", "salud", "ausencia", "medica"],
   },
-  { 
-    icon: Poll, 
-    title: 'Encuesta de bienestar', 
-    description: 'Participa en encuestas para mejorar tu entorno y condiciones.', 
-    linkTo: 'https://forms.gle/2YnLMixdN6EnZ7Qq6', 
-    category: 'Bienestar y SST',
-    keywords: ['encuesta', 'bienestar', 'participar', 'mejorar', 'entorno', 'condiciones', 'feedback']
+  {
+    icon: BriefcaseMedical,
+    title: "Seguridad y salud en el trabajo (S.S.T)",
+    description: "Accede a recursos y reportes relacionados con Seguridad y Salud en el Trabajo (SST).",
+    linkTo: "/servicios/sst",
+    category: "Bienestar y SST",
+    keywords: ["seguridad", "salud", "trabajo", "sst", "recursos", "reportes", "riesgos", "prevencion"],
   },
-  { 
-    icon: Image, 
-    title: 'Galería de bienestar', 
-    description: 'Explora fotos y eventos organizados para tu bienestar.', 
-    linkTo: '/servicios/galeria-bienestar', 
-    category: 'Bienestar y SST',
-    keywords: ['galeria', 'bienestar', 'fotos', 'eventos', 'explorar', 'actividades', 'imagenes']
+  {
+    icon: Poll,
+    title: "Encuesta de bienestar",
+    description: "Participa en encuestas para mejorar tu entorno y condiciones.",
+    linkTo: "https://forms.gle/2YnLMixdN6EnZ7Qq6",
+    category: "Bienestar y SST",
+    keywords: ["encuesta", "bienestar", "participar", "mejorar", "entorno", "condiciones", "feedback"],
   },
-  { 
-    icon: Calendar, 
-    title: 'Permisos y cambio de turnos', 
-    description: 'Diligencia el formato para solicitudes de permisos o ajustes en tus turnos.', 
-    linkTo: '/servicios/permisos-turnos', 
-    category: 'Certificados y Documentos',
-    keywords: ['permisos', 'turnos', 'formato', 'diligenciar', 'solicitudes', 'cambio', 'ajustes', 'horario']
+  {
+    icon: Image,
+    title: "Galería de bienestar",
+    description: "Explora fotos y eventos organizados para tu bienestar.",
+    linkTo: "/servicios/galeria-bienestar",
+    category: "Bienestar y SST",
+    keywords: ["galeria", "bienestar", "fotos", "eventos", "explorar", "actividades", "imagenes"],
   },
-  { 
-    icon: CalendarDays, 
-    title: 'Consulta Cuadro de turnos', 
-    description: 'Consulta tu calendario de turnos asignados.', 
-    linkTo: 'https://www.prosanet.com/#/shifts-employees/index', 
-    category: 'Gestión Personal y Sindical',
-    keywords: ['cuadro', 'turnos', 'calendario', 'consulta', 'asignados', 'horarios', 'programacion']
+  {
+    icon: Calendar,
+    title: "Permisos y cambio de turnos",
+    description: "Diligencia el formato para solicitudes de permisos o ajustes en tus turnos.",
+    linkTo: "/servicios/permisos-turnos",
+    category: "Certificados y Documentos",
+    keywords: ["permisos", "turnos", "formato", "diligenciar", "solicitudes", "cambio", "ajustes", "horario"],
   },
-  { 
-    icon: CreditCard, 
-    title: 'Solicitud de microcrédito', 
-    description: 'Aplica a un microcrédito con condiciones especiales para afiliados.', 
-    linkTo: '/servicios/microcredito', 
-    category: 'Pagos',
-    keywords: ['microcredito', 'solicitud', 'aplicar', 'credito', 'prestamo', 'condiciones', 'afiliados']
+  {
+    icon: CalendarDays,
+    title: "Consulta Cuadro de turnos",
+    description: "Consulta tu calendario de turnos asignados.",
+    linkTo: "https://www.prosanet.com/#/shifts-employees/index",
+    category: "Gestión Personal y Sindical",
+    keywords: ["cuadro", "turnos", "calendario", "consulta", "asignados", "horarios", "programacion"],
   },
-  { 
-    icon: UserPlus, 
-    title: 'Afiliación a Comfenalco', 
-    description: 'Conoce el proceso para afiliarte a Comfenalco Antioquia como beneficiario.', 
-    linkTo: '/servicios/afiliacion-comfenalco', 
-    category: 'Gestión Personal y Sindical',
-    keywords: ['comfenalco', 'afiliacion', 'beneficio', 'proceso', 'vinculacion', 'registro', 'caja', 'compensacion']
+  {
+    icon: CreditCard,
+    title: "Solicitud de microcrédito",
+    description: "Aplica a un microcrédito con condiciones especiales para afiliados.",
+    linkTo: "/servicios/microcredito",
+    category: "Pagos",
+    keywords: ["microcredito", "solicitud", "aplicar", "credito", "prestamo", "condiciones", "afiliados"],
   },
-  { 
-    icon: LogOut, 
-    title: 'Solicitud de retiro sindical', 
-    description: 'Inicia el proceso para retirarte del sindicato.', 
-    linkTo: '/servicios/retiro-sindical', 
-    category: 'Gestión Personal y Sindical',
-    keywords: ['retiro', 'sindical', 'proceso', 'iniciar', 'salida', 'desvinculacion', 'abandono']
+  {
+    icon: UserPlus,
+    title: "Afiliación a Comfenalco",
+    description: "Conoce el proceso para afiliarte a Comfenalco Antioquia como beneficiario.",
+    linkTo: "/servicios/afiliacion-comfenalco",
+    category: "Gestión Personal y Sindical",
+    keywords: ["comfenalco", "afiliacion", "beneficio", "proceso", "vinculacion", "registro", "caja", "compensacion"],
+  },
+  {
+    icon: LogOut,
+    title: "Solicitud de retiro sindical",
+    description: "Inicia el proceso para retirarte del sindicato.",
+    linkTo: "/servicios/retiro-sindical",
+    category: "Gestión Personal y Sindical",
+    keywords: ["retiro", "sindical", "proceso", "iniciar", "salida", "desvinculacion", "abandono"],
   },
 ];
 
@@ -177,16 +190,17 @@ const ServiceList: React.FC<ServiceListProps> = ({ searchTerm, selectedCategory 
   const filteredServices = useMemo(() => {
     let servicesToFilter = newServices;
 
-    if (selectedCategory && selectedCategory !== 'Todos') {
-      servicesToFilter = servicesToFilter.filter(service => service.category === selectedCategory);
+    if (selectedCategory && selectedCategory !== "Todos") {
+      servicesToFilter = servicesToFilter.filter((service) => service.category === selectedCategory);
     }
 
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      servicesToFilter = servicesToFilter.filter(service => 
-        service.title.toLowerCase().includes(lowerSearchTerm) ||
-        (service.description && service.description.toLowerCase().includes(lowerSearchTerm)) ||
-        service.keywords.some(keyword => keyword.toLowerCase().includes(lowerSearchTerm))
+      servicesToFilter = servicesToFilter.filter(
+        (service) =>
+          service.title.toLowerCase().includes(lowerSearchTerm) ||
+          (service.description && service.description.toLowerCase().includes(lowerSearchTerm)) ||
+          service.keywords.some((keyword) => keyword.toLowerCase().includes(lowerSearchTerm)),
       );
     }
     return servicesToFilter;
@@ -195,7 +209,7 @@ const ServiceList: React.FC<ServiceListProps> = ({ searchTerm, selectedCategory 
   return (
     <>
       {filteredServices.length > 0 ? (
-        <div 
+        <div
           key={`${selectedCategory}-${searchTerm}`} // Key to re-trigger animation on filter/search change
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5 gap-6 md:gap-8 animate-fadeIn"
         >
@@ -211,7 +225,9 @@ const ServiceList: React.FC<ServiceListProps> = ({ searchTerm, selectedCategory 
           ))}
         </div>
       ) : (
-        <div className="text-center py-10 animate-fadeIn"> {/* Added animation here too */}
+        <div className="text-center py-10 animate-fadeIn">
+          {" "}
+          {/* Added animation here too */}
           <SearchIconLucide size={48} className="mx-auto text-muted-foreground mb-4" />
           <p className="text-xl text-muted-foreground">No se encontraron trámites.</p>
           <p className="text-sm text-muted-foreground">Intenta con otras palabras clave o cambia la categoría.</p>
