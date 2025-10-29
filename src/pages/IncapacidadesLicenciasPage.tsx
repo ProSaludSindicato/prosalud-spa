@@ -11,8 +11,10 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-ce
 import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { submitRequest } from '@/services/requestsService';
+import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
-import DatosPersonalesSection from '@/components/solicitud-certificado/DatosPersonalesSection';
+import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
@@ -22,13 +24,6 @@ import TipoIncapacidadSection from '@/components/incapacidades/TipoIncapacidadSe
 import AnexoIncapacidadSection from '@/components/incapacidades/AnexoIncapacidadSection';
 
 const formSchemaIncapacidades = z.object({
-  tipoIdentificacion: z.string().min(1, "Este campo es requerido."),
-  numeroIdentificacion: z.string().min(5, "Debe tener al menos 5 dígitos.").regex(/^\d+$/, "Solo se permiten números."),
-  nombres: z.string().min(2, "Este campo es requerido."),
-  apellidos: z.string().min(2, "Este campo es requerido."),
-  correoElectronico: z.string().email("Correo electrónico inválido."),
-  numeroCelular: z.string().min(7, "Número de celular inválido.").regex(/^\d+$/, "Solo se permiten números."),
-  
   tipoDocumento: z.string().min(1, "Este campo es requerido."),
   entidadExpedidora: z.string().min(2, "Este campo es requerido."),
   fechaExpedicion: z.string().min(1, "La fecha de expedición es requerida."),
@@ -43,18 +38,13 @@ const formSchemaIncapacidades = z.object({
 
 type FormValuesIncapacidades = z.infer<typeof formSchemaIncapacidades>;
 
-const IncapacidadesLicenciasPage: React.FC = () => {
+const IncapacidadesLicenciasPageContent: React.FC = () => {
   const navigate = useNavigate();
+  const { afiliado } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<FormValuesIncapacidades>({
     resolver: zodResolver(formSchemaIncapacidades),
     defaultValues: {
-      tipoIdentificacion: 'CC',
-      numeroIdentificacion: '',
-      nombres: '',
-      apellidos: '',
-      correoElectronico: '',
-      numeroCelular: '',
       tipoDocumento: '',
       entidadExpedidora: '',
       fechaExpedicion: '',
@@ -65,6 +55,8 @@ const IncapacidadesLicenciasPage: React.FC = () => {
   });
 
   const onSubmit = async (data: FormValuesIncapacidades) => {
+    if (!afiliado) return;
+    
     setIsSubmitting(true);
     try {
       const files: Record<string, File> = {};
@@ -74,12 +66,12 @@ const IncapacidadesLicenciasPage: React.FC = () => {
 
       const requestData = {
         request_type: 'incapacidad-licencia',
-        id_type: data.tipoIdentificacion,
-        id_number: data.numeroIdentificacion,
-        name: data.nombres,
-        last_name: data.apellidos,
-        email: data.correoElectronico,
-        phone_number: data.numeroCelular,
+        id_type: afiliado.tipo_documento || '',
+        id_number: afiliado.documento || '',
+        name: afiliado.nombres || '',
+        last_name: afiliado.apellidos || '',
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
         payload: {
           tipoDocumento: data.tipoDocumento,
           entidadExpedidora: data.entidadExpedidora,
@@ -105,27 +97,19 @@ const IncapacidadesLicenciasPage: React.FC = () => {
         navigate('/');
       }, 500);
     } catch (error) {
-      handleError(error);
+      handleError();
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  const handleError = (errors: any) => {
-    console.error("Errores en el formulario:", errors);
+  const handleError = () => {
     toast.error('Error al enviar el formulario', {
       description: 'Por favor verifique los datos ingresados e intente nuevamente. Asegúrese de adjuntar el certificado de incapacidad.',
       duration: 5000,
       icon: <AlertCircle className="h-5 w-5 text-red-600" />,
     });
   };
-  
-  const idTypes = [
-    { value: "CC", label: "Cédula de Ciudadanía (CC)" },
-    { value: "CE", label: "Cédula de Extranjería (CE)" },
-    { value: "PP", label: "Pasaporte (PP)" },
-    { value: "PT", label: "Permiso por protección temporal (PT)" },
-  ];
 
   return (
     <MainLayout>
@@ -153,7 +137,7 @@ const IncapacidadesLicenciasPage: React.FC = () => {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
-            <DatosPersonalesSection control={form.control} idTypes={idTypes} />
+            <DatosPersonalesReadOnly />
             <TipoIncapacidadSection control={form.control} />
             <AnexoIncapacidadSection control={form.control} />
             <ConfirmacionCorreoSection />
@@ -183,6 +167,14 @@ const IncapacidadesLicenciasPage: React.FC = () => {
         </Form>
       </div>
     </MainLayout>
+  );
+};
+
+const IncapacidadesLicenciasPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <IncapacidadesLicenciasPageContent />
+    </RequireAfiliadoAuth>
   );
 };
 

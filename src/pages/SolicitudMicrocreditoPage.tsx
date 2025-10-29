@@ -22,8 +22,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { submitRequest } from "@/services/requestsService";
+import RequireAfiliadoAuth from "@/components/auth/RequireAfiliadoAuth";
+import { useAfiliadoAuth } from "@/context/AfiliadoAuthContext";
 
-import DatosPersonalesSection from "@/components/solicitud-certificado/DatosPersonalesSection";
+import DatosPersonalesReadOnly from "@/components/shared/DatosPersonalesReadOnly";
 import ConfirmacionCorreoSection from "@/components/solicitud-certificado/ConfirmacionCorreoSection";
 import AutorizacionDatosSection from "@/components/solicitud-certificado/AutorizacionDatosSection";
 
@@ -42,22 +44,6 @@ const sedesOptions = [
 ];
 
 const microcreditoFormSchema = z.object({
-  tipoIdentificacion: z
-    .string({ required_error: "Tipo de identificación es requerido." })
-    .min(1, "Tipo de identificación es requerido."),
-  numeroIdentificacion: z
-    .string({ required_error: "Número de identificación es requerido." })
-    .min(5, "Número de identificación inválido."),
-  nombres: z.string({ required_error: "Nombres son requeridos." }).min(2, "Nombres deben tener al menos 2 caracteres."),
-  apellidos: z
-    .string({ required_error: "Apellidos son requeridos." })
-    .min(2, "Apellidos deben tener al menos 2 caracteres."),
-  correoElectronico: z
-    .string({ required_error: "Correo electrónico es requerido." })
-    .email("Correo electrónico inválido."),
-  numeroCelular: z
-    .string({ required_error: "Número de celular es requerido." })
-    .regex(/^\d{10}$/, "Número de celular debe tener 10 dígitos."),
   sedeProceso: z.string({ required_error: "Sede es requerida." }).min(1, "Sede es requerida."),
   montoSolicitado: z.preprocess(
     (val) => (val === "" ? undefined : Number(String(val).replace(/\./g, ""))),
@@ -80,18 +66,13 @@ const microcreditoFormSchema = z.object({
 
 type MicrocreditoFormValues = z.infer<typeof microcreditoFormSchema>;
 
-const SolicitudMicrocreditoPage: React.FC = () => {
+const SolicitudMicrocreditoPageContent: React.FC = () => {
   const navigate = useNavigate();
+  const { afiliado } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<MicrocreditoFormValues>({
     resolver: zodResolver(microcreditoFormSchema),
     defaultValues: {
-      tipoIdentificacion: "",
-      numeroIdentificacion: "",
-      nombres: "",
-      apellidos: "",
-      correoElectronico: "",
-      numeroCelular: "",
       sedeProceso: "",
       montoSolicitado: undefined,
       numeroCuotas: undefined,
@@ -100,16 +81,18 @@ const SolicitudMicrocreditoPage: React.FC = () => {
   });
 
   const onSubmit = async (data: MicrocreditoFormValues) => {
+    if (!afiliado) return;
+    
     setIsSubmitting(true);
     try {
       const requestData = {
         request_type: "microcredito",
-        id_type: data.tipoIdentificacion,
-        id_number: data.numeroIdentificacion,
-        name: data.nombres,
-        last_name: data.apellidos,
-        email: data.correoElectronico,
-        phone_number: data.numeroCelular,
+        id_type: afiliado.tipo_documento || '',
+        id_number: afiliado.documento || '',
+        name: afiliado.nombres || '',
+        last_name: afiliado.apellidos || '',
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
         payload: {
           sedeProceso: data.sedeProceso,
           montoSolicitado: data.montoSolicitado,
@@ -211,7 +194,7 @@ const SolicitudMicrocreditoPage: React.FC = () => {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <DatosPersonalesSection control={form.control} idTypes={idTypes} />
+              <DatosPersonalesReadOnly />
 
               <section className="p-6 border rounded-lg shadow-sm bg-white">
                 <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark">Información del Microcrédito</h2>
@@ -318,6 +301,14 @@ const SolicitudMicrocreditoPage: React.FC = () => {
         </div>
       </div>
     </MainLayout>
+  );
+};
+
+const SolicitudMicrocreditoPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <SolicitudMicrocreditoPageContent />
+    </RequireAfiliadoAuth>
   );
 };
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,8 +11,10 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL, ALLOWED_FILE_TYPES_PDF } from '@
 import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { submitRequest } from '@/services/requestsService';
+import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
-import DatosPersonalesSection from '@/components/solicitud-certificado/DatosPersonalesSection';
+import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import InformacionCertificadoSection from '@/components/solicitud-certificado/InformacionCertificadoSection';
 import ArchivoAdicionalSection from '@/components/solicitud-certificado/ArchivoAdicionalSection';
 import SolicitudHeader from '@/components/solicitud-certificado/SolicitudHeader';
@@ -24,13 +25,6 @@ import AutorizacionDatosSection from '@/components/solicitud-certificado/Autoriz
 const RECAPTCHA_SITE_KEY = "6LclSkArAAAAABXa8SIwimuDgPd8tjQbNzoBSlOZ";
 
 const formSchema = z.object({
-  tipoIdentificacion: z.string().min(1, "Este campo es requerido."),
-  numeroIdentificacion: z.string().min(5, "Debe tener al menos 5 dígitos.").regex(/^\d+$/, "Solo se permiten números."),
-  nombres: z.string().min(2, "Este campo es requerido."),
-  apellidos: z.string().min(2, "Este campo es requerido."),
-  correoElectronico: z.string().email("Correo electrónico inválido."),
-  numeroCelular: z.string().min(7, "Número de celular inválido.").regex(/^\d+$/, "Solo se permiten números."),
-  
   infoCertificado: z.object({
     fechaIngresoRetiro: z.boolean().default(false),
     valorCompensaciones: z.boolean().default(false),
@@ -107,18 +101,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const SolicitudCertificadoConvenioPage: React.FC = () => {
+const SolicitudCertificadoConvenioPageContent: React.FC = () => {
   const navigate = useNavigate();
+  const { afiliado } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tipoIdentificacion: 'CC', 
-      numeroIdentificacion: '',
-      nombres: '',
-      apellidos: '',
-      correoElectronico: '',
-      numeroCelular: '',
       infoCertificado: {
         fechaIngresoRetiro: false,
         valorCompensaciones: false,
@@ -137,12 +126,12 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
       placaVehiculo: '',
       otrosDescripcion: '',
       adjuntarArchivoAdicional: undefined,
-      // confirmacionCorreo: false, // Eliminado
-      // recaptchaToken: '', 
     },
   });
 
   const onSubmit = async (data: FormValues) => {
+    if (!afiliado) return;
+    
     setIsSubmitting(true);
     try {
       const files: Record<string, File> = {};
@@ -155,12 +144,12 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
 
       const requestData = {
         request_type: 'certificado-convenio',
-        id_type: data.tipoIdentificacion,
-        id_number: data.numeroIdentificacion,
-        name: data.nombres,
-        last_name: data.apellidos,
-        email: data.correoElectronico,
-        phone_number: data.numeroCelular,
+        id_type: afiliado.tipo_documento || '',
+        id_number: afiliado.documento || '',
+        name: afiliado.nombres || '',
+        last_name: afiliado.apellidos || '',
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
         payload: {
           infoCertificado: data.infoCertificado,
           dirigidoAQuien: data.dirigidoAQuien,
@@ -205,13 +194,6 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
       icon: <AlertCircle className="h-5 w-5 text-red-600" />,
     });
   };
-  
-  const idTypes = [
-    { value: "CC", label: "Cédula de Ciudadanía (CC)" },
-    { value: "CE", label: "Cédula de Extranjería (CE)" },
-    { value: "PP", label: "Pasaporte (PP)" },
-    { value: "PT", label: "Permiso por protección temporal (PT)" },
-  ];
 
   return (
     <MainLayout>
@@ -243,7 +225,7 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
-            <DatosPersonalesSection control={form.control} idTypes={idTypes} />
+            <DatosPersonalesReadOnly />
             <InformacionCertificadoSection control={form.control} watch={form.watch} />
             <ArchivoAdicionalSection control={form.control} />
             <ConfirmacionCorreoSection /> {/* Removido el prop 'control' */}
@@ -297,6 +279,14 @@ const SolicitudCertificadoConvenioPage: React.FC = () => {
         </Form>
       </div>
     </MainLayout>
+  );
+};
+
+const SolicitudCertificadoConvenioPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <SolicitudCertificadoConvenioPageContent />
+    </RequireAfiliadoAuth>
   );
 };
 

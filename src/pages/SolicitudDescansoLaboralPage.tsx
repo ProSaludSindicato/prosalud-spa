@@ -11,8 +11,11 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-ce
 import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { submitRequest } from '@/services/requestsService';
+import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
-import DatosPersonalesDescansoSection from '@/components/solicitud-descanso/DatosPersonalesDescansoSection';
+import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
+import InformacionProcesoAuth from '@/components/shared/InformacionProcesoAuth';
 import InformacionDescansoSection from '@/components/solicitud-descanso/InformacionDescansoSection';
 import AnexoDescansoSection from '@/components/solicitud-descanso/AnexoDescansoSection';
 import DescansoHeader from '@/components/solicitud-descanso/DescansoHeader';
@@ -22,13 +25,6 @@ import ConfirmacionCorreoSection from '@/components/solicitud-certificado/Confir
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
 const formSchema = z.object({
-  tipoIdentificacion: z.string().min(1, "Este campo es requerido."),
-  numeroIdentificacion: z.string().min(5, "Debe tener al menos 5 dígitos.").regex(/^\d+$/, "Solo se permiten números."),
-  nombres: z.string().min(2, "Este campo es requerido."),
-  apellidos: z.string().min(2, "Este campo es requerido."),
-  correoElectronico: z.string().email("Correo electrónico inválido."),
-  numeroCelular: z.string().min(7, "Número de celular inválido.").regex(/^\d+$/, "Solo se permiten números."),
-  
   proceso: z.string().min(1, "Este campo es requerido."),
   dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
   coordinadorVoBo: z.string().min(2, "Este campo es requerido."),
@@ -65,20 +61,18 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const SolicitudDescansoSindicalPage: React.FC = () => {
+const SolicitudDescansoLaboralPageContent: React.FC = () => {
   const navigate = useNavigate();
+  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const activeConvenio = getActiveConvenio();
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tipoIdentificacion: 'CC',
-      numeroIdentificacion: '',
-      nombres: '',
-      apellidos: '',
-      correoElectronico: '',
-      numeroCelular: '',
-      proceso: '',
-      dondeRealizaProceso: '',
+      proceso: activeConvenio?.proceso || '',
+      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       coordinadorVoBo: '',
       fechaInicioDescanso: '',
       fechaFinalizacionDescanso: '',
@@ -88,6 +82,8 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
   });
 
   const onSubmit = async (data: FormValues) => {
+    if (!afiliado) return;
+    
     setIsSubmitting(true);
     try {
       const files: Record<string, File> = {};
@@ -97,12 +93,12 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
 
       const requestData = {
         request_type: 'compensacion-descanso',
-        id_type: data.tipoIdentificacion,
-        id_number: data.numeroIdentificacion,
-        name: data.nombres,
-        last_name: data.apellidos,
-        email: data.correoElectronico,
-        phone_number: data.numeroCelular,
+        id_type: afiliado.tipo_documento || '',
+        id_number: afiliado.documento || '',
+        name: afiliado.nombres || '',
+        last_name: afiliado.apellidos || '',
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
         payload: {
           proceso: data.proceso,
           dondeRealizaProceso: data.dondeRealizaProceso,
@@ -147,13 +143,6 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
       icon: <AlertCircle className="h-5 w-5 text-red-600" />,
     });
   };
-  
-  const idTypes = [
-    { value: "CC", label: "Cédula de Ciudadanía (CC)" },
-    { value: "CE", label: "Cédula de Extranjería (CE)" },
-    { value: "PP", label: "Pasaporte (PP)" },
-    { value: "PT", label: "Permiso por protección temporal (PT)" },
-  ];
 
   return (
     <MainLayout>
@@ -186,7 +175,8 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
-            <DatosPersonalesDescansoSection control={form.control} idTypes={idTypes} />
+            <DatosPersonalesReadOnly />
+            <InformacionProcesoAuth control={form.control} setValue={form.setValue} />
             <InformacionDescansoSection control={form.control} />
             <AnexoDescansoSection control={form.control} />
             <ConfirmacionCorreoSection />
@@ -216,6 +206,14 @@ const SolicitudDescansoSindicalPage: React.FC = () => {
         </Form>
       </div>
     </MainLayout>
+  );
+};
+
+const SolicitudDescansoSindicalPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <SolicitudDescansoLaboralPageContent />
+    </RequireAfiliadoAuth>
   );
 };
 
