@@ -7,7 +7,14 @@ interface VotesByHospitalProps {
   isLoading?: boolean;
 }
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+// Colores corporativos de ProSalud
+const COLORS = [
+  '#00529B', // ProSalud Blue
+  '#4CAF50', // ProSalud Green
+  '#17a2b8', // ProSalud Teal
+  '#003A70', // ProSalud Dark Blue
+  '#388E3C', // ProSalud Dark Green
+];
 
 export function VotesByHospitalChart({ data, isLoading }: VotesByHospitalProps) {
   if (isLoading) {
@@ -23,10 +30,29 @@ export function VotesByHospitalChart({ data, isLoading }: VotesByHospitalProps) 
     );
   }
 
-  const chartData = data.map(item => ({
-    name: item.voter_hospital,
-    value: item.vote_count
-  }));
+  // Asegurar que siempre haya datos, incluso si es un array vacío
+  const chartData = data && data.length > 0 
+    ? data.map(item => ({
+        name: item.voter_hospital,
+        value: item.vote_count
+      }))
+    : [];
+
+  // Si no hay datos, mostrar gráfica vacía con mensaje
+  if (chartData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Votos por Hospital</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            <p className="text-sm">No hay votos registrados para los filtros seleccionados</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -43,7 +69,7 @@ export function VotesByHospitalChart({ data, isLoading }: VotesByHospitalProps) 
               labelLine={false}
               label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
               outerRadius={80}
-              fill="#8884d8"
+              fill="#00529B"
               dataKey="value"
             >
               {chartData.map((_, index) => (

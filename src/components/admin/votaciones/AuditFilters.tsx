@@ -7,15 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter, X } from "lucide-react";
 import type { AuditFilters } from "@/types/votaciones";
 
+type FiltersWithoutPagination = Omit<AuditFilters, 'page' | 'per_page'>;
+
 interface AuditFiltersProps {
-  onFilterChange: (filters: AuditFilters) => void;
+  onFilterChange: (filters: FiltersWithoutPagination) => void;
   isLoading?: boolean;
 }
 
 export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFiltersProps) {
-  const [filters, setFilters] = useState<AuditFilters>({});
+  const [filters, setFilters] = useState<FiltersWithoutPagination>({});
 
-  const handleFilterChange = (key: keyof AuditFilters, value: string) => {
+  const handleFilterChange = (key: keyof FiltersWithoutPagination, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value || undefined }));
   };
 
@@ -28,7 +30,7 @@ export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFilter
     onFilterChange({});
   };
 
-  const hasActiveFilters = Object.keys(filters).some(key => filters[key as keyof AuditFilters]);
+  const hasActiveFilters = Object.keys(filters).some(key => filters[key as keyof FiltersWithoutPagination]);
 
   return (
     <Card>
