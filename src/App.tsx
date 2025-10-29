@@ -25,6 +25,7 @@ import AdminInventarioPage from '@/pages/AdminInventarioPage';
 import AdminBienestarPage from '@/pages/AdminBienestarPage';
 import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
 import AdminChatbotPage from '@/pages/AdminChatbotPage';
+import AdminVotacionesPage from '@/pages/AdminVotacionesPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -104,8 +105,9 @@ function App() {
             <Route path="/admin/bienestar" element={<AdminBienestarPage />} />
             <Route path="/admin/comfenalco" element={<AdminComfenalcoPage />} />
             <Route path="/admin/chatbot" element={<AdminChatbotPage />} />
+            <Route path="/admin/votaciones" element={<AdminVotacionesPage />} />
 
-            {/* Admin Routes 
+            {/* Admin Routes
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsuariosPage /></ProtectedRoute>} />
             <Route path="/admin/solicitudes" element={<ProtectedRoute><AdminSolicitudesPage /></ProtectedRoute>} />
