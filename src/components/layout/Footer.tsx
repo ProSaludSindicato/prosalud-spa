@@ -93,6 +93,17 @@ const Footer: React.FC = () => {
           {/* Column 4: Síguenos */}
           <div className="lg:col-span-2">
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Síguenos</h3>
+            <div className="flex space-x-4">
+              <a
+                href="https://www.facebook.com/share/17bJbpKbz1/?mibextid=wwXIfr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-secondary-prosaludgreen transition-colors"
+                aria-label="Facebook"
+              >
+                <Facebook size={22} />
+              </a>
+            </div>
             <p className="text-xs text-slate-500 mt-4">Mantente al día con nuestras novedades y actividades.</p>
           </div>
         </div>
