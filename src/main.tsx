@@ -3,11 +3,14 @@ import App from './App.tsx'
 import './index.css'
 import React from 'react'
 import { AuthProvider } from '@/context/AuthContext'
+import { AfiliadoAuthProvider } from '@/context/AfiliadoAuthContext'
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
-      <App />
+      <AfiliadoAuthProvider>
+        <App />
+      </AfiliadoAuthProvider>
     </AuthProvider>
   </React.StrictMode>
 );
