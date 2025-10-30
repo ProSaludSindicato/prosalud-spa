@@ -22,33 +22,6 @@ const TipoIncapacidadSection = <TFieldValues extends FieldValues>({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <FormField
           control={control}
-          name={"tipoDocumento" as any}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tipo de documento *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione el tipo" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="incapacidad-comun">Incapacidad de Origen Común</SelectItem>
-                  <SelectItem value="incapacidad-laboral">Incapacidad de Origen Laboral</SelectItem>
-                  <SelectItem value="licencia-maternidad">Licencia de Maternidad</SelectItem>
-                  <SelectItem value="licencia-paternidad">Licencia de Paternidad</SelectItem>
-                  <SelectItem value="licencia-luto">Licencia por Luto</SelectItem>
-                  <SelectItem value="licencia-calamidad">Licencia por Calamidad</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={control}
           name={"entidadExpedidora" as any}
           render={({ field }) => (
             <FormItem>
@@ -108,6 +81,33 @@ const TipoIncapacidadSection = <TFieldValues extends FieldValues>({
             </FormItem>
           )}
         />
+
+      <FormField
+          control={control}
+          name={"tipoDocumento" as any}
+          render={({ field }) => (
+              <FormItem>
+                  <FormLabel>Tipo de documento *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Seleccione el tipo" />
+                          </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                          <SelectItem value="incapacidad-comun">Incapacidad de Origen Común</SelectItem>
+                          <SelectItem value="incapacidad-laboral">Incapacidad de Origen Laboral</SelectItem>
+                          <SelectItem value="licencia-maternidad">Licencia de Maternidad</SelectItem>
+                          <SelectItem value="licencia-paternidad">Licencia de Paternidad</SelectItem>
+                          <SelectItem value="licencia-luto">Licencia por Luto</SelectItem>
+                          <SelectItem value="licencia-calamidad">Licencia por Calamidad</SelectItem>
+                          <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                  </Select>
+                  <FormMessage />
+              </FormItem>
+          )}
+      />
       </div>
 
       <div className="mt-6">

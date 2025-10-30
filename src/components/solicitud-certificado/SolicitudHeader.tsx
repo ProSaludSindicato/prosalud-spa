@@ -4,16 +4,13 @@
 
     const SolicitudHeader: React.FC = () => {
       return (
-        <header className="mb-8 text-center">
-          <div className="flex justify-center items-center gap-3 mb-4">
-            <FileText className="h-8 w-8 text-primary-prosalud-dark" />
-            <h1 className="text-3xl md:text-4xl font-bold text-primary-prosalud-dark tracking-tight">
+        <header className="mb-6">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary-prosalud-dark" />
+            <h1 className="text-xl md:text-2xl font-bold text-primary-prosalud-dark tracking-tight">
               Solicitud de Certificado de Convenio Sindical
             </h1>
           </div>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4">
-            Complete el siguiente formulario para solicitar su certificado de convenio sindical.
-          </p>
         </header>
       );
     };

@@ -37,9 +37,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             />
           </Avatar>
         ) : Icon && (
-          <Icon className="h-10 w-10 text-primary-prosalud group-hover:text-secondary-prosaludgreen transition-colors duration-200 flex-shrink-0 mt-1" />
+          <Icon className="h-10 w-10 text-primary-prosalud group-hover:text-white transition-colors duration-200 flex-shrink-0 mt-1" />
         )}
-        <h3 className="text-lg font-semibold text-text-dark group-hover:text-primary-prosalud transition-colors duration-200 leading-tight overflow-hidden" style={{
+        <h3 className="text-lg font-semibold text-text-dark group-hover:text-white transition-colors duration-200 leading-tight overflow-hidden" style={{
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -51,7 +51,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       {/* Descripción con altura fija */}
       <div className="mb-4 flex-grow min-h-[3rem]">
         {description ? (
-          <p className="text-sm text-text-gray overflow-hidden" style={{
+          <p className="text-sm text-text-gray group-hover:text-white transition-colors duration-200 overflow-hidden" style={{
             display: '-webkit-box',
             WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical',
@@ -65,7 +65,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       
       {/* Footer fijo */}
       <div className="mt-auto">
-        <span className="text-sm font-medium text-secondary-prosaludgreen group-hover:text-primary-prosalud flex items-center transition-colors duration-200">
+        <span className="text-sm font-medium text-secondary-prosaludgreen group-hover:text-white flex items-center transition-colors duration-200">
           Acceder al servicio
           <ArrowRight size={16} className="ml-2 transform group-hover:translate-x-1 transition-transform duration-200" />
         </span>
@@ -74,7 +74,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   );
 
   const commonClasses = cn(
-    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02] hover:bg-gray-50 dark:hover:bg-gray-800/50",
+    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02] hover:bg-prosalud-hover",
     className
   );
 

@@ -33,16 +33,13 @@ const GaleriaBienestarIntroSection: React.FC = () => {
               </div>
 
               <h2 className="mt-10 text-balance text-4xl font-bold md:text-5xl xl:text-5xl">Momentos que nos unen</h2>
-              <h3 className={`text-xl lg:text-2xl mt-1 mb-4 transition-all duration-500 ease-out delay-100 ${mounted && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                 Bienestar ProSalud
-              </h3>
-              <p className="mt-8">Cada encuentro deja una historia, una risa, un recuerdo. Explora nuestra galería y revive los momentos que nos unen. <br /> Porque en ProSalud, cuidarte también es celebrar contigo.</p>
+              <p className="mt-8">Cada encuentro deja una historia, una risa, un recuerdo. <br></br> Explora nuestra galería y revive los momentos que nos unen. <br /> Porque en ProSalud, cuidarte también es celebrar contigo.</p>
 
               <div className="md:pr-1.5 lg:pr-0 my-10">
                 <div className={`transition-all duration-500 ease-out delay-400 ${mounted && isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                   <Link to="/servicios/galeria-bienestar" aria-label="Explorar Bienestar ProSalud">
                     <Button size="lg" className="rounded-full group bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 shadow-md hover:shadow-lg transform transition-transform hover:-translate-y-0.5">
-                      Explorar Galería
+                      Explorar Bienestar
                       <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </Link>

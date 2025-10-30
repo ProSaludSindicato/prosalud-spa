@@ -15,7 +15,6 @@ import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
-import InformacionProcesoAuth from '@/components/shared/InformacionProcesoAuth';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
@@ -26,8 +25,6 @@ import AnexoCertificacionBancariaSection from '@/components/actualizar-cuenta/An
 const ALLOWED_FILE_TYPES_CERTIFICADO = ALLOWED_FILE_TYPES_ALL;
 
 const formSchemaActualizarCuenta = z.object({
-  proceso: z.string().min(1, "Este campo es requerido."),
-  dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
   
   certificacionBancaria: z.any()
     .refine(files => files && files.length > 0, "La certificación bancaria es requerida.")
@@ -47,8 +44,6 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
   const form = useForm<FormValuesActualizarCuenta>({
     resolver: zodResolver(formSchemaActualizarCuenta),
     defaultValues: {
-      proceso: activeConvenio?.proceso || '',
-      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       certificacionBancaria: undefined,
     },
   });
@@ -72,8 +67,8 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          proceso: data.proceso,
-          dondeRealizaProceso: data.dondeRealizaProceso
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || ''
         },
         files
       };
@@ -134,7 +129,6 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
-            <InformacionProcesoAuth control={form.control} setValue={form.setValue} />
             <AnexoCertificacionBancariaSection control={form.control} />
             <ConfirmacionCorreoSection /> {/* Removido el prop 'control' */}
             <AutorizacionDatosSection />

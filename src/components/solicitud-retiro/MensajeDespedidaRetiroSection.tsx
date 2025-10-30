@@ -9,7 +9,7 @@ const MensajeDespedidaRetiroSection: React.FC = () => {
         <Handshake className="h-14 w-14 mb-4 text-primary-prosalud" /> {/* Icono y color actualizados, animación de pulso eliminada */}
         <h2 className="text-2xl font-bold mb-3 text-primary-prosalud">¡Gracias por tu tiempo con nosotros!</h2> {/* Color de título actualizado */}
         <p className="text-lg mb-2">
-          Agradecemos sinceramente tu participación y contribución al sindicato ProSalud.
+          Agradecemos tu participación y contribución al sindicato ProSalud.
         </p>
         <p className="text-md">
           Te deseamos mucho éxito en tus futuros proyectos y metas. ¡Las puertas siempre estarán abiertas!

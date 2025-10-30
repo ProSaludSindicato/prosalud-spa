@@ -15,7 +15,6 @@ import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
-import InformacionProcesoAuth from '@/components/shared/InformacionProcesoAuth';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
@@ -39,8 +38,6 @@ const fileValidation = z.any().refine(files => {
 }, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).');
 
 const formSchemaAnualDiferida = z.object({
-  proceso: z.string().min(1, "Este campo es requerido."),
-  dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
   motivoSolicitud: z.string().min(1, "Este campo es requerido."),
 
   anexoFormatoDiligenciado: fileValidation,
@@ -61,8 +58,6 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
   const form = useForm<FormValuesAnualDiferida>({
     resolver: zodResolver(formSchemaAnualDiferida),
     defaultValues: {
-      proceso: activeConvenio?.proceso || '',
-      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       motivoSolicitud: '',
       anexoFormatoDiligenciado: undefined,
       anexoEvidenciaSolicitud: undefined,
@@ -92,8 +87,8 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          proceso: data.proceso,
-          dondeRealizaProceso: data.dondeRealizaProceso,
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || '',
           motivoSolicitud: data.motivoSolicitud
         },
         files
@@ -167,7 +162,6 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
-            <InformacionProcesoAuth control={form.control} setValue={form.setValue} />
             <InformacionAnualDiferidaSection control={form.control} />
             <AnexosAnualDiferidaSection control={form.control} />
             <ConfirmacionCorreoSection /> {/* Removed control prop */}

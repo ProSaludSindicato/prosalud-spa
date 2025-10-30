@@ -92,6 +92,7 @@ export default {
 				// Added specific ProSalud brand colors for the title
 				'prosalud-pro': '#0078a0',
 				'prosalud-salud': '#0095c8',
+				'prosalud-hover': '#0095c8', // Color para hover de cards
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

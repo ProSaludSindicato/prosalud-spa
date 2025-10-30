@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Form } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, AlertCircle, Send, Home, FileText } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,9 +13,9 @@ import { submitRequest } from '@/services/requestsService';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-certificado/utils';
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
-import InformacionProcesoSectionAuth from '@/components/verificacion-pagos/InformacionProcesoSectionAuth';
 import DetalleNovedadSection from '@/components/verificacion-pagos/DetalleNovedadSection';
 import ArchivoAnexoSection from '@/components/verificacion-pagos/ArchivoAnexoSection';
 import VerificacionHeader from '@/components/verificacion-pagos/VerificacionHeader';
@@ -24,11 +24,9 @@ import ConfirmacionCorreoSection from '@/components/solicitud-certificado/Confir
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
 const formSchema = z.object({
-  proceso: z.string().min(1, "Este campo es requerido."),
-  dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
   mesAnoNovedad: z.string().min(1, "Este campo es requerido."),
   solicitudRelacionadaCon: z.string().min(1, "Este campo es requerido."),
-  detalleNovedad: z.string().min(10, "Debe proporcionar al menos 10 caracteres.").max(800, "Máximo 800 caracteres."),
+  detalleNovedad: z.string().min(10, "Debe proporcionar al menos 10 caracteres.").max(500, "Máximo 500 caracteres."),
 
   archivoAnexo: z.any().optional().refine(files => {
     if (!files || files.length === 0) return true;
@@ -55,8 +53,6 @@ const VerificacionPagosPageContent: React.FC = () => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      proceso: activeConvenio?.proceso || '',
-      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       mesAnoNovedad: '',
       solicitudRelacionadaCon: '',
       detalleNovedad: '',
@@ -84,8 +80,8 @@ const VerificacionPagosPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          proceso: data.proceso,
-          dondeRealizaProceso: data.dondeRealizaProceso,
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || '',
           mesAnoNovedad: data.mesAnoNovedad,
           solicitudRelacionadaCon: data.solicitudRelacionadaCon,
           detalleNovedad: data.detalleNovedad
@@ -154,7 +150,56 @@ const VerificacionPagosPageContent: React.FC = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
-            <InformacionProcesoSectionAuth control={form.control} setValue={form.setValue} />
+            {/* Sección: Datos de la novedad (Mes/Año y Tipo) */}
+            <section className="p-6 border rounded-lg shadow-sm bg-white">
+              <h2 className="text-xl font-semibold mb-4 text-primary-prosalud-dark">Datos de la novedad</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <FormField
+                  control={form.control}
+                  name={"mesAnoNovedad" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mes y año de la novedad *</FormLabel>
+                      <FormControl>
+                        <input
+                          type="month"
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name={"solicitudRelacionadaCon" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Su solicitud está relacionada con *</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona el tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Auxilio de Escolaridad">Auxilio de Escolaridad</SelectItem>
+                            <SelectItem value="Auxilio de Salud">Auxilio de Salud</SelectItem>
+                            <SelectItem value="Auxilio de Solidaridad">Auxilio de Solidaridad</SelectItem>
+                            <SelectItem value="Compensación Anual Diferida">Compensación Anual Diferida</SelectItem>
+                            <SelectItem value="Compensación por Descanso">Compensación por Descanso</SelectItem>
+                            <SelectItem value="Otro">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+
             <DetalleNovedadSection control={form.control} />
             <ArchivoAnexoSection control={form.control} />
             <ConfirmacionCorreoSection />

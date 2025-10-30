@@ -12,18 +12,7 @@ interface InformacionAnualDiferidaSectionProps<TFieldValues extends FieldValues>
 const InformacionAnualDiferidaSection = <TFieldValues extends FieldValues>({
   control,
 }: InformacionAnualDiferidaSectionProps<TFieldValues>) => {
-  const procesos = [
-    "Auditor", "Auxiliar de enfermeria", "Auxiliar de farmacia", "Bacteriologo", "Conductor",
-    "Instrumentador", "Jefe de Enfermería", "Médico y/o Especialista", "Odontologo", "Regente",
-    "Secretario", "Técnico RX", "Terapeuta", "Otro administrativo", "Otro asistencial"
-  ];
-
-  const ubicaciones = [
-    "Bello",
-    "Caldas",
-    "La Maria",
-    "Rionegro"
-  ];
+  // Proceso y ubicación se obtienen del convenio activo y se envían por debajo
 
   const motivosSolicitud = [
     "Compra de vivienda", "Remodelación /Reforma", "Estudio", "CEII"
@@ -37,53 +26,9 @@ const InformacionAnualDiferidaSection = <TFieldValues extends FieldValues>({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <FormField
           control={control}
-          name={"proceso" as FieldPath<TFieldValues>}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Proceso *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione su proceso..." />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {procesos.map(proceso => (
-                    <SelectItem key={proceso} value={proceso}>{proceso}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name={"dondeRealizaProceso" as FieldPath<TFieldValues>}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Donde realiza el proceso *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione ubicación..." />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {ubicaciones.map(ubicacion => (
-                    <SelectItem key={ubicacion} value={ubicacion}>{ubicacion}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
           name={"motivoSolicitud" as FieldPath<TFieldValues>}
           render={({ field }) => (
-            <FormItem className="md:col-span-2">
+            <FormItem>
               <FormLabel>Motivo de la solicitud *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>

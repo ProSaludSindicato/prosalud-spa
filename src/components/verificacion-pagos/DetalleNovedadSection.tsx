@@ -28,11 +28,11 @@ const DetalleNovedadSection = <TFieldValues extends FieldValues>({
                 {...field}
                 placeholder="Agradecemos ser claro y específico con su consulta..."
                 className="min-h-32 resize-vertical"
-                maxLength={800}
+                maxLength={500}
               />
             </FormControl>
             <FormDescription>
-              Máximo 800 caracteres. Caracteres restantes: {800 - (field.value?.length || 0)}
+              Máximo 500 caracteres. Caracteres restantes: {500 - (field.value?.length || 0)}
             </FormDescription>
             <FormMessage />
           </FormItem>

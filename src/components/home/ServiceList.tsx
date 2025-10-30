@@ -72,7 +72,7 @@ const newServices: Service[] = [
   },
   { 
     icon: SearchIconLucide, 
-    title: 'Consulta de pagos', 
+    title: 'Verificación de pagos', 
     description: 'Verifica los pagos realizados por concepto sindical.', 
     linkTo: '/servicios/consulta-pagos', 
     category: 'Pagos',

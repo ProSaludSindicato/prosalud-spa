@@ -15,7 +15,6 @@ import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
-import InformacionProcesoAuth from '@/components/shared/InformacionProcesoAuth';
 
 import SolicitudRetiroHeader from '@/components/solicitud-retiro/SolicitudRetiroHeader';
 import InformacionGeneralRetiroSection from '@/components/solicitud-retiro/InformacionGeneralRetiroSection';
@@ -28,8 +27,6 @@ import AutorizacionDatosSection from '@/components/solicitud-certificado/Autoriz
 import MensajeDespedidaRetiroSection from '@/components/solicitud-retiro/MensajeDespedidaRetiroSection';
 
 const formSchema = z.object({
-  proceso: z.string().min(1, "Este campo es requerido."),
-  dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
 
   formatoRetiroAnexo: z.any().refine(files => {
     return files && files.length > 0;
@@ -58,8 +55,6 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      proceso: activeConvenio?.proceso || '',
-      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       formatoRetiroAnexo: undefined,
       confirmacionCorreo: false,
     },
@@ -84,8 +79,8 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          proceso: data.proceso,
-          dondeRealizaProceso: data.dondeRealizaProceso
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || ''
         },
         files
       };
@@ -157,7 +152,6 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DescargarFormatoRetiroSection />
             <DatosPersonalesReadOnly />
-            <InformacionProcesoAuth control={form.control} setValue={form.setValue} />
             <AnexoRetiroSection control={form.control} />
             <ConfirmacionCorreoSection />
             <AutorizacionDatosSection />

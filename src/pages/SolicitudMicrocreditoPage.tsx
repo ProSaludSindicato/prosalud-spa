@@ -35,16 +35,9 @@ const idTypes = [
   { value: "PP", label: "Pasaporte (PP)" },
   { value: "PT", label: "Permiso por protección temporal (PT)" },
 ];
-const sedesOptions = [
-  { value: "BELLO", label: "Bello" },
-  { value: "CALDAS", label: "Caldas" },
-  { value: "LA_MARIA", label: "La Maria" },
-  { value: "RIONEGRO", label: "Rionegro" },
-  { value: "GENERAL", label: "General" },
-];
+// La sede se obtiene del convenio activo (cliente) y se envía por debajo
 
 const microcreditoFormSchema = z.object({
-  sedeProceso: z.string({ required_error: "Sede es requerida." }).min(1, "Sede es requerida."),
   montoSolicitado: z.preprocess(
     (val) => (val === "" ? undefined : Number(String(val).replace(/\./g, ""))),
     z
@@ -73,7 +66,6 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
   const form = useForm<MicrocreditoFormValues>({
     resolver: zodResolver(microcreditoFormSchema),
     defaultValues: {
-      sedeProceso: "",
       montoSolicitado: undefined,
       numeroCuotas: undefined,
       confirmacionCorreo: false,
@@ -94,7 +86,7 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          sedeProceso: data.sedeProceso,
+          sedeProceso: (afiliado as any)?.convenios?.[0]?.cliente || "",
           montoSolicitado: data.montoSolicitado,
           numeroCuotas: data.numeroCuotas,
         },
@@ -144,15 +136,11 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
       </div>
 
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
-        <header className="mb-8 text-center">
-            <div className="flex justify-center items-center gap-3 mb-4">
-              <CreditCard className="h-8 w-8 text-primary-prosalud-dark" />
-              <h1 className="text-3xl font-bold text-primary-prosalud-dark">Solicitud - Microcrédito CEII</h1>
+        <header className="mb-6">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary-prosalud-dark" />
+              <h1 className="text-xl md:text-2xl font-bold text-primary-prosalud-dark">Solicitud - Microcrédito CEII</h1>
             </div>
-            <p className="mt-2 text-base text-muted-foreground max-w-3xl mx-auto">
-              Por favor, complete todos los campos del siguiente formulario para tramitar su solicitud de microcrédito.
-              Verifique que la información ingresada sea correcta.
-            </p>
           </header>
 
           <div className="space-y-4 mb-8">
@@ -194,30 +182,6 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
                   Información del Microcrédito
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="sedeProceso"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sede donde realiza el proceso *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione una sede..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {sedesOptions.map((sede) => (
-                              <SelectItem key={sede.value} value={sede.value}>
-                                {sede.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="montoSolicitado"

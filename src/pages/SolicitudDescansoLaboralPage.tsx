@@ -15,7 +15,6 @@ import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
-import InformacionProcesoAuth from '@/components/shared/InformacionProcesoAuth';
 import InformacionDescansoSection from '@/components/solicitud-descanso/InformacionDescansoSection';
 import AnexoDescansoSection from '@/components/solicitud-descanso/AnexoDescansoSection';
 import DescansoHeader from '@/components/solicitud-descanso/DescansoHeader';
@@ -25,8 +24,6 @@ import ConfirmacionCorreoSection from '@/components/solicitud-certificado/Confir
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
 const formSchema = z.object({
-  proceso: z.string().min(1, "Este campo es requerido."),
-  dondeRealizaProceso: z.string().min(1, "Este campo es requerido."),
   coordinadorVoBo: z.string().min(2, "Este campo es requerido."),
   fechaInicioDescanso: z.string().min(1, "Este campo es requerido.").refine((val) => {
     const date = new Date(val);
@@ -71,8 +68,6 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      proceso: activeConvenio?.proceso || '',
-      dondeRealizaProceso: activeConvenio?.cliente && activeConvenio.cliente !== 'SIN ASIGNAR' ? activeConvenio.cliente : '',
       coordinadorVoBo: '',
       fechaInicioDescanso: '',
       fechaFinalizacionDescanso: '',
@@ -100,8 +95,8 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
-          proceso: data.proceso,
-          dondeRealizaProceso: data.dondeRealizaProceso,
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || '',
           coordinadorVoBo: data.coordinadorVoBo,
           fechaInicioDescanso: data.fechaInicioDescanso,
           fechaFinalizacionDescanso: data.fechaFinalizacionDescanso
@@ -176,7 +171,6 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
-            <InformacionProcesoAuth control={form.control} setValue={form.setValue} />
             <InformacionDescansoSection control={form.control} />
             <AnexoDescansoSection control={form.control} />
             <ConfirmacionCorreoSection />

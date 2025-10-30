@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { toast } from 'sonner';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, IdCard, Hash, Calendar } from 'lucide-react';
 
 interface AfiliadoAuthModalProps {
   open: boolean;
@@ -75,7 +75,10 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
           <div className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
-                Tipo de documento
+                <span className="inline-flex items-center gap-2">
+                  <IdCard className="h-4 w-4 text-gray-500" />
+                  Tipo de documento
+                </span>
               </Label>
               <Select
                 value={formData.tipoDocumento}
@@ -95,7 +98,10 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
 
             <div className="space-y-2">
               <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
-                Número de documento
+                <span className="inline-flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-gray-500" />
+                  Número de documento
+                </span>
               </Label>
               <Input
                 id="numeroDocumento"
@@ -110,7 +116,10 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
 
             <div className="space-y-2">
               <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
-                Fecha de expedición
+                <span className="inline-flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  Fecha de expedición
+                </span>
               </Label>
               <Input
                 id="fechaExpedicion"
@@ -129,7 +138,7 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
               variant="outline" 
               onClick={onClose} 
               disabled={loading}
-              className="min-w-[100px] bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              className="min-w-[100px] bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-gray-800"
             >
               Cancelar
             </Button>
