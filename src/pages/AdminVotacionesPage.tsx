@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { StatisticsCards } from "@/components/admin/votaciones/StatisticsCards";
@@ -12,7 +12,17 @@ import { votacionesApi } from "@/services/votacionesApi";
 import { generateVotacionesExcelReport } from "@/components/admin/votaciones/utils/votacionesExcelGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Vote, BarChart3, FileDown } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Vote, BarChart3, FileDown, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
@@ -22,6 +32,10 @@ export default function AdminVotacionesPage() {
   const [statisticsFilters, setStatisticsFilters] = useState<StatisticsFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const [showUploadConfirmDialog, setShowUploadConfirmDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Query para estadísticas usando el endpoint especializado de hospital-statistics
   const { data: statsData, isLoading: statsLoading, isFetching: statsFetching, error: statsError } = useQuery<StatisticsResponse>({
@@ -170,6 +184,95 @@ export default function AdminVotacionesPage() {
     }
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    const validExtensions = ['.xlsx', '.xls'];
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!validExtensions.includes(fileExtension)) {
+      toast.error("Por favor seleccione un archivo Excel (.xlsx o .xls)");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Validar tamaño (máx 10 MB)
+    const maxSize = 10 * 1024 * 1024; // 10 MB en bytes
+    if (file.size > maxSize) {
+      toast.error("El archivo no puede exceder 10 MB");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setSelectedFile(file);
+    setShowUploadConfirmDialog(true);
+  };
+
+  const handleUploadConfirm = async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    setShowUploadConfirmDialog(false);
+
+    try {
+      const response = await votacionesApi.uploadActivosFile(selectedFile);
+
+      if (response.success) {
+        toast.success(response.message || "Archivo actualizado exitosamente", {
+          description: response.rows_count 
+            ? `Se procesaron ${response.rows_count} registros`
+            : undefined,
+          duration: 5000,
+        });
+      } else {
+        toast.error(response.message || "Error al actualizar el archivo", {
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error al cargar archivo:", error);
+      
+      let errorMessage = "Error al actualizar el archivo";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 422) {
+        errorMessage = "El archivo Excel no es válido o está corrupto";
+      } else if (error.response?.status === 500) {
+        errorMessage = "Error al guardar el archivo en el servidor";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage, {
+        duration: 5000,
+      });
+    } finally {
+      setIsUploading(false);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleUploadCancel = () => {
+    setShowUploadConfirmDialog(false);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6 p-6">
@@ -196,15 +299,33 @@ export default function AdminVotacionesPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Estadísticas de Votación</h2>
-                <Button
-                  onClick={handleExportStatistics}
-                  disabled={!statsData || statsLoading || statsFetching || !auditData}
-                  className="gap-2"
-                  variant="default"
-                >
-                  <FileDown className="h-4 w-4" />
-                  Exportar a Excel
-                </Button>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    onClick={handleUploadButtonClick}
+                    disabled={isUploading}
+                    className="gap-2"
+                    variant="secondary"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? "Cargando..." : "Cargar Activos"}
+                  </Button>
+                  <Button
+                    onClick={handleExportStatistics}
+                    disabled={!statsData || statsLoading || statsFetching || !auditData}
+                    className="gap-2"
+                    variant="default"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Exportar a Excel
+                  </Button>
+                </div>
               </div>
               <StatisticsFiltersComponent 
                 onFilterChange={handleStatisticsFilterChange}
@@ -292,6 +413,29 @@ export default function AdminVotacionesPage() {
             )}
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={showUploadConfirmDialog} onOpenChange={setShowUploadConfirmDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar carga de archivo</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Está seguro de que desea cargar este archivo?
+                <br />
+                <br />
+                Esta acción actualizará el registro de afiliados activos que pueden votar por delegado para la asamblea de ProSalud.
+                <br />
+                <br />
+                <strong>Archivo:</strong> {selectedFile?.name}
+                <br />
+                <strong>Tamaño:</strong> {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : 0} MB
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleUploadCancel}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleUploadConfirm}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

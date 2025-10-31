@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { buildAdminApiUrl } from '@/config/api';
 import type {
   StatisticsResponse,
   AuditTrailResponse,
@@ -7,6 +8,16 @@ import type {
 } from '@/types/votaciones';
 
 const API_BASE_URL = 'https://prosalud.laravel.cloud';
+
+interface ActivosUploadResponse {
+  success: boolean;
+  message: string;
+  file_path?: string;
+  file_size?: number;
+  rows_count?: number;
+  disk?: string;
+  error_code?: string;
+}
 
 export const votacionesApi = {
   /**
@@ -146,5 +157,25 @@ export const votacionesApi = {
         votes_by_date: [],
       },
     };
+  },
+
+  /**
+   * Carga un archivo Excel de afiliados activos para actualizar el registro de votantes
+   */
+  async uploadActivosFile(file: File): Promise<ActivosUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await axios.post<ActivosUploadResponse>(
+      buildAdminApiUrl('/api/activos-file/upload'),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data;
   },
 };
