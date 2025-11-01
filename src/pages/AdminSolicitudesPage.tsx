@@ -320,58 +320,72 @@ const AdminSolicitudesPage: React.FC = () => {
 
           {/* Stats Cards */}
           <motion.div variants={itemVariants}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               <Card className="border-l-4 border-l-blue-500 shadow-sm">
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Total Solicitudes</p>
-                      <p className="text-3xl font-bold text-blue-600">{stats?.total || 0}</p>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Total Solicitudes</p>
+                      <p className="text-2xl font-bold text-blue-600">{stats?.total || 0}</p>
                     </div>
-                    <div className="p-3 rounded-full">
-                      <Users className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 rounded-full">
+                      <Users className="h-5 w-5 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Pendientes</p>
-                      <p className="text-3xl font-bold text-yellow-600">{stats?.pending || 0}</p>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Pendientes</p>
+                      <p className="text-2xl font-bold text-yellow-600">{stats?.pending || 0}</p>
                     </div>
-                    <div className="p-3 rounded-full">
-                      <Clock className="h-6 w-6 text-yellow-600" />
+                    <div className="p-2 rounded-full">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-orange-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">En Revisión</p>
+                      <p className="text-2xl font-bold text-orange-600">{stats?.in_progress || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <FileText className="h-5 w-5 text-orange-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-green-500 shadow-sm">
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Resueltas</p>
-                      <p className="text-3xl font-bold text-green-600">{stats?.resolved || 0}</p>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Resueltas</p>
+                      <p className="text-2xl font-bold text-green-600">{stats?.resolved || 0}</p>
                     </div>
-                    <div className="p-3 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-2 rounded-full">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="border-l-4 border-l-purple-500 shadow-sm">
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-1">Este Mes</p>
-                      <p className="text-3xl font-bold text-purple-600">{stats?.this_month || 0}</p>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Este Mes</p>
+                      <p className="text-2xl font-bold text-purple-600">{stats?.this_month || 0}</p>
                     </div>
-                    <div className="rounded-full">
-                      <TrendingUp className="h-6 w-6 text-purple-600" />
+                    <div className="p-2 rounded-full">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
