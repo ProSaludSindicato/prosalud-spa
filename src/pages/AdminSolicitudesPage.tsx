@@ -57,7 +57,7 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
 const MAX_FILES = 4;
 
 const responseFormSchema = z.object({
-  newStatus: z.enum(["pending", "in_progress", "resolved", "rejected"], {
+  newStatus: z.enum(["in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
@@ -90,6 +90,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<"name" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
+  const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
 
 
   // Form para la respuesta
@@ -225,6 +226,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleViewDetails = (solicitud: Request) => {
     console.log("Ver detalles de solicitud:", solicitud);
     setSelectedSolicitud(solicitud);
+    // Resetear campos expandidos al abrir una nueva solicitud
+    setExpandedFields({});
   };
 
   const getRequestTypeLabel = (type: string) => {
@@ -246,10 +249,19 @@ const AdminSolicitudesPage: React.FC = () => {
     setIsSubmittingResponse(false); // Asegurar que el estado esté reseteado al abrir
     setSolicitudToRespond(solicitud);
     // Pre-llenar el formulario con valores por defecto basados en el estado actual
-    const defaultStatus = solicitud.status === "pending" ? "in_progress" : solicitud.status;
+    // Convertir "pending" a "in_progress" ya que "pending" no está disponible en el formulario
+    let defaultStatus: "in_progress" | "resolved" | "rejected" = "in_progress";
+    if (solicitud.status === "resolved") {
+      defaultStatus = "resolved";
+    } else if (solicitud.status === "rejected") {
+      defaultStatus = "rejected";
+    } else {
+      // Para "pending" o "in_progress", usar "in_progress"
+      defaultStatus = "in_progress";
+    }
     const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
     responseForm.reset({
-      newStatus: defaultStatus as "pending" | "in_progress" | "resolved" | "rejected",
+      newStatus: defaultStatus,
       emailSubject: `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`,
       emailBody: "",
       attachments: undefined,
@@ -281,18 +293,11 @@ const AdminSolicitudesPage: React.FC = () => {
       // Resetear estado
       setIsSubmittingResponse(false);
 
-      // Actualizar el estado localmente
+      // Actualizar el estado localmente con todas las respuestas
       if (selectedSolicitud?.id === solicitudId) {
-        setSelectedSolicitud((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: updatedRequest.status,
-                processed_at: updatedRequest.processed_at,
-                resolved_at: updatedRequest.resolved_at,
-              }
-            : null
-        );
+        setSelectedSolicitud(updatedRequest);
+        // Resetear campos expandidos cuando se actualiza la solicitud
+        setExpandedFields({});
       }
 
       // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
@@ -691,22 +696,29 @@ const AdminSolicitudesPage: React.FC = () => {
                               </TableCell>
                               <TableCell>
                                 <div>
-                                  {solicitud.payload?.proceso || solicitud.payload?.dondeRealizaProceso ? (
-                                    <>
-                                      {solicitud.payload.proceso && (
-                                        <p className="text-sm font-medium text-gray-900">
-                                          {solicitud.payload.proceso}
-                                        </p>
-                                      )}
-                                      {solicitud.payload.dondeRealizaProceso && (
-                                        <p className="text-xs text-gray-600 mt-1">
-                                          {solicitud.payload.dondeRealizaProceso}
-                                        </p>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <p className="text-sm text-gray-400 italic">No disponible</p>
-                                  )}
+                                  {(() => {
+                                    const hasProceso = solicitud.payload?.proceso && String(solicitud.payload.proceso).trim() !== '';
+                                    const hasHospital = solicitud.payload?.dondeRealizaProceso && String(solicitud.payload.dondeRealizaProceso).trim() !== '';
+                                    
+                                    if (!hasProceso && !hasHospital) {
+                                      return <p className="text-sm text-gray-400 italic">No disponible</p>;
+                                    }
+                                    
+                                    return (
+                                      <>
+                                        {hasProceso && (
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {solicitud.payload.proceso}
+                                          </p>
+                                        )}
+                                        {hasHospital && (
+                                          <p className={`text-xs text-gray-600 ${hasProceso ? 'mt-1' : ''}`}>
+                                            {solicitud.payload.dondeRealizaProceso}
+                                          </p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -808,7 +820,11 @@ const AdminSolicitudesPage: React.FC = () => {
 
           {/* Request Details Dialog */}
           {selectedSolicitud && (
-            <Dialog open={!!selectedSolicitud} onOpenChange={() => setSelectedSolicitud(null)}>
+            <Dialog open={!!selectedSolicitud} onOpenChange={() => {
+              setSelectedSolicitud(null);
+              // Resetear campos expandidos al cerrar el diálogo
+              setExpandedFields({});
+            }}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
                 <DialogTitle className="sr-only">
                   Detalles de Solicitud #{selectedSolicitud.id}
@@ -1016,6 +1032,135 @@ const AdminSolicitudesPage: React.FC = () => {
                       </CardContent>
                     </Card>
 
+                    {/* Historial de Respuestas */}
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200">
+                        <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
+                          <span>Historial de Respuestas</span>
+                          {selectedSolicitud.responses_count !== undefined && selectedSolicitud.responses_count > 0 && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {selectedSolicitud.responses_count} {selectedSolicitud.responses_count === 1 ? 'respuesta' : 'respuestas'}
+                            </Badge>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        {selectedSolicitud.responses && selectedSolicitud.responses.length > 0 ? (
+                          <div className="space-y-4">
+                            {selectedSolicitud.responses.map((response, index) => {
+                              const subjectKey = `response-${response.id}-subject`;
+                              const bodyKey = `response-${response.id}-body`;
+                              const isSubjectExpanded = expandedFields[subjectKey] || false;
+                              const isBodyExpanded = expandedFields[bodyKey] || false;
+                              
+                              const MAX_SUBJECT_LENGTH = 80;
+                              const MAX_BODY_LENGTH = 300;
+                              
+                              const shouldTruncateSubject = response.email_subject.length > MAX_SUBJECT_LENGTH;
+                              const shouldTruncateBody = response.email_body.length > MAX_BODY_LENGTH;
+                              
+                              const truncatedSubject = shouldTruncateSubject && !isSubjectExpanded
+                                ? response.email_subject.substring(0, MAX_SUBJECT_LENGTH) + '...'
+                                : response.email_subject;
+                              
+                              const truncatedBody = shouldTruncateBody && !isBodyExpanded
+                                ? response.email_body.substring(0, MAX_BODY_LENGTH) + '...'
+                                : response.email_body;
+                              
+                              // Format date
+                              const formattedDate = new Date(response.created_at).toLocaleString("es-ES", {
+                                day: "2-digit",
+                                month: "long",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              });
+                              
+                              return (
+                                <div
+                                  key={response.id}
+                                  className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                      <Badge className={getStatusColor(response.status)}>
+                                        {getStatusLabel(response.status)}
+                                      </Badge>
+                                      <span className="text-xs text-gray-500">
+                                        #{response.id} • {formattedDate}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Email Subject */}
+                                  <div className="mb-3">
+                                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                      Asunto del Correo
+                                    </label>
+                                    <div className="bg-white p-3 rounded-md border border-gray-200">
+                                      <p className="text-gray-900 text-sm whitespace-pre-wrap break-words">
+                                        {truncatedSubject}
+                                      </p>
+                                      {shouldTruncateSubject && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setExpandedFields(prev => ({
+                                              ...prev,
+                                              [subjectKey]: !isSubjectExpanded,
+                                            }));
+                                          }}
+                                          className="text-primary-prosalud hover:text-primary-prosalud-dark text-xs font-medium mt-2"
+                                        >
+                                          {isSubjectExpanded ? 'Ver menos' : 'Ver más'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Email Body */}
+                                  <div>
+                                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                      Cuerpo del Correo
+                                    </label>
+                                    <div className="bg-white p-3 rounded-md border border-gray-200">
+                                      <p className="text-gray-900 text-sm whitespace-pre-wrap break-words">
+                                        {truncatedBody.split('\n').map((line, i) => (
+                                          <React.Fragment key={i}>
+                                            {line}
+                                            {i < truncatedBody.split('\n').length - 1 && <br />}
+                                          </React.Fragment>
+                                        ))}
+                                      </p>
+                                      {shouldTruncateBody && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setExpandedFields(prev => ({
+                                              ...prev,
+                                              [bodyKey]: !isBodyExpanded,
+                                            }));
+                                          }}
+                                          className="text-primary-prosalud hover:text-primary-prosalud-dark text-xs font-medium mt-2"
+                                        >
+                                          {isBodyExpanded ? 'Ver menos' : 'Ver más'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            <Send className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm">No hay respuestas registradas para esta solicitud</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
                     {/* Acciones */}
                     {selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
@@ -1098,13 +1243,11 @@ const AdminSolicitudesPage: React.FC = () => {
                               {field.value ? (
                                 <div className="flex items-center gap-2">
                                   <div className={`h-3 w-3 rounded-full ${
-                                    field.value === "pending" ? "bg-yellow-500" :
                                     field.value === "in_progress" ? "bg-blue-500" :
                                     field.value === "resolved" ? "bg-green-500" :
                                     "bg-red-500"
                                   }`}></div>
                                   <span>{
-                                    field.value === "pending" ? "Pendiente" :
                                     field.value === "in_progress" ? "En Revisión" :
                                     field.value === "resolved" ? "Completado" :
                                     "Rechazado"
@@ -1116,12 +1259,6 @@ const AdminSolicitudesPage: React.FC = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="pending">
-                              <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
-                                <span>Pendiente</span>
-                              </div>
-                            </SelectItem>
                             <SelectItem value="in_progress">
                               <div className="flex items-center gap-2">
                                 <div className="h-3 w-3 rounded-full bg-blue-500"></div>

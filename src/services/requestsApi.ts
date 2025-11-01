@@ -13,6 +13,14 @@ const requestsApi = axios.create({
 });
 
 // Request and response interfaces based on the API documentation
+export interface ApiRequestResponse {
+  id: number;
+  status: "PENDING" | "IN_REVIEW" | "REJECTED" | "COMPLETED";
+  email_subject: string;
+  email_body: string;
+  created_at: string;
+}
+
 export interface ApiRequest {
   id: number;
   request_type: string;
@@ -29,6 +37,8 @@ export interface ApiRequest {
   formatted_created_at: string;
   processed_at: string | null;
   formatted_processed_at: string;
+  responses?: ApiRequestResponse[];
+  responses_count?: number;
 }
 
 export interface ApiResponse<T> {

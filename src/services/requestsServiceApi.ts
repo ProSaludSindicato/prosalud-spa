@@ -1,5 +1,5 @@
-import { requestsApiService, ApiRequest } from './requestsApi';
-import { Request, RequestStats } from '@/types/requests';
+import { requestsApiService, ApiRequest, ApiRequestResponse } from './requestsApi';
+import { Request, RequestResponse, RequestStats } from '@/types/requests';
 
 // Map API status to frontend status
 const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
@@ -15,6 +15,17 @@ const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
     default:
       return 'pending';
   }
+};
+
+// Map API response to frontend response
+const mapApiResponseToFrontendResponse = (apiResponse: ApiRequestResponse): RequestResponse => {
+  return {
+    id: apiResponse.id,
+    status: mapApiStatusToFrontendStatus(apiResponse.status),
+    email_subject: apiResponse.email_subject,
+    email_body: apiResponse.email_body,
+    created_at: apiResponse.created_at,
+  };
 };
 
 // Map frontend status to API status
@@ -51,6 +62,8 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
       ? apiRequest.processed_at 
       : undefined,
+    responses: apiRequest.responses?.map(mapApiResponseToFrontendResponse) || [],
+    responses_count: apiRequest.responses_count ?? apiRequest.responses?.length ?? 0,
   };
 };
 

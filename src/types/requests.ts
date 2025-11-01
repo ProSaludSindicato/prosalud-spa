@@ -1,3 +1,10 @@
+export interface RequestResponse {
+  id: number;
+  status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
+  email_subject: string;
+  email_body: string;
+  created_at: string;
+}
 
 export interface Request {
   id: string;
@@ -13,6 +20,8 @@ export interface Request {
   created_at: string;
   processed_at?: string;
   resolved_at?: string;
+  responses?: RequestResponse[];
+  responses_count?: number;
 }
 
 export interface RequestFilters {
