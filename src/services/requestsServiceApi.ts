@@ -48,7 +48,9 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     status: mapApiStatusToFrontendStatus(apiRequest.status),
     created_at: apiRequest.created_at || '',
     processed_at: apiRequest.processed_at,
-    resolved_at: apiRequest.status === 'COMPLETED' ? apiRequest.processed_at : undefined,
+    resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
+      ? apiRequest.processed_at 
+      : undefined,
   };
 };
 

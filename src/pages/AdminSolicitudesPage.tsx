@@ -620,7 +620,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gray-50">
-                            <TableHead className="w-1/4">
+                            <TableHead className="w-[18%]">
                               <Button
                                 variant="ghost"
                                 onClick={() => toggleSort("name")}
@@ -638,9 +638,10 @@ const AdminSolicitudesPage: React.FC = () => {
                                 )}
                               </Button>
                             </TableHead>
-                            <TableHead className="w-1/5">Tipo</TableHead>
-                            <TableHead className="w-1/6">Estado</TableHead>
-                            <TableHead className="w-1/6">
+                            <TableHead className="w-[15%]">Tipo</TableHead>
+                            <TableHead className="w-[20%]">Proceso y Hospital</TableHead>
+                            <TableHead className="w-[12%]">Estado</TableHead>
+                            <TableHead className="w-[15%]">
                               <Button
                                 variant="ghost"
                                 onClick={() => toggleSort("date")}
@@ -658,7 +659,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 )}
                               </Button>
                             </TableHead>
-                            <TableHead className="w-16">Acciones</TableHead>
+                            <TableHead className="w-[10%]">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -689,6 +690,26 @@ const AdminSolicitudesPage: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
+                                <div>
+                                  {solicitud.payload?.proceso || solicitud.payload?.dondeRealizaProceso ? (
+                                    <>
+                                      {solicitud.payload.proceso && (
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {solicitud.payload.proceso}
+                                        </p>
+                                      )}
+                                      {solicitud.payload.dondeRealizaProceso && (
+                                        <p className="text-xs text-gray-600 mt-1">
+                                          {solicitud.payload.dondeRealizaProceso}
+                                        </p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <p className="text-sm text-gray-400 italic">No disponible</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
                                 <Badge className={getStatusColor(solicitud.status)}>
                                   {getStatusLabel(solicitud.status)}
                                 </Badge>
@@ -711,6 +732,21 @@ const AdminSolicitudesPage: React.FC = () => {
                                   {solicitud.status === "resolved" && solicitud.resolved_at && (
                                     <p className="text-xs text-green-600 font-medium mt-1">
                                       ✓ Resuelto:{" "}
+                                      {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                      ,{" "}
+                                      {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                  )}
+                                  {solicitud.status === "rejected" && solicitud.resolved_at && (
+                                    <p className="text-xs text-red-600 font-medium mt-1">
+                                      ✗ Rechazado:{" "}
                                       {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
                                         day: "2-digit",
                                         month: "short",
