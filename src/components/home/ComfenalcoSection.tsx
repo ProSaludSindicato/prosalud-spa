@@ -175,7 +175,7 @@ const ComfenalcoSection: React.FC = () => {
     );
   }
 
-  if (events.length === 0) {
+  if (events.length === 0 || filteredEvents.length === 0) {
     return null;
   }
 
@@ -209,17 +209,19 @@ const ComfenalcoSection: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(prev => prev === 'upcoming' ? 'recent' : 'upcoming')}
-              className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white transition-colors"
-              title={sortOrder === 'upcoming' ? 'Cambiar a más recientes' : 'Cambiar a próximos'}
-            >
-              <Calendar className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">{sortOrder === 'upcoming' ? 'Próximos' : 'Recientes'}</span>
-              <span className="sm:hidden">{sortOrder === 'upcoming' ? 'Próx.' : 'Recientes'}</span>
-            </Button>
+            {filteredEvents.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSortOrder(prev => prev === 'upcoming' ? 'recent' : 'upcoming')}
+                className="text-primary-prosalud border-primary-prosalud hover:bg-primary-prosalud hover:text-white transition-colors"
+                title={sortOrder === 'upcoming' ? 'Cambiar a más recientes' : 'Cambiar a próximos'}
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">{sortOrder === 'upcoming' ? 'Próximos' : 'Recientes'}</span>
+                <span className="sm:hidden">{sortOrder === 'upcoming' ? 'Próx.' : 'Recientes'}</span>
+              </Button>
+            )}
             
             <div className="flex items-center gap-3">
               <Badge className="bg-green-100 text-green-700 font-semibold px-3 py-1.5 pointer-events-none">

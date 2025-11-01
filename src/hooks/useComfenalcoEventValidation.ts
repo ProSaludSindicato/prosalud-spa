@@ -113,7 +113,7 @@ export const useComfenalcoEventValidation = () => {
     };
   };
 
-  const validateUpdateEvent = (data: UpdateComfenalcoEventData): ValidationResult => {
+  const validateUpdateEvent = (data: UpdateComfenalcoEventData, skipDateValidation: boolean = false): ValidationResult => {
     const newErrors: ValidationErrors = {};
 
     // Title validation (if provided)
@@ -144,13 +144,15 @@ export const useComfenalcoEventValidation = () => {
       newErrors.display_size = 'El tamaño de visualización debe ser "carousel" o "mosaic"';
     }
 
-    // Date validations (if provided)
-    if (data.event_date && !validateDate(data.event_date)) {
-      newErrors.event_date = 'La fecha del evento debe ser hoy o una fecha futura';
-    }
+    // Date validations (if provided and not skipping validation)
+    if (!skipDateValidation) {
+      if (data.event_date && !validateDate(data.event_date)) {
+        newErrors.event_date = 'La fecha del evento debe ser hoy o una fecha futura';
+      }
 
-    if (data.registration_deadline && !validateDate(data.registration_deadline)) {
-      newErrors.registration_deadline = 'La fecha límite de registro debe ser hoy o una fecha futura';
+      if (data.registration_deadline && !validateDate(data.registration_deadline)) {
+        newErrors.registration_deadline = 'La fecha límite de registro debe ser hoy o una fecha futura';
+      }
     }
 
     // URL validation (if provided)

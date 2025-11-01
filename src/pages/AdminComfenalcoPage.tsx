@@ -73,6 +73,20 @@ const AdminComfenalcoPage: React.FC = () => {
     return error;
   };
 
+  // Helper function to check if event date has passed
+  const isEventDatePassed = (eventDate: string | undefined): boolean => {
+    if (!eventDate) return false;
+    
+    try {
+      const eventDateTime = new Date(eventDate + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return eventDateTime < today;
+    } catch {
+      return false;
+    }
+  };
+
   const [formValues, setFormValues] = useState<Omit<ComfenalcoEvent, 'id' | 'created_at' | 'updated_at'>>({
     title: '',
     banner_image: '',
@@ -363,8 +377,20 @@ const AdminComfenalcoPage: React.FC = () => {
         is_visible: formValues.is_visible,
       };
 
-      // Validate update data
-      const validation = validateUpdateEvent(updateData);
+      // Check if only visibility is being changed (for skipping date validation)
+      const onlyVisibilityChanged = 
+        formValues.title === selectedEvent.title &&
+        formValues.category === selectedEvent.category &&
+        formValues.description === (selectedEvent.description || '') &&
+        formValues.display_size === selectedEvent.display_size &&
+        formValues.event_date === (selectedEvent.event_date || '') &&
+        formValues.registration_deadline === (selectedEvent.registration_deadline || '') &&
+        formValues.registration_link === (selectedEvent.registration_link || '') &&
+        formValues.is_visible !== selectedEvent.is_visible &&
+        !bannerImageFile; // Also check if no new image is being uploaded
+
+      // Validate update data (skip date validation if only visibility is being changed)
+      const validation = validateUpdateEvent(updateData, onlyVisibilityChanged);
       if (!validation.isValid) {
         console.log('Validation errors:', validation.errors);
         toast.error("Error de validación", {
@@ -606,9 +632,15 @@ const AdminComfenalcoPage: React.FC = () => {
                               {event.category}
                             </Badge>
                             <div className="flex gap-1">
-                              <Badge variant={event.is_visible ? "default" : "secondary"} className="text-xs">
-                                {event.is_visible ? "Visible" : "Oculto"}
-                              </Badge>
+                              {isEventDatePassed(event.event_date) ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  Evento Vencido
+                                </Badge>
+                              ) : (
+                                <Badge variant={event.is_visible ? "default" : "secondary"} className="text-xs">
+                                  {event.is_visible ? "Visible" : "Oculto"}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                           <div className="flex-grow">
@@ -733,9 +765,15 @@ const AdminComfenalcoPage: React.FC = () => {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-600 block mb-2">Estado</label>
-                          <Badge variant={selectedEvent.is_visible ? "default" : "secondary"} className="ml-2">
-                            {selectedEvent.is_visible ? "Visible en web" : "Oculto en web"}
-                          </Badge>
+                          {isEventDatePassed(selectedEvent.event_date) ? (
+                            <Badge variant="destructive" className="ml-2">
+                              Evento Vencido
+                            </Badge>
+                          ) : (
+                            <Badge variant={selectedEvent.is_visible ? "default" : "secondary"} className="ml-2">
+                              {selectedEvent.is_visible ? "Visible en web" : "Oculto en web"}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -892,7 +930,7 @@ const AdminComfenalcoPage: React.FC = () => {
                       name="registration_deadline"
                       value={formValues.registration_deadline}
                       onChange={handleDateChange}
-                      min={new Date().toISOString().split('T')[0]}
+                      min={isEditing ? undefined : new Date().toISOString().split('T')[0]}
                       className={getFieldError('registration_deadline') ? 'border-red-500' : ''}
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -908,7 +946,7 @@ const AdminComfenalcoPage: React.FC = () => {
                       name="event_date"
                       value={formValues.event_date}
                       onChange={handleDateChange}
-                      min={formValues.registration_deadline || new Date().toISOString().split('T')[0]}
+                      min={isEditing ? undefined : (formValues.registration_deadline || new Date().toISOString().split('T')[0])}
                       className={getFieldError('event_date') ? 'border-red-500' : ''}
                     />
                     <p className="text-xs text-gray-500 mt-1">
