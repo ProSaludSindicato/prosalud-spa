@@ -1,5 +1,5 @@
-import React from 'react';
-import { Control, UseFormWatch, FieldValues } from 'react-hook-form';
+import React, { useEffect } from 'react';
+import { Control, UseFormWatch, FieldValues, useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
   watch,
 }: InformacionCertificadoSectionProps<TFieldValues>) => {
   const watchInfoCertificado = watch("infoCertificado" as any); // Use 'as any' if type inference is tricky
+  const { setValue } = useFormContext<TFieldValues>();
+
+  // Asegurar que fechaIngresoRetiro siempre sea true
+  useEffect(() => {
+    // @ts-ignore
+      setValue("infoCertificado.fechaIngresoRetiro" as any, true, { shouldValidate: false });
+  }, [setValue]);
 
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
@@ -30,7 +37,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       <div className="space-y-4">
         <FormField control={control} name={"infoCertificado.fechaIngresoRetiro" as any} render={({ field }) => (
             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                <FormControl><Checkbox checked={true} disabled={true} /></FormControl>
                 <FormLabel className="font-normal">Fecha de ingreso y retiro</FormLabel>
             </FormItem>
         )}/>

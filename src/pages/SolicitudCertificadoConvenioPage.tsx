@@ -26,7 +26,7 @@ const RECAPTCHA_SITE_KEY = "6LclSkArAAAAABXa8SIwimuDgPd8tjQbNzoBSlOZ";
 
 const formSchema = z.object({
   infoCertificado: z.object({
-    fechaIngresoRetiro: z.boolean().default(false),
+    fechaIngresoRetiro: z.boolean().default(true),
     valorCompensaciones: z.boolean().default(false),
     dirigidoAEntidad: z.boolean().default(false),
     paraSubsidioDesempleo: z.boolean().default(false),
@@ -109,7 +109,7 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       infoCertificado: {
-        fechaIngresoRetiro: false,
+        fechaIngresoRetiro: true,
         valorCompensaciones: false,
         dirigidoAEntidad: false,
         paraSubsidioDesempleo: false,
