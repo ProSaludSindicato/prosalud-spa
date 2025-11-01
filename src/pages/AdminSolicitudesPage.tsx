@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import ExportRequestsDialog from "@/components/admin/solicitudes/ExportRequestsDialog";
 import {
   FileText,
@@ -23,6 +26,8 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  Send,
+  Paperclip,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -30,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import DataPagination from "@/components/ui/data-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -38,22 +44,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import JsonView from "@uiw/react-json-view";
 import { requestsService } from "@/services/requestsServiceApi";
 import { Request } from "@/types/requests";
-import { useMemo } from "react";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
+
+// Schema para el formulario de respuesta
+const responseFormSchema = z.object({
+  newStatus: z.enum(["pending", "in_progress", "resolved", "rejected"], {
+    required_error: "Debe seleccionar un nuevo estado",
+  }),
+  emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
+  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
+  attachments: z.any().optional(),
+});
+
+type ResponseFormValues = z.infer<typeof responseFormSchema>;
 
 const AdminSolicitudesPage: React.FC = () => {
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [responseDialogOpen, setResponseDialogOpen] = useState(false);
+  const [solicitudToRespond, setSolicitudToRespond] = useState<Request | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
 
   const { toast } = useToast();
+
+  // Form para la respuesta
+  const responseForm = useForm<ResponseFormValues>({
+    resolver: zodResolver(responseFormSchema),
+    defaultValues: {
+      newStatus: "in_progress",
+      emailSubject: "",
+      emailBody: "",
+      attachments: undefined,
+    },
+  });
 
   const {
     data: allSolicitudes = [],
@@ -179,6 +211,98 @@ const AdminSolicitudesPage: React.FC = () => {
     setSelectedSolicitud(solicitud);
   };
 
+  const getRequestTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      "certificado-convenio": "Certificado de Convenio",
+      "compensacion-anual": "Compensación Anual Diferida",
+      "verificacion-pagos": "Verificación de Pagos",
+      "compensacion-descanso": "Compensación por Descanso",
+      "actualizar-cuenta": "Actualizar Cuenta Bancaria",
+      "retiro-sindical": "Retiro Sindical",
+      microcredito: "Microcrédito CEII",
+      "incapacidad-maternidad": "Incapacidad de Maternidad",
+      "permisos-turnos": "Permisos y Turnos",
+    };
+    return labels[type] || type;
+  };
+
+  const handleOpenResponseDialog = (solicitud: Request) => {
+    setSolicitudToRespond(solicitud);
+    // Pre-llenar el formulario con valores por defecto basados en el estado actual
+    const defaultStatus = solicitud.status === "pending" ? "in_progress" : solicitud.status;
+    const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
+    responseForm.reset({
+      newStatus: defaultStatus as "pending" | "in_progress" | "resolved" | "rejected",
+      emailSubject: `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`,
+      emailBody: "",
+      attachments: undefined,
+    });
+    setResponseDialogOpen(true);
+  };
+
+  const handleCloseResponseDialog = () => {
+    setResponseDialogOpen(false);
+    setSolicitudToRespond(null);
+    responseForm.reset();
+  };
+
+  const handleSubmitResponse = async (data: ResponseFormValues) => {
+    if (!solicitudToRespond) return;
+
+    setIsSubmittingResponse(true);
+    try {
+      // TODO: Aquí se conectará con la API REST cuando esté lista
+      // Por ahora solo simulamos el envío
+      console.log("Datos a enviar:", {
+        requestId: solicitudToRespond.id,
+        newStatus: data.newStatus,
+        emailSubject: data.emailSubject,
+        emailBody: data.emailBody,
+        attachments: data.attachments,
+      });
+
+      // Simulación de envío exitoso
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Actualizar el estado localmente antes de cerrar el modal
+      if (selectedSolicitud?.id === solicitudToRespond.id) {
+        setSelectedSolicitud((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: data.newStatus,
+                processed_at: new Date().toISOString(),
+                resolved_at: data.newStatus === "resolved" ? new Date().toISOString() : prev.resolved_at,
+              }
+            : null
+        );
+      }
+
+      handleCloseResponseDialog();
+      
+      // Refetch para actualizar la lista
+      await refetch();
+
+      // Mostrar toast después de que el modal se haya cerrado
+      setTimeout(() => {
+        toast({
+          title: "Respuesta enviada exitosamente",
+          description: `La respuesta a la solicitud #${solicitudToRespond.id} ha sido enviada exitosamente al afiliado.`,
+          duration: 4000,
+        });
+      }, 300);
+    } catch (error) {
+      console.error("Error sending response:", error);
+      setIsSubmittingResponse(false);
+      toast({
+        title: "Error al enviar respuesta",
+        description: error instanceof Error ? error.message : "No se pudo enviar la respuesta. Por favor, intente nuevamente.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  };
+
   const handleChangeStatus = async (id: string, newStatus: Request["status"]) => {
     try {
       await requestsService.updateRequestStatus(id, newStatus);
@@ -195,12 +319,16 @@ const AdminSolicitudesPage: React.FC = () => {
       });
 
       if (selectedSolicitud?.id === id) {
-        setSelectedSolicitud(prev => prev ? {
-          ...prev, 
-          status: newStatus,
-          processed_at: new Date().toISOString(),
-          resolved_at: newStatus === 'resolved' ? new Date().toISOString() : prev.resolved_at
-        } : null);
+        setSelectedSolicitud((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: newStatus,
+                processed_at: new Date().toISOString(),
+                resolved_at: newStatus === "resolved" ? new Date().toISOString() : prev.resolved_at,
+              }
+            : null
+        );
       }
 
       refetch();
@@ -249,21 +377,6 @@ const AdminSolicitudesPage: React.FC = () => {
       default:
         return status;
     }
-  };
-
-  const getRequestTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      "certificado-convenio": "Certificado de Convenio",
-      "compensacion-anual": "Compensación Anual Diferida",
-      "verificacion-pagos": "Verificación de Pagos",
-      "compensacion-descanso": "Compensación por Descanso",
-      "actualizar-cuenta": "Actualizar Cuenta Bancaria",
-      "retiro-sindical": "Retiro Sindical",
-      microcredito: "Microcrédito CEII",
-      "incapacidad-maternidad": "Incapacidad de Maternidad",
-      "permisos-turnos": "Permisos y Turnos",
-    };
-    return labels[type] || type;
   };
 
   const clearFilters = () => {
@@ -604,31 +717,10 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
-                                    {solicitud.status === "pending" && (
-                                      <>
-                                        <DropdownMenuItem
-                                          onClick={() => handleChangeStatus(solicitud.id, "in_progress")}
-                                        >
-                                          <div className="h-4 w-4 mr-2 bg-blue-600 rounded-full"></div>
-                                          Marcar en Revisión
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, "resolved")}>
-                                          <div className="h-4 w-4 mr-2 bg-green-600 rounded-full"></div>
-                                          Marcar como Completado
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={() => handleChangeStatus(solicitud.id, "rejected")}
-                                          className="text-red-600 focus:text-red-600"
-                                        >
-                                          <div className="h-4 w-4 mr-2 bg-red-600 rounded-full"></div>
-                                          Rechazar
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                    {solicitud.status === "in_progress" && (
-                                      <DropdownMenuItem onClick={() => handleChangeStatus(solicitud.id, "resolved")}>
-                                        <div className="h-4 w-4 mr-2 bg-green-600 rounded-full"></div>
-                                        Marcar como Completado
+                                    {(solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                      <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Dar Respuesta
                                       </DropdownMenuItem>
                                     )}
                                   </DropdownMenuContent>
@@ -869,26 +961,11 @@ const AdminSolicitudesPage: React.FC = () => {
                     {selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                         <Button
-                          variant="outline"
-                          onClick={() => handleChangeStatus(selectedSolicitud.id, "rejected")}
-                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-600"
-                        >
-                          Rechazar
-                        </Button>
-                        {selectedSolicitud.status === "pending" && (
-                          <Button
-                            variant="outline"
-                            onClick={() => handleChangeStatus(selectedSolicitud.id, "in_progress")}
-                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-600"
-                          >
-                            Marcar en Revisión
-                          </Button>
-                        )}
-                        <Button
-                          onClick={() => handleChangeStatus(selectedSolicitud.id, "resolved")}
+                          onClick={() => handleOpenResponseDialog(selectedSolicitud)}
                           className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
                         >
-                          Marcar como Completado
+                          <Send className="h-4 w-4 mr-2" />
+                          Dar Respuesta
                         </Button>
                       </div>
                     )}
@@ -897,6 +974,266 @@ const AdminSolicitudesPage: React.FC = () => {
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Response Dialog */}
+          <Dialog open={responseDialogOpen} onOpenChange={setResponseDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold text-gray-900">
+                  Dar Respuesta a Solicitud #{solicitudToRespond?.id}
+                </DialogTitle>
+                <DialogDescription>
+                  Complete el formulario para responder a la solicitud. El correo se enviará automáticamente al afiliado.
+                </DialogDescription>
+              </DialogHeader>
+
+              <Form {...responseForm}>
+                <form onSubmit={responseForm.handleSubmit(handleSubmitResponse)} className="space-y-6">
+                  {/* Información de la solicitud */}
+                  {solicitudToRespond && (
+                    <Card className="border border-gray-200 bg-gray-50">
+                      <CardContent className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600 font-medium">Solicitante:</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.name} {solicitudToRespond.last_name}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Correo:</p>
+                            <p className="text-gray-900">{solicitudToRespond.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
+                            <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Estado Actual:</p>
+                            <Badge className={getStatusColor(solicitudToRespond.status)}>
+                              {getStatusLabel(solicitudToRespond.status)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Nuevo Estado */}
+                  <FormField
+                    control={responseForm.control}
+                    name="newStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nuevo Estado *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              {field.value ? (
+                                <div className="flex items-center gap-2">
+                                  <div className={`h-3 w-3 rounded-full ${
+                                    field.value === "pending" ? "bg-yellow-500" :
+                                    field.value === "in_progress" ? "bg-blue-500" :
+                                    field.value === "resolved" ? "bg-green-500" :
+                                    "bg-red-500"
+                                  }`}></div>
+                                  <span>{
+                                    field.value === "pending" ? "Pendiente" :
+                                    field.value === "in_progress" ? "En Revisión" :
+                                    field.value === "resolved" ? "Completado" :
+                                    "Rechazado"
+                                  }</span>
+                                </div>
+                              ) : (
+                                <SelectValue placeholder="Seleccione el nuevo estado" />
+                              )}
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="pending">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                                <span>Pendiente</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="in_progress">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                                <span>En Revisión</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="resolved">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                <span>Completado</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="rejected">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                                <span>Rechazado</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Seleccione el estado que tendrá la solicitud después de enviar la respuesta.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Asunto del correo */}
+                  <FormField
+                    control={responseForm.control}
+                    name="emailSubject"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 100;
+                      const isNearLimit = currentLength > maxLength * 0.8;
+                      const isOverLimit = currentLength > maxLength;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Asunto del Correo *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ej: Respuesta a su solicitud #123" 
+                              {...field}
+                              maxLength={maxLength}
+                            />
+                          </FormControl>
+                          <div className="flex items-center justify-between">
+                            <FormDescription>
+                              El asunto del correo que se enviará al afiliado.
+                            </FormDescription>
+                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {currentLength}/{maxLength}
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  {/* Cuerpo del correo */}
+                  <FormField
+                    control={responseForm.control}
+                    name="emailBody"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 1500;
+                      const isNearLimit = currentLength > maxLength * 0.8;
+                      const isOverLimit = currentLength > maxLength;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Cuerpo del Correo *</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Escriba aquí el contenido de la respuesta al afiliado..."
+                              className="min-h-[200px]"
+                              {...field}
+                              maxLength={maxLength}
+                            />
+                          </FormControl>
+                          <div className="flex items-center justify-between">
+                            <FormDescription>
+                              El contenido del correo que se enviará al afiliado.
+                            </FormDescription>
+                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {currentLength}/{maxLength}
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  {/* Adjuntar archivos */}
+                  <FormField
+                    control={responseForm.control}
+                    name="attachments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4" />
+                            Adjuntar Archivos (Opcional)
+                          </div>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="file"
+                            multiple
+                            onChange={(e) => {
+                              field.onChange(e.target.files);
+                            }}
+                            className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Puede adjuntar uno o más archivos que se incluirán en el correo de respuesta (PDF, Word,
+                          imágenes, etc.).
+                        </FormDescription>
+                        {field.value && field.value.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {Array.from(field.value as FileList).map((file, index) => (
+                              <div
+                                key={index}
+                                className="p-2 border rounded-md bg-slate-50 flex items-center justify-between text-sm"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-gray-600" />
+                                  <span className="text-gray-700">{file.name}</span>
+                                  <span className="text-xs text-gray-500">
+                                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Botones de acción */}
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCloseResponseDialog}
+                      disabled={isSubmittingResponse}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingResponse}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    >
+                      {isSubmittingResponse ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Enviar Respuesta
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </motion.div>
       </div>
     </AdminLayout>
