@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_CONFIG } from "../config/api";
+import { getErrorMessage } from "@/utils/errorSanitizer";
 
 // API client for requests endpoints (no authentication required)
 const requestsApi = axios.create({
@@ -132,6 +133,104 @@ export const requestsApiService = {
     } catch (error) {
       handleApiError(error);
       throw error;
+    }
+  },
+
+  // Respond to request (with email and optional attachments)
+  async respondToRequest(
+    id: string,
+    data: {
+      status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED";
+      email_subject: string;
+      email_body: string;
+      attachments?: FileList;
+    }
+  ): Promise<ApiRequest> {
+    try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
+      // Si hay archivos adjuntos, usar FormData
+      if (data.attachments && data.attachments.length > 0) {
+        const formData = new FormData();
+        formData.append('status', data.status);
+        formData.append('email_subject', data.email_subject);
+        formData.append('email_body', data.email_body);
+        
+        // Agregar archivos como attachments[0], attachments[1], etc.
+        Array.from(data.attachments).forEach((file, index) => {
+          formData.append(`attachments[${index}]`, file);
+        });
+
+        const response = await requestsApi.post<ApiResponse<ApiRequest>>(
+          `/requests/${id}/respond`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+
+        if (!response.data.success) {
+          // Si hay errores de validación, construir mensaje detallado
+          if (response.data.errors) {
+            const errorMessages = Object.entries(response.data.errors)
+              .flatMap(([field, messages]) => 
+                Array.isArray(messages) 
+                  ? messages.map(msg => `${field}: ${msg}`)
+                  : [`${field}: ${messages}`]
+              )
+              .join('\n');
+            throw new Error(`Errores de validación:\n${errorMessages}`);
+          }
+          throw new Error(response.data.message || "Error al enviar la respuesta");
+        }
+
+        return response.data.data;
+      } else {
+        // Sin archivos, usar JSON
+        const response = await requestsApi.post<ApiResponse<ApiRequest>>(
+          `/requests/${id}/respond`,
+          {
+            status: data.status,
+            email_subject: data.email_subject,
+            email_body: data.email_body,
+          }
+        );
+
+        if (!response.data.success) {
+          // Si hay errores de validación, construir mensaje detallado
+          if (response.data.errors) {
+            const errorMessages = Object.entries(response.data.errors)
+              .flatMap(([field, messages]) => 
+                Array.isArray(messages) 
+                  ? messages.map(msg => `${field}: ${msg}`)
+                  : [`${field}: ${messages}`]
+              )
+              .join('\n');
+            throw new Error(`Errores de validación:\n${errorMessages}`);
+          }
+          throw new Error(response.data.message || "Error al enviar la respuesta");
+        }
+
+        return response.data.data;
+      }
+    } catch (error: any) {
+      // Sanitizar el error para evitar exponer información técnica al usuario
+      const sanitizedMessage = getErrorMessage(error);
+      
+      // Crear un nuevo error con el mensaje sanitizado
+      const sanitizedError = new Error(sanitizedMessage);
+      // Preservar información del error original para logging en consola (solo para desarrollo)
+      if (error.response) {
+        (sanitizedError as any).originalStatus = error.response.status;
+        (sanitizedError as any).originalData = error.response.data;
+      }
+      
+      throw sanitizedError;
     }
   },
 };

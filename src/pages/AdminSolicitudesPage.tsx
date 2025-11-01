@@ -28,10 +28,12 @@ import {
   AlertCircle,
   Send,
   Paperclip,
+  X,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/utils/errorSanitizer";
 import DataPagination from "@/components/ui/data-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { Input } from "@/components/ui/input";
@@ -51,13 +53,28 @@ import { Request } from "@/types/requests";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 // Schema para el formulario de respuesta
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
+const MAX_FILES = 4;
+
 const responseFormSchema = z.object({
   newStatus: z.enum(["pending", "in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
-  attachments: z.any().optional(),
+  attachments: z.any().optional().refine((files) => {
+    if (!files || files.length === 0) return true;
+    
+    // Validar cantidad de archivos
+    if (files.length > MAX_FILES) {
+      return false;
+    }
+    
+    // Validar tamaño de cada archivo
+    return Array.from(files as FileList).every(file => file.size <= MAX_FILE_SIZE);
+  }, {
+    message: `Puede adjuntar máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
+  }),
 });
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
@@ -74,7 +91,6 @@ const AdminSolicitudesPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
 
-  const { toast } = useToast();
 
   // Form para la respuesta
   const responseForm = useForm<ResponseFormValues>({
@@ -227,6 +243,7 @@ const AdminSolicitudesPage: React.FC = () => {
   };
 
   const handleOpenResponseDialog = (solicitud: Request) => {
+    setIsSubmittingResponse(false); // Asegurar que el estado esté reseteado al abrir
     setSolicitudToRespond(solicitud);
     // Pre-llenar el formulario con valores por defecto basados en el estado actual
     const defaultStatus = solicitud.status === "pending" ? "in_progress" : solicitud.status;
@@ -241,6 +258,7 @@ const AdminSolicitudesPage: React.FC = () => {
   };
 
   const handleCloseResponseDialog = () => {
+    setIsSubmittingResponse(false); // Resetear estado de envío al cerrar
     setResponseDialogOpen(false);
     setSolicitudToRespond(null);
     responseForm.reset();
@@ -250,55 +268,59 @@ const AdminSolicitudesPage: React.FC = () => {
     if (!solicitudToRespond) return;
 
     setIsSubmittingResponse(true);
+    const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
     try {
-      // TODO: Aquí se conectará con la API REST cuando esté lista
-      // Por ahora solo simulamos el envío
-      console.log("Datos a enviar:", {
-        requestId: solicitudToRespond.id,
+      // Enviar respuesta usando la API del backend
+      const updatedRequest = await requestsService.sendResponse(solicitudId, {
         newStatus: data.newStatus,
         emailSubject: data.emailSubject,
         emailBody: data.emailBody,
         attachments: data.attachments,
       });
 
-      // Simulación de envío exitoso
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Resetear estado
+      setIsSubmittingResponse(false);
 
-      // Actualizar el estado localmente antes de cerrar el modal
-      if (selectedSolicitud?.id === solicitudToRespond.id) {
+      // Actualizar el estado localmente
+      if (selectedSolicitud?.id === solicitudId) {
         setSelectedSolicitud((prev) =>
           prev
             ? {
                 ...prev,
-                status: data.newStatus,
-                processed_at: new Date().toISOString(),
-                resolved_at: data.newStatus === "resolved" ? new Date().toISOString() : prev.resolved_at,
+                status: updatedRequest.status,
+                processed_at: updatedRequest.processed_at,
+                resolved_at: updatedRequest.resolved_at,
               }
             : null
         );
       }
 
-      handleCloseResponseDialog();
+      // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
+      toast.success("Respuesta enviada exitosamente", {
+        description: `La respuesta a la solicitud #${solicitudId} ha sido enviada exitosamente al afiliado.`,
+        duration: 4000,
+      });
+
+      // Cerrar el modal después de un pequeño delay para que el usuario vea el toast
+      setTimeout(() => {
+        handleCloseResponseDialog();
+      }, 500);
       
       // Refetch para actualizar la lista
       await refetch();
-
-      // Mostrar toast después de que el modal se haya cerrado
-      setTimeout(() => {
-        toast({
-          title: "Respuesta enviada exitosamente",
-          description: `La respuesta a la solicitud #${solicitudToRespond.id} ha sido enviada exitosamente al afiliado.`,
-          duration: 4000,
-        });
-      }, 300);
     } catch (error) {
       console.error("Error sending response:", error);
+      
+      // Siempre resetear el estado primero
       setIsSubmittingResponse(false);
-      toast({
-        title: "Error al enviar respuesta",
-        description: error instanceof Error ? error.message : "No se pudo enviar la respuesta. Por favor, intente nuevamente.",
-        variant: "destructive",
-        duration: 5000,
+      
+      // Obtener mensaje sanitizado y amigable para el usuario
+      const errorMessage = getErrorMessage(error);
+      
+      // Mostrar toast de error SIN cerrar el modal para que el usuario pueda ver el error
+      toast.error("Error al enviar respuesta", {
+        description: errorMessage,
+        duration: 6000,
       });
     }
   };
@@ -313,8 +335,7 @@ const AdminSolicitudesPage: React.FC = () => {
         rejected: "Rechazada",
       };
 
-      toast({
-        title: `Solicitud ${statusLabels[newStatus]}`,
+      toast.success(`Solicitud ${statusLabels[newStatus]}`, {
         description: `La solicitud #${id} ha sido ${statusLabels[newStatus].toLowerCase()} exitosamente.`,
       });
 
@@ -334,10 +355,9 @@ const AdminSolicitudesPage: React.FC = () => {
       refetch();
     } catch (error) {
       console.error("Error updating request status:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo actualizar el estado de la solicitud",
-        variant: "destructive",
+      const errorMessage = getErrorMessage(error);
+      toast.error("Error al actualizar estado", {
+        description: errorMessage,
       });
     }
   };
@@ -754,6 +774,9 @@ const AdminSolicitudesPage: React.FC = () => {
           {selectedSolicitud && (
             <Dialog open={!!selectedSolicitud} onOpenChange={() => setSelectedSolicitud(null)}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+                <DialogTitle className="sr-only">
+                  Detalles de Solicitud #{selectedSolicitud.id}
+                </DialogTitle>
                 <div className="bg-white min-h-full">
                   <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div className="flex items-center space-x-3">
@@ -783,12 +806,12 @@ const AdminSolicitudesPage: React.FC = () => {
                             <label className="text-sm font-medium text-gray-700">Documento</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
                               <p className="text-gray-900">
-                                {selectedSolicitud.id_type}: {selectedSolicitud.id_number}
+                                {selectedSolicitud.id_type} {selectedSolicitud.id_number}
                               </p>
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Nombres</label>
+                            <label className="text-sm font-medium text-gray-700">Nombre completo</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
                               <p className="text-gray-900">
                                 {selectedSolicitud.name && selectedSolicitud.last_name
@@ -976,7 +999,14 @@ const AdminSolicitudesPage: React.FC = () => {
           )}
 
           {/* Response Dialog */}
-          <Dialog open={responseDialogOpen} onOpenChange={setResponseDialogOpen}>
+          <Dialog 
+            open={responseDialogOpen} 
+            onOpenChange={(open) => {
+              if (!open && !isSubmittingResponse) {
+                handleCloseResponseDialog();
+              }
+            }}
+          >
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold text-gray-900">
@@ -1157,49 +1187,120 @@ const AdminSolicitudesPage: React.FC = () => {
                   <FormField
                     control={responseForm.control}
                     name="attachments"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          <div className="flex items-center gap-2">
-                            <Paperclip className="h-4 w-4" />
-                            Adjuntar Archivos (Opcional)
-                          </div>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="file"
-                            multiple
-                            onChange={(e) => {
-                              field.onChange(e.target.files);
-                            }}
-                            className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Puede adjuntar uno o más archivos que se incluirán en el correo de respuesta (PDF, Word,
-                          imágenes, etc.).
-                        </FormDescription>
-                        {field.value && field.value.length > 0 && (
-                          <div className="mt-2 space-y-2">
-                            {Array.from(field.value as FileList).map((file, index) => (
-                              <div
-                                key={index}
-                                className="p-2 border rounded-md bg-slate-50 flex items-center justify-between text-sm"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-gray-600" />
-                                  <span className="text-gray-700">{file.name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const files = field.value ? Array.from(field.value as FileList) : [];
+                      const hasFiles = files.length > 0;
+                      
+                      const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                        if (!e.target.files || e.target.files.length === 0) {
+                          field.onChange(undefined);
+                          return;
+                        }
+
+                        const selectedFiles = Array.from(e.target.files);
+                        
+                        // Validar cantidad de archivos
+                        if (selectedFiles.length > MAX_FILES) {
+                          toast.error("Error al seleccionar archivos", {
+                            description: `Solo puede adjuntar un máximo de ${MAX_FILES} archivos.`,
+                            duration: 4000,
+                          });
+                          e.target.value = '';
+                          return;
+                        }
+
+                        // Validar tamaño de cada archivo
+                        const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+                        if (oversizedFiles.length > 0) {
+                          toast.error("Error al seleccionar archivos", {
+                            description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                            duration: 5000,
+                          });
+                          e.target.value = '';
+                          return;
+                        }
+
+                        field.onChange(e.target.files);
+                      };
+
+                      return (
+                        <FormItem>
+                          <FormLabel>
+                            <div className="flex items-center gap-2">
+                              <Paperclip className="h-4 w-4" />
+                              Adjuntar Archivos (Opcional)
+                            </div>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="file"
+                              multiple
+                              onChange={handleFileChange}
+                              className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Puede adjuntar máximo {MAX_FILES} archivos. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
+                            Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG).
+                          </FormDescription>
+                          {hasFiles && (
+                            <div className="mt-2 space-y-2">
+                              {files.map((file, index) => {
+                                const fileSizeMB = file.size / (1024 * 1024);
+                                const isOversized = file.size > MAX_FILE_SIZE;
+                                
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`p-2 border rounded-md flex items-center justify-between text-sm ${
+                                      isOversized ? 'bg-red-50 border-red-200' : 'bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <FileText className={`h-4 w-4 shrink-0 ${isOversized ? 'text-red-600' : 'text-gray-600'}`} />
+                                      <span className={`truncate ${isOversized ? 'text-red-700 font-medium' : 'text-gray-700'}`}>
+                                        {file.name}
+                                      </span>
+                                      <span className={`text-xs shrink-0 ${isOversized ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                                        ({fileSizeMB.toFixed(2)} MB)
+                                        {isOversized && ' - EXCEDE LÍMITE'}
+                                      </span>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-100"
+                                      onClick={() => {
+                                        const dataTransfer = new DataTransfer();
+                                        files.forEach((f, i) => {
+                                          if (i !== index) {
+                                            dataTransfer.items.add(f);
+                                          }
+                                        });
+                                        field.onChange(dataTransfer.files.length > 0 ? dataTransfer.files : undefined);
+                                        if (dataTransfer.files.length === 0) {
+                                          const input = document.querySelector('input[type="file"][multiple]') as HTMLInputElement;
+                                          if (input) input.value = '';
+                                        }
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                              {files.length >= MAX_FILES && (
+                                <p className="text-xs text-orange-600 font-medium">
+                                  Ha alcanzado el límite de {MAX_FILES} archivos.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   {/* Botones de acción */}
