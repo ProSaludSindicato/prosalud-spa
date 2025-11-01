@@ -798,7 +798,13 @@ const AdminSolicitudesPage: React.FC = () => {
                                               <span className="text-xs font-medium text-gray-600">
                                                 {formatFieldName(nestedKey)}:
                                               </span>
-                                              <span className="text-xs text-gray-900 ml-2">
+                                              <span className={`text-xs ml-2 font-medium ${
+                                                nestedValue === true || nestedValue === "true" 
+                                                  ? "text-green-600" 
+                                                  : nestedValue === false || nestedValue === "false" 
+                                                    ? "text-red-600" 
+                                                    : "text-gray-900"
+                                              }`}>
                                                 {nestedValue === true || nestedValue === "true" ? "✓ Sí" : 
                                                  nestedValue === false || nestedValue === "false" ? "✗ No" : 
                                                  String(nestedValue)}

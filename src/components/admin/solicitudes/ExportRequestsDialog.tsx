@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Download, FileText, FileSpreadsheet, Calendar } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, FileText, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { requestsService } from '@/services/requestsServiceApi';
 import { generateRequestsPDFReport } from './utils/requestsPdfGenerator';
 import { generateRequestsExcelReport } from './utils/requestsExcelGenerator';
+import { requestTypeLabels } from '@/data/requestsMock';
 import * as XLSX from 'xlsx';
 
 interface ExportRequestsDialogProps {
@@ -27,6 +29,7 @@ interface DateRangeFilter {
 
 const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpenChange }) => {
   const [format, setFormat] = useState<ReportFormat>('pdf');
+  const [requestType, setRequestType] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
   });
@@ -75,9 +78,14 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
 
       let filteredRequests = allRequests;
       
+      // Filter by request type if specified
+      if (requestType !== 'all') {
+        filteredRequests = filteredRequests.filter(request => request.request_type === requestType);
+      }
+      
       // Filter by date range if specified
       if (!dateRange.includeAll && dateRange.start && dateRange.end) {
-        filteredRequests = allRequests.filter(request => {
+        filteredRequests = filteredRequests.filter(request => {
           const requestDate = new Date(request.created_at);
           return requestDate >= dateRange.start! && requestDate <= dateRange.end!;
         });
@@ -186,6 +194,38 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
                   <p className="text-sm font-semibold">Excel</p>
                   <p className="text-xs text-gray-600">Hoja de cálculo</p>
                 </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Request Type Filter */}
+          <Card className="border border-gray-200">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center space-x-3">
+                <Filter className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Tipo de Solicitud</h4>
+                  <p className="text-sm text-gray-600">
+                    Filtra las solicitudes por tipo específico
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
+                <Select value={requestType} onValueChange={setRequestType}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos los tipos de solicitudes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos de solicitudes</SelectItem>
+                    {Object.entries(requestTypeLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
