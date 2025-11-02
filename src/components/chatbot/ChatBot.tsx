@@ -35,7 +35,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useChatbotState } from "./hooks/useChatbotState";
 import { useChatbotPersistence } from "./hooks/useChatbotPersistence";
 import { useChatbotAPI } from "./hooks/useChatbotAPI";
-import { useChatbotInactivity } from "./hooks/useChatbotInactivity";
 
 // Importar tipos
 import { Message, ChatbotFormData } from "./types/chatbot.types";
@@ -83,7 +82,6 @@ import { SuggestionsPanel } from "./components/SuggestionsPanel";
 import { RateLimitWarning } from "./components/RateLimitWarning";
 import { TypingIndicator } from "./components/TypingIndicator";
 import { ScrollToBottomButton } from "./components/ScrollToBottomButton";
-import { SessionTimeoutDialog } from "./components/SessionTimeoutDialog";
 import { markdownRenderers } from "./components/MarkdownRenderers";
 
 // Registrar lenguajes para syntax highlighting
@@ -99,43 +97,9 @@ export default function ChatBot() {
   const { loadPersistedState, saveStateToStorage, clearPersistedState } = useChatbotPersistence();
   const { solicitarRespuestaConOpenAI, saveConversationToBackend, updateBackendRating, updateBackendRatingByClientTurnId, checkRateLimit } = useChatbotAPI();
 
-  // Estado local para el diálogo de timeout
-  const [showTimeoutDialog, setShowTimeoutDialog] = React.useState(false);
-
   // Determinar si es móvil y el ancho del chat
   const isMobile = useIsMobile();
   const chatWidth = isMobile ? "w-80" : "w-[28rem]"; // Aumentado de w-96 (24rem) a w-[28rem]
-
-  /**
-   * Maneja el timeout de inactividad del chatbot
-   */
-  const handleInactivityTimeout = useCallback(() => {
-    // Agregar mensaje de cierre del bot
-    const timeoutMessage = {
-      role: "assistant",
-      content: "👋 Hemos notado que llevas un tiempo sin interactuar. Tu sesión ha finalizado por inactividad. ¡Gracias por usar nuestro servicio!",
-      isBot: true,
-    };
-    
-    state.setMessages((prev: Message[]) => [...prev, timeoutMessage]);
-    
-    // Guardar mensaje de cierre en backend
-    saveConversationToBackend({
-      conversation_id: state.conversationId,
-      user_question: "[SISTEMA: Timeout por inactividad]",
-      bot_answer: timeoutMessage.content,
-      metadata: { type: "session_timeout" },
-    });
-
-    // Mostrar el diálogo de feedback
-    setShowTimeoutDialog(true);
-  }, [state, saveConversationToBackend]);
-
-  // Hook de inactividad
-  const { updateActivity, resetInactivityTimer } = useChatbotInactivity({
-    isOpen: state.isOpen,
-    onTimeout: handleInactivityTimeout,
-  });
 
   /**
    * Inicializa los mensajes del chat
@@ -257,10 +221,6 @@ export default function ChatBot() {
         console.log("❌ Early return:", { text, isTyping: state.isTyping });
         return;
       }
-
-      // Registrar actividad del usuario
-      updateActivity();
-      resetInactivityTimer();
 
       // Bloqueo inmediato si ya se alcanzó el rate limit
       const alreadyExceeded =
@@ -774,8 +734,6 @@ export default function ChatBot() {
       solicitarRespuestaConOpenAI,
       checkRateLimit,
       scrollToBottomWithRetry,
-      updateActivity,
-      resetInactivityTimer,
     ]
   );
 
@@ -786,16 +744,11 @@ export default function ChatBot() {
     (suggestion: string) => {
       state.setInputMessage(suggestion);
       state.setIsSuggestionsExpanded(false);
-      
-      // Registrar actividad
-      updateActivity();
-      resetInactivityTimer();
-      
       setTimeout(() => {
         state.textareaRef.current?.focus();
       }, 0);
     },
-    [state, updateActivity, resetInactivityTimer]
+    [state]
   );
 
   /**
@@ -811,16 +764,11 @@ export default function ChatBot() {
         // Mostrar sugerencias si hay texto
         state.setShowSpellCheckSuggestions(value.trim().length > 0);
 
-        // Registrar actividad cuando el usuario escribe
-        if (value.trim().length > 0) {
-          updateActivity();
-          resetInactivityTimer();
-        }
-
         adjustTextareaHeight();
       }
     },
-    [state, updateActivity, resetInactivityTimer]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   /**
@@ -1380,40 +1328,6 @@ export default function ChatBot() {
   }, [state]);
 
   /**
-   * Maneja el cierre del diálogo de timeout y limpia la conversación
-   */
-  const handleTimeoutDialogClose = useCallback(async () => {
-    setShowTimeoutDialog(false);
-    
-    // Limpiar la conversación y cerrar el chat
-    await startNewChat();
-    state.setIsOpen(false);
-  }, [startNewChat, state]);
-
-  /**
-   * Guarda el feedback del usuario al cerrar por timeout
-   */
-  const handleSaveTimeoutFeedback = useCallback(async (feedback: "like" | "dislike") => {
-    try {
-      // Intentar actualizar el feedback en el backend
-      // Usamos el conversation_id para asociar el feedback a toda la conversación
-      await saveConversationToBackend({
-        conversation_id: state.conversationId,
-        user_question: "[SISTEMA: Feedback de sesión]",
-        bot_answer: `Usuario indicó que la conversación fue ${feedback === "like" ? "útil" : "no muy útil"}`,
-        feedback: feedback,
-        metadata: { 
-          type: "session_feedback",
-          session_ended_by: "timeout"
-        },
-      });
-      console.log(`✅ Feedback de sesión guardado: ${feedback}`);
-    } catch (error) {
-      console.error("❌ Error guardando feedback de sesión:", error);
-    }
-  }, [state.conversationId, saveConversationToBackend]);
-
-  /**
    * Renderiza el indicador de escritura
    */
   const renderTypingIndicator = useCallback(() => {
@@ -1764,14 +1678,6 @@ export default function ChatBot() {
           </Tooltip>
         </TooltipProvider>
       )}
-
-      {/* Diálogo de timeout de sesión */}
-      <SessionTimeoutDialog
-        open={showTimeoutDialog}
-        conversationId={state.conversationId}
-        onClose={handleTimeoutDialogClose}
-        onSaveFeedback={handleSaveTimeoutFeedback}
-      />
     </>
   );
 }
