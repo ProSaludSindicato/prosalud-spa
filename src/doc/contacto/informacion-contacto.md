@@ -39,7 +39,7 @@ Colombia
 - **Ubicación**: Sede principal - Medellín
 
 ### Atención Telefónica
-- **Lunes a Viernes**: 7:00 AM - 6:00 PM
+- **Lunes a Viernes**: 7:00 AM - 5:00 PM
 - **Línea principal**: (604) 444-5555
 
 ### Servicios Digitales

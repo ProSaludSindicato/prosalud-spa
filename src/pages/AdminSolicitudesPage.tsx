@@ -698,7 +698,9 @@ const AdminSolicitudesPage: React.FC = () => {
                                 <div>
                                   {(() => {
                                     const hasProceso = solicitud.payload?.proceso && String(solicitud.payload.proceso).trim() !== '';
-                                    const hasHospital = solicitud.payload?.dondeRealizaProceso && String(solicitud.payload.dondeRealizaProceso).trim() !== '';
+                                    const hasDondeRealiza = solicitud.payload?.dondeRealizaProceso && String(solicitud.payload.dondeRealizaProceso).trim() !== '';
+                                    const hasSedeProceso = solicitud.payload?.sedeProceso && String(solicitud.payload.sedeProceso).trim() !== '';
+                                    const hasHospital = hasDondeRealiza || hasSedeProceso;
                                     
                                     if (!hasProceso && !hasHospital) {
                                       return <p className="text-sm text-gray-400 italic">No disponible</p>;
@@ -711,9 +713,14 @@ const AdminSolicitudesPage: React.FC = () => {
                                             {solicitud.payload.proceso}
                                           </p>
                                         )}
-                                        {hasHospital && (
+                                        {hasDondeRealiza && (
                                           <p className={`text-xs text-gray-600 ${hasProceso ? 'mt-1' : ''}`}>
                                             {solicitud.payload.dondeRealizaProceso}
+                                          </p>
+                                        )}
+                                        {!hasDondeRealiza && hasSedeProceso && (
+                                          <p className={`text-xs text-gray-600 ${hasProceso ? 'mt-1' : ''}`}>
+                                            {solicitud.payload.sedeProceso}
                                           </p>
                                         )}
                                       </>

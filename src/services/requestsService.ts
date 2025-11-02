@@ -9,7 +9,7 @@ export interface RequestData {
   email: string;
   phone_number: string;
   payload: Record<string, any>;
-  files?: Record<string, File>;
+  files?: Record<string, File | FileList>;
 }
 
 export const submitRequest = async (requestData: RequestData): Promise<any> => {
@@ -48,8 +48,24 @@ export const submitRequest = async (requestData: RequestData): Promise<any> => {
     
     // Add files if present
     if (requestData.files) {
-      Object.entries(requestData.files).forEach(([key, file]) => {
-        if (file) {
+      Object.entries(requestData.files).forEach(([key, fileOrFileList]) => {
+        if (fileOrFileList) {
+          // Handle both File and FileList
+          let file: File;
+          if (fileOrFileList instanceof FileList) {
+            // Extract first file from FileList
+            if (fileOrFileList.length > 0) {
+              file = fileOrFileList[0];
+            } else {
+              return; // Skip if FileList is empty
+            }
+          } else if (fileOrFileList instanceof File) {
+            file = fileOrFileList;
+          } else {
+            console.warn(`Invalid file type for key "${key}":`, fileOrFileList);
+            return; // Skip invalid file types
+          }
+          
           formData.append(`files[${key}]`, file);
         }
       });
