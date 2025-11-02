@@ -7,8 +7,6 @@ import type {
   AuditFilters,
 } from '@/types/votaciones';
 
-const API_BASE_URL = 'https://prosalud.laravel.cloud';
-
 interface ActivosUploadResponse {
   success: boolean;
   message: string;
@@ -32,7 +30,7 @@ export const votacionesApi = {
     if (filters?.end_date) params.append('end_date', filters.end_date);
     
     const response = await axios.get<StatisticsResponse>(
-      `${API_BASE_URL}/api/votes/statistics`,
+      buildAdminApiUrl('/api/votes/statistics'),
       { params }
     );
     
@@ -51,7 +49,7 @@ export const votacionesApi = {
     }
     
     const response = await axios.get<StatisticsResponse>(
-      `${API_BASE_URL}/api/votes/hospital-statistics`,
+      buildAdminApiUrl('/api/votes/hospital-statistics'),
       { params }
     );
     
@@ -72,7 +70,7 @@ export const votacionesApi = {
     // Intentar primero sin parámetros para ver si el backend devuelve todos los registros
     try {
       const firstResponse = await axios.get<AuditTrailResponse>(
-        `${API_BASE_URL}/api/votes/audit-trail`
+        buildAdminApiUrl('/api/votes/audit-trail')
       );
       
       const firstData = firstResponse.data;
@@ -109,7 +107,7 @@ export const votacionesApi = {
     while (hasMorePages) {
       try {
         const response = await axios.get<AuditTrailResponse>(
-          `${API_BASE_URL}/api/votes/audit-trail`,
+          buildAdminApiUrl('/api/votes/audit-trail'),
           { params: { page: currentPage, per_page: perPage } }
         );
         
