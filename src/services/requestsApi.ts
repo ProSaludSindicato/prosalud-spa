@@ -21,6 +21,15 @@ export interface ApiRequestResponse {
   created_at: string;
 }
 
+export interface ApiRequestFile {
+  original_name: string;
+  mime_type: string;
+  size: number;
+  original_key: string;
+  download_url: string | null;
+  url_expires_at: string | null;
+}
+
 export interface ApiRequest {
   id: number;
   request_type: string;
@@ -39,6 +48,8 @@ export interface ApiRequest {
   formatted_processed_at: string;
   responses?: ApiRequestResponse[];
   responses_count?: number;
+  files?: Record<string, ApiRequestFile>;
+  files_count?: number;
 }
 
 export interface ApiResponse<T> {
@@ -241,6 +252,28 @@ export const requestsApiService = {
       }
       
       throw sanitizedError;
+    }
+  },
+
+  // Download a specific file from a request
+  async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
+    try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!requestId || typeof requestId !== 'string' || !/^\d{10}$/.test(requestId)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
+      const response = await requestsApi.get(
+        `/requests/${requestId}/files/${fileKey}`,
+        {
+          responseType: 'blob', // Important: specify blob response type
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
     }
   },
 };

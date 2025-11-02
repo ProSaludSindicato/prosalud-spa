@@ -1,0 +1,211 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { RequestFile } from '@/types/requests';
+import { Download, FileText, Image, File, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { requestsService } from '@/services/requestsServiceApi';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/utils/errorSanitizer';
+
+interface RequestFilesSectionProps {
+  requestId: string;
+  files: Record<string, RequestFile>;
+  filesCount?: number;
+}
+
+const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
+  requestId,
+  files,
+  filesCount,
+}) => {
+  const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) {
+      return Image;
+    }
+    if (mimeType === 'application/pdf') {
+      return FileText;
+    }
+    return File;
+  };
+
+  const getFileTypeColor = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) {
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
+    if (mimeType === 'application/pdf') {
+      return 'bg-red-100 text-red-700 border-red-200';
+    }
+    if (mimeType.includes('word') || mimeType.includes('document')) {
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) {
+      return 'bg-green-100 text-green-700 border-green-200';
+    }
+    return 'bg-gray-100 text-gray-700 border-gray-200';
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const isUrlExpired = (urlExpiresAt: string | null): boolean => {
+    if (!urlExpiresAt) return true;
+    return new Date(urlExpiresAt) < new Date();
+  };
+
+  const handleDownload = async (fileKey: string, file: RequestFile) => {
+    // Always use the download endpoint to force download (not open in new tab)
+    setDownloadingFiles(prev => new Set(prev).add(fileKey));
+    
+    try {
+      const blob = await requestsService.downloadFile(requestId, fileKey);
+      
+      // Create a download link to force download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.original_name;
+      // Force download attribute
+      link.setAttribute('download', file.original_name);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Archivo descargado', {
+        description: `El archivo "${file.original_name}" se ha descargado correctamente.`,
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      const errorMessage = getErrorMessage(error);
+      toast.error('Error al descargar archivo', {
+        description: errorMessage,
+      });
+    } finally {
+      setDownloadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileKey);
+        return newSet;
+      });
+    }
+  };
+
+  const handleOpen = (file: RequestFile) => {
+    // Open in new tab using the temporary URL
+    if (file.download_url && !isUrlExpired(file.url_expires_at)) {
+      window.open(file.download_url, '_blank');
+    }
+  };
+
+  const fileEntries = Object.entries(files || {});
+
+  if (fileEntries.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="border border-gray-200 shadow-sm">
+      <CardHeader className="bg-gray-50 border-b border-gray-200">
+        <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
+          <span>Archivos Adjuntos</span>
+          {filesCount !== undefined && filesCount > 0 && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              {filesCount} {filesCount === 1 ? 'archivo' : 'archivos'}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="space-y-3">
+          {fileEntries.map(([fileKey, file]) => {
+            const FileIcon = getFileIcon(file.mime_type);
+            const isDownloading = downloadingFiles.has(fileKey);
+            const urlExpired = isUrlExpired(file.url_expires_at);
+            const canUseUrl = file.download_url && !urlExpired;
+
+            return (
+              <div
+                key={fileKey}
+                className="border border-gray-200 rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={`p-2 rounded-md ${getFileTypeColor(file.mime_type)}`}>
+                      <FileIcon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-medium text-gray-900 truncate capitalize">
+                          {file.original_key.replace(/([A-Z])/g, ' $1').trim()}
+                        </h4>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs shrink-0 bg-gray-100`}
+                        >
+                          {file.mime_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span>{formatFileSize(file.size)}</span>
+                        <span>•</span>
+                        <span>{file.original_name}</span>
+                      </div>
+                      {urlExpired && file.download_url && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>URL temporal expirada, se usará el endpoint de descarga</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canUseUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpen(file)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Abrir
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(fileKey, file)}
+                      disabled={isDownloading}
+                      className="text-gray-500 bg-gray-100 hover:text-gray-700 hover:bg-gray-200"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Descargando...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-1" />
+                          Descargar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default RequestFilesSection;
+

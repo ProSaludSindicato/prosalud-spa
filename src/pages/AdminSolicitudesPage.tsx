@@ -47,10 +47,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import JsonView from "@uiw/react-json-view";
 import { requestsService } from "@/services/requestsServiceApi";
 import { Request } from "@/types/requests";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
+import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
 
 // Schema para el formulario de respuesta
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
@@ -293,13 +293,6 @@ const AdminSolicitudesPage: React.FC = () => {
       // Resetear estado
       setIsSubmittingResponse(false);
 
-      // Actualizar el estado localmente con todas las respuestas
-      if (selectedSolicitud?.id === solicitudId) {
-        setSelectedSolicitud(updatedRequest);
-        // Resetear campos expandidos cuando se actualiza la solicitud
-        setExpandedFields({});
-      }
-
       // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
       toast.success("Respuesta enviada exitosamente", {
         description: `La respuesta a la solicitud #${solicitudId} ha sido enviada exitosamente al afiliado.`,
@@ -311,8 +304,40 @@ const AdminSolicitudesPage: React.FC = () => {
         handleCloseResponseDialog();
       }, 500);
       
-      // Refetch para actualizar la lista
-      await refetch();
+      // Refetch para actualizar la lista primero
+      const refetchResult = await refetch();
+      
+      // Actualizar la solicitud seleccionada con los datos más recientes del servidor
+      // Esto asegura que tenemos la información completa incluyendo archivos y respuestas actualizadas
+      if (selectedSolicitud?.id === solicitudId) {
+        // Usar los datos del refetch primero (más rápido)
+        const refetchedData = refetchResult.data || [];
+        const updatedFromList = refetchedData.find(req => req.id === solicitudId);
+        
+        if (updatedFromList) {
+          // Si encontramos en la lista refetch, usar esos datos
+          setSelectedSolicitud(updatedFromList);
+          setExpandedFields({});
+        } else {
+          // Si no está en la lista, obtener directamente del servidor
+          try {
+            const refreshedRequest = await requestsService.getRequestById(solicitudId);
+            if (refreshedRequest) {
+              setSelectedSolicitud(refreshedRequest);
+              setExpandedFields({});
+            } else {
+              // Fallback final: usar updatedRequest
+              setSelectedSolicitud(updatedRequest);
+              setExpandedFields({});
+            }
+          } catch (error) {
+            console.error("Error al actualizar la solicitud seleccionada:", error);
+            // Fallback: usar updatedRequest
+            setSelectedSolicitud(updatedRequest);
+            setExpandedFields({});
+          }
+        }
+      }
     } catch (error) {
       console.error("Error sending response:", error);
       
@@ -1038,6 +1063,15 @@ const AdminSolicitudesPage: React.FC = () => {
                         </div>
                       </CardContent>
                     </Card>
+
+                    {/* Archivos Adjuntos */}
+                    {selectedSolicitud.files && Object.keys(selectedSolicitud.files).length > 0 && (
+                      <RequestFilesSection
+                        requestId={selectedSolicitud.id}
+                        files={selectedSolicitud.files}
+                        filesCount={selectedSolicitud.files_count}
+                      />
+                    )}
 
                     {/* Historial de Respuestas */}
                     <Card className="border border-gray-200 shadow-sm">
