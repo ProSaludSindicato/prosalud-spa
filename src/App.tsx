@@ -21,6 +21,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 import AdminUsuariosPage from '@/pages/AdminUsuariosPage';
 import AdminRolesPage from '@/pages/AdminRolesPage';
 import AdminSolicitudesPage from '@/pages/AdminSolicitudesPage';
+import AdminSolicitudBienestarPage from '@/pages/AdminSolicitudBienestarPage';
 import AdminInventarioPage from '@/pages/AdminInventarioPage';
 import AdminBienestarPage from '@/pages/AdminBienestarPage';
 import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
@@ -101,6 +102,7 @@ function App() {
             <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
             <Route path="/admin/roles" element={<AdminRolesPage />} />
             <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
+            <Route path="/admin/solicitudes-bienestar" element={<AdminSolicitudBienestarPage />} />
             <Route path="/admin/inventario" element={<AdminInventarioPage />} />
             <Route path="/admin/bienestar" element={<AdminBienestarPage />} />
             <Route path="/admin/comfenalco" element={<AdminComfenalcoPage />} />

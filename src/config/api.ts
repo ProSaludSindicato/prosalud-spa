@@ -9,6 +9,7 @@ export const API_CONFIG = {
   ENDPOINTS: {
     COMFENALCO_EVENTS: '/api/comfenalco-events',
     WELLNESS_EVENTS: '/api/wellness-events',
+    WELLNESS_REQUESTS: '/api/wellness-requests',
     REQUESTS: '/api/requests',
     USERS: '/api/users',
     ROLES: '/api/roles',

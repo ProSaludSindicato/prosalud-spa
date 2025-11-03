@@ -241,6 +241,7 @@ const AdminSolicitudesPage: React.FC = () => {
       microcredito: "Microcrédito CEII",
       "incapacidad-maternidad": "Incapacidad de Maternidad",
       "permisos-turnos": "Permisos y Turnos",
+      "solicitud-bienestar": "Solicitud de Bienestar",
     };
     return labels[type] || type;
   };

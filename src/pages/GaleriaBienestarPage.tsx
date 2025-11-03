@@ -18,7 +18,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Image, GalleryVertical, Home } from "lucide-react"
+import { Image, GalleryVertical, Home, Settings2 } from "lucide-react"
 import { usePagination } from "@/hooks/usePagination"
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeleton";
 
@@ -137,7 +137,7 @@ const GaleriaBienestarPage: React.FC = () => {
         </Breadcrumb>
       </div>
       <div className="container mx-auto pt-6 pb-20 px-4 md:px-6 lg:px-8 py-10">
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
           <div className="flex justify-center items-center gap-3 mb-4">
             <Image className="h-8 w-8 text-primary-prosalud-dark" />
             <h1 className="text-3xl md:text-4xl font-bold text-primary-prosalud-dark tracking-tight">
@@ -147,6 +147,15 @@ const GaleriaBienestarPage: React.FC = () => {
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4 mb-4">
             Explora los momentos y actividades que hemos compartido juntos, fortaleciendo nuestra comunidad ProSalud.
           </p>
+          {/* Botón discreto para acceso administrativo */}
+          <Link
+            to="/admin/solicitudes-bienestar"
+            className="absolute top-0 right-4 text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 opacity-60 hover:opacity-100"
+            title="Acceso administrativo"
+          >
+            <Settings2 className="h-3 w-3" />
+            <span className="hidden sm:inline">Admin</span>
+          </Link>
         </div>
 
         <EventFilters

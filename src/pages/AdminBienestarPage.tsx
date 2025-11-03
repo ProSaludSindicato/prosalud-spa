@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -130,7 +130,7 @@ const AdminBienestarPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="bg-primary-prosalud/10 p-3 rounded-lg">
-                      <Heart className="h-8 w-8 text-primary-prosalud" />
+                      <Images className="h-8 w-8 text-primary-prosalud" />
                     </div>
                     <div>
                       <CardTitle className="text-3xl font-bold text-primary-prosalud">

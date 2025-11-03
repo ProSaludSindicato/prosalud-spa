@@ -177,7 +177,8 @@ export const requestTypeLabels: Record<string, string> = {
   'actualizar-cuenta': 'Actualizar Cuenta Bancaria',
   'microcredito': 'Microcrédito CEII',
   'incapacidad-licencia': 'Incapacidades y Licencias',
-  'permisos-turnos': 'Permisos y Cambio de Turnos'
+  'permisos-turnos': 'Permisos y Cambio de Turnos',
+  'solicitud-bienestar': 'Solicitud de Bienestar'
 };
 
 export const statusLabels: Record<string, string> = {

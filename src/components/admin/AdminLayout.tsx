@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, GraduationCap, Handshake, FileText, BarChart3, Settings, Heart, 
-  Menu, X, LogOut, Home, ChevronRight, ClipboardList, Package, MessageSquare, Vote
+  Menu, X, LogOut, Home, ChevronRight, ClipboardList, Package, MessageSquare, Vote, Images
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -27,7 +27,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Roles y Permisos', href: '/admin/roles', icon: Settings },
     { name: 'Inventario', href: '/admin/inventario', icon: Package },
     { name: 'Solicitudes', href: '/admin/solicitudes', icon: ClipboardList },
-    { name: 'Galería Bienestar', href: '/admin/bienestar', icon: Heart },
+    { name: 'Solicitudes Bienestar', href: '/admin/solicitudes-bienestar', icon: Heart },
+    { name: 'Galería Bienestar', href: '/admin/bienestar', icon: Images },
     { name: 'Experiencias Comfenalco', href: '/admin/comfenalco', icon: GraduationCap },
     { name: 'Chatbot', href: '/admin/chatbot', icon: MessageSquare },
     { name: 'Votaciones Asamblea', href: '/admin/votaciones', icon: Vote },
