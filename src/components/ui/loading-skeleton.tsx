@@ -1,3 +1,4 @@
+import React from "react";
 import { Skeleton } from "./skeleton";
 
 export const PageLoadingSkeleton = () => {
@@ -42,19 +43,27 @@ export const CardLoadingSkeleton = () => {
   );
 };
 
-export const TableLoadingSkeleton = () => {
+interface TableLoadingSkeletonProps {
+  columns?: number;
+  rows?: number;
+}
+
+export const TableLoadingSkeleton: React.FC<TableLoadingSkeletonProps> = ({ 
+  columns = 4, 
+  rows = 5 
+}) => {
   return (
     <div className="space-y-3 animate-fade-in">
       {/* Header */}
       <div className="flex space-x-4 border-b pb-2">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(columns)].map((_, i) => (
           <Skeleton key={i} className="h-4 flex-1" />
         ))}
       </div>
       {/* Rows */}
-      {[...Array(5)].map((_, i) => (
+      {[...Array(rows)].map((_, i) => (
         <div key={i} className="flex space-x-4 py-3">
-          {[...Array(4)].map((_, j) => (
+          {[...Array(columns)].map((_, j) => (
             <Skeleton key={j} className="h-8 flex-1" />
           ))}
         </div>
