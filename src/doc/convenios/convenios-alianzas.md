@@ -8,10 +8,13 @@ ProSalud mantiene convenios con instituciones de salud en Antioquia, permitiendo
 ### Hospitales Asociados
 
 - Hospital Marco Fidel Suárez - Bello
-- Hospital San Juan de Dios - Rionegro  
+- Hospital San Juan de Dios - Rionegro
+- E.S.E. La Maria
 - Hospital Santa Elena - Fredonia
 - Hospital Venancio Díaz Díaz - La Ceja
 - Hospital La Merced - Ciudad Bolívar
+- San Juan de Dios de Abejorral
+- San Antonio de Cisneros
 
 ### Instituciones Especializadas
 

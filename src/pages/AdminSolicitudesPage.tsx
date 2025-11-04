@@ -464,7 +464,12 @@ const AdminSolicitudesPage: React.FC = () => {
                       <FileText className="h-8 w-8 text-primary-prosalud" />
                     </div>
                     <div>
-                      <CardTitle className="text-3xl font-bold text-primary-prosalud">Gestión de Solicitudes</CardTitle>
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-3xl font-bold text-primary-prosalud">Gestión de Solicitudes</CardTitle>
+                        <Badge variant="secondary" className="text-base px-3 py-1">
+                          Total: {stats?.total || 0}
+                        </Badge>
+                      </div>
                       <CardDescription className="text-base mt-2">
                         Administra y procesa las solicitudes de los usuarios de ProSalud
                       </CardDescription>
@@ -485,20 +490,6 @@ const AdminSolicitudesPage: React.FC = () => {
           {/* Stats Cards */}
           <motion.div variants={itemVariants}>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <Card className="border-l-4 border-l-blue-500 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-600 mb-1">Total Solicitudes</p>
-                      <p className="text-2xl font-bold text-blue-600">{stats?.total || 0}</p>
-                    </div>
-                    <div className="p-2 rounded-full">
-                      <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -513,15 +504,15 @@ const AdminSolicitudesPage: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-orange-500 shadow-sm">
+              <Card className="border-l-4 border-l-blue-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600 mb-1">En Revisión</p>
-                      <p className="text-2xl font-bold text-orange-600">{stats?.in_progress || 0}</p>
+                      <p className="text-2xl font-bold text-blue-600">{stats?.in_progress || 0}</p>
                     </div>
                     <div className="p-2 rounded-full">
-                      <FileText className="h-5 w-5 text-orange-600" />
+                      <FileText className="h-5 w-5 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -536,6 +527,20 @@ const AdminSolicitudesPage: React.FC = () => {
                     </div>
                     <div className="p-2 rounded-full">
                       <CheckCircle className="h-5 w-5 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-red-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Rechazadas</p>
+                      <p className="text-2xl font-bold text-red-600">{stats?.rejected || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <X className="h-5 w-5 text-red-600" />
                     </div>
                   </div>
                 </CardContent>

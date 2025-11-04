@@ -241,7 +241,7 @@ export const configApi = {
     await delay(300);
     return {
       yearsExperience: 10,
-      conventionsCount: 7, // Updated to match actual convenios count
+      conventionsCount: 10, // Updated to match actual convenios count
       affiliatesCount: 1500
     };
   },

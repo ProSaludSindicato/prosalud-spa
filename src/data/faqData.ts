@@ -69,15 +69,6 @@ export const faqData: FAQItem[] = [
     redirectUrl: "/nosotros",
     redirectText: "Ver misión y visión completa"
   },
-  {
-    id: "convenios-disponibles",
-    question: "¿Con qué instituciones tiene convenios ProSalud?",
-    answer: "ProSalud mantiene convenios con 7 entidades en Antioquia, incluyendo hospitales como Hospital Marco Fidel Suárez, Hospital San Juan de Dios - Rionegro, Hospital Santa Elena - Fredonia, Hospital Venancio Díaz, Hospital La Merced - Ciudad Bolívar, Promotora Médica Odontológica y SOMER S.A. También tenemos convenio con Comfenalco Antioquia para servicios de recreación, educación y salud.",
-    category: "general",
-    keywords: ["convenios", "hospitales", "instituciones", "comfenalco"],
-    redirectUrl: "/#convenios",
-    redirectText: "Ver todos los convenios"
-  },
 
   // Servicios y Trámites
   {

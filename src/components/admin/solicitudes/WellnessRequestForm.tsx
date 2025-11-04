@@ -11,7 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, X, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
 import { useAuth } from '@/context/AuthContext';
@@ -70,13 +71,16 @@ interface WellnessRequestFormProps {
 }
 
 // Centros de costos disponibles
-const CENTROS_COSTOS = ['Bello', 'Rionegro', 'La Maria', 'Admon'];
+const CENTROS_COSTOS = ['Bello', 'Rionegro', 'La Maria asistencial', 'La Maria VIH', 'La Maria Cosalud', 'La Maria Enterritorio', 'Admon'];
 
 // Mapeo de sedes por centro de costos
 const SEDES_POR_CENTRO_COSTOS: Record<string, string[]> = {
   'Bello': ['Niquia', 'Autopista'],
-  'Rionegro': ['Principal'],
-  'La Maria': ['Castilla', 'Transmisibles', 'Sede la 33'],
+  'Rionegro': ['Jorge Humberto', 'Gilberto Mejía'],
+  'La Maria asistencial': ['Castilla', 'La 33'],
+  'La Maria VIH': ['Castilla', 'La 33'],
+  'La Maria Cosalud': ['Castilla', 'La 33'],
+  'La Maria Enterritorio': ['Castilla', 'La 33'],
   'Admon': ['Principal'],
 };
 
@@ -505,6 +509,12 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
+                <Alert className="mb-4 bg-blue-50 border-blue-200">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-sm text-blue-800">
+                    Se recuerda que las actividades se deben pedir con entre 10 a 15 días hábiles de anticipación para su gestión y programación con el proveedor.
+                  </AlertDescription>
+                </Alert>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -548,7 +558,6 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                     )}
                   />
                 </div>
-
               </CardContent>
             </Card>
 

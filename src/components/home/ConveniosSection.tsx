@@ -8,41 +8,56 @@ const ConveniosSection: React.FC = () => {
 
 
   const visibleConvenios = [
-    { 
+    {
       name: "E.S.E. HOSPITAL MARCO FIDEL SUÁREZ - BELLO",
       imageUrl: "/images/convenios/hospital-marco-fidel-suarez.webp",
-      description: "Hospital público de segundo nivel de atención que brinda servicios de salud integral a la población del Valle de Aburrá Norte, con énfasis en medicina interna, cirugía general y servicios de urgencias."
+      description: "Hospital público de mediana y alta complejidad ubicado en el Norte del Valle de Aburrá (Bello), que ofrece atención integral con servicios de internación, cirugía, urgencias y tecnología hospitalaria avanzada."
     },
-    { 
+    {
       name: "E.S.E. HOSPITAL SAN JUAN DE DIOS - RIONEGRO",
       imageUrl: "/images/convenios/hospital-san-juan-de-dios-rionegro.webp",
-      description: "Institución hospitalaria de segundo nivel que atiende al Oriente Antioqueño, especializada en servicios de medicina general, cirugía, ginecología y pediatría con tecnología de vanguardia."
+      description: "Institución pública de salud de primero, segundo y algunos servicios de tercer nivel en el Oriente Antioqueño, comprometida con la atención integral del usuario y su familia, con servicios de urgencias, hospitalización, consulta externa y especialidades médicas."
     },
-    { 
+    {
+      name: "E.S.E. LA MARIA",
+      imageUrl: "/images/convenios/hospital-la-maria.webp",
+      description: "Hospital público general de alta complejidad en Antioquia, que presta servicios integrales de consulta externa, urgencias, internación, cirugía, diálisis y apoyo diagnóstico, con cobertura para múltiples municipios de la región."
+    },
+    {
       name: "PROMOTORA MÉDICA Y ODONTOLÓGICA S.A.",
       imageUrl: "/images/convenios/promotora-medica-odontologica.webp",
       description: "Empresa prestadora de servicios de salud especializada en atención médica y odontológica integral, con amplia experiencia en programas de salud ocupacional y medicina preventiva."
     },
-    { 
+    {
       name: "SOCIEDAD MÉDICA RIONEGRO SOMER S.A.",
       imageUrl: "/images/convenios/somer-sa.webp",
       description: "Clínica privada ubicada en Rionegro que ofrece servicios médicos especializados, cirugía ambulatoria y hospitalización, con un enfoque en atención personalizada y calidad asistencial."
     },
-    { 
+    {
       name: "E.S.E. HOSPITAL VENANCIO DÍAZ DÍAZ",
       imageUrl: "/images/convenios/hospital-venancio-diaz.webp",
-      description: "Hospital público que presta servicios de salud de primer y segundo nivel, enfocado en atención primaria, medicina familiar y programas de promoción y prevención en salud."
+      description: "Hospital público del municipio de Sabaneta (Antioquia) que presta servicios de primer nivel con urgencias, medicina general y atención materno-infantil, orientado a la población urbana del municipio."
     },
-    { 
+    {
       name: "E.S.E. HOSPITAL LA MERCED - CIUDAD BOLÍVAR",
       imageUrl: "/images/convenios/hospital-la-merced-ciudad-bolivar.webp",
-      description: "Centro hospitalario público que brinda atención médica integral al Suroeste Antioqueño, con servicios de urgencias, hospitalización y consulta externa especializada."
+      description: "Hospital público de mediana complejidad en el Suroeste de Antioquia que ofrece servicios de urgencias 24 horas, hospitalización, consulta externa y cirugía, atendiendo a la población municipal y regional."
     },
-    { 
+    {
       name: "E.S.E. HOSPITAL SANTA ELENA - FREDONIA",
       imageUrl: "/images/convenios/hospital-santa-elena-fredonia.webp",
       description: "Hospital comunitario que atiende a la población del Suroeste de Antioquia, ofreciendo servicios de medicina general, materno infantil y programas de salud rural."
     },
+    {
+      name: "SAN JUAN DE DIOS DE ABEJORRAL",
+      imageUrl: "/images/convenios/hospital-san-juan-Abejorral.webp",
+      description: "Hospital público que brinda servicios de salud a la población del Oriente Antioqueño, especializado en atención primaria, medicina general y programas de salud preventiva para comunidades rurales."
+    },
+    {
+      name: "SAN ANTONIO DE CISNEROS",
+      imageUrl: "/images/convenios/hospital-san-antonio-cisneros.webp",
+      description: "Hospital público de atención general en el municipio de Cisneros (Nordeste de Antioquia), que ofrece servicios de urgencias, consulta externa y hospitalización, orientado a la promoción y prevención de la salud para la comunidad local."
+    }
   ];
 
   return (
