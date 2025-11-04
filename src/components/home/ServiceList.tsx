@@ -88,11 +88,11 @@ const newServices: Service[] = [
   },
   { 
     icon: Banknote, 
-    title: 'Actualizar cuenta bancaria', 
-    description: 'Notifica un cambio en tu cuenta para recibir pagos.', 
-    linkTo: '/servicios/actualizar-cuenta', 
-    category: 'Pagos',
-    keywords: ['cuenta', 'bancaria', 'actualizar', 'cambio', 'banco', 'pagos', 'datos', 'informacion']
+    title: 'Actualizar datos personales', 
+    description: 'Actualiza tu información personal, cuenta bancaria, datos de contacto, nivel educativo, EPS y AFP.', 
+    linkTo: '/servicios/actualizar-datos-personales', 
+    category: 'Gestión Personal y Sindical',
+    keywords: ['datos', 'personales', 'actualizar', 'cuenta', 'bancaria', 'contacto', 'educacion', 'eps', 'afp', 'informacion']
   },
   { 
     icon: Hospital, 

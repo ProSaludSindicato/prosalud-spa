@@ -39,6 +39,9 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  TrendingUp,
+  FileText,
+  X,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -216,8 +219,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     const in_progress = bienestarSolicitudes.filter((r) => r.estado === 'in_progress').length;
     const resolved = bienestarSolicitudes.filter((r) => r.estado === 'resolved').length;
     const rejected = bienestarSolicitudes.filter((r) => r.estado === 'rejected').length;
+    
+    // Calcular solicitudes del mes actual
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const this_month = bienestarSolicitudes.filter((r) => {
+      const fecha = new Date(r.created_at);
+      return fecha.getMonth() === currentMonth && fecha.getFullYear() === currentYear;
+    }).length;
 
-    return { total, pending, in_progress, resolved, rejected };
+    return { total, pending, in_progress, resolved, rejected, this_month };
   }, [bienestarSolicitudes, pagination]);
 
   const totalItems = pagination?.total || 0;
@@ -365,9 +376,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       <Heart className="h-8 w-8 text-primary-prosalud" />
                     </div>
                     <div>
-                      <CardTitle className="text-3xl font-bold text-primary-prosalud">
-                        Solicitudes de Bienestar
-                      </CardTitle>
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                          Solicitudes de Bienestar
+                        </CardTitle>
+                        <Badge variant="secondary" className="text-base px-3 py-1">
+                          Total: {stats?.total || 0}
+                        </Badge>
+                      </div>
                       <CardDescription className="text-base mt-2">
                         Gestiona las solicitudes de actividades de bienestar
                       </CardDescription>
@@ -386,37 +402,78 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           </motion.div>
 
           {/* Stats Cards */}
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Total</div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Pendientes</div>
-                <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">En Revisión</div>
-                <div className="text-2xl font-bold text-blue-600">{stats.in_progress}</div>
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Aprobadas</div>
-                <div className="text-2xl font-bold text-green-600">{stats.resolved}</div>
-              </CardContent>
-            </Card>
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Rechazadas</div>
-                <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-              </CardContent>
-            </Card>
+          <motion.div variants={itemVariants}>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <Card className="border-l-4 border-l-yellow-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Pendientes</p>
+                      <p className="text-2xl font-bold text-yellow-600">{stats?.pending || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-blue-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">En Revisión</p>
+                      <p className="text-2xl font-bold text-blue-600">{stats?.in_progress || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-green-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Aprobadas</p>
+                      <p className="text-2xl font-bold text-green-600">{stats?.resolved || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-red-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Rechazadas</p>
+                      <p className="text-2xl font-bold text-red-600">{stats?.rejected || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <X className="h-5 w-5 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-purple-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Este Mes</p>
+                      <p className="text-2xl font-bold text-purple-600">{stats?.this_month || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
 
           {/* Filters */}
@@ -473,9 +530,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm bg-white">
               <CardHeader>
-                <CardTitle>Solicitudes de Bienestar</CardTitle>
-                <CardDescription>
-                  {totalItems} solicitud{totalItems !== 1 ? 'es' : ''} encontrada{totalItems !== 1 ? 's' : ''}
+                <CardTitle className="text-2xl font-bold text-gray-900">Solicitudes de Bienestar ({totalItems})</CardTitle>
+                <CardDescription className="text-gray-600 mt-1">
+                  Lista completa de solicitudes de actividades de bienestar
                 </CardDescription>
               </CardHeader>
               <CardContent>

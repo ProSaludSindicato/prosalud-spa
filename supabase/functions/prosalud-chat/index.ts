@@ -285,7 +285,7 @@ SERVICIOS Y SUS RUTAS EXACTAS:
 - Compensación Anual Diferida: /servicios/compensacion-anual
 - Verificación de Pagos: /servicios/consulta-pagos
 - Certificado de Seguridad Social: /servicios/certificado-seguridad-social
-- Actualizar Cuenta Bancaria: /servicios/actualizar-cuenta
+- Actualizar Datos Personales: /servicios/actualizar-datos-personales
 - Incapacidades y Licencias de Maternidad: /servicios/incapacidad-maternidad
 - Seguridad y Salud en el Trabajo (SST): /servicios/sst
 - Galería de Bienestar: /servicios/galeria-bienestar

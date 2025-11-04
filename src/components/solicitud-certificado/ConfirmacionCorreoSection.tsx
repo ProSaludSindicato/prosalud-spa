@@ -28,8 +28,8 @@ const ConfirmacionCorreoSection = () => {
             <p className="font-normal text-sm text-gray-700">
               La respuesta a su solicitud será enviada al correo registrado. <span className="font-semibold">Si la información de contacto no es correcta,
               se debe actualizar antes de realizar la solicitud</span>. Esto se puede hacer en{' '}
-              <Link to="/servicios/actualizar-cuenta" className="text-primary hover:underline font-medium">
-                Actualizar cuenta bancaria
+              <Link to="/servicios/actualizar-datos-personales" className="text-primary hover:underline font-medium">
+                Actualizar datos personales
               </Link>.
             </p>
           </div>

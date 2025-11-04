@@ -105,12 +105,12 @@ export const searchData: SearchItem[] = [
     keywords: ["seguridad", "social", "certificado", "salud", "pensiones", "afiliacion"]
   },
   {
-    id: "actualizar-cuenta",
-    title: "Actualizar Cuenta Bancaria",
-    description: "Actualiza la información de tu cuenta bancaria",
-    path: "/servicios/actualizar-cuenta",
+    id: "actualizar-datos-personales",
+    title: "Actualizar Datos Personales",
+    description: "Actualiza tu información personal, cuenta bancaria, datos de contacto, nivel educativo, EPS y AFP",
+    path: "/servicios/actualizar-datos-personales",
     category: "Servicios",
-    keywords: ["cuenta", "bancaria", "actualizar", "banco", "datos", "informacion", "numero"]
+    keywords: ["datos", "personales", "actualizar", "cuenta", "bancaria", "contacto", "educacion", "eps", "afp", "informacion", "banco"]
   },
   {
     id: "incapacidad-maternidad",

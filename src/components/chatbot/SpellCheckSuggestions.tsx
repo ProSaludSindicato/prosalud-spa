@@ -117,7 +117,7 @@ const contextualSuggestions: { [key: string]: string[] } = {
     'Tiempo de procesamiento del retiro'
   ],
   'cuenta': [
-    'Actualizar cuenta bancaria',
+    'Actualizar datos personales',
     'Certificación bancaria requisitos',
     'Cambiar datos bancarios'
   ],
@@ -246,7 +246,7 @@ export const SpellCheckSuggestions: React.FC<SpellCheckSuggestionsProps> = ({
       'compensacion_final': ['liquidación', 'liquidacion', 'compensación final', 'finiquito', 'pago final', 'indemnización'],
       'descanso': ['descanso', 'vacaciones', 'permiso', 'ausencia', 'tiempo libre', 'licencia', 'días libres'],
       'retiro': ['retiro', 'retirar', 'desafiliar', 'salir', 'desvincular', 'renuncia', 'desvinculación'],
-      'cuenta': ['cuenta', 'banco', 'bancaria', 'actualizar', 'cambiar', 'datos bancarios', 'número de cuenta', 'consignación'],
+      'cuenta': ['cuenta', 'banco', 'bancaria', 'actualizar', 'cambiar', 'datos bancarios', 'número de cuenta', 'consignación', 'datos personales', 'actualizar datos'],
       'tramite': ['trámite', 'tramite', 'solicitud', 'proceso', 'gestión', 'procedimiento', 'requisito', 'documentación'],
       'bienestar': ['bienestar', 'evento', 'actividad', 'recreación', 'galería', 'fotos', 'actividades', 'integración'],
       'turno': ['turno', 'cambio', 'horario', 'cuadro', 'cronograma', 'cambio de turno', 'rotación'],

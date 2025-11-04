@@ -34,7 +34,7 @@ import SolicitudDescansoLaboralPage from '@/pages/SolicitudDescansoLaboralPage';
 import SolicitudAnualDiferidaPage from '@/pages/SolicitudAnualDiferidaPage';
 import VerificacionPagosPage from '@/pages/VerificacionPagosPage';
 import CertificadoSeguridadSocialPage from '@/pages/CertificadoSeguridadSocialPage';
-import ActualizarCuentaBancariaPage from '@/pages/ActualizarCuentaBancariaPage';
+import ActualizarDatosPersonalesPage from '@/pages/ActualizarDatosPersonalesPage';
 import IncapacidadesLicenciasPage from '@/pages/IncapacidadesLicenciasPage';
 import SstPage from '@/pages/SstPage';
 import GaleriaBienestarPage from '@/pages/GaleriaBienestarPage';
@@ -87,7 +87,8 @@ function App() {
             <Route path="/servicios/compensacion-anual" element={<SolicitudAnualDiferidaPage />} />
             <Route path="/servicios/consulta-pagos" element={<VerificacionPagosPage />} />
             <Route path="/servicios/certificado-seguridad-social" element={<CertificadoSeguridadSocialPage />} />
-            <Route path="/servicios/actualizar-cuenta" element={<ActualizarCuentaBancariaPage />} />
+            <Route path="/servicios/actualizar-datos-personales" element={<ActualizarDatosPersonalesPage />} />
+            <Route path="/servicios/actualizar-cuenta" element={<ActualizarDatosPersonalesPage />} /> {/* Redirect legacy URL */}
             <Route path="/servicios/incapacidad-maternidad" element={<IncapacidadesLicenciasPage />} />
             <Route path="/servicios/sst" element={<SstPage />} />
             <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />

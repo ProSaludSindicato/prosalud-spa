@@ -27,7 +27,7 @@ import EpsAfpSection from '@/components/actualizar-datos-personales/EpsAfpSectio
 
 const ALLOWED_FILE_TYPES_CERTIFICADO = ALLOWED_FILE_TYPES_ALL;
 
-const formSchemaActualizarCuenta = z.object({
+const formSchemaActualizarDatosPersonales = z.object({
   // Datos personales (todos opcionales)
   estadoCivil: z.string().optional(),
   direccion: z.string().optional(),
@@ -42,11 +42,11 @@ const formSchemaActualizarCuenta = z.object({
   diplomaEducativo: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   actaGrado: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   
   // Información bancaria (opcional - solo si se quiere actualizar)
   numeroCuenta: z.string().optional(),
@@ -55,50 +55,74 @@ const formSchemaActualizarCuenta = z.object({
   certificacionBancaria: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   
   // EPS y AFP (opcionales - solo si se quiere actualizar)
   eps: z.string().optional(),
   certificadoEps: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   afp: z.string().optional(),
   certificadoAfp: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
 }).refine((data) => {
-  // Si se proporciona nivel educativo, los documentos son requeridos
+  // Si se proporciona nivel educativo, el diploma es requerido
   if (data.nivelEducativo && data.nivelEducativo.trim() !== '') {
     if (!data.diplomaEducativo || data.diplomaEducativo.length === 0) {
       return false;
     }
+  }
+  return true;
+}, {
+  message: "Si actualiza el nivel educativo, debe adjuntar el diploma.",
+  path: ["diplomaEducativo"],
+}).refine((data) => {
+  // Si se proporciona nivel educativo, el acta de grado es requerida
+  if (data.nivelEducativo && data.nivelEducativo.trim() !== '') {
     if (!data.actaGrado || data.actaGrado.length === 0) {
       return false;
     }
   }
   return true;
 }, {
-  message: "Si actualiza el nivel educativo, debe adjuntar el diploma y el acta de grado.",
-  path: ["diplomaEducativo"],
+  message: "Si actualiza el nivel educativo, debe adjuntar el acta de grado.",
+  path: ["actaGrado"],
 }).refine((data) => {
-  // Si se proporciona número de cuenta, tipo de cuenta, banco y certificación son requeridos
+  // Si se proporciona número de cuenta, tipo de cuenta es requerido
   if (data.numeroCuenta && data.numeroCuenta.trim() !== '') {
     if (!data.tipoCuenta || data.tipoCuenta.trim() === '') {
       return false;
     }
+  }
+  return true;
+}, {
+  message: "Si actualiza la información bancaria, debe seleccionar el tipo de cuenta.",
+  path: ["tipoCuenta"],
+}).refine((data) => {
+  // Si se proporciona número de cuenta, banco es requerido
+  if (data.numeroCuenta && data.numeroCuenta.trim() !== '') {
     if (!data.banco || data.banco.trim() === '') {
       return false;
     }
+  }
+  return true;
+}, {
+  message: "Si actualiza la información bancaria, debe seleccionar el banco.",
+  path: ["banco"],
+}).refine((data) => {
+  // Si se proporciona número de cuenta, certificación bancaria es requerida
+  if (data.numeroCuenta && data.numeroCuenta.trim() !== '') {
     if (!data.certificacionBancaria || data.certificacionBancaria.length === 0) {
       return false;
     }
   }
   return true;
 }, {
-  message: "Si actualiza la información bancaria, debe completar todos los campos y adjuntar la certificación bancaria.",
-  path: ["tipoCuenta"],
+  message: "Si actualiza la información bancaria, debe adjuntar la certificación bancaria.",
+  path: ["certificacionBancaria"],
 }).refine((data) => {
   // Si se proporciona EPS, el certificado es requerido
   if (data.eps && data.eps.trim() !== '') {
@@ -123,17 +147,17 @@ const formSchemaActualizarCuenta = z.object({
   path: ["certificadoAfp"],
 });
 
-type FormValuesActualizarCuenta = z.infer<typeof formSchemaActualizarCuenta>;
+type FormValuesActualizarDatosPersonales = z.infer<typeof formSchemaActualizarDatosPersonales>;
 
-const ActualizarCuentaBancariaPageContent: React.FC = () => {
+const ActualizarDatosPersonalesPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const activeConvenio = getActiveConvenio();
   
-  const form = useForm<FormValuesActualizarCuenta>({
-    resolver: zodResolver(formSchemaActualizarCuenta),
+  const form = useForm<FormValuesActualizarDatosPersonales>({
+    resolver: zodResolver(formSchemaActualizarDatosPersonales),
     defaultValues: {
       estadoCivil: '',
       direccion: '',
@@ -156,7 +180,7 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
     },
   });
 
-  const onSubmit = async (data: FormValuesActualizarCuenta) => {
+  const onSubmit = async (data: FormValuesActualizarDatosPersonales) => {
     if (!afiliado) return;
     
     setIsSubmitting(true);
@@ -339,9 +363,27 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
             <DatosPersonalesSection control={form.control} />
-            <NivelEducativoSection control={form.control} />
-            <InformacionBancariaSection control={form.control} />
-            <EpsAfpSection control={form.control} />
+            <NivelEducativoSection 
+              control={form.control} 
+              onFileChange={(fieldName: string) => {
+                form.clearErrors(fieldName as any);
+                form.trigger(fieldName as any);
+              }}
+            />
+            <InformacionBancariaSection 
+              control={form.control} 
+              onFileChange={(fieldName: string) => {
+                form.clearErrors(fieldName as any);
+                form.trigger(fieldName as any);
+              }}
+            />
+            <EpsAfpSection 
+              control={form.control} 
+              onFileChange={(fieldName: string) => {
+                form.clearErrors(fieldName as any);
+                form.trigger(fieldName as any);
+              }}
+            />
             <ConfirmacionCorreoSection />
             <AutorizacionDatosSection />
                         
@@ -372,12 +414,12 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
   );
 };
 
-const ActualizarCuentaBancariaPage: React.FC = () => {
+const ActualizarDatosPersonalesPage: React.FC = () => {
   return (
     <RequireAfiliadoAuth>
-      <ActualizarCuentaBancariaPageContent />
+      <ActualizarDatosPersonalesPageContent />
     </RequireAfiliadoAuth>
   );
 };
 
-export default ActualizarCuentaBancariaPage;
+export default ActualizarDatosPersonalesPage;

@@ -236,7 +236,7 @@ const AdminSolicitudesPage: React.FC = () => {
       "compensacion-anual": "Compensación Anual Diferida",
       "verificacion-pagos": "Verificación de Pagos",
       "compensacion-descanso": "Compensación por Descanso",
-      "actualizar-cuenta": "Actualizar Cuenta Bancaria",
+      "actualizar-datos-personales": "Actualizar Datos Personales",
       "retiro-sindical": "Retiro Sindical",
       microcredito: "Microcrédito CEII",
       "incapacidad-maternidad": "Incapacidad de Maternidad",
@@ -610,7 +610,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         <SelectItem value="compensacion-anual">Compensación Anual</SelectItem>
                         <SelectItem value="verificacion-pagos">Verificación de Pagos</SelectItem>
                         <SelectItem value="compensacion-descanso">Compensación por Descanso</SelectItem>
-                        <SelectItem value="actualizar-cuenta">Actualizar Cuenta</SelectItem>
+                        <SelectItem value="actualizar-datos-personales">Actualizar Datos Personales</SelectItem>
                         <SelectItem value="retiro-sindical">Retiro Sindical</SelectItem>
                         <SelectItem value="microcredito">Microcrédito</SelectItem>
                         <SelectItem value="incapacidad-maternidad">Incapacidad Maternidad</SelectItem>
@@ -988,78 +988,117 @@ const AdminSolicitudesPage: React.FC = () => {
                           {selectedSolicitud.payload &&
                           typeof selectedSolicitud.payload === "object" &&
                           Object.keys(selectedSolicitud.payload).length > 0 ? (
-                            <div className="space-y-4">
-                              {Object.entries(selectedSolicitud.payload).map(([key, value]) => {
-                                // Format field name: remove underscores/hyphens and capitalize each word
-                                const formatFieldName = (str: string) => {
-                                  return str
-                                    .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-                                    .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
-                                    .trim()
-                                    .split(' ')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                                    .join(' ');
-                                };
+                            (() => {
+                              // Format field name: remove underscores/hyphens and capitalize each word
+                              const formatFieldName = (str: string) => {
+                                return str
+                                  .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+                                  .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
+                                  .trim()
+                                  .split(' ')
+                                  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                                  .join(' ');
+                              };
 
-                                // Format value for display
-                                const formatValue = (val: any): React.ReactNode => {
-                                  if (val === null || val === undefined) {
-                                    return "No especificado";
+                              // Format value for display
+                              const formatValue = (val: any): React.ReactNode => {
+                                if (val === null || val === undefined) {
+                                  return "No especificado";
+                                }
+                                
+                                if (typeof val === "object") {
+                                  // Special handling for nested objects like infoCertificado
+                                  if (typeof val === "object" && !Array.isArray(val)) {
+                                    return (
+                                      <div className="space-y-2">
+                                        {Object.entries(val).map(([nestedKey, nestedValue]) => (
+                                          <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
+                                            <span className="text-xs font-medium text-gray-600">
+                                              {formatFieldName(nestedKey)}:
+                                            </span>
+                                            <span className={`text-xs ml-2 font-medium ${
+                                              nestedValue === true || nestedValue === "true" 
+                                                ? "text-green-600" 
+                                                : nestedValue === false || nestedValue === "false" 
+                                                  ? "text-red-600" 
+                                                  : "text-gray-900"
+                                            }`}>
+                                              {nestedValue === true || nestedValue === "true" ? "✓ Sí" : 
+                                               nestedValue === false || nestedValue === "false" ? "✗ No" : 
+                                               String(nestedValue)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
                                   }
-                                  
-                                  if (typeof val === "object") {
-                                    // Special handling for nested objects like infoCertificado
-                                    if (typeof val === "object" && !Array.isArray(val)) {
-                                      return (
-                                        <div className="space-y-2">
-                                          {Object.entries(val).map(([nestedKey, nestedValue]) => (
-                                            <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
-                                              <span className="text-xs font-medium text-gray-600">
-                                                {formatFieldName(nestedKey)}:
-                                              </span>
-                                              <span className={`text-xs ml-2 font-medium ${
-                                                nestedValue === true || nestedValue === "true" 
-                                                  ? "text-green-600" 
-                                                  : nestedValue === false || nestedValue === "false" 
-                                                    ? "text-red-600" 
-                                                    : "text-gray-900"
-                                              }`}>
-                                                {nestedValue === true || nestedValue === "true" ? "✓ Sí" : 
-                                                 nestedValue === false || nestedValue === "false" ? "✗ No" : 
-                                                 String(nestedValue)}
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      );
-                                    }
-                                    return JSON.stringify(val, null, 2);
-                                  }
-                                  
-                                  return String(val);
-                                };
+                                  return JSON.stringify(val, null, 2);
+                                }
+                                
+                                return String(val);
+                              };
 
-                                return (
-                                  <div
-                                    key={key}
-                                    className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-2 border-b border-gray-100 last:border-b-0"
-                                  >
-                                    <div className="md:col-span-1">
-                                      <label className="text-sm font-medium text-gray-700">
-                                        {formatFieldName(key)}
-                                      </label>
-                                    </div>
-                                    <div className="md:col-span-2">
-                                      <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 max-w-full overflow-auto">
-                                        <div className="text-gray-900 text-sm break-words">
-                                          {formatValue(value)}
-                                        </div>
+                              // Separar campos del proceso de los datos específicos de la solicitud para TODOS los tipos
+                              const procesoFields = ['proceso', 'dondeRealizaProceso', 'sedeProceso'];
+                              const isActualizarDatosPersonales = selectedSolicitud.request_type === 'actualizar-datos-personales';
+                              
+                              const payloadEntries = Object.entries(selectedSolicitud.payload);
+                              const procesoEntries = payloadEntries.filter(([key]) => procesoFields.includes(key));
+                              const datosEspecificosEntries = payloadEntries.filter(([key]) => !procesoFields.includes(key));
+
+                              const renderField = (key: string, value: any) => (
+                                <div
+                                  key={key}
+                                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-2 border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="md:col-span-1">
+                                    <label className="text-sm font-medium text-gray-700">
+                                      {formatFieldName(key)}
+                                    </label>
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 max-w-full overflow-auto">
+                                      <div className="text-gray-900 text-sm break-words">
+                                        {formatValue(value)}
                                       </div>
                                     </div>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+                              );
+
+                              return (
+                                <div className="space-y-6">
+                                  {/* Información del Proceso (para todos los tipos si existe) */}
+                                  {procesoEntries.length > 0 && (
+                                    <div>
+                                      <div className="mb-3 flex items-center gap-2">
+                                        <h4 className="text-sm font-semibold text-gray-700 underline">Información del Proceso</h4>
+                                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                          Informativo
+                                        </Badge>
+                                      </div>
+                                      <div className="space-y-4">
+                                        {procesoEntries.map(([key, value]) => renderField(key, value))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Datos Específicos de la Solicitud */}
+                                  {datosEspecificosEntries.length > 0 && (
+                                    <div>
+                                      <div className="mb-3">
+                                        <h4 className="text-sm font-semibold text-gray-700 underline">
+                                          {isActualizarDatosPersonales ? 'Datos a Actualizar' : 'Detalles de la Solicitud'}
+                                        </h4>
+                                      </div>
+                                      <div className="space-y-4">
+                                        {datosEspecificosEntries.map(([key, value]) => renderField(key, value))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <div className="text-gray-500 text-sm text-center py-8">
                               <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />

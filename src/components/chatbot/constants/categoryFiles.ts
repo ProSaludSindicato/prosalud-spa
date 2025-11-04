@@ -15,7 +15,7 @@ export const CATEGORY_FILES: Record<string, string[]> = {
   convenios: ["convenios/convenios-alianzas.md"],
   servicios: [
     "servicios/overview.md",
-    "servicios/actualizar-cuenta-bancaria.md",
+    "servicios/actualizar-datos-personales.md",
     "servicios/solicitud-compensacion-anual-diferida.md",
     "servicios/solicitud-descanso-laboral.md",
     "servicios/solicitud-microcredito.md",

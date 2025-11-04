@@ -18,6 +18,7 @@ interface FileUploadFieldProps<TFieldValues extends FieldValues> {
   inputClassName?: string;
   multiple?: boolean;
   maxFiles?: number;
+  onFileChange?: (fieldName: string) => void; // Callback para limpiar errores cuando cambia el archivo
 }
 
 const FileUploadField = <TFieldValues extends FieldValues>({
@@ -31,6 +32,7 @@ const FileUploadField = <TFieldValues extends FieldValues>({
   inputClassName,
   multiple = false,
   maxFiles = 1,
+  onFileChange,
 }: FileUploadFieldProps<TFieldValues>) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -89,6 +91,13 @@ const FileUploadField = <TFieldValues extends FieldValues>({
                     }
 
                     field.onChange(e.target.files);
+                    // Limpiar errores cuando se carga un archivo
+                    // Si hay un callback, llamarlo para limpiar errores
+                    if (onFileChange) {
+                      setTimeout(() => {
+                        onFileChange(name);
+                      }, 0);
+                    }
                   }}
                   onBlur={field.onBlur}
                   name={field.name}

@@ -14,7 +14,7 @@ Esta documentación contiene la información disponible en el sitio web del Sind
   - Verificación de Pagos / Consulta de Pagos (`verificacion-pagos.md`)
   - Solicitud de Microcrédito CEII (`solicitud-microcredito.md`)
   - Comprobante de Aportes Seguridad Social (`certificado-seguridad-social.md`)
-  - Actualización de Cuenta Bancaria (`actualizar-cuenta-bancaria.md`)
+  - Actualización de Datos Personales (`actualizar-datos-personales.md`)
   - Incapacidades y Licencias (`incapacidades-licencias.md`)
   - Seguridad y Salud en el Trabajo (SST) (`sst.md`)
   - Encuesta de Bienestar (`encuesta-bienestar-laboral.md`)

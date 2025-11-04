@@ -77,7 +77,7 @@ export const mockRequests: Request[] = [
   },
   {
     id: 'req-005',
-    request_type: 'actualizar-cuenta',
+    request_type: 'actualizar-datos-personales',
     id_type: 'CC',
     id_number: '7788990011',
     name: 'Elena',
@@ -174,7 +174,7 @@ export const requestTypeLabels: Record<string, string> = {
   'compensacion-descanso': 'Compensación por Descanso',
   'verificacion-pagos': 'Verificación de Pagos',
   'retiro-sindical': 'Retiro Sindical',
-  'actualizar-cuenta': 'Actualizar Cuenta Bancaria',
+  'actualizar-datos-personales': 'Actualizar Datos Personales',
   'microcredito': 'Microcrédito CEII',
   'incapacidad-licencia': 'Incapacidades y Licencias',
   'permisos-turnos': 'Permisos y Cambio de Turnos',
