@@ -8,10 +8,12 @@ import { estadosCiviles, municipios, tallasUniforme } from './formOptions';
 
 interface DatosPersonalesSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
+  modifiedFields?: Set<string>;
 }
 
 const DatosPersonalesSection = <TFieldValues extends FieldValues>({
   control,
+  modifiedFields,
 }: DatosPersonalesSectionProps<TFieldValues>) => {
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white space-y-6">
@@ -26,9 +28,9 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Estado Civil</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={modifiedFields?.has('estadoCivil') ? 'border-green-500 bg-green-50' : ''}>
                       <SelectValue placeholder="Seleccione su estado civil" />
                     </SelectTrigger>
                   </FormControl>
@@ -55,6 +57,7 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   <Input
                     placeholder="Ej: Calle 123 #45-67"
                     {...field}
+                    className={modifiedFields?.has('direccion') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -68,9 +71,9 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Municipio</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={modifiedFields?.has('municipio') ? 'border-green-500 bg-green-50' : ''}>
                       <SelectValue placeholder="Seleccione el municipio" />
                     </SelectTrigger>
                   </FormControl>
@@ -98,6 +101,7 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     type="tel"
                     placeholder="Ej: 6041234567"
                     {...field}
+                    className={modifiedFields?.has('telefonoFijo') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -116,6 +120,7 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     type="tel"
                     placeholder="Ej: 3001234567"
                     {...field}
+                    className={modifiedFields?.has('celular') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -134,6 +139,7 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     type="email"
                     placeholder="Ej: ejemplo@correo.com"
                     {...field}
+                    className={modifiedFields?.has('correo') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -147,9 +153,9 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Talla de Uniforme</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={modifiedFields?.has('tallaUniforme') ? 'border-green-500 bg-green-50' : ''}>
                       <SelectValue placeholder="Seleccione la talla" />
                     </SelectTrigger>
                   </FormControl>
@@ -161,6 +167,25 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     ))}
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name={"tallaCalzado" as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Talla de Calzado</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="Ej: 42"
+                    {...field}
+                    className={modifiedFields?.has('tallaCalzado') ? 'border-green-500 bg-green-50' : ''}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

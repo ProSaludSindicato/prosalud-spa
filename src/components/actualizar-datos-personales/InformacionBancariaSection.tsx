@@ -9,11 +9,13 @@ import { tiposCuenta, bancos } from './formOptions';
 
 interface InformacionBancariaSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
+  modifiedFields?: Set<string>;
   onFileChange?: (fieldName: string) => void;
 }
 
 const InformacionBancariaSection = <TFieldValues extends FieldValues>({
   control,
+  modifiedFields,
   onFileChange,
 }: InformacionBancariaSectionProps<TFieldValues>) => {
   const numeroCuenta = useWatch({
@@ -39,6 +41,7 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
                     <Input
                       placeholder="Ej: 1234567890"
                       {...field}
+                      className={modifiedFields?.has('numeroCuenta') ? 'border-green-500 bg-green-50' : ''}
                     />
                   </FormControl>
                   <FormMessage />
@@ -54,11 +57,11 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
                   <FormLabel>Tipo de Cuenta</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={!numeroCuenta}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className={modifiedFields?.has('tipoCuenta') ? 'border-green-500 bg-green-50' : ''}>
                         <SelectValue placeholder="Seleccione el tipo de cuenta" />
                       </SelectTrigger>
                     </FormControl>
@@ -83,11 +86,11 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
                   <FormLabel>Banco</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={!numeroCuenta}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className={modifiedFields?.has('banco') ? 'border-green-500 bg-green-50' : ''}>
                         <SelectValue placeholder="Seleccione el banco" />
                       </SelectTrigger>
                     </FormControl>

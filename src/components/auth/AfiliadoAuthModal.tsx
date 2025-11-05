@@ -18,7 +18,7 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
   const { authenticate } = useAfiliadoAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    tipoDocumento: '',
+    tipoDocumento: 'CC',
     numeroDocumento: '',
     fechaExpedicion: '',
   });

@@ -3,12 +3,25 @@ import api from '@/services/api';
 import { API_CONFIG } from '@/config/api';
 import { toast } from 'sonner';
 import axios from "axios";
+import { verifyOtp, VerifyOtpResponse } from '@/services/afiliadosOtpService';
 
 export interface Convenio {
   cliente: string | null;
   proceso: string | null;
   estado: string | null;
   fecha_fin?: string | null;
+}
+
+export interface Beneficiario {
+  documento_afiliado: string;
+  tipo_documento: string;
+  documento: string;
+  nombres: string;
+  apellidos: string;
+  fecha_nacimiento: string;
+  parentesco: string;
+  sexo: string;
+  estado: string | null;
 }
 
 export interface AfiliadoData {
@@ -20,12 +33,27 @@ export interface AfiliadoData {
   celular: string | null;
   correo_personal: string | null;
   convenios: Convenio[];
+  beneficiarios?: Beneficiario[];
+  // Campos adicionales del OTP (opcionales, solo disponibles después de autenticación OTP)
+  estado_civil?: string | null;
+  direccion?: string | null;
+  municipio?: string | null;
+  telefono?: string | null;
+  talla_uniforme?: string | null;
+  talla_calzado?: string | null;
+  nivel_educacion?: string | null;
+  numero_cuenta?: string | null;
+  tipo_cuenta?: string | null;
+  banco?: string | null;
+  eps?: string | null;
+  afp?: string | null;
 }
 
 interface AfiliadoAuthContextType {
   afiliado: AfiliadoData | null;
   isAuthenticated: boolean;
   authenticate: (tipoDoc: string, numDoc: string, fechaExp: string) => Promise<AfiliadoData>;
+  authenticateWithOtp: (tipoDoc: string, numDoc: string, fechaExp: string, sessionId: string, otp: string) => Promise<AfiliadoData>;
   logout: () => void;
   getActiveConvenio: () => Convenio | null;
 }
@@ -258,6 +286,117 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
+  const authenticateWithOtp = useCallback(async (
+    tipoDoc: string,
+    numDoc: string,
+    fechaExp: string,
+    sessionId: string,
+    otp: string
+  ): Promise<AfiliadoData> => {
+    try {
+      const response: VerifyOtpResponse = await verifyOtp({
+        tipo_documento: tipoDoc,
+        documento: numDoc,
+        fecha_expedicion: fechaExp,
+        session_id: sessionId,
+        otp: otp,
+      });
+
+      if (!response.success || !response.data?.afiliado) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+
+      // Log de la respuesta del API para debugging
+      console.log('🔐 Respuesta del API de autenticación OTP:', response);
+
+      // Transformar los datos de la API al formato esperado por el contexto
+      const afiliadoData: AfiliadoData = {
+        tipo_documento: response.data.afiliado.tipo_documento || null,
+        documento: response.data.afiliado.documento || null,
+        nombres: response.data.afiliado.nombres || null,
+        apellidos: response.data.afiliado.apellidos || null,
+        estado: response.data.afiliado.estado || null,
+        celular: response.data.afiliado.celular || null,
+        correo_personal: response.data.afiliado.correo_personal || null,
+        convenios: response.data.convenios.map((c) => ({
+          cliente: c.cliente || null,
+          proceso: c.proceso || null,
+          estado: c.estado || null,
+          fecha_fin: c.fecha_fin || null,
+        })),
+        beneficiarios: response.data.beneficiarios?.map((b) => {
+          // El API parece intercambiar parentesco y sexo en algunos casos
+          // parentesco puede venir como "M" (sexo) y sexo como "HIJO" (parentesco)
+          const parentescoValue = b.parentesco || '';
+          const sexoValue = b.sexo || '';
+          
+          // Determinar cuál es cuál basándose en los valores posibles
+          const parentescosValidos = ['MADRE', 'PADRE', 'HIJA', 'HIJO', 'CONYUGUE'];
+          const sexosValidos = ['M', 'F', 'MASCULINO', 'FEMENINO'];
+          
+          let parentescoFinal = parentescoValue;
+          let sexoFinal = sexoValue;
+          
+          // Si parentesco tiene un valor de sexo, intercambiar
+          if (sexosValidos.includes(parentescoValue.toUpperCase()) && parentescosValidos.includes(sexoValue.toUpperCase())) {
+            parentescoFinal = sexoValue;
+            sexoFinal = parentescoValue;
+          } else if (sexosValidos.includes(parentescoValue.toUpperCase())) {
+            // Solo parentesco es sexo
+            sexoFinal = parentescoValue;
+            parentescoFinal = sexoValue || '';
+          } else if (parentescosValidos.includes(sexoValue.toUpperCase())) {
+            // Solo sexo es parentesco
+            parentescoFinal = sexoValue;
+            sexoFinal = parentescoValue || '';
+          }
+          
+          return {
+            documento_afiliado: b.documento_afiliado || '',
+            tipo_documento: b.tipo_documento || '',
+            documento: b.documento || '',
+            nombres: b.nombres || '',
+            apellidos: b.apellidos || '',
+            fecha_nacimiento: b.fecha_nacimiento || '',
+            parentesco: parentescoFinal,
+            sexo: sexoFinal,
+            estado: b.estado || null,
+          };
+        }) || [],
+        // Campos adicionales del OTP
+        estado_civil: response.data.afiliado.estado_civil || null,
+        direccion: response.data.afiliado.direccion || null,
+        municipio: response.data.afiliado.municipio || null,
+        telefono: response.data.afiliado.telefono || null,
+        talla_uniforme: response.data.afiliado.talla_uniforme || null,
+        talla_calzado: response.data.afiliado.talla_calzado || null,
+        nivel_educacion: response.data.afiliado.nivel_educacion || null,
+        numero_cuenta: response.data.afiliado.numero_cuenta || null,
+        tipo_cuenta: response.data.afiliado.tipo_cuenta || null,
+        banco: response.data.afiliado.banco || null,
+        eps: response.data.afiliado.eps || null,
+        afp: response.data.afiliado.afp || null,
+      };
+
+      const newExpiresAt = Date.now() + SESSION_DURATION;
+      setAfiliado(afiliadoData);
+      setExpiresAt(newExpiresAt);
+      lastActivityRef.current = Date.now();
+      hasShownExpirationToastRef.current = false;
+
+      // Guardar en localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        afiliado: afiliadoData,
+        expiresAt: newExpiresAt,
+      }));
+
+      return afiliadoData;
+    } catch (error: any) {
+      // El servicio ya maneja los errores y los convierte en mensajes de error descriptivos
+      throw error;
+    }
+  }, []);
+
   const getActiveConvenio = useCallback((): Convenio | null => {
     if (!afiliado?.convenios || afiliado.convenios.length === 0) return null;
 
@@ -279,9 +418,10 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     afiliado,
     isAuthenticated: !!afiliado,
     authenticate,
+    authenticateWithOtp,
     logout,
     getActiveConvenio,
-  }), [afiliado, authenticate, logout, getActiveConvenio]);
+  }), [afiliado, authenticate, authenticateWithOtp, logout, getActiveConvenio]);
 
   return (
     <AfiliadoAuthContext.Provider value={value}>

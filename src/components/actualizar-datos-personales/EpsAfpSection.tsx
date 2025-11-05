@@ -8,11 +8,13 @@ import { epsList, afpList } from './formOptions';
 
 interface EpsAfpSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
+  modifiedFields?: Set<string>;
   onFileChange?: (fieldName: string) => void;
 }
 
 const EpsAfpSection = <TFieldValues extends FieldValues>({
   control,
+  modifiedFields,
   onFileChange,
 }: EpsAfpSectionProps<TFieldValues>) => {
   return (
@@ -29,9 +31,9 @@ const EpsAfpSection = <TFieldValues extends FieldValues>({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>EPS</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className={modifiedFields?.has('eps') ? 'border-green-500 bg-green-50' : ''}>
                         <SelectValue placeholder="Seleccione su EPS" />
                       </SelectTrigger>
                     </FormControl>
@@ -54,9 +56,9 @@ const EpsAfpSection = <TFieldValues extends FieldValues>({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>AFP</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className={modifiedFields?.has('afp') ? 'border-green-500 bg-green-50' : ''}>
                         <SelectValue placeholder="Seleccione su AFP" />
                       </SelectTrigger>
                     </FormControl>

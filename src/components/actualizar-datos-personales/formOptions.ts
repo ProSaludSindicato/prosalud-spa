@@ -151,11 +151,11 @@ export const tallasUniforme = [
 
 export const nivelesEducativos = [
   { value: 'primaria', label: 'Primaria' },
-  { value: 'secundaria', label: 'Secundaria' },
-  { value: 'tecnico', label: 'Técnico' },
-  { value: 'tecnologo', label: 'Tecnólogo' },
-  { value: 'pregrado', label: 'Pregrado' },
-  { value: 'especializacion', label: 'Especialización' },
+  { value: 'bachiller', label: 'Bachiller' },
+  { value: 'tecnico', label: 'Tecnico' },
+  { value: 'tecnologo', label: 'Tecnologo' },
+  { value: 'profesional', label: 'Profesional' },
+  { value: 'especialista', label: 'Especialista' },
   { value: 'maestria', label: 'Maestría' },
   { value: 'doctorado', label: 'Doctorado' },
 ];
@@ -196,8 +196,35 @@ export const afpList = [
   { value: 'proteccion', label: 'Protección' },
   { value: 'porvenir', label: 'Porvenir' },
   { value: 'colfondos', label: 'Colfondos' },
+  { value: 'colpensiones', label: 'Colpensiones' },
   { value: 'old_mutual', label: 'Old Mutual' },
   { value: 'skandia', label: 'Skandia' },
   { value: 'otros', label: 'Otros' },
+];
+
+export const parentescos = [
+  { value: 'MADRE', label: 'Madre' },
+  { value: 'PADRE', label: 'Padre' },
+  { value: 'HIJA', label: 'Hija' },
+  { value: 'HIJO', label: 'Hijo' },
+  { value: 'CONYUGUE', label: 'Cónyuge' },
+];
+
+export const tiposDocumento = [
+  { value: 'CC', label: 'CC' },
+  { value: 'TI', label: 'TI' },
+  { value: 'CE', label: 'CE' },
+  { value: 'PA', label: 'PA' },
+  { value: 'RC', label: 'RC' },
+  { value: 'PT', label: 'PT' },
+];
+
+export const tiposDocumentoCompletos = [
+  { value: 'CC', label: 'Cédula de Ciudadanía' },
+  { value: 'TI', label: 'Tarjeta de Identidad' },
+  { value: 'CE', label: 'Cédula de Extranjería' },
+  { value: 'PA', label: 'Pasaporte' },
+  { value: 'RC', label: 'Registro Civil' },
+  { value: 'PT', label: 'Permiso por Protección Temporal' },
 ];
 

@@ -8,11 +8,13 @@ import { nivelesEducativos } from './formOptions';
 
 interface NivelEducativoSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
+  modifiedFields?: Set<string>;
   onFileChange?: (fieldName: string) => void;
 }
 
 const NivelEducativoSection = <TFieldValues extends FieldValues>({
   control,
+  modifiedFields,
   onFileChange,
 }: NivelEducativoSectionProps<TFieldValues>) => {
   return (
@@ -28,9 +30,9 @@ const NivelEducativoSection = <TFieldValues extends FieldValues>({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Nivel Educativo</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className={modifiedFields?.has('nivelEducativo') ? 'border-green-500 bg-green-50' : ''}>
                       <SelectValue placeholder="Seleccione su nivel educativo" />
                     </SelectTrigger>
                   </FormControl>

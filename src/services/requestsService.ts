@@ -63,7 +63,29 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
       // Only append if value is not null, undefined, or empty string
       // For required fields, they should always have a value
       if (value !== null && value !== undefined && value !== '') {
-        formData.append(`payload[${key}]`, String(value));
+        // Handle arrays (like beneficiariosNuevos) - Laravel expects array notation with indices
+        if (Array.isArray(value)) {
+          // For beneficiariosNuevos, send each item as nested array fields for Laravel
+          if (key === 'beneficiariosNuevos' && value.length > 0) {
+            value.forEach((item, index) => {
+              if (item && typeof item === 'object') {
+                Object.entries(item).forEach(([fieldKey, fieldValue]) => {
+                  if (fieldValue !== null && fieldValue !== undefined && fieldValue !== '') {
+                    formData.append(`payload[${key}][${index}][${fieldKey}]`, String(fieldValue));
+                  }
+                });
+              }
+            });
+          } else {
+            // For other arrays, convert to JSON string
+            formData.append(`payload[${key}]`, JSON.stringify(value));
+          }
+        } else if (typeof value === 'object') {
+          // Handle nested objects by converting to JSON
+          formData.append(`payload[${key}]`, JSON.stringify(value));
+        } else {
+          formData.append(`payload[${key}]`, String(value));
+        }
       }
     });
     

@@ -1006,12 +1006,97 @@ const AdminSolicitudesPage: React.FC = () => {
                                   return "No especificado";
                                 }
                                 
-                                if (typeof val === "object") {
+                                // Handle string that might be JSON (from FormData serialization)
+                                let parsedVal = val;
+                                if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                                  try {
+                                    parsedVal = JSON.parse(val);
+                                  } catch (e) {
+                                    // Not JSON, use original value
+                                  }
+                                }
+                                
+                                // Handle arrays (like beneficiariosNuevos)
+                                if (Array.isArray(parsedVal)) {
+                                  if (parsedVal.length === 0) {
+                                    return <span className="text-gray-500 italic">No hay elementos</span>;
+                                  }
+                                  
+                                  // Special handling for beneficiariosNuevos array
+                                  if (selectedSolicitud.request_type === 'actualizar-datos-personales' && 
+                                      parsedVal.length > 0 && 
+                                      parsedVal[0] && 
+                                      typeof parsedVal[0] === 'object' &&
+                                      ('tipo_documento' in parsedVal[0] || 'documento' in parsedVal[0])) {
+                                    return (
+                                      <div className="space-y-3">
+                                        <p className="text-xs font-semibold text-gray-700 mb-2">
+                                          Nuevos Miembros del Grupo Familiar ({parsedVal.length})
+                                        </p>
+                                        {parsedVal.map((beneficiario: any, idx: number) => (
+                                          <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                              <div>
+                                                <span className="font-medium text-gray-600">Tipo Doc:</span>{' '}
+                                                <span className="text-gray-900">{beneficiario.tipo_documento || 'N/A'}</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Documento:</span>{' '}
+                                                <span className="text-gray-900">{beneficiario.documento || 'N/A'}</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Nombres:</span>{' '}
+                                                <span className="text-gray-900">{beneficiario.nombres || 'N/A'}</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Apellidos:</span>{' '}
+                                                <span className="text-gray-900">{beneficiario.apellidos || 'N/A'}</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Fecha Nacimiento:</span>{' '}
+                                                <span className="text-gray-900">
+                                                  {beneficiario.fecha_nacimiento 
+                                                    ? new Date(beneficiario.fecha_nacimiento).toLocaleDateString('es-CO')
+                                                    : 'N/A'}
+                                                </span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Parentesco:</span>{' '}
+                                                <span className="text-gray-900">{beneficiario.parentesco || 'N/A'}</span>
+                                              </div>
+                                              <div>
+                                                <span className="font-medium text-gray-600">Sexo:</span>{' '}
+                                                <span className="text-gray-900">
+                                                  {beneficiario.sexo === 'M' ? 'Masculino' : 
+                                                   beneficiario.sexo === 'F' ? 'Femenino' : 
+                                                   beneficiario.sexo || 'N/A'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  // Generic array display
+                                  return (
+                                    <div className="space-y-1">
+                                      {parsedVal.map((item: any, idx: number) => (
+                                        <div key={idx} className="text-sm text-gray-700">
+                                          {idx + 1}. {typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                }
+                                
+                                if (typeof parsedVal === "object") {
                                   // Special handling for nested objects like infoCertificado
-                                  if (typeof val === "object" && !Array.isArray(val)) {
+                                  if (typeof parsedVal === "object" && !Array.isArray(parsedVal)) {
                                     return (
                                       <div className="space-y-2">
-                                        {Object.entries(val).map(([nestedKey, nestedValue]) => (
+                                        {Object.entries(parsedVal).map(([nestedKey, nestedValue]) => (
                                           <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
                                             <span className="text-xs font-medium text-gray-600">
                                               {formatFieldName(nestedKey)}:
@@ -1032,10 +1117,10 @@ const AdminSolicitudesPage: React.FC = () => {
                                       </div>
                                     );
                                   }
-                                  return JSON.stringify(val, null, 2);
+                                  return JSON.stringify(parsedVal, null, 2);
                                 }
                                 
-                                return String(val);
+                                return String(parsedVal);
                               };
 
                               // Separar campos del proceso de los datos específicos de la solicitud para TODOS los tipos

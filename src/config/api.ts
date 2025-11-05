@@ -16,6 +16,8 @@ export const API_CONFIG = {
     INVENTORY: '/api/inventory',
     CHATBOT: '/api/chatbot',
     AFILIADOS_AUTHENTICATE: '/api/afiliados/authenticate',
+    AFILIADOS_REQUEST_OTP: '/api/afiliados/request-otp',
+    AFILIADOS_VERIFY_OTP: '/api/afiliados/verify-otp',
   },
 } as const;
 
