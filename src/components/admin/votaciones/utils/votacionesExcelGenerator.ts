@@ -69,38 +69,12 @@ export const generateVotacionesExcelReport = (
     (a, b) => b.vote_count - a.vote_count
   );
 
-  // Calcular distribución de votos por hospital para cada candidato
-  // Agrupar votos de auditoría por hospital y luego distribuir por candidato
-  const hospitalVoteDistribution: { [hospital: string]: number } = {};
-  auditData.forEach(vote => {
-    const hospital = vote.voter.hospital;
-    hospitalVoteDistribution[hospital] = (hospitalVoteDistribution[hospital] || 0) + 1;
-  });
-
+  // Mostrar todos los candidatos con su hospital
+  // Usar el campo hospital directamente de votes_by_candidate que ahora está disponible
   sortedCandidates.forEach((candidate, index) => {
-    // Determinar el hospital que más votó por este candidato
-    let candidateHospital = 'N/A';
-    
-    if (hospitalFilter) {
-      candidateHospital = hospitalFilter;
-    } else {
-      // Si tenemos estadísticas detalladas, usarlas
-      if (candidateHospitalStats[candidate.candidate_id]) {
-        const hospitalVotes = candidateHospitalStats[candidate.candidate_id];
-        const topHospitalEntry = Object.entries(hospitalVotes)
-          .sort(([, a], [, b]) => b - a)[0];
-        if (topHospitalEntry) {
-          candidateHospital = topHospitalEntry[0];
-        }
-      } else {
-        // Aproximación: usar el hospital con más votos totales
-        const topHospital = Object.entries(hospitalVoteDistribution)
-          .sort(([, a], [, b]) => b - a)[0];
-        if (topHospital) {
-          candidateHospital = topHospital[0];
-        }
-      }
-    }
+    // Usar el campo hospital directamente del candidato
+    const candidateHospital = candidate.hospital || 
+      (hospitalFilter ? hospitalFilter : 'N/A');
     
     statsData.push([
       (index + 1).toString(),
@@ -117,40 +91,72 @@ export const generateVotacionesExcelReport = (
   statsData.push(['Hospital', 'ID Candidato', 'Nombre del Candidato', 'Cantidad de Votos']);
 
   // Calcular el candidato más votado por cada hospital
+  // Usar los datos de votes_by_candidate agrupados por hospital
   const hospitalTopCandidates: { [hospital: string]: { candidate_id: string; candidate_name: string; vote_count: number } } = {};
   
-  // Si tenemos estadísticas detalladas, usarlas
+  // Primero, agrupar candidatos por hospital usando el campo hospital de votes_by_candidate
+  const candidatesByHospitalMap: { [hospital: string]: typeof sortedCandidates } = {};
+  
+  sortedCandidates.forEach(candidate => {
+    if (candidate.hospital) {
+      if (!candidatesByHospitalMap[candidate.hospital]) {
+        candidatesByHospitalMap[candidate.hospital] = [];
+      }
+      candidatesByHospitalMap[candidate.hospital].push(candidate);
+    }
+  });
+
+  // Para cada hospital, encontrar el candidato más votado
+  Object.entries(candidatesByHospitalMap).forEach(([hospital, candidates]) => {
+    // Ordenar candidatos por cantidad de votos (descendente) y tomar el primero
+    const sortedByVotes = [...candidates].sort((a, b) => b.vote_count - a.vote_count);
+    if (sortedByVotes.length > 0) {
+      const topCandidate = sortedByVotes[0];
+      hospitalTopCandidates[hospital] = {
+        candidate_id: topCandidate.candidate_id,
+        candidate_name: topCandidate.candidate_name,
+        vote_count: topCandidate.vote_count
+      };
+    }
+  });
+
+  // Si tenemos estadísticas detalladas desde auditData, combinarlas o usarlas como validación
+  // Esto puede ayudar si hay candidatos que no tienen el campo hospital pero están en auditData
   if (Object.keys(hospitalCandidateStats).length > 0) {
     Object.entries(hospitalCandidateStats).forEach(([hospital, candidateVotes]) => {
-      const topCandidateEntry = Object.entries(candidateVotes)
-        .sort(([, a], [, b]) => b - a)[0];
-      
-      if (topCandidateEntry) {
-        const [topCandidateId, voteCount] = topCandidateEntry;
-        const candidateInfo = sortedCandidates.find(c => c.candidate_id === topCandidateId);
-        if (candidateInfo) {
-          hospitalTopCandidates[hospital] = {
-            candidate_id: candidateInfo.candidate_id,
-            candidate_name: candidateInfo.candidate_name,
-            vote_count: voteCount
-          };
+      // Si ya tenemos datos de este hospital desde votes_by_candidate, comparar
+      // Si no tenemos datos, usar los de auditData
+      if (!hospitalTopCandidates[hospital]) {
+        const topCandidateEntry = Object.entries(candidateVotes)
+          .sort(([, a], [, b]) => b - a)[0];
+        
+        if (topCandidateEntry) {
+          const [topCandidateId, voteCount] = topCandidateEntry;
+          const candidateInfo = sortedCandidates.find(c => c.candidate_id === topCandidateId);
+          if (candidateInfo) {
+            hospitalTopCandidates[hospital] = {
+              candidate_id: candidateInfo.candidate_id,
+              candidate_name: candidateInfo.candidate_name,
+              vote_count: voteCount
+            };
+          }
         }
       }
     });
-  } else {
-    // Aproximación: distribuir el candidato más votado por cada hospital
-    statistics.votes_by_hospital.forEach(hospital => {
-      const hospitalName = hospital.voter_hospital;
-      if (sortedCandidates.length > 0) {
-        const topCandidate = sortedCandidates[0];
-        hospitalTopCandidates[hospitalName] = {
-          candidate_id: topCandidate.candidate_id,
-          candidate_name: topCandidate.candidate_name,
-          vote_count: topCandidate.vote_count
-        };
-      }
-    });
   }
+
+  // Asegurarnos de incluir todos los hospitales de statistics.votes_by_hospital
+  // Si algún hospital no tiene candidato más votado, mostrar "No disponible"
+  statistics.votes_by_hospital.forEach(hospital => {
+    const hospitalName = hospital.voter_hospital;
+    if (!hospitalTopCandidates[hospitalName]) {
+      hospitalTopCandidates[hospitalName] = {
+        candidate_id: 'N/A',
+        candidate_name: 'No disponible',
+        vote_count: 0
+      };
+    }
+  });
 
   // Mostrar candidato más votado por cada hospital
   Object.entries(hospitalTopCandidates)
