@@ -245,11 +245,6 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           throw new Error(message);
         } else if (status === 502) {
           // Error 502: Bad Gateway - el servidor backend no está respondiendo
-          console.error('❌ Error 502 - Backend no disponible:', {
-            endpoint: API_CONFIG.ENDPOINTS.AFILIADOS_AUTHENTICATE,
-            baseURL: error.config?.baseURL,
-            url: error.config?.url,
-          });
           throw new Error('El servidor backend no está disponible en este momento (Error 502). Por favor, contacta al administrador o intenta más tarde.');
         } else if (status === 503) {
           throw new Error('Servicio temporalmente no disponible. Intenta más tarde.');
@@ -305,9 +300,6 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!response.success || !response.data?.afiliado) {
         throw new Error('Respuesta inválida del servidor');
       }
-
-      // Log de la respuesta del API para debugging
-      console.log('🔐 Respuesta del API de autenticación OTP:', response);
 
       // Transformar los datos de la API al formato esperado por el contexto
       const afiliadoData: AfiliadoData = {

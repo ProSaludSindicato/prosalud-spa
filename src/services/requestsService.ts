@@ -105,8 +105,8 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
           } else if (fileOrFileList instanceof File) {
             file = fileOrFileList;
           } else {
-            console.warn(`Invalid file type for key "${key}":`, fileOrFileList);
-            return; // Skip invalid file types
+            // Skip invalid file types
+            return;
           }
           
           formData.append(`files[${key}]`, file);
@@ -169,7 +169,6 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
       }
     }
     
-    console.error('Error submitting request:', error);
     throw {
       success: false,
       message: 'Error desconocido al enviar la solicitud',
