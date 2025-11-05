@@ -62,26 +62,6 @@ export function CandidatesTable({ data, isLoading, currentHospital }: Candidates
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          {currentHospital && (
-            <p className="text-sm text-muted-foreground">
-              Filtrando por: <span className="font-medium">{currentHospital}</span>
-            </p>
-          )}
-          <Button
-            variant="outline"
-            onClick={handleSortToggle}
-            className="gap-2"
-          >
-            {sortOrder === 'desc' ? (
-              <ArrowDown className="h-4 w-4" />
-            ) : (
-              <ArrowUp className="h-4 w-4" />
-            )}
-            {sortOrder === 'desc' ? 'Más votos primero' : 'Menos votos primero'}
-          </Button>
-        </div>
-
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -89,6 +69,7 @@ export function CandidatesTable({ data, isLoading, currentHospital }: Candidates
                 <TableHead>#</TableHead>
                 <TableHead>ID Candidato</TableHead>
                 <TableHead>Nombre del Candidato</TableHead>
+                <TableHead>Hospital</TableHead>
                 <TableHead className="text-right">
                   <Button
                     variant="ghost"
@@ -109,7 +90,7 @@ export function CandidatesTable({ data, isLoading, currentHospital }: Candidates
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No hay candidatos para los filtros seleccionados
                   </TableCell>
                 </TableRow>
@@ -119,10 +100,12 @@ export function CandidatesTable({ data, isLoading, currentHospital }: Candidates
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>{candidate.candidate_id}</TableCell>
                     <TableCell className="font-medium">{candidate.candidate_name}</TableCell>
+                    <TableCell>{candidate.hospital || 'N/A'}</TableCell>
                     <TableCell className="text-right font-semibold">
                       {candidate.vote_count}
                     </TableCell>
                   </TableRow>
+
                 ))
               )}
             </TableBody>

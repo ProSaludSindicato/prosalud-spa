@@ -10,6 +10,7 @@ export interface VotesByCandidate {
   candidate_id: string;
   candidate_name: string;
   vote_count: number;
+  hospital?: string;
 }
 
 export interface VotesByHospital {

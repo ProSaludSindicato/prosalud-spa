@@ -355,6 +355,7 @@ export default function AdminVotacionesPage() {
                     data={statsData.statistics?.votes_by_candidate || []}
                     isLoading={statsLoading || statsFetching}
                     currentHospital={statisticsFilters.hospital}
+                    hospitalsData={statsData.statistics?.votes_by_hospital || []}
                   />
                   <VotesByHospitalChart 
                     data={statsData.statistics?.votes_by_hospital || []}
