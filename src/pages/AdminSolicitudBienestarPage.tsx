@@ -42,6 +42,9 @@ import {
   TrendingUp,
   FileText,
   X,
+  CheckCircle2,
+  Image as ImageIcon,
+  Globe,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -50,6 +53,8 @@ import DataPagination from '@/components/ui/data-pagination';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
 import { TableLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import WellnessRequestForm from '@/components/admin/solicitudes/WellnessRequestForm';
+import WellnessActivityRealizedForm from '@/components/admin/solicitudes/WellnessActivityRealizedForm';
+import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -67,12 +72,24 @@ interface ActionMenuProps {
   onViewDetails: (s: WellnessRequest) => void;
   onEdit: (s: WellnessRequest) => void;
   onChangeStatus: (s: WellnessRequest) => void;
+  onAddActivityRealized?: (s: WellnessRequest) => void;
+  onReviewActivity?: (s: WellnessRequest) => void;
 }
 
-const ActionMenu: React.FC<ActionMenuProps> = ({ solicitud, onViewDetails, onEdit, onChangeStatus }) => {
+const ActionMenu: React.FC<ActionMenuProps> = ({ 
+  solicitud, 
+  onViewDetails, 
+  onEdit, 
+  onChangeStatus,
+  onAddActivityRealized,
+  onReviewActivity,
+}) => {
   const canEditSolicitud = (s: WellnessRequest): boolean => {
     return s.estado === 'pending' || s.estado === 'in_progress';
   };
+
+  const hasActivityRealized = !!solicitud.actividad_realizada;
+  const canAddActivity = solicitud.estado === 'resolved';
 
   return (
     <DropdownMenu>
@@ -87,7 +104,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({ solicitud, onViewDetails, onEdi
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-48"
+        className="w-56"
       >
         <DropdownMenuItem onClick={() => onViewDetails(solicitud)}>
           <Eye className="h-4 w-4 mr-2" />
@@ -103,6 +120,18 @@ const ActionMenu: React.FC<ActionMenuProps> = ({ solicitud, onViewDetails, onEdi
           <Send className="h-4 w-4 mr-2" />
           Cambiar Estado
         </DropdownMenuItem>
+        {canAddActivity && !hasActivityRealized && onAddActivityRealized && (
+          <DropdownMenuItem onClick={() => onAddActivityRealized(solicitud)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Actividad Realizada
+          </DropdownMenuItem>
+        )}
+        {hasActivityRealized && onReviewActivity && (
+          <DropdownMenuItem onClick={() => onReviewActivity(solicitud)}>
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Revisar y Publicar
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -122,6 +151,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [sortBy, setSortBy] = useState<'id' | 'fechaPropuesta' | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showActivityRealizedForm, setShowActivityRealizedForm] = useState(false);
+  const [solicitudForActivity, setSolicitudForActivity] = useState<WellnessRequest | null>(null);
+  const [showActivityReviewDialog, setShowActivityReviewDialog] = useState(false);
+  const [solicitudForReview, setSolicitudForReview] = useState<WellnessRequest | null>(null);
   const queryClient = useQueryClient();
 
   const statusChangeForm = useForm<StatusChangeFormValues>({
@@ -281,6 +314,22 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   const handleViewDetails = React.useCallback((solicitud: WellnessRequest) => {
     setSelectedSolicitud(solicitud);
+  }, []);
+
+  const handleAddActivityRealized = React.useCallback((solicitud: WellnessRequest) => {
+    setSolicitudForActivity(solicitud);
+    setShowActivityRealizedForm(true);
+  }, []);
+
+  const handleReviewActivity = React.useCallback((solicitud: WellnessRequest) => {
+    if (!solicitud.actividad_realizada) {
+      toast.error('No hay actividad realizada', {
+        description: 'Esta solicitud no tiene información de actividad realizada.',
+      });
+      return;
+    }
+    setSolicitudForReview(solicitud);
+    setShowActivityReviewDialog(true);
   }, []);
 
   const handleOpenStatusDialog = React.useCallback((solicitud: WellnessRequest) => {
@@ -607,8 +656,20 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                               <TableCell className="font-medium">#{solicitud.id}</TableCell>
                               <TableCell>
                                 <div className="max-w-xs">
-                                  <div className="font-medium truncate">
+                                  <div className="font-medium truncate flex items-center gap-2">
                                     {solicitud.nombreActividad || 'N/A'}
+                                    {solicitud.actividad_realizada && (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        Realizada
+                                      </Badge>
+                                    )}
+                                    {solicitud.actividad_realizada?.publicado_en_galeria && (
+                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                        <Globe className="h-3 w-3 mr-1" />
+                                        Publicado
+                                      </Badge>
+                                    )}
                                   </div>
                                   {solicitud.numeroParticipantes && (
                                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
@@ -673,6 +734,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                   onViewDetails={handleViewDetails}
                                   onEdit={handleEdit}
                                   onChangeStatus={handleOpenStatusDialog}
+                                  onAddActivityRealized={handleAddActivityRealized}
+                                  onReviewActivity={handleReviewActivity}
                                 />
                               </TableCell>
                             </TableRow>
@@ -941,8 +1004,78 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
+                {/* Actividad Realizada */}
+                {selectedSolicitud.actividad_realizada ? (
+                  <Card className="border border-green-200 shadow-sm bg-green-50/30">
+                    <CardHeader className="bg-green-50 border-b border-green-200">
+                      <CardTitle className="text-lg font-semibold text-gray-900 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          Actividad Realizada
+                        </span>
+                        {selectedSolicitud.actividad_realizada?.publicado_en_galeria && (
+                          <Badge className="bg-green-600 text-white">
+                            Publicado en Galería
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Fecha Realizada</label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {selectedSolicitud.actividad_realizada.fecha_realizada
+                              ? new Date(selectedSolicitud.actividad_realizada.fecha_realizada).toLocaleDateString('es-ES')
+                              : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Ubicación Real</label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {selectedSolicitud.actividad_realizada.ubicacion_real || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Número de Asistentes</label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {selectedSolicitud.actividad_realizada.numero_asistentes_real || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Evidencias</label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {selectedSolicitud.actividad_realizada.evidencias?.length || 0} imágenes
+                          </p>
+                        </div>
+                      </div>
+                      {selectedSolicitud.actividad_realizada.descripcion_realizada && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Descripción</label>
+                          <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                            {selectedSolicitud.actividad_realizada.descripcion_realizada}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gray-50 border-b border-gray-200">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        Actividad Realizada
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-500 mb-4">
+                        Aún no se ha registrado información de la actividad realizada.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Botones de Acción */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 flex-wrap">
                   {canEditSolicitud(selectedSolicitud) && (
                     <Button
                       variant="outline"
@@ -953,6 +1086,31 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                     >
                       <Pencil className="h-4 w-4 mr-2" />
                       Editar
+                    </Button>
+                  )}
+                  {selectedSolicitud.estado === 'resolved' && 
+                   !selectedSolicitud.actividad_realizada && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedSolicitud(null);
+                        handleAddActivityRealized(selectedSolicitud);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Actividad Realizada
+                    </Button>
+                  )}
+                  {selectedSolicitud.actividad_realizada && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedSolicitud(null);
+                        handleReviewActivity(selectedSolicitud);
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Revisar y Publicar
                     </Button>
                   )}
                   <Button
@@ -1090,6 +1248,45 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             setEditingSolicitud(null);
           }}
         />
+
+        {/* Formulario de Actividad Realizada */}
+        {solicitudForActivity && (
+          <WellnessActivityRealizedForm
+            open={showActivityRealizedForm}
+            onClose={() => {
+              setShowActivityRealizedForm(false);
+              setSolicitudForActivity(null);
+            }}
+            solicitud={solicitudForActivity}
+            actividadRealizada={solicitudForActivity.actividad_realizada || null}
+            onSuccess={async () => {
+              await queryClient.invalidateQueries({ queryKey: ['wellness-requests'] });
+              await refetch();
+              setShowActivityRealizedForm(false);
+              setSolicitudForActivity(null);
+            }}
+          />
+        )}
+
+        {/* Diálogo de Revisión y Publicación */}
+        {solicitudForReview && solicitudForReview.actividad_realizada && (
+          <WellnessActivityReviewDialog
+            open={showActivityReviewDialog}
+            onClose={() => {
+              setShowActivityReviewDialog(false);
+              setSolicitudForReview(null);
+            }}
+            solicitud={solicitudForReview}
+            actividadRealizada={solicitudForReview.actividad_realizada!}
+            onSuccess={async () => {
+              await queryClient.invalidateQueries({ queryKey: ['wellness-requests'] });
+              await queryClient.invalidateQueries({ queryKey: ['bienestar-events'] });
+              await refetch();
+              setShowActivityReviewDialog(false);
+              setSolicitudForReview(null);
+            }}
+          />
+        )}
       </div>
     </AdminLayout>
   );

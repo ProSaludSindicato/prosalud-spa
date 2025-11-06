@@ -32,6 +32,38 @@ export interface CreateWellnessRequestData {
   solicitanteId: string;
 }
 
+export interface WellnessActivityEvidence {
+  id?: number;
+  image_url?: string;
+  file?: File;
+  is_selected_for_gallery?: boolean;
+  order?: number;
+}
+
+export interface WellnessActivityRealized {
+  id?: number;
+  wellness_request_id: number;
+  // Información de la actividad realizada
+  fecha_realizada?: string;
+  ubicacion_real?: string;
+  numero_asistentes_real?: number;
+  descripcion_realizada?: string;
+  obsequio_entregado?: string;
+  // Archivos
+  evidencias?: WellnessActivityEvidence[]; // Imágenes de evidencia
+  listado_asistencia?: {
+    id?: number;
+    file_url?: string;
+    file?: File;
+    original_name?: string;
+  };
+  // Control de publicación
+  publicado_en_galeria?: boolean;
+  evento_galeria_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface WellnessRequest {
   id: number;
   nombreActividad: string;
@@ -53,6 +85,8 @@ export interface WellnessRequest {
   estado: 'pending' | 'in_progress' | 'resolved' | 'rejected';
   created_at: string;
   updated_at: string;
+  // Nueva relación con actividad realizada
+  actividad_realizada?: WellnessActivityRealized;
 }
 
 export interface UpdateWellnessRequestData {
@@ -66,6 +100,30 @@ export interface UpdateWellnessRequestData {
   numeroParticipantes?: number;
   requiereDetalles?: boolean;
   detalles?: WellnessRequestDetail[];
+}
+
+export interface CreateWellnessActivityRealizedData {
+  wellness_request_id: number;
+  fecha_realizada?: string;
+  ubicacion_real?: string;
+  numero_asistentes_real?: number;
+  descripcion_realizada?: string;
+  obsequio_entregado?: string;
+  evidencias?: File[]; // Imágenes de evidencia
+  listado_asistencia?: File; // Archivo de listado de asistencia
+}
+
+export interface UpdateWellnessActivityRealizedData {
+  fecha_realizada?: string;
+  ubicacion_real?: string;
+  numero_asistentes_real?: number;
+  descripcion_realizada?: string;
+  obsequio_entregado?: string;
+  evidencias?: File[]; // Nuevas imágenes a agregar
+  evidencias_seleccionadas?: number[]; // IDs de evidencias seleccionadas para galería
+  evidencias_eliminadas?: number[]; // IDs de evidencias a eliminar
+  listado_asistencia?: File; // Nuevo archivo de listado
+  eliminar_listado_asistencia?: boolean;
 }
 
 export interface WellnessRequestFilters {
@@ -285,6 +343,210 @@ export const wellnessRequestsService = {
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Error al actualizar el estado de la solicitud');
+      }
+
+      return response.data.data;
+    } catch (error) {
+      const sanitizedMessage = getErrorMessage(error);
+      const sanitizedError = new Error(sanitizedMessage);
+      
+      if ((error as any).response) {
+        (sanitizedError as any).originalStatus = (error as any).response.status;
+        (sanitizedError as any).originalData = (error as any).response.data;
+      }
+      
+      throw sanitizedError;
+    }
+  },
+
+  /**
+   * Create activity realized data for a wellness request
+   */
+  async createWellnessActivityRealized(
+    data: CreateWellnessActivityRealizedData,
+  ): Promise<WellnessActivityRealized> {
+    try {
+      const formData = new FormData();
+      
+      formData.append('wellness_request_id', String(data.wellness_request_id));
+      
+      if (data.fecha_realizada) formData.append('fecha_realizada', data.fecha_realizada);
+      if (data.ubicacion_real) formData.append('ubicacion_real', data.ubicacion_real);
+      if (data.numero_asistentes_real !== undefined) {
+        formData.append('numero_asistentes_real', String(data.numero_asistentes_real));
+      }
+      if (data.descripcion_realizada) formData.append('descripcion_realizada', data.descripcion_realizada);
+      if (data.obsequio_entregado) formData.append('obsequio_entregado', data.obsequio_entregado);
+      
+      // Agregar evidencias (imágenes)
+      if (data.evidencias && data.evidencias.length > 0) {
+        data.evidencias.forEach((file, index) => {
+          formData.append(`evidencias[${index}]`, file);
+        });
+      }
+      
+      // Agregar listado de asistencia
+      if (data.listado_asistencia) {
+        formData.append('listado_asistencia', data.listado_asistencia);
+      }
+      
+      const response = await wellnessRequestsApi.post<ApiResponse<WellnessActivityRealized>>(
+        `/api/wellness-requests/${data.wellness_request_id}/activity-realized`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        },
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al crear la información de actividad realizada');
+      }
+
+      return response.data.data;
+    } catch (error) {
+      const sanitizedMessage = getErrorMessage(error);
+      const sanitizedError = new Error(sanitizedMessage);
+      
+      if ((error as any).response) {
+        (sanitizedError as any).originalStatus = (error as any).response.status;
+        (sanitizedError as any).originalData = (error as any).response.data;
+      }
+      
+      throw sanitizedError;
+    }
+  },
+
+  /**
+   * Update activity realized data for a wellness request
+   */
+  async updateWellnessActivityRealized(
+    requestId: number,
+    data: UpdateWellnessActivityRealizedData,
+  ): Promise<WellnessActivityRealized> {
+    try {
+      const formData = new FormData();
+      
+      if (data.fecha_realizada !== undefined) formData.append('fecha_realizada', data.fecha_realizada || '');
+      if (data.ubicacion_real !== undefined) formData.append('ubicacion_real', data.ubicacion_real || '');
+      if (data.numero_asistentes_real !== undefined) {
+        formData.append('numero_asistentes_real', String(data.numero_asistentes_real));
+      }
+      if (data.descripcion_realizada !== undefined) {
+        formData.append('descripcion_realizada', data.descripcion_realizada || '');
+      }
+      if (data.obsequio_entregado !== undefined) {
+        formData.append('obsequio_entregado', data.obsequio_entregado || '');
+      }
+      
+      // Agregar nuevas evidencias
+      if (data.evidencias && data.evidencias.length > 0) {
+        data.evidencias.forEach((file, index) => {
+          formData.append(`evidencias[${index}]`, file);
+        });
+      }
+      
+      // Evidencias seleccionadas para galería
+      if (data.evidencias_seleccionadas && data.evidencias_seleccionadas.length > 0) {
+        formData.append('evidencias_seleccionadas', JSON.stringify(data.evidencias_seleccionadas));
+      }
+      
+      // Evidencias a eliminar
+      if (data.evidencias_eliminadas && data.evidencias_eliminadas.length > 0) {
+        formData.append('evidencias_eliminadas', JSON.stringify(data.evidencias_eliminadas));
+      }
+      
+      // Nuevo listado de asistencia
+      if (data.listado_asistencia) {
+        formData.append('listado_asistencia', data.listado_asistencia);
+      }
+      
+      // Eliminar listado de asistencia
+      if (data.eliminar_listado_asistencia) {
+        formData.append('eliminar_listado_asistencia', 'true');
+      }
+      
+      const response = await wellnessRequestsApi.put<ApiResponse<WellnessActivityRealized>>(
+        `/api/wellness-requests/${requestId}/activity-realized`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        },
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al actualizar la información de actividad realizada');
+      }
+
+      return response.data.data;
+    } catch (error) {
+      const sanitizedMessage = getErrorMessage(error);
+      const sanitizedError = new Error(sanitizedMessage);
+      
+      if ((error as any).response) {
+        (sanitizedError as any).originalStatus = (error as any).response.status;
+        (sanitizedError as any).originalData = (error as any).response.data;
+      }
+      
+      throw sanitizedError;
+    }
+  },
+
+  /**
+   * Get activity realized data for a wellness request
+   */
+  async getWellnessActivityRealized(
+    requestId: number,
+  ): Promise<WellnessActivityRealized> {
+    try {
+      const response = await wellnessRequestsApi.get<ApiResponse<WellnessActivityRealized>>(
+        `/api/wellness-requests/${requestId}/activity-realized`,
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener la información de actividad realizada');
+      }
+
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  /**
+   * Publish activity realized as a public gallery event
+   */
+  async publishActivityToGallery(
+    requestId: number,
+    selectedEvidenceIds: number[],
+    eventData?: {
+      title?: string;
+      category?: string;
+      description?: string;
+      is_visible?: boolean;
+    },
+  ): Promise<any> {
+    try {
+      const payload: any = {
+        wellness_request_id: requestId,
+        evidencias_seleccionadas: selectedEvidenceIds,
+      };
+      
+      if (eventData) {
+        Object.assign(payload, eventData);
+      }
+      
+      const response = await wellnessRequestsApi.post<ApiResponse<any>>(
+        `/api/wellness-requests/${requestId}/publish-to-gallery`,
+        payload,
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al publicar en la galería');
       }
 
       return response.data.data;
