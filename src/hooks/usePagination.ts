@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 
 interface UsePaginationProps<T> {
   data: T[];
@@ -32,25 +32,37 @@ export const usePagination = <T>({
   const totalItems = data.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+  // Reset to page 1 if current page is out of range when data changes
+  useEffect(() => {
+    if (totalPages > 0) {
+      setCurrentPage((prevPage) => {
+        // Reset to page 1 if current page is out of range
+        return prevPage > totalPages ? 1 : prevPage;
+      });
+    }
+  }, [totalPages]); // Only depend on totalPages to avoid loops
+
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return data.slice(startIndex, endIndex);
   }, [data, currentPage, itemsPerPage]);
 
-  const goToPage = (page: number) => {
-    const validPage = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(validPage);
-  };
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage((prevPage) => {
+      const validPage = Math.max(1, Math.min(page, totalPages || 1));
+      return validPage;
+    });
+  }, [totalPages]);
 
-  const setItemsPerPage = (items: number) => {
+  const setItemsPerPage = useCallback((items: number) => {
     setItemsPerPageState(items);
     // Reset to first page when changing items per page
     setCurrentPage(1);
-  };
+  }, []);
 
-  const goToFirstPage = () => setCurrentPage(1);
-  const goToLastPage = () => setCurrentPage(totalPages);
+  const goToFirstPage = useCallback(() => setCurrentPage(1), []);
+  const goToLastPage = useCallback(() => setCurrentPage(totalPages), [totalPages]);
 
   const hasNextPage = currentPage < totalPages;
   const hasPreviousPage = currentPage > 1;

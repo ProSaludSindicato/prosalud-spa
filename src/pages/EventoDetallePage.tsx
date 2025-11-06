@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/carousel";
 import ImagePreviewDialog from '@/components/sst/ImagePreviewDialog';
 import { Button } from '@/components/ui/button';
-import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import { EventDetailLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 const EventoDetallePage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -40,6 +40,7 @@ const EventoDetallePage: React.FC = () => {
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageAlt, setSelectedImageAlt] = useState<string | undefined>(undefined);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
   const [api, setApi] = React.useState<CarouselApi>()
   const [current, setCurrent] = React.useState(0)
@@ -80,7 +81,7 @@ const EventoDetallePage: React.FC = () => {
   if (isLoading) {
     return (
       <MainLayout>
-        <PageLoadingSkeleton />
+        <EventDetailLoadingSkeleton />
       </MainLayout>
     );
   }
@@ -104,8 +105,10 @@ const EventoDetallePage: React.FC = () => {
   const hasMultipleImages = allImages.length > 1;
 
   const handleImageClick = (imageSrc: string, imageAlt?: string) => {
+    const imageIndex = allImages.findIndex(img => img.url === imageSrc);
     setSelectedImage(imageSrc);
     setSelectedImageAlt(imageAlt || event.title);
+    setSelectedImageIndex(imageIndex >= 0 ? imageIndex : 0);
   };
 
   const handleThumbnailClick = (index: number) => {
@@ -340,6 +343,8 @@ const EventoDetallePage: React.FC = () => {
         selectedImage={selectedImage} 
         setSelectedImage={setSelectedImage}
         imageAlt={selectedImageAlt}
+        allImages={allImages}
+        currentImageIndex={selectedImageIndex}
       />
     </MainLayout>
   );

@@ -71,9 +71,9 @@ const GaleriaBienestarPage: React.FC = () => {
   })
 
   useEffect(() => {
+    goToPage(1)
     window.scrollTo(0, 0)
-    goToPage(1) // Reset to first page when filters change
-  }, [sortOrder, filterCategory, goToPage])
+  }, [sortOrder, filterCategory]) // Removed goToPage from dependencies to avoid infinite loops
 
   const handlePageChange = (page: number) => {
     goToPage(page)
