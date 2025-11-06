@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Upload, X, Loader2, Image as ImageIcon, FileText, Info, CheckCircle2, AlertTriangle, Maximize2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon, FileText, Info, AlertTriangle, Maximize2, ChevronLeft, ChevronRight, Trash2, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   wellnessRequestsService, 
@@ -22,8 +22,17 @@ import {
 
 const activityRealizedSchema = z.object({
   fecha_realizada: z.string().min(1, 'La fecha realizada es obligatoria'),
-  ubicacion_real: z.array(z.string()).min(1, 'Debe seleccionar al menos una ubicación'),
-  numero_asistentes_real: z.number().min(1, 'El número de asistentes debe ser mayor a 0'),
+  ubicacion_real: z.array(z.string()).min(1, 'Debe seleccionar al menos una ubicación').refine(
+    (arr) => {
+      // Validar que el string unido no exceda 500 caracteres
+      const joined = arr.join(', ');
+      return joined.length <= 500;
+    },
+    { message: 'La ubicación total no puede exceder 500 caracteres' }
+  ),
+  numero_asistentes_real: z.number().refine((val) => val > 0, {
+    message: 'El número de asistentes debe ser mayor a 0',
+  }),
   descripcion_realizada: z.string().min(1, 'La descripción es obligatoria').max(500, 'La descripción no puede exceder 500 caracteres'),
   obsequio_entregado: z.string().max(255, 'El obsequio no puede exceder 255 caracteres').optional(),
 });
@@ -342,7 +351,8 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
             {/* Información de la Actividad Realizada */}
             <Card className="border border-gray-200 shadow-sm">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-lg font-semibold text-gray-900">
+                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
                   Información de la Actividad Realizada
                 </CardTitle>
               </CardHeader>
@@ -362,46 +372,55 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="ubicacion_real"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Ubicación Real *</FormLabel>
-                        <FormDescription className="text-xs text-gray-500 mb-2">
-                          Seleccione una o más ubicaciones donde se realizó la actividad
-                        </FormDescription>
-                        <FormControl>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                            {sedesDisponibles.map((sede) => (
-                              <div key={sede} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`ubicacion-${sede}`}
-                                  checked={field.value?.includes(sede)}
-                                  onCheckedChange={(checked) => {
-                                    const currentUbicaciones = field.value || [];
-                                    if (checked) {
-                                      field.onChange([...currentUbicaciones, sede]);
-                                    } else {
-                                      field.onChange(currentUbicaciones.filter((s) => s !== sede));
-                                    }
-                                  }}
-                                />
-                                <label
-                                  htmlFor={`ubicacion-${sede}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                >
-                                  {sede}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormItem>
+                    <FormLabel className="text-gray-700">Centro de Costos</FormLabel>
+                    <FormControl>
+                      <div className="flex h-10 w-full rounded-md border border-input bg-gray-50 px-3 py-2 text-sm text-gray-900">
+                        {solicitud.centroCostos || 'N/A'}
+                      </div>
+                    </FormControl>
+                  </FormItem>
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="ubicacion_real"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700">Ubicación Real *</FormLabel>
+                      <FormDescription className="text-xs text-gray-500 mb-2">
+                        Seleccione una o más ubicaciones donde se realizó la actividad
+                      </FormDescription>
+                      <FormControl>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                          {sedesDisponibles.map((sede) => (
+                            <div key={sede} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`ubicacion-${sede}`}
+                                checked={field.value?.includes(sede)}
+                                onCheckedChange={(checked) => {
+                                  const currentUbicaciones = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...currentUbicaciones, sede]);
+                                  } else {
+                                    field.onChange(currentUbicaciones.filter((s) => s !== sede));
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={`ubicacion-${sede}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {sede}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -412,10 +431,18 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                       <FormControl>
                         <Input
                           type="number"
-                          min="1"
                           placeholder="Ej: 50"
                           {...field}
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          value={field.value ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(undefined);
+                            } else {
+                              const numValue = parseInt(value, 10);
+                              field.onChange(isNaN(numValue) ? undefined : numValue);
+                            }
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -667,6 +694,9 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
         {/* Diálogo de Visualización de Imágenes */}
         <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
           <DialogContent className="max-w-7xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
+            <DialogTitle className="sr-only">
+              Visualización de Evidencia {selectedImageIndex !== null ? selectedImageIndex + 1 : ''}
+            </DialogTitle>
             {selectedImageIndex !== null && evidenciaPreviews[selectedImageIndex] && (
               <div className="relative w-full h-[95vh] flex items-center justify-center">
                 <img
@@ -693,7 +723,8 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                     variant="ghost"
                     size="icon"
                     onClick={handlePreviousImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50"
+                    className="fixed left-4 top-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50 transition-colors"
+                    style={{ transform: 'translateY(-50%)' }}
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </Button>
@@ -706,7 +737,8 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                     variant="ghost"
                     size="icon"
                     onClick={handleNextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50"
+                    className="fixed right-4 top-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50 transition-colors"
+                    style={{ transform: 'translateY(-50%)' }}
                   >
                     <ChevronRight className="h-6 w-6" />
                   </Button>

@@ -57,6 +57,7 @@ const AdminUsuariosPage: React.FC = () => {
   
   const filteredUsers = users.filter(user => {
     const matchesSearch = !searchTerm || 
+      user.id.toString().includes(searchTerm) ||
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -151,10 +152,10 @@ const AdminUsuariosPage: React.FC = () => {
                 {/* Filtro de búsqueda: ocupa 2/3 */}
                 <div className="relative md:col-span-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Buscar usuarios..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    <Input
+                      placeholder="Buscar por ID, nombre o email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
                 </div>

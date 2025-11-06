@@ -25,8 +25,6 @@ import {
   Eye,
   Clock,
   CheckCircle,
-  XCircle,
-  AlertCircle,
   Send,
   Heart,
   Calendar,
@@ -43,8 +41,8 @@ import {
   FileText,
   X,
   CheckCircle2,
-  Image as ImageIcon,
   Globe,
+  EyeOff,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -90,6 +88,11 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
   const hasActivityRealized = !!solicitud.actividad_realizada;
   const canAddActivity = solicitud.estado === 'resolved';
+  const isApproved = solicitud.estado === 'resolved';
+  // isActivityProcessed: true cuando publicado_en_galeria no es null ni undefined (ya fue revisada)
+  const isActivityProcessed = hasActivityRealized && 
+    (solicitud.actividad_realizada.publicado_en_galeria !== null && 
+     solicitud.actividad_realizada.publicado_en_galeria !== undefined);
 
   return (
     <DropdownMenu>
@@ -116,17 +119,19 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
             Editar
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => onChangeStatus(solicitud)}>
-          <Send className="h-4 w-4 mr-2" />
-          Cambiar Estado
-        </DropdownMenuItem>
+        {!isApproved && (
+          <DropdownMenuItem onClick={() => onChangeStatus(solicitud)}>
+            <Send className="h-4 w-4 mr-2" />
+            Cambiar Estado
+          </DropdownMenuItem>
+        )}
         {canAddActivity && !hasActivityRealized && onAddActivityRealized && (
           <DropdownMenuItem onClick={() => onAddActivityRealized(solicitud)}>
             <Plus className="h-4 w-4 mr-2" />
             Agregar Actividad Realizada
           </DropdownMenuItem>
         )}
-        {hasActivityRealized && onReviewActivity && (
+        {hasActivityRealized && !isActivityProcessed && onReviewActivity && (
           <DropdownMenuItem onClick={() => onReviewActivity(solicitud)}>
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Revisar y Publicar
@@ -333,15 +338,23 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   }, []);
 
   const handleOpenStatusDialog = React.useCallback((solicitud: WellnessRequest) => {
+    // Prevenir cambio de estado si está aprobada (resolved)
+    if (solicitud.estado === 'resolved') {
+      toast.error('No se puede cambiar el estado', {
+        description: 'Una solicitud aprobada no puede cambiar su estado.',
+      });
+      return;
+    }
+    
     setSolicitudToRespond(solicitud);
     // Si el estado actual es 'pending', establecer 'in_progress' por defecto
-    // De lo contrario, mantener el estado actual (si es in_progress, resolved o rejected)
+    // De lo contrario, mantener el estado actual (si es in_progress o rejected)
     const currentStatus = solicitud.estado;
     let defaultStatus: 'in_progress' | 'resolved' | 'rejected' = 'in_progress';
     
     if (currentStatus === 'pending') {
       defaultStatus = 'in_progress';
-    } else if (currentStatus === 'in_progress' || currentStatus === 'resolved' || currentStatus === 'rejected') {
+    } else if (currentStatus === 'in_progress' || currentStatus === 'rejected') {
       defaultStatus = currentStatus;
     }
     
@@ -383,6 +396,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   });
 
   const handleSubmitStatusChange = async (data: StatusChangeFormValues) => {
+    // Prevenir cambio de estado si está aprobada (resolved)
+    if (solicitudToRespond?.estado === 'resolved') {
+      toast.error('No se puede cambiar el estado', {
+        description: 'Una solicitud aprobada no puede cambiar su estado.',
+      });
+      return;
+    }
+    
     setIsSubmittingResponse(true);
     updateStatusMutation.mutate(data);
   };
@@ -656,19 +677,28 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                               <TableCell className="font-medium">#{solicitud.id}</TableCell>
                               <TableCell>
                                 <div className="max-w-xs">
-                                  <div className="font-medium truncate flex items-center gap-2">
+                                  <div className="font-medium text-gray-900 mb-1">
                                     {solicitud.nombreActividad || 'N/A'}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
                                     {solicitud.actividad_realizada && (
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                        Realizada
-                                      </Badge>
-                                    )}
-                                    {solicitud.actividad_realizada?.publicado_en_galeria && (
-                                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                                        <Globe className="h-3 w-3 mr-1" />
-                                        Publicado
-                                      </Badge>
+                                      <>
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
+                                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                                          Realizada
+                                        </Badge>
+                                        {solicitud.actividad_realizada.publicado_en_galeria === true ? (
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs whitespace-nowrap">
+                                            <Globe className="h-3 w-3 mr-1" />
+                                            Publicado
+                                          </Badge>
+                                        ) : solicitud.actividad_realizada.publicado_en_galeria === false ? (
+                                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs whitespace-nowrap">
+                                            <EyeOff className="h-3 w-3 mr-1" />
+                                            No publicado
+                                          </Badge>
+                                        ) : null}
+                                      </>
                                     )}
                                   </div>
                                   {solicitud.numeroParticipantes && (
@@ -1013,9 +1043,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
                           Actividad Realizada
                         </span>
-                        {selectedSolicitud.actividad_realizada?.publicado_en_galeria && (
+                        {selectedSolicitud.actividad_realizada?.publicado_en_galeria === true && (
                           <Badge className="bg-green-600 text-white">
                             Publicado en Galería
+                          </Badge>
+                        )}
+                        {selectedSolicitud.actividad_realizada?.publicado_en_galeria === false && (
+                          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                            No publicado
                           </Badge>
                         )}
                       </CardTitle>
@@ -1055,6 +1090,31 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
                             {selectedSolicitud.actividad_realizada.descripcion_realizada}
                           </p>
+                        </div>
+                      )}
+                      {selectedSolicitud.actividad_realizada.listado_asistencia && (
+                        <div className="border-t border-gray-200 pt-4">
+                          <label className="text-sm font-medium text-gray-700 mb-2 block">Listado de Asistencia</label>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1">
+                              {selectedSolicitud.actividad_realizada.listado_asistencia.file_url ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(selectedSolicitud.actividad_realizada!.listado_asistencia!.file_url, '_blank')}
+                                  className="mt-2"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Abrir archivo en nueva pestaña
+                                </Button>
+                              ) : (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Archivo no disponible
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -1101,7 +1161,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       Agregar Actividad Realizada
                     </Button>
                   )}
-                  {selectedSolicitud.actividad_realizada && (
+                  {selectedSolicitud.actividad_realizada && 
+                   (selectedSolicitud.actividad_realizada.publicado_en_galeria === null || 
+                    selectedSolicitud.actividad_realizada.publicado_en_galeria === undefined) && (
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -1113,16 +1175,18 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       Revisar y Publicar
                     </Button>
                   )}
-                  <Button
-                    onClick={() => {
-                      setSelectedSolicitud(null);
-                      handleOpenStatusDialog(selectedSolicitud);
-                    }}
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Cambiar Estado
-                  </Button>
+                  {selectedSolicitud.estado !== 'resolved' && (
+                    <Button
+                      onClick={() => {
+                        setSelectedSolicitud(null);
+                        handleOpenStatusDialog(selectedSolicitud);
+                      }}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Cambiar Estado
+                    </Button>
+                  )}
                 </div>
                 </div>
               </div>

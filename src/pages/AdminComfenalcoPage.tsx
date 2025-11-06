@@ -207,7 +207,8 @@ const AdminComfenalcoPage: React.FC = () => {
     const searchTermLower = searchTerm.toLowerCase();
     const titleLower = event.title.toLowerCase();
   
-    const matchesSearchTerm = titleLower.includes(searchTermLower);
+    const matchesSearchTerm = event.id.toString().includes(searchTerm) ||
+                              titleLower.includes(searchTermLower);
     const matchesCategory = filters.category === 'all' || event.category === filters.category;
     const matchesDisplaySize = filters.displaySize === 'all' || event.display_size === filters.displaySize;
   
@@ -543,7 +544,7 @@ const AdminComfenalcoPage: React.FC = () => {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Buscar por título..."
+                      placeholder="Buscar por ID o título..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"

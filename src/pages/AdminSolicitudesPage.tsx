@@ -115,6 +115,35 @@ const AdminSolicitudesPage: React.FC = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Función para obtener la etiqueta del tipo de solicitud
+  const getRequestTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      "certificado-convenio": "Certificado de Convenio",
+      "compensacion-anual": "Compensación Anual Diferida",
+      "verificacion-pagos": "Verificación de Pagos",
+      "compensacion-descanso": "Compensación por Descanso",
+      "actualizar-datos-personales": "Actualizar Datos Personales",
+      "solicitud-microcredito": "Solicitud de Microcrédito",
+      "solicitud-retiro-sindical": "Solicitud de Retiro Sindical",
+      "solicitud-descanso-laboral": "Solicitud de Descanso Laboral",
+      "certificado-seguridad-social": "Certificado de Seguridad Social",
+      "contrato-sindical": "Contrato Sindical",
+      "estatutos-beneficios": "Estatutos y Beneficios",
+      "cuadro-turnos": "Cuadro de Turnos",
+      "permisos-cambio-turnos": "Permisos y Cambio de Turnos",
+      "incapacidades-licencias": "Incapacidades y Licencias",
+      "informacion-contacto": "Información de Contacto",
+      "eps-sura": "EPS Sura",
+      "convenios-alianzas": "Convenios y Alianzas",
+      "mision-vision": "Misión y Visión",
+      "valores": "Valores",
+      "principios": "Principios",
+      "estructura-organizacional": "Estructura Organizacional",
+      "sst": "SST",
+    };
+    return labels[type] || type;
+  };
+
   const filteredSolicitudes = useMemo(() => {
     let filtered = [...allSolicitudes];
 
@@ -122,6 +151,7 @@ const AdminSolicitudesPage: React.FC = () => {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (request) =>
+          request.id.toString().includes(searchTerm) ||
           request.name.toLowerCase().includes(searchLower) ||
           request.last_name.toLowerCase().includes(searchLower) ||
           request.email.toLowerCase().includes(searchLower) ||
@@ -228,22 +258,6 @@ const AdminSolicitudesPage: React.FC = () => {
     setSelectedSolicitud(solicitud);
     // Resetear campos expandidos al abrir una nueva solicitud
     setExpandedFields({});
-  };
-
-  const getRequestTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      "certificado-convenio": "Certificado de Convenio",
-      "compensacion-anual": "Compensación Anual Diferida",
-      "verificacion-pagos": "Verificación de Pagos",
-      "compensacion-descanso": "Compensación por Descanso",
-      "actualizar-datos-personales": "Actualizar Datos Personales",
-      "retiro-sindical": "Retiro Sindical",
-      microcredito: "Microcrédito CEII",
-      "incapacidad-maternidad": "Incapacidad de Maternidad",
-      "permisos-turnos": "Permisos y Turnos",
-      "solicitud-bienestar": "Solicitud de Bienestar",
-    };
-    return labels[type] || type;
   };
 
   const handleOpenResponseDialog = (solicitud: Request) => {
@@ -578,7 +592,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
                         type="text"
-                        placeholder="Buscar por nombre, email o tipo de solicitud..."
+                        placeholder="Buscar por ID, nombre, email o tipo de solicitud..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 h-10"

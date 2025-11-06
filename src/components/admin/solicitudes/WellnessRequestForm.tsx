@@ -36,11 +36,15 @@ const wellnessRequestSchema = z.object({
   }),
   horaInicio: z.string().optional(),
   horaFin: z.string().optional(),
-  numeroParticipantes: z.number().min(1, 'El número de participantes debe ser mayor a 0').max(10000, 'El número de participantes no puede exceder 10000').optional(),
+  numeroParticipantes: z.number().refine((val) => val === undefined || (val > 0 && val <= 10000), {
+    message: 'El número de participantes debe ser mayor a 0 y no exceder 10000',
+  }).optional(),
   requiereDetalles: z.boolean().default(false),
   detalles: z.array(z.object({
     tipo: z.string().min(1, 'El tipo de detalle es obligatorio').max(100, 'El tipo de detalle no puede exceder 100 caracteres'),
-    cantidad: z.number().min(1, 'La cantidad debe ser mayor a 0').max(10000, 'La cantidad no puede exceder 10000'),
+    cantidad: z.number().refine((val) => val > 0 && val <= 10000, {
+      message: 'La cantidad debe ser mayor a 0 y no exceder 10000',
+    }),
   })).optional(),
 }).refine((data) => {
   // Validar que la hora de fin sea posterior a la hora de inicio si ambas están presentes
@@ -221,7 +225,7 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
 
     // Validar que los detalles estén completos
     if (data.requiereDetalles) {
-      const detallesIncompletos = detalles.some(d => !d.tipo || d.cantidad <= 0);
+      const detallesIncompletos = detalles.some(d => !d.tipo || !d.cantidad || d.cantidad <= 0);
       if (detallesIncompletos) {
         toast.error('Todos los detalles deben tener tipo y cantidad válida');
         return;
@@ -427,10 +431,18 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                         <FormControl>
                           <Input
                             type="number"
-                            min="1"
                             placeholder="Ej: 50"
                             {...field}
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                            value={field.value ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '') {
+                                field.onChange(undefined);
+                              } else {
+                                const numValue = parseInt(value, 10);
+                                field.onChange(isNaN(numValue) ? undefined : numValue);
+                              }
+                            }}
                           />
                         </FormControl>
                         { /* <FormDescription>
@@ -640,12 +652,17 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                             </FormLabel>
                             <Input
                               type="number"
-                              min="1"
                               placeholder="Ej: 50"
-                              value={detalle.cantidad}
-                              onChange={(e) =>
-                                updateDetalle(detalle.id, 'cantidad', parseInt(e.target.value) || 0)
-                              }
+                              value={detalle.cantidad || ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '') {
+                                  updateDetalle(detalle.id, 'cantidad', 0);
+                                } else {
+                                  const numValue = parseInt(value, 10);
+                                  updateDetalle(detalle.id, 'cantidad', isNaN(numValue) ? 0 : numValue);
+                                }
+                              }}
                             />
                           </div>
                         </div>

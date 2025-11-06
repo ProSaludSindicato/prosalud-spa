@@ -38,6 +38,7 @@ export interface WellnessActivityEvidence {
   file?: File;
   is_selected_for_gallery?: boolean;
   order?: number;
+  is_main?: boolean; // Indica si esta evidencia es la imagen principal del evento
 }
 
 export interface WellnessActivityRealized {
@@ -53,12 +54,16 @@ export interface WellnessActivityRealized {
   evidencias?: WellnessActivityEvidence[]; // Imágenes de evidencia
   listado_asistencia?: {
     id?: number;
-    file_url?: string;
+    file_url?: string; // URL temporal firmada (válida 1 hora)
+    url_expires_at?: string | null; // ISO 8601 - fecha de expiración de la URL
     file?: File;
     original_name?: string;
   };
   // Control de publicación
-  publicado_en_galeria?: boolean;
+  // null o undefined: No ha sido revisada aún
+  // false: Fue revisada y se determinó no publicar (mantener oculto)
+  // true: Fue revisada y se publicó en la galería
+  publicado_en_galeria?: boolean | null;
   evento_galeria_id?: number;
   created_at?: string;
   updated_at?: string;
@@ -448,13 +453,17 @@ export const wellnessRequestsService = {
       }
       
       // Evidencias seleccionadas para galería
+      // El backend acepta JSON array o string separado por comas
       if (data.evidencias_seleccionadas && data.evidencias_seleccionadas.length > 0) {
-        formData.append('evidencias_seleccionadas', JSON.stringify(data.evidencias_seleccionadas));
+        // Enviar como string separado por comas (más compatible)
+        formData.append('evidencias_seleccionadas', data.evidencias_seleccionadas.join(','));
       }
       
       // Evidencias a eliminar
+      // El backend acepta JSON array o string separado por comas
       if (data.evidencias_eliminadas && data.evidencias_eliminadas.length > 0) {
-        formData.append('evidencias_eliminadas', JSON.stringify(data.evidencias_eliminadas));
+        // Enviar como string separado por comas (más compatible)
+        formData.append('evidencias_eliminadas', data.evidencias_eliminadas.join(','));
       }
       
       // Nuevo listado de asistencia
@@ -528,11 +537,13 @@ export const wellnessRequestsService = {
       category?: string;
       description?: string;
       is_visible?: boolean;
+      evidencias_orden?: Record<string, number>; // Mapea ID de evidencia a su orden
+      imagen_principal_id?: number;
     },
   ): Promise<any> {
     try {
+      // El wellness_request_id viene en la URL, no es necesario en el body
       const payload: any = {
-        wellness_request_id: requestId,
         evidencias_seleccionadas: selectedEvidenceIds,
       };
       
@@ -543,6 +554,11 @@ export const wellnessRequestsService = {
       const response = await wellnessRequestsApi.post<ApiResponse<any>>(
         `/api/wellness-requests/${requestId}/publish-to-gallery`,
         payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       if (!response.data.success) {

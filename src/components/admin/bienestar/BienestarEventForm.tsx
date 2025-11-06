@@ -79,10 +79,24 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
   useEffect(() => {
     if (event) {
+      // Convertir la fecha al formato YYYY-MM-DD para el input type="date"
+      let formattedDate = "";
+      if (event.date) {
+        try {
+          const dateObj = new Date(event.date);
+          if (!isNaN(dateObj.getTime())) {
+            formattedDate = dateObj.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          // Si falla la conversión, intentar usar la fecha directamente si ya está en formato YYYY-MM-DD
+          formattedDate = event.date;
+        }
+      }
+      
       // Actualizar los valores del formulario cuando cambia el evento
       form.reset({
         title: event.title || "",
-        date: event.date || "",
+        date: formattedDate,
         category: event.category || "",
         description: event.description || "",
         location: event.location || "",

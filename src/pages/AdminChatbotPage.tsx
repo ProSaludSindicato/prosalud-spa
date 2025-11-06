@@ -73,6 +73,7 @@ const AdminChatbotPage: React.FC = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         conv =>
+          conv.id.toString().includes(searchQuery) ||
           conv.user_question.toLowerCase().includes(query) ||
           conv.bot_answer.toLowerCase().includes(query) ||
           conv.conversation_id?.toLowerCase().includes(query)
@@ -334,7 +335,7 @@ const AdminChatbotPage: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     type="text"
-                    placeholder="Buscar en preguntas y respuestas..."
+                    placeholder="Buscar por ID, preguntas y respuestas..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 h-10"

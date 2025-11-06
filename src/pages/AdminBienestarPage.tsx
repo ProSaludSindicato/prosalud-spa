@@ -64,8 +64,10 @@ const AdminBienestarPage: React.FC = () => {
   });
 
   const filteredEvents = events.filter((event: BienestarEvent) => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = event.id.toString().includes(searchTerm) ||
+                         event.title.toLowerCase().includes(searchLower) ||
+                         event.category.toLowerCase().includes(searchLower);
     const matchesCategory = categoryFilter === 'all' || event.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -167,7 +169,7 @@ const AdminBienestarPage: React.FC = () => {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Buscar por título o categoría..."
+                      placeholder="Buscar por ID, título o categoría..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
