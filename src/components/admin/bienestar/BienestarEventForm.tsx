@@ -41,7 +41,9 @@ const formSchema = z.object({
   attendees: z
     .number()
     .int("El número de asistentes debe ser un número entero")
-    .min(0, "El número de asistentes no puede ser negativo")
+    .refine((val) => val === undefined || val >= 0, {
+      message: "El número de asistentes no puede ser negativo",
+    })
     .optional(),
   gift: z.string().max(255, "El obsequio no puede exceder 255 caracteres").optional(),
   provider: z
@@ -452,11 +454,18 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       <Input
                         id="attendees"
                         type="number"
-                        min="1"
                         max="10000"
-                        {...form.register("attendees", { valueAsNumber: true })}
+                        {...form.register("attendees", { 
+                          valueAsNumber: true,
+                          setValueAs: (value: string) => {
+                            if (value === '') return undefined;
+                            const num = parseInt(value, 10);
+                            return isNaN(num) ? undefined : num;
+                          }
+                        })}
                         className="h-10"
                         placeholder="150"
+                        value={form.watch("attendees") ?? ''}
                       />
                       {form.formState.errors.attendees && (
                         <p className="text-destructive text-sm">{form.formState.errors.attendees.message}</p>

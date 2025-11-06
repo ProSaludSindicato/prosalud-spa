@@ -20,9 +20,15 @@ const productSchema = z.object({
   variants: z.array(z.object({
     size: z.string().optional(),
     color: z.string().optional(),
-    stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
-    minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0'),
-    maxStock: z.number().min(1, 'El stock máximo debe ser mayor a 0'),
+    stock: z.number().refine((val) => val >= 0, {
+      message: 'El stock debe ser mayor o igual a 0',
+    }),
+    minStock: z.number().refine((val) => val >= 0, {
+      message: 'El stock mínimo debe ser mayor o igual a 0',
+    }),
+    maxStock: z.number().refine((val) => val > 0, {
+      message: 'El stock máximo debe ser mayor a 0',
+    }),
     sku: z.string().min(1, 'El SKU es requerido')
   })).min(1, 'Debe tener al menos una variante')
 });
@@ -291,10 +297,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                       <Label className="text-sm font-medium text-gray-700">Stock Actual *</Label>
                       <Input
                         type="number"
-                        min="0"
-                        {...form.register(`variants.${index}.stock`, { valueAsNumber: true })}
+                        {...form.register(`variants.${index}.stock`, { 
+                          valueAsNumber: true,
+                          setValueAs: (value: string) => {
+                            if (value === '') return 0;
+                            const num = parseFloat(value);
+                            return isNaN(num) ? 0 : num;
+                          }
+                        })}
                         placeholder="0"
                         className="bg-white border-gray-300"
+                        value={form.watch(`variants.${index}.stock`) ?? ''}
                       />
                     </div>
 
@@ -302,10 +315,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                       <Label className="text-sm font-medium text-gray-700">Stock Mínimo *</Label>
                       <Input
                         type="number"
-                        min="0"
-                        {...form.register(`variants.${index}.minStock`, { valueAsNumber: true })}
+                        {...form.register(`variants.${index}.minStock`, { 
+                          valueAsNumber: true,
+                          setValueAs: (value: string) => {
+                            if (value === '') return 0;
+                            const num = parseFloat(value);
+                            return isNaN(num) ? 0 : num;
+                          }
+                        })}
                         placeholder="0"
                         className="bg-white border-gray-300"
+                        value={form.watch(`variants.${index}.minStock`) ?? ''}
                       />
                     </div>
 
@@ -313,10 +333,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                       <Label className="text-sm font-medium text-gray-700">Stock Máximo *</Label>
                       <Input
                         type="number"
-                        min="1"
-                        {...form.register(`variants.${index}.maxStock`, { valueAsNumber: true })}
+                        {...form.register(`variants.${index}.maxStock`, { 
+                          valueAsNumber: true,
+                          setValueAs: (value: string) => {
+                            if (value === '') return 0;
+                            const num = parseFloat(value);
+                            return isNaN(num) ? 0 : num;
+                          }
+                        })}
                         placeholder="100"
                         className="bg-white border-gray-300"
+                        value={form.watch(`variants.${index}.maxStock`) ?? ''}
                       />
                     </div>
 

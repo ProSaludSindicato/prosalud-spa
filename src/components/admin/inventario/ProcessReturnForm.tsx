@@ -254,10 +254,17 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
                 <Input
                   type="number"
                   value={newItem.quantity || ''}
-                  onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value) || 0})}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setNewItem({...newItem, quantity: 0});
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      setNewItem({...newItem, quantity: isNaN(numValue) ? 0 : numValue});
+                    }
+                  }}
                   placeholder="0"
                   className="bg-white border-gray-300"
-                  min="1"
                 />
               </div>
               <div className="space-y-2">

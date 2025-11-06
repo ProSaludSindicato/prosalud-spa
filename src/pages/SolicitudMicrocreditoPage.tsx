@@ -216,13 +216,18 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
                         <FormControl>
                           <Input
                             type="number"
-                            min="1"
                             max="12"
                             placeholder="Ej: 6"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(e.target.value === "" ? undefined : parseInt(e.target.value, 10))
-                            }
+                            value={field.value ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '') {
+                                field.onChange(undefined);
+                              } else {
+                                const numValue = parseInt(value, 10);
+                                field.onChange(isNaN(numValue) ? undefined : numValue);
+                              }
+                            }}
                           />
                         </FormControl>
                         <FormMessage />

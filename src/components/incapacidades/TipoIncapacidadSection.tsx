@@ -71,7 +71,16 @@ const TipoIncapacidadSection = <TFieldValues extends FieldValues>({
                   {...field} 
                   type="number"
                   placeholder="Ej: 3"
-                  min="1"
+                  value={field.value ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      field.onChange(undefined);
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      field.onChange(isNaN(numValue) ? undefined : numValue);
+                    }
+                  }}
                 />
               </FormControl>
               <FormDescription>

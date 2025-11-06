@@ -88,7 +88,6 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
       title: solicitud.nombreActividad || '',
       category: '',
       description: actividadRealizada.descripcion_realizada || solicitud.descripcionActividad || '',
-      is_visible: true,
     },
   });
 

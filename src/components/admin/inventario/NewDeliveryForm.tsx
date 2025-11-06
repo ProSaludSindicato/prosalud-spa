@@ -217,10 +217,17 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
                     <Input
                       type="number"
                       placeholder="Cantidad"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
+                      value={item.quantity || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          handleItemChange(index, 'quantity', 0);
+                        } else {
+                          const numValue = Number(value);
+                          handleItemChange(index, 'quantity', isNaN(numValue) ? 0 : numValue);
+                        }
+                      }}
                       className="bg-white border-gray-300"
-                      min="1"
                       required
                     />
                   </div>
@@ -229,10 +236,17 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
                     <Input
                       type="number"
                       placeholder="Precio"
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', Number(e.target.value))}
+                      value={item.unitPrice || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          handleItemChange(index, 'unitPrice', 0);
+                        } else {
+                          const numValue = Number(value);
+                          handleItemChange(index, 'unitPrice', isNaN(numValue) ? 0 : numValue);
+                        }
+                      }}
                       className="bg-white border-gray-300"
-                      min="0"
                       step="0.01"
                     />
                   </div>
