@@ -1,69 +1,264 @@
-import { sstAffiliatesMock } from '@/data/sstAffiliatesMock';
-import { sstInventoryMock } from '@/data/sstInventoryMock';
 import type {
   SstAffiliate,
+  SstAffiliatesResponse,
+  SstDeliveryDraft,
   SstDeliveryRecord,
+  SstDeliveriesResponse,
   SstDocumentType,
   SstInventoryItem,
+  SstInventoryResponse,
 } from '@/types/adminSst';
+import { buildAdminApiUrl } from '@/config/api';
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const BASE_PATH = '/api/dotacion-epp';
 
-let deliveryRecords: SstDeliveryRecord[] = [];
+const endpoints = {
+  affiliates: `${BASE_PATH}/affiliates`,
+  inventory: `${BASE_PATH}/inventory`,
+  deliveries: `${BASE_PATH}/deliveries`,
+} as const;
 
-export interface AffiliateSearchParams {
+interface GetAffiliatesParams {
+  page?: number;
+  pageSize?: number;
   documentType?: SstDocumentType;
   documentNumber?: string;
-  includeInactive?: boolean;
+  hospital?: string;
+  status?: 'active' | 'inactive' | 'all';
+  searchTerm?: string;
+  signal?: AbortSignal;
 }
 
+interface GetDeliveryHistoryParams {
+  affiliateId: string;
+  deliveredBy?: string;
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}
+
+const buildQueryString = (params: Record<string, string | number | undefined>) => {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, String(value));
+    }
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+};
+
+const parseErrorMessage = async (response: Response): Promise<never> => {
+  let message = `Error ${response.status}`;
+
+  try {
+    const data = await response.json();
+    if (data?.message) {
+      message = data.message;
+    }
+  } catch (error) {
+    console.error('No fue posible parsear el mensaje de error del API Dotación & EPP', error);
+  }
+
+  const apiError = new Error(message) as Error & { status?: number };
+  apiError.status = response.status;
+  throw apiError;
+};
+
+const mapAffiliate = (affiliate: any): SstAffiliate => ({
+  id: affiliate.id,
+  firstName: affiliate.firstName,
+  lastName: affiliate.lastName,
+  documentType: affiliate.documentType as SstDocumentType,
+  documentNumber: affiliate.documentNumber,
+  hospital: affiliate.hospital,
+  role: affiliate.role,
+  active: Boolean(affiliate.active ?? affiliate.status === 'ACTIVO'),
+  status: affiliate.status ?? undefined,
+  convenioStatus: affiliate.convenioStatus ?? undefined,
+  lastDeliveryAt: affiliate.lastDeliveryAt ?? undefined,
+  notes: affiliate.notes ?? null,
+});
+
+const mapDeliveryRecord = (record: any): SstDeliveryRecord => ({
+  id: record.id,
+  affiliateId: record.affiliateId,
+  deliveredAt: record.deliveredAt,
+  deliveredBy: record.deliveredByName ?? record.deliveredBy,
+  deliveredByName: record.deliveredByName ?? record.deliveredBy,
+  items: Array.isArray(record.items)
+    ? record.items.map((item: any) => ({
+        itemId: item.itemId,
+        variant: item.variant,
+        quantity: item.quantity,
+      }))
+    : [],
+  signedDocumentUrl: record.signedDocumentUrl ?? null,
+  signedDocumentType: record.signedDocumentType as SstDocumentType | undefined,
+  signedDocumentNumber: record.signedDocumentNumber ?? undefined,
+  notes: record.notes ?? null,
+});
+
+const mapInventoryItem = (item: any): SstInventoryItem => ({
+  id: item.id,
+  name: item.name,
+  category: item.category,
+  defaultColor: item.defaultColor ?? undefined,
+  description: item.description ?? undefined,
+  unit: item.unit ?? undefined,
+  variants: Array.isArray(item.variants) ? item.variants : undefined,
+});
+
+const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T | undefined> => {
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+    ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(init?.headers ?? {}),
+  };
+
+  let response: Response;
+
+  try {
+    response = await fetch(input, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    const networkError = new Error(
+      'No fue posible conectar con el servicio de Dotación y EPP. Verifica tu conexión o intenta nuevamente más tarde.',
+    ) as Error & { cause?: unknown };
+    networkError.cause = error;
+    throw networkError;
+  }
+
+  if (!response.ok) {
+    await parseErrorMessage(response);
+  }
+
+  if (response.status === 204) {
+    return undefined;
+  }
+
+  const data = (await response.json()) as T;
+  return data;
+};
+
 export const sstAdminService = {
-  async getAffiliates(params: AffiliateSearchParams = {}): Promise<SstAffiliate[]> {
-    await delay(200);
+  async getAffiliates({
+    page = 1,
+    pageSize = 50,
+    documentType,
+    documentNumber,
+    hospital,
+    status = 'active',
+    searchTerm,
+    signal,
+  }: GetAffiliatesParams = {}): Promise<SstAffiliatesResponse> {
+    const queryString = buildQueryString({
+      page,
+      pageSize,
+      documentType,
+      documentNumber,
+      hospital,
+      status,
+      searchTerm,
+    });
 
-    const { documentType, documentNumber, includeInactive } = params;
+    const data = (await fetchJson<any>(
+      buildAdminApiUrl(`${endpoints.affiliates}${queryString}`),
+      { method: 'GET', signal }
+    )) ?? {};
 
-    let results = includeInactive
-      ? [...sstAffiliatesMock]
-      : sstAffiliatesMock.filter((affiliate) => affiliate.active);
-
-    if (documentType) {
-      results = results.filter(
-        (affiliate) => affiliate.documentType.toUpperCase() === documentType.toUpperCase(),
-      );
-    }
-
-    if (documentNumber) {
-      results = results.filter((affiliate) =>
-        affiliate.documentNumber.toLowerCase().includes(documentNumber.toLowerCase()),
-      );
-    }
-
-    return results;
+    return {
+      items: Array.isArray(data.items) ? data.items.map(mapAffiliate) : [],
+      total: data.total ?? 0,
+      page: data.page ?? page,
+      pageSize: data.pageSize ?? pageSize,
+    };
   },
 
-  async getAffiliateByDocument(documentType: SstDocumentType, documentNumber: string) {
-    await delay(150);
-    return sstAffiliatesMock.find(
-      (affiliate) =>
-        affiliate.documentType === documentType && affiliate.documentNumber === documentNumber,
+  async getAffiliateByDocument(documentType: SstDocumentType, documentNumber: string, signal?: AbortSignal): Promise<SstAffiliate | null> {
+    const url = buildAdminApiUrl(`${endpoints.affiliates}/${documentType}/${documentNumber}`);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      signal,
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      await parseErrorMessage(response);
+    }
+
+    const data = await response.json();
+    return mapAffiliate(data);
+  },
+
+  async getInventory(signal?: AbortSignal): Promise<SstInventoryItem[]> {
+    const data = await fetchJson<SstInventoryResponse>(
+      buildAdminApiUrl(endpoints.inventory),
+      { method: 'GET', signal }
     );
+
+    const rawItems = Array.isArray(data?.items) ? (data.items as SstInventoryItem[]) : [];
+    return rawItems.map(mapInventoryItem);
   },
 
-  async getInventory(): Promise<SstInventoryItem[]> {
-    await delay(220);
-    return [...sstInventoryMock];
+  async getDeliveryHistory({ affiliateId, deliveredBy, page = 1, pageSize = 25, signal }: GetDeliveryHistoryParams): Promise<SstDeliveriesResponse> {
+    const queryString = buildQueryString({ affiliateId, deliveredBy, page, pageSize });
+    const data = await fetchJson<any>(
+      buildAdminApiUrl(`${endpoints.deliveries}${queryString}`),
+      { method: 'GET', signal }
+    );
+
+    const rawItems = Array.isArray(data?.items) ? (data.items as any[]) : [];
+
+    return {
+      items: rawItems.map(mapDeliveryRecord),
+      total: data?.total ?? 0,
+      page: data?.page ?? page,
+      pageSize: data?.pageSize ?? pageSize,
+    };
   },
 
-  async getDeliveryHistory(affiliateId: string): Promise<SstDeliveryRecord[]> {
-    await delay(180);
-    return deliveryRecords.filter((record) => record.affiliateId === affiliateId);
-  },
+  async registerDelivery(draft: SstDeliveryDraft): Promise<{ message: string; record: SstDeliveryRecord }> {
+    const payload = {
+      affiliateId: draft.affiliateId,
+      affiliateDocumentType: draft.affiliateDocumentType,
+      affiliateDocumentNumber: draft.affiliateDocumentNumber,
+      items: draft.items.map((item) => ({
+        itemId: item.itemId,
+        variant: item.variant ? { color: item.variant.color, size: item.variant.size } : undefined,
+        quantity: item.quantity,
+      })),
+      signatureData: draft.signatureData,
+      signedDocumentType: draft.signedDocumentType,
+      signedDocumentNumber: draft.signedDocumentNumber,
+      deliveredBy: draft.deliveredBy,
+      deliveredByName: draft.deliveredByName,
+      notes: draft.notes ?? null,
+    };
 
-  async registerDelivery(record: SstDeliveryRecord): Promise<SstDeliveryRecord> {
-    await delay(250);
-    deliveryRecords = [record, ...deliveryRecords];
-    return record;
+    const data = await fetchJson<any>(buildAdminApiUrl(endpoints.deliveries), {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!data) {
+      throw new Error('El servicio de Dotación y EPP no retornó información de la entrega registrada.');
+    }
+
+    return {
+      message: data.message ?? 'Entrega registrada exitosamente',
+      record: mapDeliveryRecord(data.record),
+    };
   },
 };
 

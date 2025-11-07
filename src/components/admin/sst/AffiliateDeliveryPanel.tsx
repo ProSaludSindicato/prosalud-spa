@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ClipboardCheck, ClipboardList, Eye, Signature, UploadCloud, ChevronDown, ChevronUp } from 'lucide-react';
 import type {
   SstAffiliate,
+  SstDeliveryDraft,
   SstDeliveryItemSelection,
   SstDeliveryRecord,
   SstInventoryItem,
@@ -27,7 +28,7 @@ interface AffiliateDeliveryPanelProps {
   affiliate: SstAffiliate;
   inventory: SstInventoryItem[];
   deliveryHistory: SstDeliveryRecord[];
-  onConfirmDelivery?: (record: SstDeliveryRecord) => void;
+  onConfirmDelivery?: (draft: SstDeliveryDraft) => void;
   confirmedRecordId?: string | null;
 }
 
@@ -83,6 +84,7 @@ export function AffiliateDeliveryPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSignatureDrawerOpen, setIsSignatureDrawerOpen] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+  const [itemSearchTerm, setItemSearchTerm] = useState('');
 
   useEffect(() => {
     resetForm();
@@ -90,8 +92,16 @@ export function AffiliateDeliveryPanel({
     setExpandedHistory({});
   }, [affiliate.id]);
 
+  const filteredInventory = useMemo(() => {
+    const term = itemSearchTerm.trim().toLowerCase();
+
+    return inventory.filter((item) => {
+      return term === '' || item.name.toLowerCase().includes(term);
+    });
+  }, [inventory, itemSearchTerm]);
+
   const inventoryByCategory = useMemo(() => {
-    return inventory.reduce<Record<string, SstInventoryItem[]>>((acc, item) => {
+    return filteredInventory.reduce<Record<string, SstInventoryItem[]>>((acc, item) => {
       const key = item.category;
       if (!acc[key]) {
         acc[key] = [];
@@ -99,7 +109,7 @@ export function AffiliateDeliveryPanel({
       acc[key].push(item);
       return acc;
     }, {});
-  }, [inventory]);
+  }, [filteredInventory]);
 
   const selectedCount = Object.keys(selectedItems).length;
 
@@ -238,25 +248,28 @@ export function AffiliateDeliveryPanel({
     }
 
     setFormError(null);
-      const record: SstDeliveryRecord = {
-        id: `sst-delivery-${Date.now()}`,
-        affiliateId: affiliate.id,
-        deliveredAt: new Date().toISOString(),
-        deliveredBy: deliveredBy || 'Encargado SST',
-        items: asDeliveryItems(),
-        signedDocumentUrl: signatureDataUrl,
+    const cleanedNotes = notes.trim();
+    const responsible = deliveredBy.trim() || 'Responsable Dotación y EPP';
+
+    const draft: SstDeliveryDraft = {
+      affiliateId: affiliate.id,
+      affiliateDocumentType: affiliate.documentType,
+      affiliateDocumentNumber: affiliate.documentNumber,
+      deliveredBy: responsible,
+      deliveredByName: responsible,
+      items: asDeliveryItems(),
+      signatureData: signatureDataUrl,
       signedDocumentType: affiliate.documentType,
       signedDocumentNumber: affiliate.documentNumber,
-        notes: notes.trim() || undefined,
-      };
+      notes: cleanedNotes ? cleanedNotes : undefined,
+    };
 
-    // Trigger confirmation modal
-    onConfirmDelivery?.(record);
+    onConfirmDelivery?.(draft);
   };
 
   useEffect(() => {
     if (!confirmedRecordId) return;
-      resetForm();
+    resetForm();
   }, [confirmedRecordId]);
 
   useEffect(() => {
@@ -290,19 +303,42 @@ export function AffiliateDeliveryPanel({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="item-search" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Buscar artículo
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="item-search"
+                value={itemSearchTerm}
+                onChange={(event) => setItemSearchTerm(event.target.value)}
+                placeholder="Nombre del artículo"
+              />
+              {itemSearchTerm && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setItemSearchTerm('')}>
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
           {formError && (
             <Alert variant="destructive">
               <AlertTitle>Acción requerida</AlertTitle>
               <AlertDescription>{formError}</AlertDescription>
             </Alert>
           )}
-          {Object.entries(inventoryByCategory).map(([category, items]) => (
+          {Object.entries(inventoryByCategory).length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+              No se encontraron artículos con los filtros aplicados.
+            </div>
+          ) : (
+            Object.entries(inventoryByCategory).map(([category, items]) => (
             <div key={category} className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-slate-700">{category}</h3>
                 <span className="text-sm text-slate-500">{items.length} artículos</span>
               </div>
-              <div className="max-h-[360px] overflow-y-auto overflow-x-auto rounded-lg border">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -390,7 +426,8 @@ export function AffiliateDeliveryPanel({
                 </Table>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
 
@@ -602,29 +639,25 @@ export function AffiliateDeliveryPanel({
                           {hasMoreItems && (
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="inline-flex items-center gap-2 text-primary-prosalud hover:text-primary-prosalud-dark"
                               onClick={() => toggleHistoryExpansion(record.id)}
                             >
-                              {isExpanded ? (
-                                <>
-                                  <ChevronUp className="h-4 w-4" /> Ver menos detalles
-                                </>
-                              ) : (
-                                <>
-                                  <ChevronDown className="h-4 w-4" /> Ver más detalles
-                                </>
-                              )}
+                              {isExpanded ? 'Ver menos detalles' : 'Ver más detalles'}
                             </Button>
                           )}
                         </div>
                       )}
 
-                      {isExpanded && record.notes && (
-                        <p className="mt-2 text-sm text-slate-600">
-                          Observaciones: <span className="font-medium">{record.notes}</span>
-                        </p>
+                      {record.notes && (
+                        <div className="mt-4 space-y-1">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Observaciones
+                          </h4>
+                          <p className="rounded-md border border-slate-200 bg-slate-50 p-2 text-sm text-slate-600">
+                            {record.notes}
+                          </p>
+                        </div>
                       )}
                   </div>
                   );

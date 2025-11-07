@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,28 +11,39 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import type { SstDeliveryRecord, SstInventoryItem } from '@/types/adminSst';
+import type { SstDeliveryDraft, SstInventoryItem } from '@/types/adminSst';
 
 interface DeliveryConfirmationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  record: SstDeliveryRecord | null;
+  record: SstDeliveryDraft | null;
   inventory: SstInventoryItem[];
   affiliateName: string;
-  onConfirm: (record: SstDeliveryRecord) => Promise<void>;
+  onConfirm: (record: SstDeliveryDraft) => Promise<void>;
 }
 
 const colorPalette: Record<string, string> = {
-  aguamarina: '#7FDBFF',
-  blanco: '#FFFFFF',
-  azul: '#0074D9',
-  gris: '#AAAAAA',
-  negro: '#111111',
-  petroleo: '#17505F',
-  verde: '#2ECC40',
+  aguamarina: '#14b8a6',
+  aquamarina: '#14b8a6',
+  blanco: '#f8fafc',
+  'azul claro': '#60a5fa',
+  'azul oscuro': '#1e3a8a',
+  'azul rey': '#1d4ed8',
+  azul: '#3b82f6',
+  'gris raton': '#6b7280',
+  'gris ratón': '#6b7280',
+  'gris reflectivo': '#94a3b8',
+  gris: '#9ca3af',
+  negro: '#0f172a',
+  petroleo: '#0d9488',
+  petróleo: '#0d9488',
+  verde: '#22c55e',
+  aguama: '#14b8a6',
+  'aguama ': '#14b8a6',
+  'azul cielo': '#38bdf8',
 };
 
-const normalizeColorName = (color: string): string | undefined =>
+const normalizeColorName = (color?: string) =>
   color
     ? color
         .toLowerCase()
@@ -67,6 +78,8 @@ export function DeliveryConfirmationModal({
   const [isConfirming, setIsConfirming] = useState(false);
 
   if (!record) return null;
+
+  const confirmationTimestamp = new Date();
 
   const handleConfirm = async () => {
     setIsConfirming(true);
@@ -104,10 +117,10 @@ export function DeliveryConfirmationModal({
               </div>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Fecha y hora
+                  Fecha y hora de registro
                 </span>
                 <p className="text-base font-medium text-slate-800">
-                  {new Date(record.deliveredAt).toLocaleString('es-CO', {
+                  {confirmationTimestamp.toLocaleString('es-CO', {
                     dateStyle: 'long',
                     timeStyle: 'short',
                   })}
@@ -117,7 +130,7 @@ export function DeliveryConfirmationModal({
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Entregado por
                 </span>
-                <p className="text-base font-medium text-slate-800">{record.deliveredBy}</p>
+                <p className="text-base font-medium text-slate-800">{record.deliveredByName || record.deliveredBy}</p>
               </div>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -150,18 +163,19 @@ export function DeliveryConfirmationModal({
             <ul className="space-y-2">
               {record.items.map((item, index) => {
                 const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
+                const resolvedColor = item.variant?.color || inventoryItem?.defaultColor;
                 return (
                   <li
                     key={`${item.itemId}-${index}`}
                     className="flex flex-wrap items-center gap-2.5 rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
                   >
-                    {inventoryItem?.defaultColor && renderColorSwatch(inventoryItem.defaultColor)}
+                    {resolvedColor && renderColorSwatch(resolvedColor)}
                     <span className="font-semibold text-slate-800">
                       {inventoryItem?.name ?? item.itemId}
                     </span>
-                    {inventoryItem?.defaultColor && (
+                    {resolvedColor && (
                       <span className="text-xs text-slate-500">
-                        ({inventoryItem.defaultColor})
+                        ({resolvedColor})
                       </span>
                     )}
                     {item.variant?.size && (
@@ -178,14 +192,14 @@ export function DeliveryConfirmationModal({
             </ul>
           </div>
 
-          {record.signedDocumentUrl && (
+          {record.signatureData && (
             <div>
               <h4 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">
                 Firma de recibido
               </h4>
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <img
-                  src={record.signedDocumentUrl}
+                  src={record.signatureData}
                   alt="Firma del afiliado"
                   className="mx-auto max-h-60 w-full object-contain"
                 />

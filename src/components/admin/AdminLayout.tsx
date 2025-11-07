@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, GraduationCap, Handshake, FileText, BarChart3, Settings, Heart,
+  Users, GraduationCap, BarChart3, Settings, Heart,
   Menu, X, LogOut, Home, ChevronRight, ChevronLeft, ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

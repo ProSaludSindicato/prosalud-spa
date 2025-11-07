@@ -27,9 +27,11 @@ export interface SstAffiliate {
   hospital: string;
   role: string;
   active: boolean;
+  status?: string;
+  convenioStatus?: string;
   lastDeliveryAt?: string;
   pendingTrainings?: string[];
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface SstDeliveryItemSelection {
@@ -43,10 +45,42 @@ export interface SstDeliveryRecord {
   affiliateId: string;
   deliveredAt: string;
   deliveredBy: string;
+  deliveredByName?: string;
   items: SstDeliveryItemSelection[];
-  signedDocumentUrl?: string;
+  signedDocumentUrl?: string | null;
   signedDocumentType?: SstDocumentType;
   signedDocumentNumber?: string;
+  notes?: string | null;
+}
+
+export interface SstAffiliatesResponse {
+  items: SstAffiliate[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SstInventoryResponse {
+  items: SstInventoryItem[];
+}
+
+export interface SstDeliveriesResponse {
+  items: SstDeliveryRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SstDeliveryDraft {
+  affiliateId: string;
+  affiliateDocumentType: SstDocumentType;
+  affiliateDocumentNumber: string;
+  deliveredBy: string;
+  deliveredByName: string;
+  items: SstDeliveryItemSelection[];
+  signatureData: string;
+  signedDocumentType: SstDocumentType;
+  signedDocumentNumber: string;
   notes?: string;
 }
 

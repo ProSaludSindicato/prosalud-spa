@@ -123,7 +123,7 @@ const SstPage: React.FC = () => {
 
       <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8">
         <div className="relative">
-          <SstPageHeader />
+        <SstPageHeader />
           <Link
             to="/admin/dotacion-epp"
             className="absolute top-0 right-0 text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1 opacity-60 hover:opacity-100"

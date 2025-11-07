@@ -110,7 +110,17 @@ export interface HospitalStock {
 
 export interface SolicitudRequest {
   id: string;
-  request_type: 'certificado-convenio' | 'compensacion-anual' | 'descanso-laboral' | 'verificacion-pagos' | 'retiro-sindical' | 'actualizar-datos-personales' | 'microcredito' | 'incapacidad-licencia' | 'permisos-turnos';
+  request_type:
+    | 'certificado-convenio'
+    | 'compensacion-anual'
+    | 'descanso-laboral'
+    | 'verificacion-pagos'
+    | 'retiro-sindical'
+    | 'actualizar-datos-personales'
+    | 'microcredito'
+    | 'incapacidad-licencia'
+    | 'permisos-turnos'
+    | 'solicitud-bienestar';
   id_type: 'CC' | 'CE' | 'TI' | 'PP';
   id_number: string;
   name: string;
