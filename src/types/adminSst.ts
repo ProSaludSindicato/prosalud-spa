@@ -1,4 +1,4 @@
-export type SstDocumentType = 'CC' | 'CE' | 'TI' | 'PA';
+export type SstDocumentType = 'CC' | 'CE' | 'PT';
 
 export type SstInventoryCategory = 'EPP' | 'Dotación' | 'Otro';
 

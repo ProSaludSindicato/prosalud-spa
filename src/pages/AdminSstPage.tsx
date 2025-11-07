@@ -47,10 +47,9 @@ interface DocumentTypeOption {
 }
 
 const documentTypeOptions: DocumentTypeOption[] = [
-  { value: 'CC', label: 'Cédula de ciudadanía' },
-  { value: 'CE', label: 'Cédula de extranjería' },
-  { value: 'TI', label: 'Tarjeta de identidad' },
-  { value: 'PA', label: 'Pasaporte' },
+  { value: 'CC', label: 'Cédula de ciudadanía (CC)' },
+  { value: 'CE', label: 'Cédula de extranjería (CE)' },
+  { value: 'PT', label: 'Permiso por Protección Temporal (PT)' },
 ];
 
 const containerVariants = {
