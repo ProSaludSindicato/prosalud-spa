@@ -110,7 +110,7 @@ function App() {
             <Route path="/admin/comfenalco" element={<AdminComfenalcoPage />} />
             <Route path="/admin/chatbot" element={<AdminChatbotPage />} />
             <Route path="/admin/votaciones" element={<AdminVotacionesPage />} />
-            <Route path="/admin/sst" element={<AdminSstPage />} />
+            <Route path="/admin/dotacion-epp" element={<AdminSstPage />} />
 
             {/* Admin Routes
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />

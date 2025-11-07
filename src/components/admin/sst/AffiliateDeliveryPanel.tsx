@@ -187,10 +187,10 @@ export function AffiliateDeliveryPanel({
   };
 
   const handleQuantityChange = (itemId: string, value: number) => {
-    if (Number.isNaN(value) || value <= 0) return;
+    if (Number.isNaN(value)) return;
     setSelectedItems((prev) => ({
       ...prev,
-      [itemId]: { ...prev[itemId], quantity: value },
+      [itemId]: { ...prev[itemId], quantity: Math.max(0, value) },
     }));
   };
 
@@ -225,18 +225,30 @@ export function AffiliateDeliveryPanel({
       return;
     }
 
+    const hasInvalidQuantities = Object.values(selectedItems).some((item) => (item?.quantity ?? 0) <= 0);
+    if (hasInvalidQuantities) {
+      setFormError('Revisa las cantidades. Cada elemento seleccionado debe tener una cantidad mayor a cero.');
+      toast({
+        title: 'Cantidad inválida',
+        description: 'Ajusta las cantidades de los elementos seleccionados antes de registrar la entrega.',
+        variant: 'destructive',
+        duration: 5000,
+      });
+      return;
+    }
+
     setFormError(null);
-    const record: SstDeliveryRecord = {
-      id: `sst-delivery-${Date.now()}`,
-      affiliateId: affiliate.id,
-      deliveredAt: new Date().toISOString(),
-      deliveredBy: deliveredBy || 'Encargado SST',
-      items: asDeliveryItems(),
-      signedDocumentUrl: signatureDataUrl,
+      const record: SstDeliveryRecord = {
+        id: `sst-delivery-${Date.now()}`,
+        affiliateId: affiliate.id,
+        deliveredAt: new Date().toISOString(),
+        deliveredBy: deliveredBy || 'Encargado SST',
+        items: asDeliveryItems(),
+        signedDocumentUrl: signatureDataUrl,
       signedDocumentType: affiliate.documentType,
       signedDocumentNumber: affiliate.documentNumber,
-      notes: notes.trim() || undefined,
-    };
+        notes: notes.trim() || undefined,
+      };
 
     // Trigger confirmation modal
     onConfirmDelivery?.(record);
@@ -244,7 +256,7 @@ export function AffiliateDeliveryPanel({
 
   useEffect(() => {
     if (!confirmedRecordId) return;
-    resetForm();
+      resetForm();
   }, [confirmedRecordId]);
 
   useEffect(() => {
@@ -320,14 +332,14 @@ export function AffiliateDeliveryPanel({
                           <TableCell>
                             <div className="flex items-center gap-2.5">
                               {item.defaultColor && renderColorSwatch(item.defaultColor)}
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-800">{item.name}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-800">{item.name}</span>
                                 {item.defaultColor && (
                                   <span className="text-xs text-slate-600">{item.defaultColor}</span>
                                 )}
-                                {item.unit && (
-                                  <span className="text-xs text-slate-500">Unidad: {item.unit}</span>
-                                )}
+                              {item.unit && (
+                                <span className="text-xs text-slate-500">Unidad: {item.unit}</span>
+                              )}
                               </div>
                             </div>
                           </TableCell>
@@ -363,7 +375,6 @@ export function AffiliateDeliveryPanel({
                           </TableCell>
                           <TableCell>
                             <Input
-                              min={1}
                               type="number"
                               disabled={!isSelected}
                               value={itemState?.quantity ?? 1}
@@ -500,19 +511,19 @@ export function AffiliateDeliveryPanel({
                   const remainingItems = record.items.length - visibleItems.length;
 
                   return (
-                    <div
-                      key={record.id}
-                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-700">
-                          {new Date(record.deliveredAt).toLocaleString()}
-                        </span>
-                        <Badge variant="outline">{record.items.length} elementos</Badge>
-                      </div>
-                      <p className="text-sm text-slate-500">
-                        Entregado por: <span className="font-medium">{record.deliveredBy}</span>
-                      </p>
+                  <div
+                    key={record.id}
+                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">
+                        {new Date(record.deliveredAt).toLocaleString()}
+                      </span>
+                      <Badge variant="outline">{record.items.length} elementos</Badge>
+                    </div>
+                    <p className="text-sm text-slate-500">
+                      Entregado por: <span className="font-medium">{record.deliveredBy}</span>
+                    </p>
                       {record.signedDocumentType && record.signedDocumentNumber && (
                         <p className="text-xs text-slate-500">
                           Documento verificado: <span className="font-medium">{record.signedDocumentType}</span>{' '}
@@ -521,8 +532,8 @@ export function AffiliateDeliveryPanel({
                       )}
                       <ul className="mt-3 space-y-2 text-sm text-slate-600">
                         {visibleItems.map((item) => {
-                          const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
-                          return (
+                        const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
+                        return (
                             <li
                               key={`${record.id}-${item.itemId}-${item.variant?.color ?? 'default'}-${
                                 item.variant?.size ?? 'unique'
@@ -542,10 +553,10 @@ export function AffiliateDeliveryPanel({
                                 </span>
                               )}
                               <span className="text-xs text-slate-500">× {item.quantity}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                          </li>
+                        );
+                      })}
+                    </ul>
                       {hasMoreItems && !isExpanded && (
                         <p className="mt-2 text-xs text-slate-500">
                           + {remainingItems} elemento{remainingItems === 1 ? '' : 's'} adicional{remainingItems === 1 ? '' : 'es'}
@@ -615,7 +626,7 @@ export function AffiliateDeliveryPanel({
                           Observaciones: <span className="font-medium">{record.notes}</span>
                         </p>
                       )}
-                    </div>
+                  </div>
                   );
                 })}
               </div>

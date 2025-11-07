@@ -16,8 +16,8 @@ export interface SignaturePadRef {
 
 export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
   ({ onChange, height = 180, initialValue }, ref) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
     const savedDataRef = useRef<string | null>(null);
 
     useImperativeHandle(ref, () => ({
@@ -46,34 +46,34 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
       },
     }));
 
-    useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      const resizeCanvas = () => {
-        const parent = canvas.parentElement;
-        if (!parent) return;
+    const resizeCanvas = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
 
-        const ratio = window.devicePixelRatio || 1;
-        const width = parent.clientWidth;
+      const ratio = window.devicePixelRatio || 1;
+      const width = parent.clientWidth;
         
         // Save current data before resize
         const currentData = savedDataRef.current || canvas.toDataURL('image/png');
         
-        canvas.width = width * ratio;
-        canvas.height = height * ratio;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
 
-        const context = canvas.getContext('2d');
-        if (context) {
-          context.scale(ratio, ratio);
-          context.lineWidth = 2;
-          context.lineJoin = 'round';
-          context.lineCap = 'round';
-          context.strokeStyle = '#0f172a';
-          context.fillStyle = '#ffffff';
-          context.fillRect(0, 0, width, height);
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.scale(ratio, ratio);
+        context.lineWidth = 2;
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+        context.strokeStyle = '#0f172a';
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, width, height);
           
           // Restore data if exists
           if (savedDataRef.current) {
@@ -83,14 +83,14 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
             };
             img.src = savedDataRef.current;
           }
-        }
-      };
+      }
+    };
 
-      resizeCanvas();
+    resizeCanvas();
 
-      window.addEventListener('resize', resizeCanvas);
-      return () => window.removeEventListener('resize', resizeCanvas);
-    }, [height]);
+    window.addEventListener('resize', resizeCanvas);
+    return () => window.removeEventListener('resize', resizeCanvas);
+  }, [height]);
 
     useEffect(() => {
       if (initialValue && canvasRef.current) {

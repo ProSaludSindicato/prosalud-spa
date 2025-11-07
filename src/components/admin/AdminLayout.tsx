@@ -29,8 +29,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const hasAutoCollapsedForSst = useRef(false);
+  const hasAutoCollapsedForDotacion = useRef(false);
   const isForcingCollapse = useRef(false);
+  const DOTACION_ROUTE = '/admin/dotacion-epp';
 
   useEffect(() => {
     if (!isForcingCollapse.current) {
@@ -39,30 +40,30 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    if (location.pathname.startsWith('/admin/sst')) {
-      if (!hasAutoCollapsedForSst.current) {
+    if (location.pathname.startsWith(DOTACION_ROUTE)) {
+      if (!hasAutoCollapsedForDotacion.current) {
         isForcingCollapse.current = true;
         setSidebarCollapsed(true);
-        hasAutoCollapsedForSst.current = true;
+        hasAutoCollapsedForDotacion.current = true;
         requestAnimationFrame(() => {
           isForcingCollapse.current = false;
         });
       }
     } else {
-      hasAutoCollapsedForSst.current = false;
+      hasAutoCollapsedForDotacion.current = false;
       const storedPreference = localStorage.getItem('adminSidebarCollapsed');
       if (storedPreference !== null) {
         setSidebarCollapsed(storedPreference === 'true');
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, DOTACION_ROUTE]);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
     { name: 'Usuarios', href: '/admin/usuarios', icon: Users },
     { name: 'Roles y Permisos', href: '/admin/roles', icon: Settings },
     { name: 'Inventario', href: '/admin/inventario', icon: Package },
-    { name: 'SST', href: '/admin/sst', icon: ShieldCheck },
+    { name: 'Dotación y EPP', href: DOTACION_ROUTE, icon: ShieldCheck },
     { name: 'Solicitudes', href: '/admin/solicitudes', icon: ClipboardList },
     { name: 'Solicitudes Bienestar', href: '/admin/solicitudes-bienestar', icon: Heart },
     { name: 'Galería Bienestar', href: '/admin/bienestar', icon: Images },

@@ -306,6 +306,7 @@ const AdminSstPage: React.FC = () => {
           duration: 5000,
         });
         setSelectedAffiliate(null);
+        setShowAffiliateList(true);
         return;
       }
 
@@ -330,6 +331,7 @@ const AdminSstPage: React.FC = () => {
         variant: 'destructive',
         duration: 5000,
       });
+      setShowAffiliateList(true);
     } finally {
       setIsSearchingAffiliate(false);
     }
@@ -445,11 +447,11 @@ const AdminSstPage: React.FC = () => {
                     </div>
                     <div>
                       <CardTitle className="text-3xl font-bold text-primary-prosalud">
-                        Gestión SST - Entrega de dotación y EPP
+                        Gestión Dotación y EPP
                       </CardTitle>
                       <CardDescription className="text-base mt-2">
-                        Consulta afiliados activos, registra entregas de elementos de protección y guarda la firma
-                        de recibido como constancia.
+                        Consulta afiliados activos, registra entregas de dotación y elementos de protección personal,
+                        y guarda la firma de recibido como constancia.
                       </CardDescription>
                     </div>
                   </div>
@@ -467,7 +469,7 @@ const AdminSstPage: React.FC = () => {
                     <Users className="h-5 w-5 text-primary-prosalud" />
                     Afiliados activos
                   </CardTitle>
-                  <CardDescription>Total registrados en el sistema SST</CardDescription>
+                  <CardDescription>Total registrados en el sistema de Dotación y EPP</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <span className="text-3xl font-bold text-slate-800">{activeAffiliatesCount}</span>
@@ -518,7 +520,7 @@ const AdminSstPage: React.FC = () => {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="justify-start gap-2 text-sm text-primary-prosalud hover:text-primary-prosalud-dark"
+                    className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white"
                     onClick={() =>
                       setShowAffiliateList((prev) => {
                         const next = !prev;
@@ -597,7 +599,7 @@ const AdminSstPage: React.FC = () => {
               <CardHeader className="pb-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="text-xl">Afiliados activos en SST</CardTitle>
+                    <CardTitle className="text-xl">Afiliados activos en Dotación y EPP</CardTitle>
                     <CardDescription>
                       Lista general de afiliados con posibilidad de filtrar por nombre, documento, hospital o rol.
                     </CardDescription>
@@ -841,7 +843,7 @@ const AdminSstPage: React.FC = () => {
                       <AlertTitle>Inventario no disponible</AlertTitle>
                       <AlertDescription>
                         No se encontraron elementos configurados en el inventario. Por favor, revisa la configuración
-                        del módulo de SST.
+                        del módulo de Dotación y EPP.
                       </AlertDescription>
                     </Alert>
                   )}
