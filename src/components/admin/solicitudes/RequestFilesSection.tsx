@@ -7,6 +7,7 @@ import { Download, FileText, Image, File, Loader2, ExternalLink, AlertCircle } f
 import { requestsService } from '@/services/requestsServiceApi';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
+import { logger } from '@/utils/logger';
 
 interface RequestFilesSectionProps {
   requestId: string;
@@ -83,7 +84,7 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
         description: `El archivo "${file.original_name}" se ha descargado correctamente.`,
       });
     } catch (error) {
-      console.error('Error downloading file:', error);
+      logger.error('Error al descargar archivo de solicitud', error instanceof Error ? error.message : error);
       const errorMessage = getErrorMessage(error);
       toast.error('Error al descargar archivo', {
         description: errorMessage,

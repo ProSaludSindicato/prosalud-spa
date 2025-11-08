@@ -9,6 +9,7 @@ import type {
   SstInventoryResponse,
 } from '@/types/adminSst';
 import { buildAdminApiUrl } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 const BASE_PATH = '/api/dotacion-epp';
 
@@ -64,7 +65,7 @@ const parseErrorMessage = async (response: Response): Promise<never> => {
       message = data.message;
     }
   } catch (error) {
-    console.error('No fue posible parsear el mensaje de error del API Dotación & EPP', error);
+    logger.error('No fue posible parsear el mensaje de error del API Dotación & EPP', error instanceof Error ? error.message : error);
   }
 
   const apiError = new Error(message) as Error & { status?: number };

@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/utils/logger";
 
 // Definir tipo para los chunks recuperados
 export type RelevantChunk = {
@@ -20,7 +21,7 @@ export async function getQuestionEmbedding(text: string): Promise<number[]> {
     });
 
     if (error) {
-      console.error('Error en embed-question:', error);
+      logger.error('Error en embed-question', error.message || error);
       throw new Error(`Error al generar embedding: ${error.message}`);
     }
 
@@ -30,7 +31,7 @@ export async function getQuestionEmbedding(text: string): Promise<number[]> {
 
     return data.embedding;
   } catch (error) {
-    console.error('Error completo en getQuestionEmbedding:', error);
+    logger.error('Error en getQuestionEmbedding', error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -112,16 +113,16 @@ function expandQuery(query: string): string {
  */
 export async function searchRelevantChunks(query: string, topK: number = 5): Promise<RelevantChunk[]> {
   try {
-    console.log('Query original:', query);
+    logger.debug('Vector search query recibida', { queryLength: query.length });
     
     // Expandir la consulta con términos relacionados
     const expandedQuery = expandQuery(query);
-    console.log('Query expandida:', expandedQuery);
+    logger.debug('Vector search query expandida', { expandedLength: expandedQuery.length });
     
-    console.log('Generando embedding para query expandida...');
+    logger.debug('Generando embedding para query expandida');
     const questionEmbedding = await getQuestionEmbedding(expandedQuery);
     
-    console.log('Buscando chunks relevantes...');
+    logger.debug('Buscando chunks relevantes para vector search');
     // @ts-ignore - RPC function exists in database
     const { data, error } = await supabase.rpc("match_doc_chunks", {
       query_embedding: JSON.stringify(questionEmbedding),
@@ -129,17 +130,17 @@ export async function searchRelevantChunks(query: string, topK: number = 5): Pro
     }) as { data: RelevantChunk[] | null, error: any };
 
     if (error) {
-      console.error('Error en match_doc_chunks:', error);
+      logger.error('Error en match_doc_chunks', error?.message || error);
       throw new Error(`Error en búsqueda vectorial: ${error.message}`);
     }
 
     let chunks = data || [];
-    console.log(`Encontrados ${chunks.length} chunks iniciales`);
+    logger.debug('Chunks iniciales recuperados', { total: chunks.length });
     
     // Si no encontramos suficientes resultados con la query expandida, 
     // intentamos con la query original
     if (chunks.length < topK && expandedQuery !== query) {
-      console.log('Buscando con query original como fallback...');
+      logger.debug('Buscando con query original como fallback');
       const originalEmbedding = await getQuestionEmbedding(query);
       
       // @ts-ignore - RPC function exists in database
@@ -171,12 +172,14 @@ export async function searchRelevantChunks(query: string, topK: number = 5): Pro
     // Limitar al número solicitado pero garantizar diversidad de fuentes
     const diverseChunks = diversifyChunks(finalChunks.slice(0, topK));
     
-    console.log(`Devolviendo ${diverseChunks.length} chunks relevantes con diversidad`);
-    console.log('Archivos fuente:', [...new Set(diverseChunks.map(c => c.doc_path))]);
+    logger.debug('Chunks relevantes preparados', {
+      total: diverseChunks.length,
+      fuentes: [...new Set(diverseChunks.map((c) => c.doc_path))],
+    });
     
     return diverseChunks;
   } catch (error) {
-    console.error('Error en searchRelevantChunks:', error);
+    logger.error('Error en searchRelevantChunks', error instanceof Error ? error.message : error);
     // Fallback: devolver array vacío para que la consulta continúe sin contexto específico
     return [];
   }

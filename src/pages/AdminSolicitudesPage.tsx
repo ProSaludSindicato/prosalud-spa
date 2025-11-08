@@ -38,6 +38,7 @@ import DataPagination from "@/components/ui/data-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { logger } from "@/utils/logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -254,7 +255,10 @@ const AdminSolicitudesPage: React.FC = () => {
   };
 
   const handleViewDetails = (solicitud: Request) => {
-    console.log("Ver detalles de solicitud:", solicitud);
+    logger.debug("Visualizando detalles de solicitud", {
+      id: solicitud.id,
+      estado: solicitud.status,
+    });
     setSelectedSolicitud(solicitud);
     // Resetear campos expandidos al abrir una nueva solicitud
     setExpandedFields({});
@@ -346,7 +350,7 @@ const AdminSolicitudesPage: React.FC = () => {
               setExpandedFields({});
             }
           } catch (error) {
-            console.error("Error al actualizar la solicitud seleccionada:", error);
+            logger.error("Error al actualizar la solicitud seleccionada", error instanceof Error ? error.message : error);
             // Fallback: usar updatedRequest
             setSelectedSolicitud(updatedRequest);
             setExpandedFields({});
@@ -354,7 +358,7 @@ const AdminSolicitudesPage: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error("Error sending response:", error);
+      logger.error("Error al enviar respuesta de solicitud", error instanceof Error ? error.message : error);
       
       // Siempre resetear el estado primero
       setIsSubmittingResponse(false);
@@ -399,7 +403,7 @@ const AdminSolicitudesPage: React.FC = () => {
 
       refetch();
     } catch (error) {
-      console.error("Error updating request status:", error);
+      logger.error("Error al actualizar estado de solicitud", error instanceof Error ? error.message : error);
       const errorMessage = getErrorMessage(error);
       toast.error("Error al actualizar estado", {
         description: errorMessage,

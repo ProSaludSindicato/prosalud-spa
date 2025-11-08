@@ -47,9 +47,6 @@ export const classifyQuestion = (
     conversationContext.lastCategory &&
     safeHistory.length > 0
   ) {
-    console.log(
-      `🔄 Pregunta de seguimiento detectada, manteniendo categoría: ${conversationContext.lastCategory}`
-    );
     return conversationContext.lastCategory;
   }
 
@@ -59,7 +56,6 @@ export const classifyQuestion = (
       questionLower.includes(keyword.toLowerCase())
     );
     if (hasMatch) {
-      console.log(`🎯 Pregunta clasificada como: ${category}`);
       return category as CategoryType;
     }
   }
@@ -72,14 +68,10 @@ export const classifyQuestion = (
     );
 
     if (hasContextualReference) {
-      console.log(
-        `🔗 Usando contexto anterior por referencia contextual: ${conversationContext.lastCategory}`
-      );
       return conversationContext.lastCategory;
     }
   }
 
-  console.log("🎯 Pregunta clasificada como: general (sin categoría específica)");
   return "general";
 };
 

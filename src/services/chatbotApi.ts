@@ -1,4 +1,6 @@
 import publicApi from './publicApi';
+import { logger } from '@/utils/logger';
+
 // Tipado laxo para evitar dependencias a tipos no presentes en el repo
 type ChatbotConversation = any;
 type PaginatedResponse<T> = any;
@@ -19,11 +21,10 @@ export const chatbotApi = {
         '/api/chatbot-conversations',
         data
       );
-      console.log('✅ Conversación guardada exitosamente:', response.data.id);
       return response.data;
     } catch (error: any) {
       // Log del error pero no interrumpir el flujo del chatbot
-      console.error('❌ Error guardando conversación del chatbot:', {
+      logger.error('❌ Error guardando conversación del chatbot:', {
         error: error?.response?.data || error?.message || error,
         status: error?.response?.status,
         data: data
@@ -45,7 +46,7 @@ export const chatbotApi = {
       );
       return response.data;
     } catch (error: any) {
-      console.error('Error obteniendo conversaciones:', error);
+      logger.error('Error obteniendo conversaciones:', error);
       throw error;
     }
   },
@@ -62,10 +63,10 @@ export const chatbotApi = {
         `/api/chatbot-conversations/${id}/feedback`,
         { feedback }
       );
-      console.log(`✅ Feedback actualizado por id ${id}:`, feedback);
+      logger.info(`✅ Feedback actualizado por id ${id}:`, feedback);
       return response.data;
     } catch (error: any) {
-      console.error('❌ Error actualizando feedback:', error);
+      logger.error('❌ Error actualizando feedback:', error);
       return null;
     }
   },
@@ -82,10 +83,10 @@ export const chatbotApi = {
         `/api/chatbot-conversations/client/${encodeURIComponent(clientTurnId)}/feedback`,
         { feedback }
       );
-      console.log(`✅ Feedback actualizado por client_turn_id ${clientTurnId}:`, feedback);
+      logger.info(`✅ Feedback actualizado por client_turn_id ${clientTurnId}:`, feedback);
       return response.data;
     } catch (error: any) {
-      console.error('❌ Error actualizando feedback por client_turn_id:', error);
+      logger.error('❌ Error actualizando feedback por client_turn_id:', error);
       return null;
     }
   },

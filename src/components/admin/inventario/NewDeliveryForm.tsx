@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Minus, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface DeliveryItem {
   productName: string;
@@ -82,7 +82,10 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
       return;
     }
 
-    console.log('Registrando nueva entrega:', { formData, items });
+    logger.debug('Registrando nueva entrega de inventario', {
+      supplierName: formData.supplierName,
+      totalItems: items.length,
+    });
     
     if (onSuccess) {
       onSuccess();

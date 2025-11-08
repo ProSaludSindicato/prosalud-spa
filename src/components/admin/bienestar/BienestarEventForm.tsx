@@ -3,8 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { ArrowLeft, Upload, X, Plus, Star, Image as ImageIcon, MapPin, Users, Gift } from "lucide-react";
+import { Upload, X, Plus, Star, Image as ImageIcon, MapPin } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +13,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { toast } from "sonner";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
-import {
-  baseNameValidation,
-  baseTextValidation,
-  baseCategoryValidation,
-  numberValidation,
-} from "@/hooks/useFormValidation";
+import { logger } from "@/utils/logger";
 
 const formSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
@@ -127,7 +121,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       onClose();
     },
     onError: (error: any) => {
-      console.error("Error al crear evento:", error);
+      logger.error("Error al crear evento de bienestar", error?.message || error);
 
       // Manejar errores de validación (422)
       if (error.response?.status === 422 && error.response?.data?.errors) {
@@ -157,8 +151,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       }
     },
     onSettled: () => {
-      // Esto se ejecuta siempre, independientemente de si fue exitoso o error
-      console.log("Mutation settled");
+      logger.debug("Mutación de creación de evento finalizada");
     },
   });
 
@@ -172,7 +165,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       onClose();
     },
     onError: (error: any) => {
-      console.error("Error al actualizar evento:", error);
+      logger.error("Error al actualizar evento de bienestar", error?.message || error);
 
       // Manejar errores de validación (422)
       if (error.response?.status === 422 && error.response?.data?.errors) {
@@ -202,7 +195,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       }
     },
     onSettled: () => {
-      console.log("Update mutation settled");
+      logger.debug("Mutación de actualización de evento finalizada");
     },
   });
 
@@ -291,14 +284,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         images: images.length > 0 ? images : undefined,
       };
       
-      console.log('🔄 Enviando datos de actualización:', {
+      logger.debug("Enviando datos para actualizar evento", {
         eventId: event.id,
-        updateData: {
-          ...updateData,
-          images: updateData.images ? `${updateData.images.length} imágenes` : 'sin nuevas imágenes'
-        },
-        formData: data,
-        hasNewImages: images.length > 0
+        tieneNuevasImagenes: images.length > 0,
       });
       
       updateMutation.mutate(updateData);

@@ -1,4 +1,5 @@
 import publicApi from './publicApi';
+import { logger } from '@/utils/logger';
 
 // Interfaces para la API real de incapacidades
 export interface IncapacidadRecord {
@@ -57,23 +58,23 @@ export const consultarIncapacidad = async (
 
     // Manejo de respuesta exitosa
     if (response.data.status === 'success' && response.data.data) {
-      console.log('✅ Incapacidades encontradas:', response.data.data.length);
+      logger.info('✅ Incapacidades encontradas:', response.data.data.length);
       return response.data.data;
     }
 
     // No se encontraron registros
     if (response.data.status === 'not_found') {
-      console.log('ℹ️ No se encontraron incapacidades para el documento consultado');
+      logger.info('ℹ️ No se encontraron incapacidades para el documento consultado');
       return null;
     }
 
     // Otros casos
-    console.warn('⚠️ Respuesta inesperada de la API:', response.data);
+    logger.warn('⚠️ Respuesta inesperada de la API:', response.data);
     return null;
 
   } catch (error: any) {
     // Log detallado del error para soporte
-    console.error('❌ Error consultando incapacidades:', {
+    logger.error('❌ Error consultando incapacidades:', {
       status: error?.response?.status,
       message: error?.response?.data?.message,
       errors: error?.response?.data?.errors,

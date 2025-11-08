@@ -5,6 +5,7 @@
 
 import { Message } from "./categoryClassifier";
 import { ConversationTokens } from "./tokenCalculator";
+import { logger } from "@/utils/logger";
 
 /**
  * Exporta la conversación a un archivo de texto
@@ -76,6 +77,6 @@ export const exportConversation = (
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 
-  console.log("📥 Conversación exportada exitosamente");
+  logger.info("📥 Conversación exportada exitosamente");
 };
 

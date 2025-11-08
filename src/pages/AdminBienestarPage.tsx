@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { wellnessEventsApi } from '@/services/wellnessEventsApi';
 import { BienestarEvent } from '@/types/admin';
 import BienestarEventForm from '@/components/admin/bienestar/BienestarEventForm';
+import { logger } from '@/utils/logger';
 
 const AdminBienestarPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,7 +55,7 @@ const AdminBienestarPage: React.FC = () => {
       });
     },
     onError: (error: any) => {
-      console.error('Error al cambiar visibilidad:', error);
+      logger.error('Error al cambiar visibilidad de evento de bienestar', error?.message || error);
       toast({
         title: "Error al cambiar visibilidad",
         description: error.response?.data?.message || "No se pudo cambiar la visibilidad del evento.",

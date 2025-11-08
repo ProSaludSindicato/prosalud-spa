@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_CONFIG } from "../config/api";
 import { getErrorMessage } from "@/utils/errorSanitizer";
+import { logger } from "@/utils/logger";
 
 // API client for requests endpoints (no authentication required)
 const requestsApi = axios.create({
@@ -59,25 +60,27 @@ export interface ApiResponse<T> {
   errors?: Record<string, string[]>;
 }
 
-// Add request/response interceptors for debugging
+// Add request/response interceptors for debugging (dev-only)
 requestsApi.interceptors.request.use((config) => {
-  console.log("🚀 API Request:", config.method?.toUpperCase(), config.url, {
-    params: config.params,
-    data: config.data,
+  logger.debug("Requests API request", {
+    method: config.method?.toUpperCase(),
+    url: config.url,
   });
   return config;
 });
 
 requestsApi.interceptors.response.use(
   (response) => {
-    console.log("✅ API Response:", response.status, response.config.url, response.data);
+    logger.debug("Requests API response", {
+      status: response.status,
+      url: response.config.url,
+    });
     return response;
   },
   (error) => {
-    console.error("❌ API Response Error:", {
+    logger.error("Requests API response error", {
       status: error.response?.status,
       statusText: error.response?.statusText,
-      data: error.response?.data,
       message: error.message,
       url: error.config?.url,
     });
@@ -86,7 +89,7 @@ requestsApi.interceptors.response.use(
 );
 
 const handleApiError = (error: any) => {
-  console.error("API Error details:", error);
+  logger.error("Requests API error handled", getErrorMessage(error));
 
   // Handle network errors
   if (error.code === "ERR_NETWORK" || error.message.includes("CORS")) {

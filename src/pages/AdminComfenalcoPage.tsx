@@ -39,6 +39,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from '@/components/ui/separator';
 import { FieldError } from '@/components/ui/field-error';
 import DeleteComfenalcoEventDialog from '@/components/admin/comfenalco/DeleteComfenalcoEventDialog';
+import { logger } from '@/utils/logger';
 
 const AdminComfenalcoPage: React.FC = () => {
   const [eventFormOpen, setEventFormOpen] = useState(false);
@@ -55,9 +56,8 @@ const AdminComfenalcoPage: React.FC = () => {
   const { errors: validationErrors, validateCreateEvent, validateUpdateEvent, clearErrors, setFieldError, clearFieldError } = useComfenalcoEventValidation();
   const [backendErrors, setBackendErrors] = useState<ValidationErrors>({});
 
-  // Debug logging for errors
-  console.log('Validation errors:', validationErrors);
-  console.log('Backend errors:', backendErrors);
+  // Debug logging para entornos de desarrollo
+  logger.debug('Errores de validación de Comfenalco', { frontend: validationErrors, backend: backendErrors });
 
   // Helper function to get field error
   const getFieldError = (field: keyof ValidationErrors): string | undefined => {
@@ -67,7 +67,7 @@ const AdminComfenalcoPage: React.FC = () => {
     
     // Debug logging
     if (error) {
-      console.log(`Error for field ${field}:`, error);
+      logger.debug('Error de campo en formulario Comfenalco', { field, error });
     }
     
     return error;
@@ -393,7 +393,7 @@ const AdminComfenalcoPage: React.FC = () => {
       // Validate update data (skip date validation if only visibility is being changed)
       const validation = validateUpdateEvent(updateData, onlyVisibilityChanged);
       if (!validation.isValid) {
-        console.log('Validation errors:', validation.errors);
+        logger.warn('Errores de validación al actualizar evento Comfenalco', validation.errors);
         toast.error("Error de validación", {
           description: "Por favor corrige los errores en el formulario.",
         });
@@ -425,9 +425,9 @@ const AdminComfenalcoPage: React.FC = () => {
 
       // Validate create data
       const validation = validateCreateEvent(createData);
-      console.log('Validation result:', validation);
+      logger.debug('Resultado de validación al crear evento Comfenalco', { isValid: validation.isValid });
       if (!validation.isValid) {
-        console.log('Validation errors:', validation.errors);
+        logger.warn('Errores de validación al crear evento Comfenalco', validation.errors);
         toast.error("Error de validación", {
           description: "Por favor corrige los errores en el formulario.",
         });

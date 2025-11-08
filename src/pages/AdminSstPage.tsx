@@ -32,7 +32,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -58,6 +57,7 @@ import {
   SstInventoryItem,
 } from '@/types/adminSst';
 import { sstAdminService } from '@/services/sstAdminService';
+import { logger } from '@/utils/logger';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -170,7 +170,7 @@ const AdminSstPage: React.FC = () => {
         });
       } catch (error) {
         if (!isMounted) return;
-        console.error(error);
+        logger.error('Error al cargar afiliados SST', error instanceof Error ? error.message : error);
         const message = error instanceof Error ? error.message : 'No fue posible cargar la lista de afiliados.';
         setAffiliates([]);
         setTotalAffiliates(0);
@@ -206,7 +206,7 @@ const AdminSstPage: React.FC = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        console.error(error);
+        logger.error('Error al cargar inventario SST', error instanceof Error ? error.message : error);
         if (isMounted) {
           setErrorMessage('No fue posible cargar la información de inventario.');
         }
@@ -252,7 +252,7 @@ const AdminSstPage: React.FC = () => {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        console.error(error);
+        logger.error('Error al obtener historial de entregas SST', error instanceof Error ? error.message : error);
         const message = error instanceof Error ? error.message : 'No fue posible cargar el historial de entregas.';
         showFeedbackBanner('error', 'Error al obtener historial', message);
       } finally {
@@ -405,7 +405,7 @@ const AdminSstPage: React.FC = () => {
         duration: 5000,
       });
     } catch (error) {
-      console.error(error);
+      logger.error('Error al buscar afiliado SST', error instanceof Error ? error.message : error);
       showFeedbackBanner('error', 'Error de búsqueda', 'No fue posible buscar el afiliado. Intenta nuevamente.');
       toast({
         title: 'Error de búsqueda',
@@ -486,7 +486,7 @@ const AdminSstPage: React.FC = () => {
       setPendingRecord(null);
       setConfirmationModalOpen(false);
     } catch (error) {
-      console.error(error);
+      logger.error('Error al registrar entrega SST', error instanceof Error ? error.message : error);
       const message = error instanceof Error ? error.message : 'No fue posible registrar la entrega. Intenta nuevamente.';
       showFeedbackBanner('error', 'Error al registrar la entrega', message);
       toast({
@@ -945,7 +945,7 @@ const AdminSstPage: React.FC = () => {
       });
       handleCloseExportDialog();
     } catch (error) {
-      console.error(error);
+      logger.error('Error al exportar entregas SST', error instanceof Error ? error.message : error);
       const message =
         error instanceof Error ? error.message : 'No fue posible generar el reporte en Excel.';
       setExportError(message);

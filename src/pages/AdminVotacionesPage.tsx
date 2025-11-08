@@ -12,20 +12,56 @@ import { votacionesApi } from "@/services/votacionesApi";
 import { generateVotacionesExcelReport } from "@/components/admin/votaciones/utils/votacionesExcelGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Vote, BarChart3, FileDown, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Vote, BarChart3, FileDown, Upload, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
+import { logger } from "@/utils/logger";
+import { adminExcelFilesService, type AdminExcelFileType } from "@/services/adminExcelFilesService";
+
+type VotacionesUploadType = "activos" | "delegados";
+
+interface VotacionesUploadConfig {
+  buttonLabel: string;
+  uploadingLabel: string;
+  dialogTitle: string;
+  description: string;
+  storageName: string;
+  maxSizeMB: number;
+  successFallback: string;
+  errorFallback: string;
+  toastDescription?: (response: any) => string | undefined;
+}
+
+const votacionesUploadConfigs: Record<VotacionesUploadType, VotacionesUploadConfig & { serviceType: AdminExcelFileType }> = {
+  activos: {
+    serviceType: "afiliados",
+    buttonLabel: "Actualizar Activos",
+    uploadingLabel: "Actualizando...",
+    dialogTitle: "Confirmar actualización de afiliados activos",
+    description:
+      "Actualizarás el listado de afiliados activos habilitados para votar. La acción reemplaza el archivo anterior y los cambios se reflejan inmediatamente.",
+    storageName: "PROSANET_INFORMACION_AFILIADOS.xlsx",
+    maxSizeMB: 10,
+    successFallback: "Archivo de afiliados actualizado exitosamente.",
+    errorFallback: "No fue posible actualizar el archivo de afiliados.",
+    toastDescription: (response) =>
+      response?.rows_count ? `Se procesaron ${response.rows_count} registros.` : undefined,
+  },
+  delegados: {
+    serviceType: "delegados",
+    buttonLabel: "Actualizar Candidatos",
+    uploadingLabel: "Actualizando...",
+    dialogTitle: "Confirmar actualización de candidatos",
+    description:
+      "Se reemplazará el archivo maestro de candidatos (delegados). Esta acción sobrescribe el archivo anterior y los cambios se reflejan inmediatamente.",
+    storageName: "DELEGADOS.xlsx",
+    maxSizeMB: 5,
+    successFallback: "Archivo de candidatos actualizado exitosamente.",
+    errorFallback: "No fue posible actualizar el archivo de candidatos.",
+  },
+};
 
 export default function AdminVotacionesPage() {
   const [auditFilters, setAuditFilters] = useState<Omit<AuditFilters, 'page' | 'per_page'>>({});
@@ -34,7 +70,10 @@ export default function AdminVotacionesPage() {
   const itemsPerPage = 50;
   const [showUploadConfirmDialog, setShowUploadConfirmDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileUrl, setSelectedFileUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadContext, setUploadContext] = useState<VotacionesUploadType | null>(null);
+  const [uploadingType, setUploadingType] = useState<VotacionesUploadType | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Query para estadísticas usando el endpoint especializado de hospital-statistics
@@ -151,7 +190,7 @@ export default function AdminVotacionesPage() {
 
       toast.success("Reporte Excel generado exitosamente");
     } catch (error) {
-      console.error("Error al exportar:", error);
+      logger.error("Error al exportar reporte de votaciones", error instanceof Error ? error.message : error);
       toast.error("Error al generar el reporte Excel");
     }
   };
@@ -179,8 +218,32 @@ export default function AdminVotacionesPage() {
 
       toast.success("Reporte Excel generado exitosamente");
     } catch (error) {
-      console.error("Error al exportar:", error);
+      logger.error("Error al exportar reporte de auditoría de votaciones", error instanceof Error ? error.message : error);
       toast.error("Error al generar el reporte Excel");
+    }
+  };
+
+  const resetUploadState = ({ preserveContext = false }: { preserveContext?: boolean } = {}) => {
+    if (selectedFileUrl) {
+      URL.revokeObjectURL(selectedFileUrl);
+    }
+    setSelectedFileUrl(null);
+    setSelectedFile(null);
+
+    if (!preserveContext) {
+      setUploadContext(null);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleUploadDialogChange = (open: boolean) => {
+    setShowUploadConfirmDialog(open);
+
+    if (!open && !isUploading) {
+      resetUploadState();
     }
   };
 
@@ -188,90 +251,120 @@ export default function AdminVotacionesPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de archivo
-    const validExtensions = ['.xlsx', '.xls'];
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!validExtensions.includes(fileExtension)) {
-      toast.error("Por favor seleccione un archivo Excel (.xlsx o .xls)");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    if (!uploadContext) {
+      toast.error("Selecciona una acción de carga antes de elegir un archivo.");
+      resetUploadState();
       return;
     }
 
-    // Validar tamaño (máx 10 MB)
-    const maxSize = 10 * 1024 * 1024; // 10 MB en bytes
-    if (file.size > maxSize) {
-      toast.error("El archivo no puede exceder 10 MB");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    const config = votacionesUploadConfigs[uploadContext];
+
+    const extension = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`;
+    const allowedExtensions = [".xlsx", ".xls"];
+    if (!allowedExtensions.includes(extension)) {
+      toast.error("Por favor selecciona un archivo Excel (.xlsx o .xls).");
+      resetUploadState({ preserveContext: true });
       return;
     }
 
+    const maxSizeBytes = config.maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      toast.error(`El archivo supera el tamaño máximo permitido (${config.maxSizeMB} MB).`);
+      resetUploadState({ preserveContext: true });
+      return;
+    }
+
+    if (selectedFileUrl) {
+      URL.revokeObjectURL(selectedFileUrl);
+    }
+
+    const fileUrl = URL.createObjectURL(file);
+    setSelectedFileUrl(fileUrl);
     setSelectedFile(file);
     setShowUploadConfirmDialog(true);
   };
 
   const handleUploadConfirm = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !uploadContext) return;
+
+    const config = votacionesUploadConfigs[uploadContext];
 
     setIsUploading(true);
+    setUploadingType(uploadContext);
     setShowUploadConfirmDialog(false);
 
     try {
-      const response = await votacionesApi.uploadActivosFile(selectedFile);
+      const response = await adminExcelFilesService.uploadExcelFile(config.serviceType, selectedFile);
 
       if (response.success) {
-        toast.success(response.message || "Archivo actualizado exitosamente", {
-          description: response.rows_count 
-            ? `Se procesaron ${response.rows_count} registros`
-            : undefined,
-          duration: 5000,
+        toast.success(response.message || config.successFallback, {
+          description: config.toastDescription?.(response),
         });
       } else {
-        toast.error(response.message || "Error al actualizar el archivo", {
-          duration: 5000,
-        });
+        toast.error(response.message || config.errorFallback);
       }
     } catch (error: any) {
-      console.error("Error al cargar archivo:", error);
-      
-      let errorMessage = "Error al actualizar el archivo";
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.status === 422) {
-        errorMessage = "El archivo Excel no es válido o está corrupto";
-      } else if (error.response?.status === 500) {
-        errorMessage = "Error al guardar el archivo en el servidor";
-      } else if (error.message) {
+      logger.error("Error al cargar archivo de votaciones", error?.message || error);
+
+      const backendMessage: string | undefined = error?.response?.data?.message;
+      const statusCode: number | undefined = error?.response?.status;
+
+      let errorMessage = backendMessage || config.errorFallback;
+
+      if (statusCode === 422) {
+        const lowerMessage = backendMessage?.toLowerCase() ?? "";
+        if (lowerMessage.includes("formato")) {
+          errorMessage = "El archivo debe ser un Excel válido (.xlsx o .xls).";
+        } else if (lowerMessage.includes("tamaño") || lowerMessage.includes("tamano") || lowerMessage.includes("size")) {
+          errorMessage = `El archivo supera el tamaño máximo permitido (${config.maxSizeMB} MB).`;
+        } else if (lowerMessage.includes("vacío") || lowerMessage.includes("vacio")) {
+          errorMessage = "El archivo Excel parece estar vacío.";
+        }
+      } else if (statusCode === 500) {
+        errorMessage = backendMessage || "El servidor reportó un error al guardar el archivo.";
+      } else if (error?.message) {
         errorMessage = error.message;
       }
 
-      toast.error(errorMessage, {
-        duration: 5000,
-      });
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setUploadingType(null);
+      resetUploadState();
     }
   };
 
   const handleUploadCancel = () => {
     setShowUploadConfirmDialog(false);
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    resetUploadState();
   };
 
-  const handleUploadButtonClick = () => {
+  const handleUploadButtonClick = (type: VotacionesUploadType) => {
+    if (isUploading) return;
+    resetUploadState({ preserveContext: false });
+    setUploadContext(type);
     fileInputRef.current?.click();
   };
+
+  const renderUploadButton = (type: VotacionesUploadType) => {
+    const config = votacionesUploadConfigs[type];
+    const isTypeLoading = isUploading && uploadingType === type;
+
+    return (
+      <Button
+        key={type}
+        onClick={() => handleUploadButtonClick(type)}
+        disabled={isUploading}
+        className="gap-2"
+        variant={type === "activos" ? "secondary" : "default"}
+      >
+        <Upload className="h-4 w-4" />
+        {isTypeLoading ? config.uploadingLabel : config.buttonLabel}
+      </Button>
+    );
+  };
+
+  const activeUploadConfig = uploadContext ? votacionesUploadConfigs[uploadContext] : null;
 
   return (
     <AdminLayout>
@@ -307,15 +400,8 @@ export default function AdminVotacionesPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <Button
-                    onClick={handleUploadButtonClick}
-                    disabled={isUploading}
-                    className="gap-2"
-                    variant="secondary"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {isUploading ? "Cargando..." : "Cargar Activos"}
-                  </Button>
+                  {renderUploadButton("activos")}
+                  {renderUploadButton("delegados")}
                   <Button
                     onClick={handleExportStatistics}
                     disabled={!statsData || statsLoading || statsFetching || !auditData}
@@ -415,28 +501,59 @@ export default function AdminVotacionesPage() {
           </TabsContent>
         </Tabs>
 
-        <AlertDialog open={showUploadConfirmDialog} onOpenChange={setShowUploadConfirmDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar carga de archivo</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Está seguro de que desea cargar este archivo?
-                <br />
-                <br />
-                Esta acción actualizará el registro de afiliados activos que pueden votar por delegado para la asamblea de ProSalud.
-                <br />
-                <br />
-                <strong>Archivo:</strong> {selectedFile?.name}
-                <br />
-                <strong>Tamaño:</strong> {selectedFile ? (selectedFile.size / 1024 / 1024).toFixed(2) : 0} MB
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleUploadCancel}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleUploadConfirm}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Dialog open={showUploadConfirmDialog} onOpenChange={handleUploadDialogChange}>
+          <DialogContent
+            overlayClassName="fixed inset-0 z-50 bg-black/40 supports-[backdrop-filter]:backdrop-blur-sm dark:bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            className="sm:max-w-xl gap-6 bg-white"
+          >
+            {activeUploadConfig && (
+              <>
+                <DialogHeader className="space-y-2">
+                  <DialogTitle className="text-2xl font-semibold text-slate-900">
+                    {activeUploadConfig.dialogTitle}
+                  </DialogTitle>
+                </DialogHeader>
+                <DialogDescription asChild>
+                  <div className="space-y-4 text-left">
+                    <p className="text-sm text-muted-foreground leading-6">
+                      {activeUploadConfig.description}
+                    </p>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">Archivo seleccionado</p>
+                      <p className="text-sm text-slate-700">
+                        {selectedFile?.name ?? "Sin archivo"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "0 MB"}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Se almacenará como <span className="font-semibold">{activeUploadConfig.storageName}</span>.
+                        Tamaño máximo permitido: {activeUploadConfig.maxSizeMB} MB.
+                      </p>
+                      {selectedFile && selectedFileUrl && (
+                        <Button asChild variant="outline" size="sm" className="mt-3">
+                          <a href={selectedFileUrl} download={selectedFile.name} className="flex items-center">
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar archivo seleccionado
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </DialogDescription>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={handleUploadCancel} disabled={isUploading}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleUploadConfirm} disabled={isUploading}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {isUploading ? "Subiendo..." : "Confirmar"}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

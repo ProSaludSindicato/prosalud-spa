@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import { Request } from '@/types/requests';
 import { requestTypeLabels, statusLabels } from '@/data/requestsMock';
+import { logger } from '@/utils/logger';
 
 interface DateRangeFilter {
   includeAll: boolean;
@@ -118,10 +119,10 @@ export const generateRequestsExcelReport = (requests: Request[], dateRange: Date
     const payloadWs = XLSX.utils.aoa_to_sheet(payloadData);
     XLSX.utils.book_append_sheet(wb, payloadWs, 'Detalles Específicos');
 
-    console.log('Excel report generated successfully');
+    logger.info('Excel report generated successfully');
     return wb;
   } catch (error) {
-    console.error('Error generating Excel report:', error);
+    logger.error('Error generating Excel report:', error);
     throw new Error('Failed to generate Excel report: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 };

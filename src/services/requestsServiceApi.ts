@@ -1,5 +1,6 @@
 import { requestsApiService, ApiRequest, ApiRequestResponse, ApiRequestFile } from './requestsApi';
 import { Request, RequestResponse, RequestStats, RequestFile } from '@/types/requests';
+import { logger } from '@/utils/logger';
 
 // Map API status to frontend status
 const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
@@ -92,9 +93,9 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
 // Service that connects to real API only - no mock fallbacks
 export const requestsService = {
   async getRequests(): Promise<Request[]> {
-    console.log('🔄 Fetching requests from API...');
+    logger.debug('Fetching requests from API');
     const apiRequests = await requestsApiService.getAllRequests();
-    console.log('✅ Successfully fetched from API:', apiRequests.length, 'requests');
+    logger.debug('Requests fetched', { total: apiRequests.length });
     return apiRequests.map(mapApiRequestToFrontendRequest);
   },
 

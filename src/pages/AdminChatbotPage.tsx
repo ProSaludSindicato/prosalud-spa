@@ -40,6 +40,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { logger } from "@/utils/logger";
 
 // Extender localmente para incluir nuevos campos del backend
 type AdminChatbotConversation = ChatbotConversation & {
@@ -172,13 +173,12 @@ const AdminChatbotPage: React.FC = () => {
         description: `Archivo ${fileName} descargado exitosamente con ${filteredConversations.length} conversaciones.`,
       });
 
-      console.log('✅ Reporte Excel exportado:', {
+      logger.debug("Reporte Excel exportado", {
         fileName,
         totalConversations: filteredConversations.length,
-        dateRange
       });
     } catch (error) {
-      console.error('❌ Error exportando Excel:', error);
+      logger.error("Error exportando Excel de chatbot", error instanceof Error ? error.message : error);
       toast({
         title: "Error al exportar",
         description: "No se pudo generar el reporte Excel. Intente nuevamente.",

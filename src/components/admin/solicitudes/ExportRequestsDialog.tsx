@@ -13,6 +13,7 @@ import { generateRequestsPDFReport } from './utils/requestsPdfGenerator';
 import { generateRequestsExcelReport } from './utils/requestsExcelGenerator';
 import { requestTypeLabels } from '@/data/requestsMock';
 import * as XLSX from 'xlsx';
+import { logger } from '@/utils/logger';
 
 interface ExportRequestsDialogProps {
   open: boolean;
@@ -70,11 +71,11 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
     setIsGenerating(true);
     
     try {
-      console.log('Starting export process...');
+      logger.debug('Iniciando exportación de solicitudes');
       
       // Fetch real data from API
       const allRequests = await requestsService.getRequests();
-      console.log('Fetched requests from API:', allRequests.length);
+      logger.debug('Solicitudes obtenidas para exportación', { total: allRequests.length });
 
       let filteredRequests = allRequests;
       
@@ -91,11 +92,11 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
         });
       }
 
-      console.log('Filtered requests:', filteredRequests.length);
+      logger.debug('Solicitudes filtradas para exportación', { total: filteredRequests.length });
       const today = new Date().toISOString().split('T')[0];
 
       if (format === 'pdf') {
-        console.log('Generating PDF report...');
+        logger.debug('Generando reporte PDF de solicitudes');
         const doc = generateRequestsPDFReport(filteredRequests, dateRange);
         doc.save(`Reporte_Solicitudes_ProSalud_${today}.pdf`);
         
@@ -105,7 +106,7 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
           duration: 4000,
         });
       } else {
-        console.log('Generating Excel report...');
+        logger.debug('Generando reporte Excel de solicitudes');
         const wb = generateRequestsExcelReport(filteredRequests, dateRange);
         XLSX.writeFile(wb, `Reporte_Solicitudes_ProSalud_${today}.xlsx`);
         
@@ -116,10 +117,10 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
         });
       }
 
-      console.log('Export completed successfully');
+      logger.debug('Exportación de solicitudes completada');
       onOpenChange(false);
     } catch (error) {
-      console.error('Export error:', error);
+      logger.error('Error al exportar solicitudes', error instanceof Error ? error.message : error);
       toast({
         title: "Error al Generar Reporte",
         description: error instanceof Error ? error.message : "No se pudo conectar con el servidor. Verifique su conexión.",

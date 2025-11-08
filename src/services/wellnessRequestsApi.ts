@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 import { getErrorMessage } from '@/utils/errorSanitizer';
+import { logger } from '@/utils/logger';
 
 // API client for wellness requests endpoints
 const wellnessRequestsApi = axios.create({
@@ -169,37 +170,34 @@ export interface ApiResponse<T> {
 
 // Add request/response interceptors for debugging
 wellnessRequestsApi.interceptors.request.use((config) => {
-  if (import.meta.env.DEV) {
-    console.log('🚀 Wellness Request API:', config.method?.toUpperCase(), config.url, {
-      data: config.data,
-    });
-  }
+  logger.debug('Wellness Request API request', {
+    method: config.method?.toUpperCase(),
+    url: config.url,
+  });
   return config;
 });
 
 wellnessRequestsApi.interceptors.response.use(
   (response) => {
-    if (import.meta.env.DEV) {
-      console.log('✅ Wellness Request API Response:', response.status, response.config.url, response.data);
-    }
+    logger.debug('Wellness Request API response', {
+      status: response.status,
+      url: response.config.url,
+    });
     return response;
   },
   (error) => {
-    if (import.meta.env.DEV) {
-      console.error('❌ Wellness Request API Error:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-        url: error.config?.url,
-      });
-    }
+    logger.error('Wellness Request API response error', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      message: error.message,
+      url: error.config?.url,
+    });
     return Promise.reject(error);
   },
 );
 
 const handleApiError = (error: any) => {
-  console.error('Wellness Request API Error details:', error);
+  logger.error('Wellness Request API error', getErrorMessage(error));
 
   // Handle network errors
   if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {

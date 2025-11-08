@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import type { SstDeliveryDraft, SstInventoryItem } from '@/types/adminSst';
+import { logger } from '@/utils/logger';
 
 interface DeliveryConfirmationModalProps {
   open: boolean;
@@ -87,7 +88,7 @@ export function DeliveryConfirmationModal({
       await onConfirm(record);
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
+      logger.error('Error al confirmar entrega en modal SST', error instanceof Error ? error.message : error);
     } finally {
       setIsConfirming(false);
     }

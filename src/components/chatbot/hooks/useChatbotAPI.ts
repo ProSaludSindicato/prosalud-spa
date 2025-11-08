@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { Message } from "../utils/categoryClassifier";
 import { RateLimitInfo } from "./useChatbotState";
 import { RATE_LIMITS, RATE_LIMIT_STORAGE_KEY } from "../constants/chatbotConstants";
+import { logger } from "@/utils/logger";
 
 export const useChatbotAPI = () => {
   /**
@@ -13,7 +14,7 @@ export const useChatbotAPI = () => {
    */
   const solicitarRespuestaConOpenAI = useCallback(async (messages: Message[]) => {
     try {
-      console.log("🚀 Iniciando llamada a Lovable AI con mensajes:", messages.length);
+      logger.debug("Iniciando llamada a Lovable AI", { totalMensajes: messages.length });
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prosalud-chat`,
@@ -27,12 +28,11 @@ export const useChatbotAPI = () => {
         }
       );
 
-      console.log("Response status:", response.status);
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+      logger.debug("Respuesta recibida de Lovable AI", { status: response.status });
 
       // Leer el contenido primero
       const responseText = await response.text();
-      console.log("Response raw text:", responseText);
+      logger.debug("Respuesta cruda de Lovable AI recibida");
 
       if (!response.ok) {
         // Usar mensaje genérico sin exponer detalles técnicos
@@ -61,7 +61,7 @@ export const useChatbotAPI = () => {
           // Si no se puede parsear, usar mensaje genérico
         }
 
-        console.error("Response no OK:", response.status, errorMessage);
+        logger.error("Respuesta no OK de Lovable AI", { status: response.status, errorMessage });
 
         // Lanzar error con código de estado y flag de rate limit
         const error: any = new Error(errorMessage);
@@ -79,7 +79,7 @@ export const useChatbotAPI = () => {
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error("Error parseando respuesta JSON:", parseError);
+        logger.error("Error parseando respuesta JSON de Lovable AI", parseError instanceof Error ? parseError.message : parseError);
         throw new Error("Error del servidor");
       }
 
@@ -92,7 +92,7 @@ export const useChatbotAPI = () => {
         usageInfo: data.usageInfo || null,
       };
     } catch (error) {
-      console.error("❌ Error en llamada a OpenAI:", error);
+      logger.error("Error en llamada a Lovable AI", error instanceof Error ? error.message : error);
       throw error;
     }
   }, []);
@@ -106,7 +106,7 @@ export const useChatbotAPI = () => {
       const created = await chatbotApi.createConversation(payload);
       return created; // puede ser null si falla
     } catch (error) {
-      console.error("⚠️ Error guardando conversación (no afecta funcionamiento):", error);
+      logger.error("Error guardando conversación del chatbot", error instanceof Error ? error.message : error);
       return null;
     }
   }, []);
@@ -118,9 +118,9 @@ export const useChatbotAPI = () => {
     try {
       const { chatbotApi } = await import("@/services/chatbotApi");
       await chatbotApi.updateFeedbackById(backendId, rating as 'like' | 'dislike');
-      console.log(`✅ Rating actualizado en backend: ${rating}`);
+      logger.debug("Rating de chatbot actualizado por backendId", { rating });
     } catch (error) {
-      console.error("⚠️ Error actualizando rating (no afecta funcionamiento):", error);
+      logger.error("Error actualizando rating de chatbot por backendId", error instanceof Error ? error.message : error);
     }
   }, []);
 
@@ -131,9 +131,9 @@ export const useChatbotAPI = () => {
     try {
       const { chatbotApi } = await import("@/services/chatbotApi");
       await chatbotApi.updateFeedbackByClientTurnId(clientTurnId, rating as 'like' | 'dislike');
-      console.log(`✅ Rating actualizado por client_turn_id: ${rating}`);
+      logger.debug("Rating de chatbot actualizado por clientTurnId", { rating });
     } catch (error) {
-      console.error("⚠️ Error actualizando rating por client_turn_id (no afecta funcionamiento):", error);
+      logger.error("Error actualizando rating de chatbot por clientTurnId", error instanceof Error ? error.message : error);
     }
   }, []);
 

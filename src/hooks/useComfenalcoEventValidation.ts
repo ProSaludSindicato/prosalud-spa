@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CreateComfenalcoEventData, UpdateComfenalcoEventData } from '@/types/comfenalco';
+import { logger } from '@/utils/logger';
 
 export interface ValidationErrors {
   title?: string;
@@ -55,7 +56,7 @@ export const useComfenalcoEventValidation = () => {
   const validateCreateEvent = (data: CreateComfenalcoEventData): ValidationResult => {
     const newErrors: ValidationErrors = {};
 
-    console.log('Validating create event data:', data);
+    logger.debug('Validando datos para crear evento de Comfenalco');
 
     // Title validation
     if (!data.title || data.title.trim().length === 0) {
@@ -102,7 +103,7 @@ export const useComfenalcoEventValidation = () => {
       newErrors.registration_link = 'El enlace de registro debe ser una URL válida';
     }
 
-    console.log('Validation errors found:', newErrors);
+    logger.debug('Errores de validación detectados para creación de evento Comfenalco', newErrors);
 
     // Update errors state
     setErrors(newErrors);

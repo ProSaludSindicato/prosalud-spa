@@ -10,13 +10,6 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Security: Add security headers and basic protections
   useEffect(() => {
-    // Security: Disable console in production first to prevent any errors from showing
-    if (import.meta.env.PROD) {
-      console.log = () => {};
-      console.warn = () => {};
-      console.error = () => {};
-    }
-
     // Security: Add meta tags for security
     const addSecurityMeta = () => {
       // Content type sniffing protection

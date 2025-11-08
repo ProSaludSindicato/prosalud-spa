@@ -7,6 +7,7 @@ import { Message, ConversationContext } from "../utils/categoryClassifier";
 import { ConversationTokens, generateTokenReport } from "../utils/tokenCalculator";
 import { CHATBOT_STORAGE_KEY } from "../constants/chatbotConstants";
 import { generateConversationId } from "../utils/idGenerators";
+import { logger } from "@/utils/logger";
 
 interface ChatbotPersistedState {
   messages: Message[];
@@ -26,11 +27,11 @@ export const useChatbotPersistence = () => {
       const saved = localStorage.getItem(CHATBOT_STORAGE_KEY);
       if (saved) {
         const parsed: ChatbotPersistedState = JSON.parse(saved);
-        console.log("📥 Cargando estado persistido del chatbot:", parsed);
+        logger.debug("Cargando estado persistido del chatbot");
         return parsed;
       }
     } catch (error) {
-      console.warn("⚠️ Error cargando estado persistido:", error);
+      logger.warn("Error cargando estado persistido del chatbot", error instanceof Error ? error.message : error);
       localStorage.removeItem(CHATBOT_STORAGE_KEY);
     }
     return null;
@@ -58,14 +59,14 @@ export const useChatbotPersistence = () => {
           timestamp: Date.now(),
         };
         localStorage.setItem(CHATBOT_STORAGE_KEY, JSON.stringify(stateToSave));
-        console.log("💾 Estado del chatbot guardado");
+        logger.debug("Estado del chatbot guardado en localStorage");
 
         // Log de tokens acumulados
         if (conversationTokens.requestCount > 0) {
-          console.log("📊 TOKENS ACUMULADOS EN LA CONVERSACIÓN:", generateTokenReport(conversationTokens));
+          logger.debug("Tokens acumulados en la conversación", generateTokenReport(conversationTokens));
         }
       } catch (error) {
-        console.warn("⚠️ Error guardando estado:", error);
+        logger.warn("Error guardando estado del chatbot", error instanceof Error ? error.message : error);
       }
     },
     []
@@ -76,7 +77,7 @@ export const useChatbotPersistence = () => {
    */
   const clearPersistedState = useCallback((): string => {
     localStorage.removeItem(CHATBOT_STORAGE_KEY);
-    console.log("🗑️ Estado persistido limpiado");
+    logger.debug("Estado persistido del chatbot limpiado");
     // Generar nuevo conversation_id al limpiar
     return generateConversationId();
   }, []);

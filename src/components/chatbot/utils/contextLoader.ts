@@ -5,6 +5,7 @@
 
 import { CATEGORY_FILES } from "../constants/categoryFiles";
 import { CategoryType } from "../constants/categoryKeywords";
+import { logger } from "@/utils/logger";
 
 const docsModules = import.meta.glob("/src/doc/**/*.md", { as: "raw" });
 
@@ -15,7 +16,7 @@ export const loadSelectiveContext = async (
   category: CategoryType
 ): Promise<string> => {
   try {
-    console.log(`📂 Cargando contexto para categoría: ${category}`);
+    logger.debug("📂 Cargando contexto para categoría", { category });
 
     const filesToLoad = CATEGORY_FILES[category] || CATEGORY_FILES.general;
 
@@ -25,14 +26,14 @@ export const loadSelectiveContext = async (
       if (docsModules[fullPath]) {
         try {
           const content = await docsModules[fullPath]();
-          console.log(`✅ Cargado: ${filePath}`);
+          logger.debug("✅ Contexto cargado", { filePath });
           return content;
         } catch (error) {
-          console.warn(`⚠️ No se pudo cargar: ${filePath}`, error);
+          logger.warn("⚠️ No se pudo cargar el archivo de contexto", { filePath, error });
           return "";
         }
       } else {
-        console.warn(`⚠️ Archivo no encontrado: ${fullPath}`);
+        logger.warn("⚠️ Archivo de contexto no encontrado", { fullPath });
         return "";
       }
     });
@@ -43,26 +44,26 @@ export const loadSelectiveContext = async (
     );
     const contextContent = filteredContents.join("\n\n---\n\n");
 
-    console.log(
-      `📄 Contexto cargado: ${contextContent.length} caracteres para categoría ${category}`
-    );
-    console.log(
-      `📊 Archivos cargados: ${filteredContents.length}/${filesToLoad.length}`
-    );
+    logger.debug("📄 Contexto cargado", {
+      category,
+      characters: contextContent.length,
+      loaded: filteredContents.length,
+      requested: filesToLoad.length,
+    });
 
     return contextContent;
   } catch (error) {
-    console.error("❌ Error cargando contexto selectivo:", error);
+    logger.error("❌ Error cargando contexto selectivo", error);
     // Fallback a contexto mínimo
     try {
       const fallbackPath = "/src/doc/quienes-somos/overview.md";
       if (docsModules[fallbackPath]) {
         const fallbackContent = await docsModules[fallbackPath]();
-        console.log("🔄 Usando contexto fallback");
+        logger.warn("🔄 Usando contexto fallback");
         return fallbackContent;
       }
     } catch (fallbackError) {
-      console.error("❌ Error en fallback:", fallbackError);
+      logger.error("❌ Error en fallback de contexto selectivo", fallbackError);
     }
     return "";
   }
@@ -96,7 +97,7 @@ export const importContext = async (specialtyPart?: string) => {
       return { docs: "" };
     }
   } catch (error) {
-    console.error("Error:", error);
+    logger.error("Error importando contexto legacy", error);
     return { docs: "" };
   }
 };

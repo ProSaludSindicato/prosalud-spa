@@ -1,7 +1,8 @@
+import { logger } from "@/utils/logger";
+
 /**
  * Generadores de respuestas para consultas de incapacidades y liquidaciones
  */
-
 /**
  * Genera respuesta cuando no se encuentran datos
  */
@@ -11,9 +12,9 @@ export const generateNoDataResponse = (): string => {
 No encontramos información de incapacidades asociadas al documento consultado.
 
 **Posibles razones:**
-• No hay incapacidades registradas con estos datos
-• La información aún no ha sido procesada en el sistema
-• Los datos ingresados no coinciden con nuestros registros
+- No hay incapacidades registradas con estos datos
+- La información aún no ha sido procesada en el sistema
+- Los datos ingresados no coinciden con nuestros registros
 
 **¿Necesitas ayuda?**
 Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu solicitud.
@@ -30,8 +31,8 @@ export const generateServerErrorResponse = (): string => {
 Lo sentimos, estamos experimentando problemas técnicos temporales.
 
 **¿Qué puedes hacer?**
-• Intenta nuevamente en unos minutos
-• Si el problema persiste, comunícate con nosotros
+- Intenta nuevamente en unos minutos
+- Si el problema persiste, comunícate con nosotros
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
 };
@@ -44,12 +45,12 @@ export const generateValidationErrorResponse = (errors: any): string => {
 
 Los datos proporcionados no son válidos:
 
-${errors ? JSON.stringify(errors, null, 2) : "• Verifica que todos los campos estén completos"}
+${errors ? `\`\`\`json\n${JSON.stringify(errors, null, 2)}\n\`\`\`` : "- Verifica que todos los campos estén completos"}
 
 **¿Qué puedes hacer?**
-• Revisa los datos ingresados
-• Asegúrate de que el formato sea correcto
-• Intenta nuevamente
+- Revisa los datos ingresados
+- Asegúrate de que el formato sea correcto
+- Intenta nuevamente
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
 };
@@ -63,8 +64,8 @@ export const generateGenericErrorResponse = (): string => {
 No pudimos procesar tu solicitud en este momento.
 
 **¿Qué puedes hacer?**
-• Intenta nuevamente en unos minutos
-• Si el problema persiste, comunícate con nosotros
+- Intenta nuevamente en unos minutos
+- Si el problema persiste, comunícate con nosotros
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
 };
@@ -130,7 +131,10 @@ export const generateIncapacidadResponse = (
     incapacidad["Estado Pago"] ||
     "DESCONOCIDO";
 
-  console.log("🔍 Estado de incapacidad:", estado, "Objeto completo:", incapacidad);
+  logger.debug("🔍 Estado de incapacidad", {
+    estado,
+    keys: Object.keys(incapacidad || {}).slice(0, 8),
+  });
 
   const statusIcon = getStatusIcon(estado);
 
@@ -192,9 +196,9 @@ export const generateLiquidacionNoDataResponse = (): string => {
 No encontramos información de compensación final asociada al documento consultado.
 
 **Posibles razones:**
-• No hay solicitud de compensación registrada con estos datos
-• La información aún no ha sido procesada en el sistema
-• Los datos ingresados no coinciden con nuestros registros
+- No hay solicitud de compensación registrada con estos datos
+- La información aún no ha sido procesada en el sistema
+- Los datos ingresados no coinciden con nuestros registros
 
 **¿Necesitas ayuda?**
 Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu solicitud.
@@ -207,15 +211,16 @@ Si crees que debería haber información disponible, por favor comunícate con n
  */
 export const generateLiquidacionResponse = (liquidacion: any): string => {
   // Debug: Log del objeto recibido
-  console.log("🔍 DEBUG - Objeto liquidacion recibido:", liquidacion);
-  console.log("🔍 DEBUG - Tipo de liquidacion:", typeof liquidacion);
-  console.log("🔍 DEBUG - Keys del objeto:", Object.keys(liquidacion || {}));
+  logger.debug("🔍 Objeto liquidación recibido", {
+    type: typeof liquidacion,
+    keys: Object.keys(liquidacion || {}).slice(0, 10),
+  });
 
   // Mapear los campos de la API a los campos esperados
   const estado = liquidacion["ESTADO BD"] || liquidacion.estado || "DESCONOCIDO";
   const statusIcon = getStatusIcon(estado);
 
-  console.log("🔍 DEBUG - Estado encontrado:", estado);
+  logger.debug("🔍 Estado de liquidación identificado", { estado });
 
   // Determinar si hay documentos pendientes
   const documentosPendientes =
@@ -238,7 +243,7 @@ Tienes pendientes en tu compensación final
 
 **Lo que necesitas completar:**
 
-• Documentos pendientes: ${documentosPendientes}
+- Documentos pendientes: ${documentosPendientes}
 
 💡 *La compensación final está sujeta al recaudo previo de la cartera correspondiente del hospital.*
 
@@ -330,7 +335,9 @@ Contáctanos vía correo electrónico para solicitar y enviar los documentos pen
 
   response += `**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 
-  console.log("🔍 DEBUG - Respuesta generada:", response);
+  logger.debug("🔍 Respuesta de liquidación generada", {
+    length: response.length,
+  });
   return response;
 };
 

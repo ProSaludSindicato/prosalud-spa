@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClipboardList, Plus, Trash } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface RequestItem {
   id: string;
@@ -95,7 +96,10 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
       totalItems: items.reduce((sum, item) => sum + item.quantity, 0)
     };
     
-    console.log('Nueva solicitud creada:', requestData);
+    logger.debug('Nueva solicitud de inventario creada', {
+      hospitalName: requestData.hospitalName,
+      totalItems: requestData.totalItems,
+    });
     onSuccess();
   };
 

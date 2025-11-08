@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RotateCcw, Plus, Trash } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface ReturnItem {
   id: string;
@@ -102,7 +103,10 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
       totalItems: items.reduce((sum, item) => sum + item.quantity, 0)
     };
     
-    console.log('Nueva devolución procesada:', returnData);
+    logger.debug('Nueva devolución de inventario procesada', {
+      hospitalName: returnData.hospitalName,
+      totalItems: returnData.totalItems,
+    });
     onSuccess();
   };
 

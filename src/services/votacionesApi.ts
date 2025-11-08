@@ -7,16 +7,6 @@ import type {
   AuditFilters,
 } from '@/types/votaciones';
 
-interface ActivosUploadResponse {
-  success: boolean;
-  message: string;
-  file_path?: string;
-  file_size?: number;
-  rows_count?: number;
-  disk?: string;
-  error_code?: string;
-}
-
 export const votacionesApi = {
   /**
    * Obtiene estadísticas agregadas de votaciones
@@ -155,25 +145,5 @@ export const votacionesApi = {
         votes_by_date: [],
       },
     };
-  },
-
-  /**
-   * Carga un archivo Excel de afiliados activos para actualizar el registro de votantes
-   */
-  async uploadActivosFile(file: File): Promise<ActivosUploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await axios.post<ActivosUploadResponse>(
-      buildAdminApiUrl('/api/activos-file/upload'),
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-
-    return response.data;
   },
 };

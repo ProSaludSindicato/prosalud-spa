@@ -1,6 +1,7 @@
 import api from './api';
 import { API_CONFIG } from '../config/api';
 import { BienestarEvent } from '@/types/admin';
+import { logger } from '@/utils/logger';
 
 export interface WellnessEventImage {
   id: number;
@@ -86,7 +87,7 @@ export interface UpdateWellnessEventData {
  * Convierte la respuesta de la API al formato BienestarEvent usado en el frontend
  */
 function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
-  console.log('🔄 Mapeando evento:', apiEvent);
+  logger.debug('Mapeando evento de bienestar', { id: apiEvent.id });
   
   // Validate required fields
   if (!apiEvent.id || !apiEvent.title || !apiEvent.date || !apiEvent.category) {
@@ -107,22 +108,20 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
       // Normalizar URLs de imágenes
       let imageUrl = img.image_url;
       
-      console.log('🖼️ Procesando imagen:', {
-        originalUrl: imageUrl,
+      logger.debug('Procesando imagen de evento', {
         isRelative: imageUrl.startsWith('/storage/'),
         isCloudflare: imageUrl.includes('cloudflarestorage.com'),
-        baseUrl: API_CONFIG.PUBLIC_BASE_URL
       });
       
       // Si la URL es relativa, convertirla a absoluta
       if (imageUrl.startsWith('/storage/')) {
         imageUrl = `${API_CONFIG.PUBLIC_BASE_URL}${imageUrl}`;
-        console.log('🔗 URL convertida a absoluta:', imageUrl);
+        logger.debug('URL de imagen convertida a absoluta');
       }
       
       // Si la URL es de Cloudflare R2, mantenerla como está (ya es absoluta)
       if (imageUrl.includes('cloudflarestorage.com')) {
-        console.log('☁️ URL de Cloudflare R2 detectada:', imageUrl);
+        logger.debug('URL de Cloudflare R2 detectada');
       }
       
       return {
@@ -141,69 +140,29 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
  */
 export async function getWellnessEvents(filters?: WellnessEventFilters): Promise<BienestarEvent[]> {
   try {
-    console.log('🔍 [GET] Solicitando eventos de bienestar:', { 
-      filters, 
-      url: '/api/wellness-events',
-      baseURL: api.defaults.baseURL,
-      fullURL: `${api.defaults.baseURL}/api/wellness-events`
-    });
-    
-    // Primero hacer una prueba simple de conectividad
-    console.log('🧪 Probando conectividad básica...');
+    logger.debug('Solicitando eventos de bienestar', { hasFilters: Boolean(filters) });
     
     const response = await api.get<PaginatedWellnessEvents>('/api/wellness-events', {
       params: filters,
       timeout: 15000 // Aumentar timeout para debugging
     });
     
-    console.log('✅ [GET] Respuesta exitosa:', { 
-      status: response.status, 
-      statusText: response.statusText,
-      headers: response.headers,
-      data: response.data 
-    });
+    logger.debug('Respuesta recibida de eventos de bienestar', { status: response.status });
     
     // Validar que la respuesta tenga la estructura esperada
     if (!response.data || !response.data.data) {
-      console.warn('⚠️ Respuesta de la API sin datos esperados:', response.data);
+      logger.warn('Respuesta de la API sin datos esperados al obtener eventos');
       return [];
     }
     
     const mappedEvents = response.data.data.map(mapToBienestarEvent);
-    console.log('📦 Eventos mapeados:', mappedEvents.length);
+    logger.debug('Eventos de bienestar mapeados', { total: mappedEvents.length });
     
     return mappedEvents;
   } catch (error: any) {
-    console.error('❌ [GET] Error al obtener eventos de bienestar:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      method: error.config?.method,
-      baseURL: error.config?.baseURL,
-      fullURL: error.config?.baseURL + error.config?.url,
-      timeout: error.config?.timeout,
-      withCredentials: error.config?.withCredentials,
-      fullError: error
-    });
+    logger.error('Error al obtener eventos de bienestar', error?.message || error);
     
-    // Mostrar mensaje específico según el tipo de error
-    if (error.response?.status === 404) {
-      console.error('🔴 Endpoint no encontrado. Verifica que el backend esté configurado correctamente.');
-    } else if (error.response?.status === 500) {
-      console.error('🔴 Error del servidor al obtener eventos.');
-    } else if (error.code === 'ERR_NETWORK') {
-      console.error('🔴 Error de red: No se pudo conectar al servidor.');
-      console.error('🔧 Verifica que:');
-      console.error('   - El servidor backend esté ejecutándose');
-      console.error('   - La URL base sea correcta:', error.config?.baseURL);
-      console.error('   - No haya problemas de CORS');
-      console.error('   - La red esté funcionando');
-    }
-    
-    // Retornar array vacío en caso de error para evitar crashes
+    // Retornar array vacío en caso de error para evitar crashes manteniendo una respuesta segura
     return [];
   }
 }
@@ -216,7 +175,7 @@ export async function getWellnessEvent(id: number | string): Promise<BienestarEv
     const response = await api.get<WellnessEventResponse>(`/api/wellness-events/${id}`);
     return mapToBienestarEvent(response.data);
   } catch (error) {
-    console.error('Error al obtener evento:', error);
+    logger.error('Error al obtener evento de bienestar', error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -226,10 +185,7 @@ export async function getWellnessEvent(id: number | string): Promise<BienestarEv
  */
 export async function createWellnessEvent(data: CreateWellnessEventData): Promise<BienestarEvent> {
   try {
-    console.log('📤 [POST] Creando evento de bienestar:', {
-      data,
-      url: '/api/wellness-events'
-    });
+    logger.debug('Creando evento de bienestar');
     
     const formData = new FormData();
     
@@ -250,13 +206,11 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       data.images.forEach((file, index) => {
         formData.append(`images[${index}]`, file);
       });
-      console.log('📸 Adjuntando imágenes:', data.images.length);
+      logger.debug('Imágenes adjuntadas al crear evento', { total: data.images.length });
     }
     
-    console.log('📋 FormData enviado:', Array.from(formData.entries()).map(([key, value]) => ({
-      key,
-      value: value instanceof File ? `File: ${value.name}` : value
-    })));
+    const totalCampos = Array.from(formData.keys()).length;
+    logger.debug('FormData generado para creación de evento', { totalCampos });
     
     const response = await api.post<WellnessEventResponse>(
       '/api/wellness-events',
@@ -268,11 +222,7 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       }
     );
     
-    console.log('✅ [POST] Evento creado exitosamente:', {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data
-    });
+    logger.debug('Respuesta recibida al crear evento de bienestar', { status: response.status });
     
     // Validate response data before mapping
     if (!response.data) {
@@ -280,21 +230,11 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
     }
     
     const mappedEvent = mapToBienestarEvent(response.data);
-    console.log('📦 Evento mapeado:', mappedEvent);
+    logger.debug('Evento de bienestar mapeado tras creación', { id: mappedEvent.id });
     
     return mappedEvent;
   } catch (error: any) {
-    console.error('❌ [POST] Error al crear evento:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      method: error.config?.method,
-      baseURL: error.config?.baseURL,
-      fullError: error
-    });
+    logger.error('Error al crear evento de bienestar', error?.message || error);
     throw error;
   }
 }
@@ -307,23 +247,9 @@ export async function updateWellnessEvent(
   data: UpdateWellnessEventData
 ): Promise<BienestarEvent> {
   try {
-    console.log('📝 [PUT] Actualizando evento:', {
+    logger.debug('Actualizando evento de bienestar', {
       id,
-      data,
-      url: `/api/wellness-events/${id}`
-    });
-    
-    console.log('🔍 Datos recibidos para actualización:', {
-      title: data.title,
-      date: data.date,
-      category: data.category,
-      location: data.location,
-      description: data.description,
-      attendees: data.attendees,
-      gift: data.gift,
-      provider: data.provider,
-      is_visible: data.is_visible,
-      hasImages: data.images && data.images.length > 0
+      hasImages: Boolean(data.images && data.images.length > 0),
     });
     
     const formData = new FormData();
@@ -362,22 +288,17 @@ export async function updateWellnessEvent(
       data.images.forEach((file, index) => {
         formData.append(`images[${index}]`, file);
       });
-      console.log('📸 Actualizando imágenes:', data.images.length);
+      logger.debug('Actualizando imágenes de evento', { total: data.images.length });
     }
     
     // Logging detallado del FormData
     const formDataEntries = Array.from(formData.entries());
-    console.log('📋 FormData construido:', {
+    logger.debug('Campos preparados para actualización de evento', {
       totalEntries: formDataEntries.length,
-      entries: formDataEntries.map(([key, value]) => ({
-        key,
-        value: value instanceof File ? `File: ${value.name}` : value,
-        type: typeof value
-      }))
     });
     
     if (formDataEntries.length === 0) {
-      console.error('❌ FormData está vacío! No se agregaron campos.');
+      logger.error('Intento de actualizar evento sin cambios');
       throw new Error('No hay datos para actualizar');
     }
     
@@ -391,23 +312,11 @@ export async function updateWellnessEvent(
       }
     );
     
-    console.log('✅ [PUT] Evento actualizado exitosamente:', {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data
-    });
+    logger.debug('Evento de bienestar actualizado correctamente', { status: response.status });
     
     return mapToBienestarEvent(response.data);
   } catch (error: any) {
-    console.error('❌ [PUT] Error al actualizar evento:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      fullError: error
-    });
+    logger.error('Error al actualizar evento de bienestar', error?.message || error);
     throw error;
   }
 }
@@ -420,11 +329,7 @@ export async function toggleWellnessEventVisibility(
   isVisible: boolean
 ): Promise<BienestarEvent> {
   try {
-    console.log('🔄 [PATCH] Cambiando visibilidad:', {
-      id,
-      isVisible,
-      url: `/api/wellness-events/${id}/visibility`
-    });
+    logger.debug('Cambiando visibilidad de evento de bienestar', { id, isVisible });
     
     const response = await api.patch<{ id: number; is_visible: boolean }>(
       `/api/wellness-events/${id}/visibility`,
@@ -436,22 +341,13 @@ export async function toggleWellnessEventVisibility(
       }
     );
     
-    console.log('✅ [PATCH] Visibilidad cambiada exitosamente:', {
-      status: response.status,
-      data: response.data
-    });
+    logger.debug('Visibilidad de evento de bienestar actualizada', { status: response.status });
     
     // Después de cambiar la visibilidad, obtener el evento completo
     const fullEvent = await getWellnessEvent(id);
     return fullEvent;
   } catch (error: any) {
-    console.error('❌ [PATCH] Error al cambiar visibilidad:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data,
-      fullError: error
-    });
+    logger.error('Error al cambiar visibilidad de evento', error?.message || error);
     throw error;
   }
 }
@@ -482,7 +378,7 @@ export async function addImagesToWellnessEvent(
     
     return mapToBienestarEvent(response.data);
   } catch (error) {
-    console.error('Error al agregar imágenes al evento:', error);
+    logger.error('Error al agregar imágenes al evento de bienestar', error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -501,7 +397,7 @@ export async function deleteWellnessEventImage(
     
     return response.data;
   } catch (error) {
-    console.error('Error al eliminar imagen:', error);
+    logger.error('Error al eliminar imagen de evento de bienestar', error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -511,14 +407,14 @@ export async function deleteWellnessEventImage(
  */
 export async function testApiConnectivity(): Promise<{ success: boolean; message: string; details?: any }> {
   try {
-    console.log('🧪 Probando conectividad básica con el API...');
+    logger.debug('Probando conectividad con API de bienestar');
     
     const response = await api.get('/api/wellness-events', {
       timeout: 5000,
       params: { per_page: 1 } // Solo pedir 1 elemento para prueba rápida
     });
     
-    console.log('✅ Conectividad exitosa:', response.status);
+    logger.debug('Conectividad con API de bienestar exitosa', { status: response.status });
     
     return {
       success: true,
@@ -531,7 +427,7 @@ export async function testApiConnectivity(): Promise<{ success: boolean; message
       }
     };
   } catch (error: any) {
-    console.error('❌ Error de conectividad:', error);
+    logger.error('Error de conectividad con API de bienestar', error?.message || error);
     
     return {
       success: false,

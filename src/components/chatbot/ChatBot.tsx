@@ -60,6 +60,7 @@ import { buildSystemPrompt } from "./utils/promptBuilder";
 import { scrollToBottom, scrollToBottomWithRetry, isNearBottom } from "./utils/scrollUtils";
 import { exportConversation } from "./utils/exportConversation";
 import { generateClientTurnId } from "./utils/idGenerators";
+import { logger } from "@/utils/logger";
 
 // Importar constantes
 import {
@@ -149,9 +150,9 @@ export default function ChatBot() {
         const newConversationId = clearPersistedState();
         state.setConversationId(newConversationId);
 
-        console.log("🔄 Contexto conversacional reiniciado");
+        logger.debug("🔄 Contexto conversacional reiniciado");
       } catch (error) {
-        console.error("Error generating initial message:", error);
+        logger.error("Error generating initial message:", error);
         state.setMessages([
           {
             role: "assistant",
@@ -172,7 +173,7 @@ export default function ChatBot() {
     const persistedState = loadPersistedState();
 
     if (persistedState) {
-      console.log("✅ Estado del chatbot restaurado desde localStorage");
+      logger.debug("✅ Estado del chatbot restaurado desde localStorage");
       
       // Restaurar estados desde el estado persistido
       const filteredMessages = persistedState.messages.filter((msg) => msg.role !== "system");
@@ -214,11 +215,14 @@ export default function ChatBot() {
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      console.log("🚀 handleSendMessage called", { text: state.inputMessage.trim(), isTyping: state.isTyping });
+      logger.debug("🚀 handleSendMessage called", {
+        textPreview: state.inputMessage.trim().slice(0, 40),
+        isTyping: state.isTyping,
+      });
 
       const text = state.inputMessage.trim();
       if (!text || state.isTyping) {
-        console.log("❌ Early return:", { text, isTyping: state.isTyping });
+        logger.debug("❌ Early return", { hasText: Boolean(text), isTyping: state.isTyping });
         return;
       }
 
@@ -518,7 +522,10 @@ export default function ChatBot() {
         }
 
         // Clasificar pregunta y cargar contexto selectivo
-        console.log("🔍 Iniciando clasificación temática para:", text);
+        logger.debug("🔍 Iniciando clasificación temática", {
+          textPreview: text.slice(0, 60),
+          previousCategory: state.conversationContext.lastCategory,
+        });
         const safeChatMessages = chatMessages || [];
         const detectedCategory = classifyQuestion(text, safeChatMessages, state.conversationContext);
         const selectiveContext = await loadSelectiveContext(detectedCategory);
@@ -530,8 +537,8 @@ export default function ChatBot() {
           questionCount: prev.questionCount + 1,
         }));
 
-        console.log(`📄 Contexto selectivo cargado: ${selectiveContext.length} caracteres`);
-        console.log(`💡 Categoría detectada: ${detectedCategory}`);
+        logger.debug("📄 Contexto selectivo cargado", { characters: selectiveContext.length });
+        logger.debug("💡 Categoría detectada", { category: detectedCategory });
 
         // Preparar contexto de incapacidades para el prompt
         let incapacidadesInfo = "";
@@ -553,7 +560,7 @@ export default function ChatBot() {
           ...chatMessages.slice(-8), // Últimos 8 mensajes para contexto
         ];
 
-        console.log(`🚀 Enviando ${promptMessages.length} mensajes a OpenAI`);
+        logger.debug("🚀 Enviando mensajes a OpenAI", { messages: promptMessages.length });
 
         // Agregar mensaje temporal con animación de escritura
         const tempBotMessageId = Date.now();
@@ -573,7 +580,7 @@ export default function ChatBot() {
 
         // Validar que la respuesta tenga contenido
         if (!result || !result.text) {
-          console.error("❌ Respuesta vacía del servidor");
+          logger.error("❌ Respuesta vacía del servidor");
           throw new Error("Error del servidor");
         }
 
@@ -593,11 +600,11 @@ export default function ChatBot() {
           })
         );
 
-        console.log("📊 Tokens de esta solicitud:", {
+        logger.debug("📊 Tokens de esta solicitud", {
           input: inputTokens,
           output: outputTokens,
           total: inputTokens + outputTokens,
-          cost: `$${cost.toFixed(6)}`,
+          cost: Number(cost.toFixed(6)),
         });
 
         // Actualizar estado de rate limit si backend envía usageInfo
@@ -692,7 +699,7 @@ export default function ChatBot() {
           scrollToBottomWithRetry(state.messagesEndRef);
         }, 100);
       } catch (error) {
-        console.error("❌ Error en handleSendMessage:", error);
+        logger.error("❌ Error en handleSendMessage", error);
 
         let errorContent = "Lo siento, ocurrió un error al procesar tu solicitud. Por favor, intenta nuevamente.";
 
@@ -892,7 +899,7 @@ export default function ChatBot() {
       const incapacidades = state.currentMultipleIncapacidades;
       
       if (!incapacidades || incapacidades.length === 0) {
-        console.error("No hay incapacidades en el estado");
+        logger.error("No hay incapacidades en el estado");
         return;
       }
 
@@ -1097,7 +1104,7 @@ export default function ChatBot() {
           return newMessages;
         });
       } catch (error) {
-        console.error("Error en consulta de incapacidad:", error);
+        logger.error("Error en consulta de incapacidad", error);
 
         let errorContent;
         if ((error as { response?: { status?: number } })?.response?.status === 500) {
@@ -1192,29 +1199,35 @@ export default function ChatBot() {
         };
         
         const liquidacion = await consultarLiquidacion(apiRequest);
-        
-        console.log("🔍 DEBUG - Respuesta de consultarLiquidacion:", liquidacion);
-        console.log("🔍 DEBUG - Tipo de liquidacion:", typeof liquidacion);
-        console.log("🔍 DEBUG - Es array?", Array.isArray(liquidacion));
+
+        logger.debug("🔍 Respuesta de consultarLiquidacion", {
+          hasValue: Boolean(liquidacion),
+          type: typeof liquidacion,
+          isArray: Array.isArray(liquidacion),
+        });
         if (Array.isArray(liquidacion)) {
-          console.log("🔍 DEBUG - Longitud del array:", liquidacion.length);
-          console.log("🔍 DEBUG - Primer elemento:", liquidacion[0]);
+          logger.debug("🔍 Liquidacion array summary", {
+            length: liquidacion.length,
+            firstKeys: Object.keys(liquidacion[0] ?? {}).slice(0, 5),
+          });
         }
 
         let responseMessage: Message;
 
         if (!liquidacion) {
-          console.log("🔍 DEBUG - No hay liquidacion, usando respuesta de no datos");
+          logger.debug("🔍 Sin datos de liquidación, usando respuesta de no datos");
           responseMessage = {
             role: "assistant",
             content: generateLiquidacionNoDataResponse(),
             isBot: true,
           };
         } else {
-          console.log("🔍 DEBUG - Hay liquidacion, generando respuesta");
+          logger.debug("🔍 Liquidación encontrada, generando respuesta");
           // Si es un array, tomar el primer elemento; si es un objeto, usarlo directamente
           const liquidacionData = Array.isArray(liquidacion) ? liquidacion[0] : liquidacion;
-          console.log("🔍 DEBUG - Datos de liquidacion a procesar:", liquidacionData);
+          logger.debug("🔍 Resumen de datos de liquidación a procesar", {
+            keys: Object.keys(liquidacionData ?? {}).slice(0, 8),
+          });
           responseMessage = {
             role: "assistant",
             content: generateLiquidacionResponse(liquidacionData),
@@ -1258,7 +1271,7 @@ export default function ChatBot() {
           return newMessages;
         });
       } catch (error) {
-        console.error("Error en consulta de liquidación:", error);
+        logger.error("Error en consulta de liquidación", error);
 
         const errorContent = generateGenericErrorResponse();
         const errorMessage = {
