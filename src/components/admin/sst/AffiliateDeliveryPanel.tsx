@@ -543,9 +543,11 @@ export function AffiliateDeliveryPanel({
               <div className="space-y-4">
                 {deliveryHistory.map((record) => {
                   const isExpanded = expandedHistory[record.id] ?? false;
-                  const visibleItems = isExpanded ? record.items : record.items.slice(0, 3);
-                  const hasMoreItems = record.items.length > 3;
-                  const remainingItems = record.items.length - visibleItems.length;
+                  const visibleItems = isExpanded ? record.items : record.items.slice(0, 4);
+                  const hasMoreItems = record.items.length > visibleItems.length;
+                  const remainingItems = hasMoreItems ? record.items.length - visibleItems.length : 0;
+                  const totalUnits = record.items.reduce((acc, item) => acc + item.quantity, 0);
+                  const totalVariants = record.items.length;
 
                   return (
                   <div
@@ -556,44 +558,92 @@ export function AffiliateDeliveryPanel({
                       <span className="font-semibold text-slate-700">
                         {new Date(record.deliveredAt).toLocaleString()}
                       </span>
-                      <Badge variant="outline">{record.items.length} elementos</Badge>
+                      <Badge variant="outline">
+                        {totalVariants} artículo{totalVariants === 1 ? '' : 's'} · {totalUnits}{' '}
+                        unidad{totalUnits === 1 ? '' : 'es'}
+                      </Badge>
                     </div>
                     <p className="text-sm text-slate-500">
                       Entregado por: <span className="font-medium">{record.deliveredBy}</span>
                     </p>
-                      {record.signedDocumentType && record.signedDocumentNumber && (
-                        <p className="text-xs text-slate-500">
-                          Documento verificado: <span className="font-medium">{record.signedDocumentType}</span>{' '}
-                          <span className="font-semibold">{record.signedDocumentNumber}</span>
-                        </p>
-                      )}
-                      <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                        {visibleItems.map((item) => {
-                        const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
-                        return (
-                            <li
-                              key={`${record.id}-${item.itemId}-${item.variant?.color ?? 'default'}-${
-                                item.variant?.size ?? 'unique'
-                              }`}
-                              className="flex flex-wrap items-center gap-2"
-                            >
-                              {inventoryItem?.defaultColor && renderColorSwatch(inventoryItem.defaultColor)}
-                              <span className="font-medium text-slate-700">
-                                {inventoryItem?.name ?? item.itemId}
-                              </span>
-                              {inventoryItem?.defaultColor && (
-                                <span className="text-xs text-slate-500">({inventoryItem.defaultColor})</span>
-                              )}
-                              {item.variant?.size && (
-                                <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                                  {item.variant.size}
-                                </span>
-                              )}
-                              <span className="text-xs text-slate-500">× {item.quantity}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+                      <div className="flex items-center justify-between bg-slate-50 px-4 py-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Detalle de artículos entregados
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">
+                          {totalVariants} artículo{totalVariants === 1 ? '' : 's'} · {totalUnits}{' '}
+                          unidad{totalUnits === 1 ? '' : 'es'}
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                          <thead className="bg-slate-50">
+                            <tr className="text-xs uppercase tracking-wide text-slate-500">
+                              <th className="px-4 py-2 text-left font-semibold">Artículo</th>
+                              <th className="px-4 py-2 text-left font-semibold">Color</th>
+                              <th className="px-4 py-2 text-left font-semibold">Talla</th>
+                              <th className="px-4 py-2 text-right font-semibold">Cantidad</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {visibleItems.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="px-4 py-3 text-center text-sm text-slate-500">
+                                  No se registraron artículos en esta entrega.
+                                </td>
+                              </tr>
+                            ) : (
+                              visibleItems.map((item) => {
+                                const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
+                                const colorLabel = item.variant?.color ?? inventoryItem?.defaultColor ?? null;
+                                const sizeLabel = item.variant?.size ?? 'Única';
+
+                                return (
+                                  <tr
+                                    key={`${record.id}-${item.itemId}-${item.variant?.color ?? 'default'}-${
+                                      item.variant?.size ?? 'unique'
+                                    }`}
+                                    className="hover:bg-primary-prosalud/5 transition-colors"
+                                  >
+                                    <td className="px-4 py-2 align-top font-medium text-slate-700">
+                                      {inventoryItem?.name ?? item.itemId}
+                                      {inventoryItem?.category && (
+                                        <span className="block text-xs font-normal text-slate-500">
+                                          {inventoryItem.category}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2 align-top">
+                                      {colorLabel ? (
+                                        <span className="inline-flex items-center gap-2 text-sm text-slate-600">
+                                          {renderColorSwatch(colorLabel)}
+                                          <span>{colorLabel}</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-sm text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2 align-top">
+                                      {sizeLabel ? (
+                                        <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                                          {sizeLabel}
+                                        </span>
+                                      ) : (
+                                        <span className="text-sm text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-semibold text-slate-700">
+                                      {item.quantity}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                       {hasMoreItems && !isExpanded && (
                         <p className="mt-2 text-xs text-slate-500">
                           + {remainingItems} elemento{remainingItems === 1 ? '' : 's'} adicional{remainingItems === 1 ? '' : 'es'}

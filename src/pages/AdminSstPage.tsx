@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Users,
+  Download,
   Info,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -39,9 +40,21 @@ import { AffiliateDeliveryPanel } from '@/components/admin/sst/AffiliateDelivery
 import { DeliveryConfirmationModal } from '@/components/admin/sst/DeliveryConfirmationModal';
 import { useToast } from '@/components/ui/use-toast';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+import {
   SstAffiliate,
   SstDeliveryDraft,
   SstDeliveryRecord,
+  SstDocumentType,
   SstInventoryItem,
 } from '@/types/adminSst';
 import { sstAdminService } from '@/services/sstAdminService';
@@ -81,11 +94,14 @@ const AdminSstPage: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [listFilterTerm, setListFilterTerm] = useState('');
-
-  const nameCollator = useMemo(
-    () => new Intl.Collator('es', { sensitivity: 'base', ignorePunctuation: true }),
-    [],
-  );
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportHospital, setExportHospital] = useState<string>('all');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [exportDocumentNumber, setExportDocumentNumber] = useState('');
+  const [exportDeliveredBy, setExportDeliveredBy] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [isLoadingAffiliates, setIsLoadingAffiliates] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
@@ -267,6 +283,11 @@ const AdminSstPage: React.FC = () => {
   const totalItems = totalAffiliates;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
+  const exportHospitalOptions = useMemo(() => {
+    const options = new Set(hospitalOptions.filter((option) => option && option.trim().length > 0));
+    return ['all', ...Array.from(options).sort((a, b) => a.localeCompare(b))];
+  }, [hospitalOptions]);
+
   const sortedAffiliates = useMemo(() => {
     if (affiliates.length === 0) return [];
  
@@ -406,6 +427,21 @@ const AdminSstPage: React.FC = () => {
     setShowAffiliateList(true);
   };
 
+  const handleOpenExportDialog = () => {
+    setExportHospital(hospitalFilter);
+    setExportStartDate('');
+    setExportEndDate('');
+    setExportDocumentNumber('');
+    setExportDeliveredBy('');
+    setExportError(null);
+    setIsExportDialogOpen(true);
+  };
+
+  const handleCloseExportDialog = () => {
+    setIsExportDialogOpen(false);
+    setExportError(null);
+  };
+
   const handleOpenConfirmationModal = (record: SstDeliveryDraft) => {
     setPendingRecord(record);
     setConfirmationModalOpen(true);
@@ -460,6 +496,466 @@ const AdminSstPage: React.FC = () => {
         duration: 5000,
       });
       throw error;
+    }
+  };
+
+  const handleExportDeliveries = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isExporting) return;
+
+    setExportError(null);
+
+    if (exportStartDate && exportEndDate && new Date(exportStartDate) > new Date(exportEndDate)) {
+      setExportError('La fecha inicial debe ser anterior o igual a la fecha final.');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const startDateParam = exportStartDate || undefined;
+      const endDateParam = exportEndDate || undefined;
+      const startDateObj = startDateParam ? new Date(startDateParam) : undefined;
+      const endDateObj = endDateParam ? new Date(endDateParam) : undefined;
+
+      const filters = {
+        hospital: exportHospital !== 'all' ? exportHospital : undefined,
+        startDate: startDateParam,
+        endDate: endDateParam,
+        documentNumber: exportDocumentNumber.trim() || undefined,
+        deliveredBy: exportDeliveredBy.trim() || undefined,
+      };
+
+      const deliveries: SstDeliveryRecord[] = [];
+      const PAGE_SIZE = 200;
+      let page = 1;
+      let total = 0;
+
+      do {
+        const response = await sstAdminService.getDeliveryHistory({
+          ...filters,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        deliveries.push(...response.items);
+        total = response.total ?? deliveries.length;
+        if (deliveries.length >= total || response.items.length === 0) {
+          break;
+        }
+        page += 1;
+      } while (page < 500);
+
+      if (deliveries.length === 0) {
+        const emptyMessage = 'No se encontraron entregas con los filtros seleccionados.';
+        setExportError(emptyMessage);
+        showFeedbackBanner('info', 'Sin entregas para exportar', emptyMessage);
+        toast({
+          title: 'Sin datos para exportar',
+          description: emptyMessage,
+        });
+        return;
+      }
+
+      const uniqueAffiliateIds = Array.from(
+        new Set(deliveries.map((record) => record.affiliateId).filter(Boolean)),
+      );
+
+      const affiliateMap = new Map<string, SstAffiliate>();
+      affiliates.forEach((affiliate) => {
+        affiliateMap.set(affiliate.id, affiliate);
+      });
+      if (uniqueAffiliateIds.length > 0) {
+        const AFFILIATES_PAGE_SIZE = 200;
+        let pageCounter = 1;
+        let totalAffiliates = Infinity;
+
+        while (affiliateMap.size < uniqueAffiliateIds.length && (pageCounter - 1) * AFFILIATES_PAGE_SIZE < totalAffiliates) {
+          const response = await sstAdminService.getAffiliates({
+            page: pageCounter,
+            pageSize: AFFILIATES_PAGE_SIZE,
+            hospital: exportHospital !== 'all' ? exportHospital : undefined,
+            status: 'all',
+          });
+
+          response.items.forEach((affiliate) => {
+            affiliateMap.set(affiliate.id, affiliate);
+          });
+
+          totalAffiliates = response.total ?? response.items.length;
+          if (response.items.length === 0) {
+            break;
+          }
+
+          pageCounter += 1;
+        }
+      }
+
+      const affiliateCacheByDocument = new Map<string, SstAffiliate | null>();
+      const affiliateFetchPromises: Promise<void>[] = [];
+
+      deliveries.forEach((record) => {
+        if (affiliateMap.has(record.affiliateId)) {
+          return;
+        }
+
+        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
+        const fallbackDocType = affiliateIdParts.length > 1 ? (affiliateIdParts[0] as SstDocumentType) : undefined;
+        const fallbackDocNumber =
+          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
+
+        const docType = (record.affiliateDocumentType ?? fallbackDocType) as SstDocumentType | undefined;
+        const docNumber = record.affiliateDocumentNumber ?? fallbackDocNumber ?? '';
+
+        if (!docType || !docNumber) {
+          return;
+        }
+
+        const cacheKey = `${docType}-${docNumber}`;
+        if (affiliateCacheByDocument.has(cacheKey)) {
+          const cached = affiliateCacheByDocument.get(cacheKey);
+          if (cached) {
+            affiliateMap.set(cached.id, cached);
+          }
+          return;
+        }
+
+        affiliateCacheByDocument.set(cacheKey, null);
+        affiliateFetchPromises.push(
+          sstAdminService
+            .getAffiliateByDocument(docType, docNumber)
+            .then((result) => {
+              if (result) {
+                affiliateCacheByDocument.set(cacheKey, result);
+                affiliateMap.set(result.id, result);
+              }
+            })
+            .catch(() => {
+              affiliateCacheByDocument.set(cacheKey, null);
+            }),
+        );
+      });
+
+      if (affiliateFetchPromises.length > 0) {
+        await Promise.all(affiliateFetchPromises);
+      }
+
+      const inventoryMap = new Map(inventory.map((item) => [item.id, item]));
+
+      const normalizeText = (value: string | null | undefined) =>
+        value ? value.toString().trim().toLowerCase() : '';
+      const hospitalFilterValue = filters.hospital ? normalizeText(filters.hospital) : '';
+      const deliveredByFilterValue = filters.deliveredBy ? normalizeText(filters.deliveredBy) : '';
+      const documentFilterValue = filters.documentNumber?.trim() ?? '';
+      const startTimestamp = startDateObj
+        ? new Date(
+            startDateObj.getFullYear(),
+            startDateObj.getMonth(),
+            startDateObj.getDate(),
+          ).getTime()
+        : undefined;
+      const endTimestamp = endDateObj
+        ? new Date(
+            endDateObj.getFullYear(),
+            endDateObj.getMonth(),
+            endDateObj.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ).getTime()
+        : undefined;
+
+      const filteredDeliveries = deliveries.filter((record) => {
+        const affiliate = affiliateMap.get(record.affiliateId);
+        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
+        const fallbackDocNumber =
+          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
+
+        const docNumberCandidate =
+          record.affiliateDocumentNumber ??
+          affiliate?.documentNumber ??
+          fallbackDocNumber ??
+          '';
+
+        if (documentFilterValue && docNumberCandidate !== documentFilterValue) {
+          return false;
+        }
+
+        if (hospitalFilterValue) {
+          const recordHospitalRaw =
+            record.affiliateHospital ??
+            affiliate?.hospital ??
+            '';
+          if (normalizeText(recordHospitalRaw) !== hospitalFilterValue) {
+            return false;
+          }
+        }
+
+        if (deliveredByFilterValue) {
+          const deliveredByRaw = record.deliveredByName ?? record.deliveredBy ?? '';
+          if (!normalizeText(deliveredByRaw).includes(deliveredByFilterValue)) {
+            return false;
+          }
+        }
+
+        if (startTimestamp !== undefined || endTimestamp !== undefined) {
+          const deliveredAtTime = new Date(record.deliveredAt).getTime();
+          if (Number.isNaN(deliveredAtTime)) {
+            return false;
+          }
+          if (startTimestamp !== undefined && deliveredAtTime < startTimestamp) {
+            return false;
+          }
+          if (endTimestamp !== undefined && deliveredAtTime > endTimestamp) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      if (filteredDeliveries.length === 0) {
+        const emptyMessage = 'No se encontraron entregas con los filtros seleccionados.';
+        setExportError(emptyMessage);
+        showFeedbackBanner('info', 'Sin entregas para exportar', emptyMessage);
+        toast({
+          title: 'Sin datos para exportar',
+          description: emptyMessage,
+        });
+        return;
+      }
+
+      const rows: Record<string, any>[] = [];
+      const deliveriesByHospital = new Map<string, { deliveries: number; units: number }>();
+      const itemsByCategory = new Map<string, number>();
+      const itemsByArticle = new Map<string, number>();
+      const articleCategoryMap = new Map<string, string>();
+      let totalUnitsDelivered = 0;
+      let deliveriesWithNotes = 0;
+
+      filteredDeliveries.forEach((record) => {
+        const affiliate = affiliateMap.get(record.affiliateId);
+        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
+        const fallbackDocType = affiliateIdParts.length > 1 ? (affiliateIdParts[0] as SstDocumentType) : undefined;
+        const fallbackDocNumber =
+          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
+
+        const docType =
+          record.affiliateDocumentType ?? affiliate?.documentType ?? fallbackDocType ?? '';
+        const docNumber =
+          record.affiliateDocumentNumber ?? affiliate?.documentNumber ?? fallbackDocNumber ?? '';
+
+        const affiliatePrimaryName = (record.affiliateFullName ?? '').trim();
+        const affiliateSecondaryName = affiliate ? `${affiliate.firstName} ${affiliate.lastName}`.trim() : '';
+        const affiliateFallbackName = [record.affiliateFirstName, record.affiliateLastName].filter(Boolean).join(' ');
+        const affiliateName = (affiliatePrimaryName || affiliateSecondaryName || affiliateFallbackName || '').trim();
+
+        const rawHospital =
+          record.affiliateHospital ??
+          affiliate?.hospital ??
+          (exportHospital !== 'all' ? exportHospital : '') ??
+          '';
+        const hospital = rawHospital && rawHospital.trim().length > 0 ? rawHospital : 'No especificado';
+
+        const rawRole =
+          record.affiliateRole ??
+          affiliate?.role ??
+          '';
+        const role = rawRole && rawRole.trim().length > 0 ? rawRole : 'No especificado';
+
+        const recordUnits = record.items.reduce((acc, item) => acc + item.quantity, 0);
+        totalUnitsDelivered += recordUnits;
+        if (record.notes && record.notes.trim().length > 0) {
+          deliveriesWithNotes += 1;
+        }
+
+        const hospitalStats = deliveriesByHospital.get(hospital) ?? { deliveries: 0, units: 0 };
+        hospitalStats.deliveries += 1;
+        hospitalStats.units += recordUnits;
+        deliveriesByHospital.set(hospital, hospitalStats);
+
+        const baseRow = {
+          'ID de entrega': record.id,
+          'Fecha de entrega': format(new Date(record.deliveredAt), 'yyyy-MM-dd HH:mm'),
+          Hospital: hospital,
+          'Afiliado tipo documento': docType,
+          'Afiliado número documento': docNumber,
+          'Afiliado nombre completo': affiliateName || 'Sin información',
+          'Proceso del afiliado': role,
+          'Responsable de entrega': record.deliveredByName ?? record.deliveredBy,
+          Observaciones: record.notes ?? '',
+        };
+
+        if (!record.items.length) {
+          rows.push({
+            ...baseRow,
+            Artículo: 'Sin artículos registrados',
+            'Categoría artículo': '',
+            Color: '',
+            Talla: '',
+            Cantidad: 0,
+          });
+          return;
+        }
+
+        record.items.forEach((item) => {
+          const inventoryItem = inventoryMap.get(item.itemId);
+          const category = inventoryItem?.category ?? 'Sin categoría';
+          const articleName = inventoryItem?.name ?? item.itemId;
+          const colorLabel = item.variant?.color ?? inventoryItem?.defaultColor ?? '';
+          const quantity = item.quantity ?? 0;
+
+          itemsByCategory.set(category, (itemsByCategory.get(category) ?? 0) + quantity);
+          itemsByArticle.set(articleName, (itemsByArticle.get(articleName) ?? 0) + quantity);
+          if (!articleCategoryMap.has(articleName)) {
+            articleCategoryMap.set(articleName, category);
+          }
+
+          rows.push({
+            ...baseRow,
+            Artículo: articleName,
+            'Categoría artículo': category,
+            Color: colorLabel,
+            Talla: item.variant?.size ?? '',
+            Cantidad: quantity,
+          });
+        });
+      });
+
+      const workbook = XLSX.utils.book_new();
+      const deliveriesSheet = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, deliveriesSheet, 'Entregas');
+      if (rows.length > 0 && deliveriesSheet['!ref']) {
+        deliveriesSheet['!cols'] = [
+          { wch: 18 },
+          { wch: 20 },
+          { wch: 26 },
+          { wch: 12 },
+          { wch: 18 },
+          { wch: 30 },
+          { wch: 24 },
+          { wch: 24 },
+          { wch: 36 },
+          { wch: 28 },
+          { wch: 20 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 12 },
+        ];
+        const filterRange = XLSX.utils.encode_range({
+          s: { r: 0, c: 0 },
+          e: { r: rows.length, c: 12 },
+        });
+        deliveriesSheet['!autofilter'] = { ref: filterRange };
+      }
+
+      const summarySheetData: (string | number)[][] = [
+        ['Filtros aplicados', '', ''],
+        ['Hospital', exportHospital === 'all' ? 'Todos' : exportHospital, ''],
+        ['Fecha desde', startDateObj ? format(startDateObj, 'yyyy-MM-dd') : 'Sin definir', ''],
+        ['Fecha hasta', endDateObj ? format(endDateObj, 'yyyy-MM-dd') : 'Sin definir', ''],
+        ['Número de documento', exportDocumentNumber.trim() || 'Sin definir', ''],
+        ['Responsable (registrado por)', exportDeliveredBy.trim() || 'Sin definir', ''],
+        [''],
+        ['Indicadores generales', '', ''],
+        ['Total entregas registradas', filteredDeliveries.length, ''],
+        ['Total unidades entregadas', totalUnitsDelivered, ''],
+        ['Entregas con observaciones', deliveriesWithNotes, ''],
+        ['Afiliados únicos incluidos', new Set(filteredDeliveries.map((record) => record.affiliateId)).size, ''],
+        ['Artículos diferentes entregados', itemsByArticle.size, ''],
+        [''],
+        ['Entregas por hospital', 'Entregas', 'Unidades entregadas'],
+      ];
+
+      if (deliveriesByHospital.size === 0) {
+        summarySheetData.push(['Sin datos', 0, 0]);
+      } else {
+        Array.from(deliveriesByHospital.entries())
+          .sort((a, b) => b[1].deliveries - a[1].deliveries)
+          .forEach(([hospitalName, stats]) => {
+            summarySheetData.push([hospitalName, stats.deliveries, stats.units]);
+          });
+      }
+
+      summarySheetData.push(['']);
+      summarySheetData.push(['Top artículos entregados', 'Unidades', '']);
+      const topArticles = Array.from(itemsByArticle.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      if (topArticles.length === 0) {
+        summarySheetData.push(['Sin artículos registrados', 0, '']);
+      } else {
+        topArticles.forEach(([articleName, quantity]) => {
+          summarySheetData.push([articleName, quantity, '']);
+        });
+      }
+
+      summarySheetData.push(['']);
+      summarySheetData.push(['Artículos por categoría', 'Unidades', '']);
+      if (itemsByCategory.size === 0) {
+        summarySheetData.push(['Sin categoría', 0, '']);
+      } else {
+        Array.from(itemsByCategory.entries())
+          .sort((a, b) => b[1] - a[1])
+          .forEach(([category, quantity]) => {
+            summarySheetData.push([category, quantity, '']);
+          });
+      }
+
+      summarySheetData.push(['']);
+      summarySheetData.push(['Generado el', format(new Date(), 'yyyy-MM-dd HH:mm'), '']);
+
+      const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData);
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
+      if (summarySheet['!ref']) {
+        summarySheet['!cols'] = [{ wch: 36 }, { wch: 28 }, { wch: 24 }];
+      }
+
+      const articleTotalsSheetData = [
+        ['Artículo', 'Categoría', 'Total unidades', 'Entregas registradas'],
+        ...Array.from(itemsByArticle.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([articleName, quantity]) => {
+            const matchingRecords = filteredDeliveries.filter((record) =>
+              record.items.some((item) => {
+                const inventoryItem = inventoryMap.get(item.itemId);
+                const currentName = inventoryItem?.name ?? item.itemId;
+                return currentName === articleName;
+              }),
+            );
+            const deliveriesCount = matchingRecords.length;
+            const categoryFromMatch = articleCategoryMap.get(articleName) ?? 'Sin categoría';
+            return [articleName, categoryFromMatch, quantity, deliveriesCount];
+          }),
+      ];
+      const articlesSheet = XLSX.utils.aoa_to_sheet(articleTotalsSheetData);
+      XLSX.utils.book_append_sheet(workbook, articlesSheet, 'Totales por artículo');
+      if (articlesSheet['!ref']) {
+        const articleRange = XLSX.utils.decode_range(articlesSheet['!ref']);
+        articlesSheet['!autofilter'] = { ref: XLSX.utils.encode_range(articleRange) };
+        articlesSheet['!cols'] = [{ wch: 34 }, { wch: 22 }, { wch: 18 }, { wch: 20 }];
+      }
+
+      const filename = `reporte-dotacion-epp-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+
+      toast({
+        title: 'Reporte exportado',
+        description: `Se generaron ${rows.length} filas en el reporte.`,
+      });
+      handleCloseExportDialog();
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof Error ? error.message : 'No fue posible generar el reporte en Excel.';
+      setExportError(message);
+      toast({
+        title: 'Error al exportar',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -568,25 +1064,37 @@ const AdminSstPage: React.FC = () => {
                       Ingresa el documento o nombre del afiliado para registrar la entrega.
                     </CardDescription>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white"
-                    onClick={() =>
-                      setShowAffiliateList((prev) => {
-                        const next = !prev;
-                        if (next) {
-                          setSelectedAffiliate(null);
-                        }
-                        return next;
-                      })
-                    }
-                    disabled={isSearchingAffiliate}
-                  >
-                    <Users className="h-4 w-4" />
-                    {showAffiliateList ? 'Ocultar listado de afiliados' : 'Mostrar listado de afiliados'}
-                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="justify-center gap-2 text-sm"
+                      onClick={handleOpenExportDialog}
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar reporte
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white"
+                      onClick={() =>
+                        setShowAffiliateList((prev) => {
+                          const next = !prev;
+                          if (next) {
+                            setSelectedAffiliate(null);
+                          }
+                          return next;
+                        })
+                      }
+                      disabled={isSearchingAffiliate}
+                    >
+                      <Users className="h-4 w-4" />
+                      {showAffiliateList ? 'Ocultar listado de afiliados' : 'Mostrar listado de afiliados'}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -884,6 +1392,126 @@ const AdminSstPage: React.FC = () => {
             </motion.div>
           )}
         </motion.div>
+
+        <Dialog
+          open={isExportDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleCloseExportDialog();
+            }
+          }}
+        >
+          <DialogContent className="max-w-3xl bg-white">
+            <DialogHeader>
+              <DialogTitle>Exportar entregas de Dotación y EPP</DialogTitle>
+              <DialogDescription>
+                Configura los filtros del reporte para obtener la trazabilidad y métricas de las entregas realizadas.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleExportDeliveries} className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="export-hospital">Hospital</Label>
+                  <Select
+                    value={exportHospital}
+                    onValueChange={(value) => setExportHospital(value)}
+                    disabled={isExporting}
+                  >
+                    <SelectTrigger id="export-hospital">
+                      <SelectValue placeholder="Selecciona un hospital" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exportHospitalOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option === 'all' ? 'Todos los hospitales' : option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="export-delivered-by">Responsable que registró (opcional)</Label>
+                  <Input
+                    id="export-delivered-by"
+                    placeholder="Nombre o identificador del responsable"
+                    value={exportDeliveredBy}
+                    onChange={(event) => setExportDeliveredBy(event.target.value)}
+                    disabled={isExporting}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="export-start-date">Fecha desde</Label>
+                  <Input
+                    id="export-start-date"
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(event) => setExportStartDate(event.target.value)}
+                    disabled={isExporting}
+                    max={exportEndDate || undefined}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="export-end-date">Fecha hasta</Label>
+                  <Input
+                    id="export-end-date"
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(event) => setExportEndDate(event.target.value)}
+                    disabled={isExporting}
+                    min={exportStartDate || undefined}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="export-document">Número de documento del afiliado (opcional)</Label>
+                <Input
+                  id="export-document"
+                  placeholder="Ingresa solo números de documento"
+                  value={exportDocumentNumber}
+                  onChange={(event) => setExportDocumentNumber(event.target.value.replace(/\D+/g, ''))}
+                  disabled={isExporting}
+                  inputMode="numeric"
+                  pattern="\d*"
+                />
+              </div>
+
+              {exportError && (
+                <p className="text-sm font-medium text-red-600">
+                  {exportError}
+                </p>
+              )}
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseExportDialog}
+                  disabled={isExporting}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark" disabled={isExporting}>
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Exportar Excel
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         <DeliveryConfirmationModal
           open={confirmationModalOpen}

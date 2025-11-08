@@ -30,8 +30,13 @@ interface GetAffiliatesParams {
 }
 
 interface GetDeliveryHistoryParams {
-  affiliateId: string;
+  affiliateId?: string;
   deliveredBy?: string;
+  hospital?: string;
+  startDate?: string;
+  endDate?: string;
+  documentNumber?: string;
+  searchTerm?: string;
   page?: number;
   pageSize?: number;
   signal?: AbortSignal;
@@ -82,24 +87,50 @@ const mapAffiliate = (affiliate: any): SstAffiliate => ({
   notes: affiliate.notes ?? null,
 });
 
-const mapDeliveryRecord = (record: any): SstDeliveryRecord => ({
-  id: record.id,
-  affiliateId: record.affiliateId,
-  deliveredAt: record.deliveredAt,
-  deliveredBy: record.deliveredByName ?? record.deliveredBy,
-  deliveredByName: record.deliveredByName ?? record.deliveredBy,
-  items: Array.isArray(record.items)
-    ? record.items.map((item: any) => ({
-        itemId: item.itemId,
-        variant: item.variant,
-        quantity: item.quantity,
-      }))
-    : [],
-  signedDocumentUrl: record.signedDocumentUrl ?? null,
-  signedDocumentType: record.signedDocumentType as SstDocumentType | undefined,
-  signedDocumentNumber: record.signedDocumentNumber ?? undefined,
-  notes: record.notes ?? null,
-});
+const mapDeliveryRecord = (record: any): SstDeliveryRecord => {
+  const affiliateData = record.affiliate ?? record.affiliateData ?? record.affiliateDetails ?? null;
+  const affiliateDocumentType =
+    record.affiliateDocumentType ?? affiliateData?.documentType ?? record.documentType ?? undefined;
+  const affiliateDocumentNumber =
+    record.affiliateDocumentNumber ?? affiliateData?.documentNumber ?? record.documentNumber ?? undefined;
+  const affiliateFirstName = affiliateData?.firstName ?? record.affiliateFirstName ?? undefined;
+  const affiliateLastName = affiliateData?.lastName ?? record.affiliateLastName ?? undefined;
+  const affiliatePrimaryFullName = record.affiliateFullName ?? '';
+  const affiliateSecondaryFullName = affiliateData?.fullName ?? '';
+  const affiliateFallbackFullName = [affiliateFirstName, affiliateLastName].filter(Boolean).join(' ');
+  const affiliateFullName =
+    affiliatePrimaryFullName ||
+    affiliateSecondaryFullName ||
+    (affiliateFallbackFullName !== '' ? affiliateFallbackFullName : undefined);
+  const affiliateHospital = record.affiliateHospital ?? affiliateData?.hospital ?? undefined;
+  const affiliateRole = record.affiliateRole ?? affiliateData?.role ?? undefined;
+
+  return {
+    id: record.id,
+    affiliateId: record.affiliateId,
+    deliveredAt: record.deliveredAt,
+    deliveredBy: record.deliveredByName ?? record.deliveredBy,
+    deliveredByName: record.deliveredByName ?? record.deliveredBy,
+    affiliateDocumentType: affiliateDocumentType as SstDocumentType | undefined,
+    affiliateDocumentNumber: affiliateDocumentNumber ?? undefined,
+    affiliateFirstName,
+    affiliateLastName,
+    affiliateFullName,
+    affiliateHospital,
+    affiliateRole,
+    items: Array.isArray(record.items)
+      ? record.items.map((item: any) => ({
+          itemId: item.itemId,
+          variant: item.variant,
+          quantity: item.quantity,
+        }))
+      : [],
+    signedDocumentUrl: record.signedDocumentUrl ?? null,
+    signedDocumentType: record.signedDocumentType as SstDocumentType | undefined,
+    signedDocumentNumber: record.signedDocumentNumber ?? undefined,
+    notes: record.notes ?? null,
+  };
+};
 
 const mapInventoryItem = (item: any): SstInventoryItem => ({
   id: item.id,
@@ -211,8 +242,29 @@ export const sstAdminService = {
     return rawItems.map(mapInventoryItem);
   },
 
-  async getDeliveryHistory({ affiliateId, deliveredBy, page = 1, pageSize = 25, signal }: GetDeliveryHistoryParams): Promise<SstDeliveriesResponse> {
-    const queryString = buildQueryString({ affiliateId, deliveredBy, page, pageSize });
+  async getDeliveryHistory({
+    affiliateId,
+    deliveredBy,
+    hospital,
+    startDate,
+    endDate,
+    documentNumber,
+    searchTerm,
+    page = 1,
+    pageSize = 25,
+    signal,
+  }: GetDeliveryHistoryParams = {}): Promise<SstDeliveriesResponse> {
+    const queryString = buildQueryString({
+      affiliateId,
+      deliveredBy,
+      hospital,
+      startDate,
+      endDate,
+      documentNumber,
+      searchTerm,
+      page,
+      pageSize,
+    });
     const data = await fetchJson<any>(
       buildAdminApiUrl(`${endpoints.deliveries}${queryString}`),
       { method: 'GET', signal }

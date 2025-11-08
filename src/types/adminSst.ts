@@ -46,6 +46,13 @@ export interface SstDeliveryRecord {
   deliveredAt: string;
   deliveredBy: string;
   deliveredByName?: string;
+  affiliateDocumentType?: SstDocumentType;
+  affiliateDocumentNumber?: string;
+  affiliateFirstName?: string;
+  affiliateLastName?: string;
+  affiliateFullName?: string;
+  affiliateHospital?: string;
+  affiliateRole?: string;
   items: SstDeliveryItemSelection[];
   signedDocumentUrl?: string | null;
   signedDocumentType?: SstDocumentType;
