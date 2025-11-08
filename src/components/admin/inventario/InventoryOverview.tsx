@@ -9,7 +9,7 @@ import {
   TrendingUp, 
   AlertTriangle, 
   Activity,
-  Hospital,
+  // Hospital,
   Shirt,
   Gift,
   Shield,
@@ -20,13 +20,13 @@ import {
 import { motion } from 'framer-motion';
 import QuickActionsDialog from './QuickActionsDialog';
 import LowStockDialog from './LowStockDialog';
-import HospitalRequestsDialog from './HospitalRequestsDialog';
+// import HospitalRequestsDialog from './HospitalRequestsDialog';
 
 const InventoryOverview: React.FC = () => {
   const [expandedCategory, setExpandedCategory] = useState<string | undefined>(undefined);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [lowStockOpen, setLowStockOpen] = useState(false);
-  const [hospitalRequestsOpen, setHospitalRequestsOpen] = useState(false);
+  // const [hospitalRequestsOpen, setHospitalRequestsOpen] = useState(false);
 
   const categoryStats = [
     {
@@ -180,14 +180,14 @@ const InventoryOverview: React.FC = () => {
     { name: 'Oxímetro Digital Azul', current: 12, min: 8, category: 'Implementos' }
   ];
 
-  const hospitalRequests = [
-    { hospital: 'Hospital Marco Fidel Suárez', pending: 6, priority: 'high' },
-    { hospital: 'Hospital San Juan de Dios', pending: 4, priority: 'urgent' },
-    { hospital: 'Hospital La Merced', pending: 3, priority: 'urgent' },
-    { hospital: 'Promotora Médica y Odontológica', pending: 3, priority: 'medium' },
-    { hospital: 'Sociedad Médica Rionegro SOMER', pending: 2, priority: 'medium' },
-    { hospital: 'Hospital Venancio Díaz', pending: 2, priority: 'high' }
-  ];
+  // const hospitalRequests = [
+  //   { hospital: 'Hospital Marco Fidel Suárez', pending: 6, priority: 'high' },
+  //   { hospital: 'Hospital San Juan de Dios', pending: 4, priority: 'urgent' },
+  //   { hospital: 'Hospital La Merced', pending: 3, priority: 'urgent' },
+  //   { hospital: 'Promotora Médica y Odontológica', pending: 3, priority: 'medium' },
+  //   { hospital: 'Sociedad Médica Rionegro SOMER', pending: 2, priority: 'medium' },
+  //   { hospital: 'Hospital Venancio Díaz', pending: 2, priority: 'high' }
+  // ];
 
   return (
     <div className="space-y-6">
@@ -332,7 +332,8 @@ const InventoryOverview: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Hospital Requests */}
+          {/* Sección de solicitudes por hospital temporalmente deshabilitada */}
+          {/*
           <Card className="border shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center space-x-2 text-primary-prosalud">
@@ -370,13 +371,14 @@ const InventoryOverview: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
+          */}
         </motion.div>
       </div>
 
       {/* Dialogs */}
       <QuickActionsDialog open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
       <LowStockDialog open={lowStockOpen} onOpenChange={setLowStockOpen} />
-      <HospitalRequestsDialog open={hospitalRequestsOpen} onOpenChange={setHospitalRequestsOpen} />
+      {/* <HospitalRequestsDialog open={hospitalRequestsOpen} onOpenChange={setHospitalRequestsOpen} /> */}
     </div>
   );
 };
