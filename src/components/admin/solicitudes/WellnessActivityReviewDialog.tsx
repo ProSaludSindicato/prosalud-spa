@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,12 +20,7 @@ import {
   Eye, 
   EyeOff,
   Globe,
-  Upload,
   Info,
-  Calendar,
-  MapPin,
-  Users,
-  Gift,
   Star,
   ChevronLeft,
   ChevronRight,
@@ -34,13 +28,13 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 import { 
   wellnessRequestsService, 
   WellnessRequest, 
   WellnessActivityRealized,
   UpdateWellnessActivityRealizedData,
 } from '@/services/wellnessRequestsApi';
-import { wellnessEventsApi } from '@/services/wellnessEventsApi';
 
 const reviewSchema = z.object({
   title: z.string().min(1, 'El título es obligatorio').max(255),
@@ -294,7 +288,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      console.error('Error updating activity:', error);
+      logger.error('Error al actualizar actividad de bienestar', error?.message || error);
       toast.error('Error al guardar', {
         description: error?.message || 'Por favor, intente nuevamente.',
       });
@@ -353,7 +347,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      console.error('Error publishing to gallery:', error);
+      logger.error('Error al publicar actividad en galería', error?.message || error);
       toast.error('Error al publicar', {
         description: error?.message || 'Por favor, intente nuevamente.',
       });

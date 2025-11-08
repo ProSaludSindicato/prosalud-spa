@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Gift, Sparkles, Calendar, Clock, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/utils/logger';
 
 const ComfenalcoSection: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement | null>(null);
@@ -153,7 +154,7 @@ const ComfenalcoSection: React.FC = () => {
   }
 
   if (error) {
-    console.error('ComfenalcoSection Error:', error);
+    logger.error('Error al cargar eventos públicos de Comfenalco', error?.message || error);
     return (
       <section ref={sectionRef} className="py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">

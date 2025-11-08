@@ -1,4 +1,5 @@
 import publicApi from './publicApi';
+import { logger } from '@/utils/logger';
 
 // Interfaces para la API real de liquidaciones
 export interface LiquidacionRecord {
@@ -55,26 +56,27 @@ export const consultarLiquidacion = async (
 
     // Manejo de respuesta exitosa
     if (response.data.status === 'success' && response.data.data) {
-      console.log('✅ compensaciones finales encontradas:', response.data.data.length);
+      logger.debug('Compensaciones finales encontradas', { total: response.data.data.length });
       return response.data.data;
     }
 
     // No se encontraron registros
     if (response.data.status === 'not_found') {
-      console.log('ℹ️ No se encontraron compensaciones finales para el documento consultado');
+      logger.debug('No se encontraron compensaciones finales para el documento consultado');
       return null;
     }
 
     // Otros casos
-    console.warn('⚠️ Respuesta inesperada de la API:', response.data);
+    logger.warn('Respuesta inesperada al consultar compensaciones finales', {
+      status: response.data.status,
+    });
     return null;
 
   } catch (error: any) {
     // Log detallado del error para soporte
-    console.error('❌ Error consultando compensaciones finales:', {
+    logger.error('Error consultando compensaciones finales', {
       status: error?.response?.status,
       message: error?.response?.data?.message,
-      errors: error?.response?.data?.errors,
     });
 
     // Re-lanzar el error para que el componente pueda manejarlo

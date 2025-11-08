@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "@/utils/logger";
 
 import { API_CONFIG } from "../config/api";
 
@@ -55,11 +56,14 @@ const rolesApi = axios.create({
 // Request interceptor
 rolesApi.interceptors.request.use(
   (config) => {
-    console.log(`[Roles API] ${config.method?.toUpperCase()} ${config.url}`);
+    logger.debug("Roles API request", {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+    });
     return config;
   },
   (error) => {
-    console.error("[Roles API] Request error:", error);
+    logger.error("Roles API request error", error?.message || error);
     return Promise.reject(error);
   },
 );
@@ -67,11 +71,14 @@ rolesApi.interceptors.request.use(
 // Response interceptor
 rolesApi.interceptors.response.use(
   (response) => {
-    console.log(`[Roles API] Response:`, response.data);
+    logger.debug("Roles API response", {
+      status: response.status,
+      url: response.config.url,
+    });
     return response;
   },
   (error) => {
-    console.error("[Roles API] Response error:", error.response?.data || error.message);
+    logger.error("Roles API response error", error.response?.data?.message || error.message);
 
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
       throw new Error("No se pudo conectar con el servidor. Verifica tu conexión a internet.");

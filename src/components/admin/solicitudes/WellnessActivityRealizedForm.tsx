@@ -19,6 +19,7 @@ import {
   CreateWellnessActivityRealizedData,
   UpdateWellnessActivityRealizedData,
 } from '@/services/wellnessRequestsApi';
+import { logger } from '@/utils/logger';
 
 const activityRealizedSchema = z.object({
   fecha_realizada: z.string().min(1, 'La fecha realizada es obligatoria'),
@@ -317,7 +318,10 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      console.error(`Error ${isEditing ? 'updating' : 'creating'} activity realized:`, error);
+      logger.error(
+        `Error al ${isEditing ? 'actualizar' : 'crear'} actividad realizada`,
+        error?.message || error,
+      );
       toast.error(`Error al ${isEditing ? 'actualizar' : 'guardar'} la información`, {
         description: error?.message || 'Por favor, intente nuevamente.',
       });

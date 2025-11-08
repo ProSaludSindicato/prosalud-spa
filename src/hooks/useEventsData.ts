@@ -1,6 +1,5 @@
-
-import { useState, useMemo } from 'react';
-import { mockEvents } from '@/data/eventosMock';
+import {useMemo, useState} from 'react';
+import {mockEvents} from '@/data/eventosMock';
 
 const ITEMS_PER_PAGE = 12;
 
@@ -17,59 +16,44 @@ export const useEventsData = () => {
 
   // Procesar eventos usando useMemo para evitar cálculos innecesarios
   const processedEvents = useMemo(() => {
-    console.log('Processing events - Category:', filterCategory, 'Sort:', sortOrder);
-
     const filtered = mockEvents.filter(event => 
       filterCategory === 'all' || event.category === filterCategory
     );
-
-    console.log('Filtered events count:', filtered.length);
     
     // Paso 2: Ordenar según el criterio seleccionado
-    const sorted = [...filtered].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      
+
       if (sortOrder === 'date-desc') {
         return dateB - dateA; // Más recientes primero
       } else {
         return dateA - dateB; // Más antiguos primero
       }
     });
-    
-    console.log('Sorted events - First event:', sorted[0]?.title, 'Date:', sorted[0]?.date);
-    console.log('Sorted events - Last event:', sorted[sorted.length - 1]?.title, 'Date:', sorted[sorted.length - 1]?.date);
-    
-    return sorted;
   }, [filterCategory, sortOrder]);
 
   // Calcular eventos para mostrar en la página actual
   const eventsToDisplay = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    const pageEvents = processedEvents.slice(startIndex, endIndex);
-    
-    console.log('Events to display on page', currentPage, ':', pageEvents.length);
-    return pageEvents;
+    return processedEvents.slice(startIndex, endIndex);
   }, [processedEvents, currentPage]);
 
   const totalPages = Math.ceil(processedEvents.length / ITEMS_PER_PAGE);
 
   const handlePageChange = (page: number) => {
-    console.log('Changing to page:', page);
     setCurrentPage(page);
     window.scrollTo(0, 0);
   };
 
   const handleSortOrderChange = (newOrder: 'date-desc' | 'date-asc') => {
-    console.log('Changing sort order from', sortOrder, 'to', newOrder);
     setSortOrder(newOrder);
     setCurrentPage(1); // Reset a la primera página
     window.scrollTo(0, 0);
   };
 
   const handleCategoryChange = (newCategory: string) => {
-    console.log('Changing category from', filterCategory, 'to', newCategory);
     setFilterCategory(newCategory);
     setCurrentPage(1); // Reset a la primera página
     window.scrollTo(0, 0);

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface UpdateProfileDialogProps {
   open: boolean;
@@ -49,9 +50,8 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        console.log('Usuario cargado:', user);
-        console.log('Metadata del usuario:', user.user_metadata);
-        
+        logger.debug('Perfil de usuario cargado correctamente');
+
         setProfile({
           firstName: user.user_metadata?.firstName || user.user_metadata?.first_name || '',
           lastName: user.user_metadata?.lastName || user.user_metadata?.last_name || '',
@@ -59,7 +59,7 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error cargando perfil:', error);
+      logger.error('Error cargando perfil de usuario', error instanceof Error ? error.message : error);
       toast({
         title: "Error",
         description: "No se pudo cargar el perfil del usuario",
@@ -85,7 +85,7 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
     setIsLoading(true);
 
     try {
-      console.log('Actualizando perfil con:', profile);
+      logger.debug('Actualizando perfil de usuario');
       
       const { error } = await supabase.auth.updateUser({
         email: profile.email,
@@ -98,14 +98,14 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
       });
 
       if (error) {
-        console.error('Error actualizando perfil:', error);
+        logger.error('Error actualizando perfil', error instanceof Error ? error.message : error);
         toast({
           title: "Error",
           description: error.message,
           variant: "destructive"
         });
       } else {
-        console.log('Perfil actualizado correctamente');
+        logger.debug('Perfil actualizado correctamente');
         toast({
           title: "¡Éxito!",
           description: "Perfil actualizado correctamente",
@@ -115,7 +115,7 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
         onOpenChange(false);
       }
     } catch (error) {
-      console.error('Error inesperado:', error);
+      logger.error('Error inesperado al actualizar perfil', error instanceof Error ? error.message : error);
       toast({
         title: "Error",
         description: "Ocurrió un error inesperado",

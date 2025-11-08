@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
+import { logger } from '@/utils/logger';
 
 // Schema de validación (las sedes se validarán dinámicamente en el onSubmit)
 const wellnessRequestSchema = z.object({
@@ -296,7 +297,10 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      console.error(`Error ${isEditing ? 'updating' : 'creating'} wellness request:`, error);
+      logger.error(
+        `Error al ${isEditing ? 'actualizar' : 'crear'} solicitud de bienestar`,
+        error?.message || error,
+      );
       toast.error(`Error al ${isEditing ? 'actualizar' : 'crear'} la solicitud`, {
         description: error?.message || 'Por favor, intente nuevamente.',
       });

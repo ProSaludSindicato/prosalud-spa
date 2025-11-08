@@ -14,7 +14,6 @@ const ChatbotFab: React.FC = () => {
 
   const handleChatOpen = () => {
     // Lógica para abrir el chatbot (se implementará más adelante)
-    console.log('Abrir chatbot');
     setIsTooltipOpen(true); // Mostrar el tooltip al hacer clic
     // Por ejemplo, podrías usar un estado global o un context para manejar la visibilidad del chat.
   };

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "@/utils/logger";
 
 // Backend API types
 export interface BackendUser {
@@ -75,14 +76,14 @@ const backendApi = axios.create({
 // Add request interceptor for logging
 backendApi.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
-      params: config.params,
-      data: config.data,
+    logger.debug("RealUsers API request", {
+      method: config.method?.toUpperCase(),
+      url: `${config.baseURL}${config.url}`,
     });
     return config;
   },
   (error) => {
-    console.error("❌ API Request Error:", error);
+    logger.error("RealUsers API request error", error?.message || error);
     return Promise.reject(error);
   },
 );
@@ -90,17 +91,17 @@ backendApi.interceptors.request.use(
 // Add response interceptor to handle errors consistently
 backendApi.interceptors.response.use(
   (response) => {
-    console.log(
-      `✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`,
-      response.data,
-    );
+    logger.debug("RealUsers API response", {
+      status: response.status,
+      method: response.config.method?.toUpperCase(),
+      url: response.config.url,
+    });
     return response;
   },
   (error) => {
-    console.error("❌ API Response Error:", {
+    logger.error("RealUsers API response error", {
       status: error.response?.status,
       statusText: error.response?.statusText,
-      data: error.response?.data,
       message: error.message,
       url: error.config?.url,
     });
@@ -129,7 +130,7 @@ export const realUsersApi = {
       const response = await backendApi.get<BackendPaginatedResponse<BackendUser>>(`/users?${params}`);
       return response.data;
     } catch (error) {
-      console.error("Error fetching users:", error);
+      logger.error("Error al obtener usuarios", error instanceof Error ? error.message : error);
       throw error;
     }
   },
@@ -139,7 +140,10 @@ export const realUsersApi = {
       const response = await backendApi.get<BackendResponse<BackendUser>>(`/users/${id}`);
       return response.data.data;
     } catch (error) {
-      console.error(`Error fetching user ${id}:`, error);
+      logger.error("Error al obtener usuario por id", {
+        id,
+        message: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   },
@@ -149,7 +153,7 @@ export const realUsersApi = {
       const response = await backendApi.post<BackendResponse<BackendUser>>("/users", data);
       return response.data.data;
     } catch (error) {
-      console.error("Error creating user:", error);
+      logger.error("Error al crear usuario", error instanceof Error ? error.message : error);
       throw error;
     }
   },
@@ -159,7 +163,10 @@ export const realUsersApi = {
       const response = await backendApi.put<BackendResponse<BackendUser>>(`/users/${id}`, data);
       return response.data.data;
     } catch (error) {
-      console.error(`Error updating user ${id}:`, error);
+      logger.error("Error al actualizar usuario", {
+        id,
+        message: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   },
@@ -176,7 +183,10 @@ export const realUsersApi = {
       const response = await backendApi.patch<BackendResponse<BackendUser>>(`/users/${id}/status`, updateData);
       return response.data.data;
     } catch (error) {
-      console.error(`Error toggling user ${id} status:`, error);
+      logger.error("Error al alternar estado de usuario", {
+        id,
+        message: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   },

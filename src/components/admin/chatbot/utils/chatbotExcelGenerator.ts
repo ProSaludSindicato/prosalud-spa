@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { ChatbotConversation } from '@/types/chatbot';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { logger } from '@/utils/logger';
 
 interface DateRangeFilter {
   includeAll: boolean;
@@ -13,7 +14,7 @@ export const generateChatbotExcelReport = (
   conversations: ChatbotConversation[], 
   dateRange: DateRangeFilter
 ): XLSX.WorkBook => {
-  console.log('📊 Generando reporte Excel del chatbot con', conversations.length, 'conversaciones');
+  logger.debug('Generando reporte Excel del chatbot', { total: conversations.length });
   
   try {
     const wb = XLSX.utils.book_new();
@@ -273,10 +274,10 @@ export const generateChatbotExcelReport = (
 
     XLSX.utils.book_append_sheet(wb, feedbackWs, 'Feedback Detallado');
 
-    console.log('✅ Reporte Excel del chatbot generado exitosamente');
+    logger.debug('Reporte Excel del chatbot generado exitosamente');
     return wb;
   } catch (error) {
-    console.error('❌ Error generando reporte Excel del chatbot:', error);
+    logger.error('Error generando reporte Excel del chatbot', error instanceof Error ? error.message : error);
     throw new Error('Failed to generate chatbot Excel report: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 };

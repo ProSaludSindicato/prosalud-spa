@@ -141,7 +141,6 @@ const HeroSection: React.FC = () => {
                                     <img
                                         src={collageImages[2]}
                                         alt="Collage ProSalud imagen 3"
-                                        fetchPriority="high"
                                         onLoad={() => handleImageLoad(2)}
                                         className={`w-full h-full object-cover transition-transform duration-500 ${imagesLoaded[2] ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
                                         } hover:scale-105`}

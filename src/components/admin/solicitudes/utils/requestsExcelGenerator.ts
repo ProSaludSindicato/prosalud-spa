@@ -11,7 +11,7 @@ interface DateRangeFilter {
 }
 
 export const generateRequestsExcelReport = (requests: Request[], dateRange: DateRangeFilter): XLSX.WorkBook => {
-  console.log('Generating Excel report with', requests.length, 'requests');
+  logger.debug('Generando reporte de solicitudes', { total: requests.length });
   
   try {
     const wb = XLSX.utils.book_new();

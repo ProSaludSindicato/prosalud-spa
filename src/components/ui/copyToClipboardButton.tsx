@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Check, Clipboard } from 'lucide-react';
 import { toast } from "@/components/ui/sonner"; // Importar toast para notificaciones
+import { logger } from "@/utils/logger";
 
 interface Props {
     textToCopy: string;
@@ -15,7 +16,7 @@ const CopyToClipboardButton: React.FC<Props> = ({ textToCopy }) => {
             toast.error('Error al copiar', {
                 description: 'La función de copiar al portapapeles no está disponible en este navegador o contexto.',
             });
-            console.error('Error al copiar: navigator.clipboard no está disponible.');
+            logger.warn('Intento de copiar sin soporte de clipboard');
             return;
         }
         try {
@@ -27,7 +28,7 @@ const CopyToClipboardButton: React.FC<Props> = ({ textToCopy }) => {
             toast.error('Error al copiar texto', {
                 description: 'No se pudo copiar el texto. Inténtalo de nuevo o copia manualmente.',
             });
-            console.error('Error al copiar:', err);
+            logger.error('Error al copiar al portapapeles', err instanceof Error ? err.message : err);
         }
     };
 

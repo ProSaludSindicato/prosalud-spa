@@ -3,16 +3,14 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Home, Search, ArrowLeft, Compass, MapPin } from "lucide-react";
+import { logger } from "@/utils/logger";
 
 const NotFound = () => {
   const location = useLocation();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
+    logger.warn("Se intentó acceder a una ruta inexistente", { path: location.pathname });
     
     // Trigger animation
     const timer = setTimeout(() => setIsVisible(true), 100);

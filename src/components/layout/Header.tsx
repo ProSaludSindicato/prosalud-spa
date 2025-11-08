@@ -25,7 +25,6 @@ const Header: React.FC = () => {
               className="h-12 w-auto" 
               width="120"
               height="48"
-              fetchPriority="high"
             />
           </Link>
 
