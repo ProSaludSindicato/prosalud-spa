@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -10,155 +9,651 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useInventory } from '@/context/InventoryContext';
+import { InventoryProduct, InventoryVariantMode, ProductVariant, InventorySize } from '@/types/inventory';
 
-const productSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  category: z.enum(['uniforme', 'tapabocas', 'batas', 'regalo', 'implemento']),
-  description: z.string().optional(),
-  variants: z.array(z.object({
-    size: z.string().optional(),
-    color: z.string().optional(),
-    stock: z.number().refine((val) => val >= 0, {
-      message: 'El stock debe ser mayor o igual a 0',
-    }),
-    minStock: z.number().refine((val) => val >= 0, {
-      message: 'El stock mínimo debe ser mayor o igual a 0',
-    }),
-    maxStock: z.number().refine((val) => val > 0, {
-      message: 'El stock máximo debe ser mayor a 0',
-    }),
-    sku: z.string().min(1, 'El SKU es requerido')
-  })).min(1, 'Debe tener al menos una variante')
+const variantModeOptions: { value: InventoryVariantMode; label: string; description: string }[] = [
+  {
+    value: 'simple',
+    label: 'Stock único',
+    description: 'Mantiene un solo nivel de inventario sin combinaciones.',
+  },
+  {
+    value: 'color',
+    label: 'Variantes por color',
+    description: 'Genera una fila de stock por cada color seleccionado.',
+  },
+  {
+    value: 'size',
+    label: 'Variantes por talla',
+    description: 'Genera una fila de stock por cada talla seleccionada.',
+  },
+  {
+    value: 'size_color',
+    label: 'Talla + Color',
+    description: 'Combina tallas y colores para generar todas las variantes necesarias.',
+  },
+];
+
+const productSchema = z
+  .object({
+    name: z.string().min(1, 'El nombre es requerido'),
+    categoryId: z.string().min(1, 'La categoría es requerida'),
+    subcategoryId: z.string().optional(),
+    description: z.string().optional(),
+    variantMode: z.enum(['simple', 'size', 'color', 'size_color']),
+    selectedSizes: z.array(z.string()).optional(),
+    selectedColors: z.array(z.string()).optional(),
+    variants: z.array(
+      z.object({
+        id: z.string(),
+        size: z.enum(['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL']).optional(),
+        colorId: z.string().optional(),
+        stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
+        minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0'),
+        maxStock: z.number().min(1, 'El stock máximo debe ser mayor a 0'),
+        sku: z.string(),
+      }),
+    ),
+  })
+  .superRefine((data, ctx) => {
+    const sizes = data.selectedSizes ?? [];
+    const colors = data.selectedColors ?? [];
+
+    if (data.variantMode === 'simple' && data.variants.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['variants'],
+        message: 'Debe existir exactamente una variante para productos sin combinaciones.',
+      });
+    }
+
+    if ((data.variantMode === 'size' || data.variantMode === 'size_color') && !sizes.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['selectedSizes'],
+        message: 'Selecciona al menos una talla.',
+      });
+    }
+
+    if ((data.variantMode === 'color' || data.variantMode === 'size_color') && !colors.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['selectedColors'],
+        message: 'Selecciona al menos un color.',
+      });
+    }
+
+    if (data.variantMode !== 'simple' && !data.variants.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['variants'],
+        message: 'Configura al menos una combinación de variantes.',
+      });
+    }
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
 
 interface ProductFormProps {
-  product?: any;
+  product?: InventoryProduct | null;
   onClose: () => void;
 }
 
+const inferVariantMode = (item?: InventoryProduct | null): InventoryVariantMode => {
+  if (!item) return 'simple';
+  if (item.variantMode) return item.variantMode;
+  const variants = item.variants ?? [];
+  const hasSize = variants.some((variant) => !!variant.size);
+  const hasColor = variants.some((variant) => !!variant.colorId);
+  if (hasSize && hasColor) return 'size_color';
+  if (hasSize) return 'size';
+  if (hasColor) return 'color';
+  return 'simple';
+};
+
+const extractSelectedSizes = (item?: InventoryProduct | null) => {
+  if (!item) return [];
+  const set = new Set<string>();
+  item.variants?.forEach((variant) => {
+    if (variant.size) set.add(variant.size);
+  });
+  return Array.from(set);
+};
+
+const extractSelectedColors = (item?: InventoryProduct | null) => {
+  if (!item) return [];
+  const set = new Set<string>();
+  item.variants?.forEach((variant) => {
+    if (variant.colorId) set.add(variant.colorId);
+  });
+  return Array.from(set);
+};
+
+const variantKey = (size?: string, colorId?: string) => `${size ?? ''}__${colorId ?? ''}`;
+
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const createSku = (productName: string, size?: string, colorId?: string) => {
+  const sanitizedName = productName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const base = sanitizedName.substring(0, 3) || 'SKU';
+  const sizePart = size ? `-${size}` : '';
+  const colorPart = colorId ? `-${colorId}` : '';
+  return `${base}${sizePart}${colorPart}`;
+};
+
 const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const { toast } = useToast();
+  const { categories, colorOptions, sizeOptions, addProduct, updateProduct } = useInventory();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  );
+
+  const defaultVariantMode = inferVariantMode(product);
+  const defaultSelectedSizes = extractSelectedSizes(product);
+  const defaultSelectedColors = extractSelectedColors(product);
+
+  const firstVariant = product?.variants?.[0];
+  const [defaultVariantValues, setDefaultVariantValues] = useState(() => ({
+    stock: firstVariant?.stock ?? 0,
+    minStock: firstVariant?.minStock ?? 0,
+    maxStock: firstVariant?.maxStock ?? 100,
+  }));
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
-    defaultValues: product ? {
-      name: product.name,
-      category: product.category,
-      description: product.description,
-      variants: product.variants?.map((v: any) => ({
-        size: v.size || '',
-        color: v.color || '',
-        stock: v.stock || 0,
-        minStock: v.minStock || 0,
-        maxStock: v.maxStock || 100,
-        sku: v.sku || `${product.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-      })) || []
-    } : {
-      name: '',
-      category: 'uniforme',
-      description: '',
-      variants: [{
-        size: '',
-        color: '',
-        stock: 0,
-        minStock: 0,
-        maxStock: 100,
-        sku: ''
-      }]
-    }
+    defaultValues: {
+      name: product?.name ?? '',
+      categoryId: product?.categoryId ?? sortedCategories[0]?.id ?? '',
+      subcategoryId: product?.subcategoryId,
+      description: product?.description ?? '',
+      variantMode: defaultVariantMode,
+      selectedSizes: defaultSelectedSizes,
+      selectedColors: defaultSelectedColors,
+      variants:
+        product?.variants?.map((variant) => ({
+          id: variant.id,
+          size: variant.size ?? undefined,
+          colorId: variant.colorId ?? undefined,
+          stock: variant.stock ?? defaultVariantValues.stock,
+          minStock: variant.minStock ?? defaultVariantValues.minStock,
+          maxStock: variant.maxStock ?? defaultVariantValues.maxStock,
+          sku: variant.sku,
+        })) ?? [
+          {
+            id: generateId(),
+            size: undefined,
+            colorId: undefined,
+            stock: defaultVariantValues.stock,
+            minStock: defaultVariantValues.minStock,
+            maxStock: defaultVariantValues.maxStock,
+            sku: '',
+          },
+        ],
+    },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, replace } = useFieldArray({
     control: form.control,
-    name: 'variants'
+    name: 'variants',
   });
 
-  const selectedCategory = form.watch('category');
+  const selectedCategoryId = useWatch({ control: form.control, name: 'categoryId' });
+  const selectedSubcategoryId = useWatch({ control: form.control, name: 'subcategoryId' });
+  const variantMode = useWatch({ control: form.control, name: 'variantMode' });
+  const selectedSizes = useWatch({ control: form.control, name: 'selectedSizes' }) ?? [];
+  const selectedColors = useWatch({ control: form.control, name: 'selectedColors' }) ?? [];
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId),
+    [categories, selectedCategoryId],
+  );
+  const subcategoryOptions = selectedCategory?.subcategories ?? [];
+
+  useEffect(() => {
+    if (!selectedCategory) {
+      form.setValue('subcategoryId', undefined);
+      return;
+    }
+
+    const isStillValid = subcategoryOptions.some((subcategory) => subcategory.id === selectedSubcategoryId);
+    if (!isStillValid) {
+      form.setValue('subcategoryId', undefined);
+    }
+  }, [selectedCategory, selectedSubcategoryId, subcategoryOptions, form]);
+
+  useEffect(() => {
+    if (variantMode === 'simple') {
+      if (selectedSizes.length) form.setValue('selectedSizes', []);
+      if (selectedColors.length) form.setValue('selectedColors', []);
+    } else if (variantMode === 'size' && selectedColors.length) {
+      form.setValue('selectedColors', []);
+    } else if (variantMode === 'color' && selectedSizes.length) {
+      form.setValue('selectedSizes', []);
+    }
+  }, [variantMode, selectedSizes.length, selectedColors.length, form]);
+
+  useEffect(() => {
+    const currentVariants = form.getValues('variants');
+    const existingMap = new Map<string, ProductVariant>();
+    currentVariants.forEach((variant) => {
+      if (variant.id && variant.sku) {
+        existingMap.set(variantKey(variant.size, variant.colorId), variant as ProductVariant);
+      }
+    });
+
+    const productName = form.getValues('name');
+
+    if (variantMode === 'simple') {
+      const existing = currentVariants[0];
+      replace([
+        {
+          id: existing?.id ?? generateId(),
+          size: undefined,
+          colorId: undefined,
+          stock: existing?.stock ?? defaultVariantValues.stock,
+          minStock: existing?.minStock ?? defaultVariantValues.minStock,
+          maxStock: existing?.maxStock ?? defaultVariantValues.maxStock,
+          sku: existing?.sku ?? createSku(productName, undefined, undefined),
+        },
+      ]);
+      return;
+    }
+
+    const combos: Array<{ size?: InventorySize; colorId?: string }> = [];
+    if (variantMode === 'size') {
+      selectedSizes.forEach((size) => combos.push({ size: size as InventorySize }));
+    } else if (variantMode === 'color') {
+      selectedColors.forEach((colorId) => combos.push({ colorId }));
+    } else if (variantMode === 'size_color') {
+      selectedSizes.forEach((size) => {
+        selectedColors.forEach((colorId) => combos.push({ size: size as InventorySize, colorId }));
+      });
+    }
+
+    const nextVariants = combos.map(({ size, colorId }) => {
+      const existing = existingMap.get(variantKey(size, colorId));
+      return {
+        id: existing?.id ?? generateId(),
+        size,
+        colorId,
+        stock: existing?.stock ?? defaultVariantValues.stock,
+        minStock: existing?.minStock ?? defaultVariantValues.minStock,
+        maxStock: existing?.maxStock ?? defaultVariantValues.maxStock,
+        sku: existing?.sku ?? createSku(productName, size, colorId),
+      };
+    });
+
+    replace(nextVariants);
+  }, [variantMode, selectedSizes.join(','), selectedColors.join(','), defaultVariantValues, replace, form]);
+
+  const updateDefaultValue = useCallback(
+    (field: 'stock' | 'minStock' | 'maxStock', rawValue: number) => {
+      const safeValue = Number.isNaN(rawValue) ? undefined : rawValue;
+      setDefaultVariantValues((prev) => ({ ...prev, [field]: safeValue ?? 0 }));
+
+      const current = form.getValues('variants');
+      if (!current.length || safeValue === undefined) return;
+
+      const updated = current.map((variant) => ({
+        ...variant,
+        [field]: safeValue,
+      }));
+      replace(updated);
+    },
+    [form, replace],
+  );
 
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
+      const ensureSku = (variant: ProductVariant): ProductVariant => ({
+        ...variant,
+        sku: createSku(data.name, variant.size, variant.colorId),
+      });
+
+      if (product) {
+        const variants: ProductVariant[] = data.variants.map((variant, index) => {
+          const existingId = product.variants[index]?.id;
+          return ensureSku({
+            id: variant.id ?? existingId,
+            size: variant.size || undefined,
+            colorId: variant.colorId || undefined,
+            stock: variant.stock,
+            minStock: variant.minStock,
+            maxStock: variant.maxStock,
+            sku: variant.sku,
+          });
+        });
+
+        updateProduct(product.id, {
+          name: data.name,
+          categoryId: data.categoryId,
+          subcategoryId: data.subcategoryId || undefined,
+          description: data.description,
+          variantMode: data.variantMode,
+          variants,
+        });
+      } else {
+        addProduct({
+          name: data.name,
+          categoryId: data.categoryId,
+          subcategoryId: data.subcategoryId || undefined,
+          description: data.description,
+          variantMode: data.variantMode,
+          variants: data.variants.map((variant) =>
+            ensureSku({
+              id: variant.id,
+              size: variant.size || undefined,
+              colorId: variant.colorId || undefined,
+              stock: variant.stock,
+              minStock: variant.minStock,
+              maxStock: variant.maxStock,
+              sku: variant.sku,
+            }),
+          ),
+        });
+      }
       
       toast({
-        title: product ? "Producto actualizado" : "Producto creado",
+        title: product ? 'Producto actualizado' : 'Producto creado',
         description: `El producto "${data.name}" ha sido ${product ? 'actualizado' : 'creado'} exitosamente.`,
       });
       
       onClose();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Hubo un problema al guardar el producto",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Hubo un problema al guardar el producto',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const addVariant = () => {
-    append({
-      size: '',
-      color: '',
-      stock: 0,
-      minStock: 0,
-      maxStock: 100,
-      sku: ''
-    });
-  };
+  const updateVariantValue = useCallback(
+    (index: number, field: keyof ProductFormData['variants'][number], rawValue: number) => {
+      const safeValue = Number.isNaN(rawValue) ? undefined : rawValue;
+      const current = form.getValues('variants');
+      const updated = current.map((variant, vIndex) =>
+        vIndex === index
+          ? {
+              ...variant,
+              [field]: safeValue,
+            }
+          : variant,
+      );
+      replace(updated);
+    },
+    [form, replace],
+  );
 
-  const generateSKU = (index: number) => {
-    const productName = form.getValues('name');
-    const variant = form.getValues(`variants.${index}`);
-    
-    if (productName) {
-      const baseSKU = productName.substring(0, 3).toUpperCase();
-      const sizePart = variant.size ? `-${variant.size}` : '';
-      const colorPart = variant.color ? `-${variant.color.substring(0, 2).toUpperCase()}` : '';
-      const randomPart = Math.random().toString(36).substr(2, 4).toUpperCase();
-      
-      const newSKU = `${baseSKU}${sizePart}${colorPart}-${randomPart}`;
-      form.setValue(`variants.${index}.sku`, newSKU);
+  const variantValues = useWatch({ control: form.control, name: 'variants' }) ?? [];
+
+  const toggleSize = (size: string) => {
+    const current = new Set(selectedSizes);
+    if (current.has(size)) {
+      current.delete(size);
+    } else {
+      current.add(size);
     }
+    form.setValue('selectedSizes', Array.from(current), { shouldDirty: true });
   };
 
-  const categoryOptions = [
-    { value: 'uniforme', label: 'Uniformes' },
-    { value: 'tapabocas', label: 'Tapabocas' },
-    { value: 'batas', label: 'Batas' },
-    { value: 'regalo', label: 'Regalos' },
-    { value: 'implemento', label: 'Implementos' }
-  ];
+  const toggleColor = (colorId: string) => {
+    const current = new Set(selectedColors);
+    if (current.has(colorId)) {
+      current.delete(colorId);
+    } else {
+      current.add(colorId);
+    }
+    form.setValue('selectedColors', Array.from(current), { shouldDirty: true });
+  };
 
-  const hasVariantFields = selectedCategory === 'uniforme' || selectedCategory === 'batas';
-
-  return (
-    <div className="bg-white min-h-full">
-      <div className="flex items-center justify-between p-6 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="bg-primary-prosalud/10 p-2 rounded-lg">
-            <Package className="h-6 w-6 text-primary-prosalud" />
+  const renderVariantRows = () => {
+    if (variantMode === 'simple') {
+      return variantValues.map((variant, index) => (
+        <div key={fields[index]?.id ?? index} className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Stock actual *</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                className="bg-white border-gray-300"
+                value={variant.stock ?? ''}
+                onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Stock mínimo *</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                className="bg-white border-gray-300"
+                value={variant.minStock ?? ''}
+                onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Stock máximo *</Label>
+              <Input
+                type="number"
+                placeholder="100"
+                className="bg-white border-gray-300"
+                value={variant.maxStock ?? ''}
+                onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+              />
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {product ? 'Editar Producto' : 'Nuevo Producto'}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {product ? 'Modifica la información del producto' : 'Agrega un nuevo producto al inventario'}
-            </p>
           </div>
         </div>
-      </div>
+      ));
+    }
 
-      <div className="p-6 space-y-6">
+    if (!variantValues.length) {
+      return (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
+          Selecciona tallas y/o colores para generar las combinaciones de inventario.
+        </div>
+      );
+    }
+
+    if (variantMode === 'color') {
+      return (
+        <div className="space-y-3">
+          {variantValues.map((variant, index) => {
+            const color = colorOptions.find((option) => option.id === variant.colorId);
+            return (
+              <div
+                key={fields[index]?.id ?? index}
+                className="grid grid-cols-1 md:grid-cols-5 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="flex items-center gap-3 md:col-span-2">
+                  <span
+                    className="h-8 w-8 rounded-full border border-gray-200"
+                    style={{ backgroundColor: color?.hex ?? '#ffffff' }}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
+                    <span className="text-xs text-gray-500">Código: {variant.colorId ?? '—'}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Stock *</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    className="bg-white border-gray-300"
+                    value={variant.stock ?? ''}
+                    onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Mínimo *</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    className="bg-white border-gray-300"
+                    value={variant.minStock ?? ''}
+                    onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Máximo *</Label>
+                  <Input
+                    type="number"
+                    placeholder="100"
+                    className="bg-white border-gray-300"
+                    value={variant.maxStock ?? ''}
+                    onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (variantMode === 'size') {
+      return (
+        <div className="space-y-3">
+          {variantValues.map((variant, index) => (
+            <div
+              key={fields[index]?.id ?? index}
+              className="grid grid-cols-1 md:grid-cols-5 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+            >
+              <div className="flex items-center gap-3 md:col-span-2">
+                <Badge className="bg-primary-prosalud/10 text-primary-prosalud">Talla {variant.size ?? '—'}</Badge>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Stock *</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className="bg-white border-gray-300"
+                  value={variant.stock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Mínimo *</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className="bg-white border-gray-300"
+                  value={variant.minStock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Máximo *</Label>
+                <Input
+                  type="number"
+                  placeholder="100"
+                  className="bg-white border-gray-300"
+                  value={variant.maxStock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (variantMode === 'size_color') {
+      const grouped = variantValues.reduce<
+        Record<string, { size?: string; items: { variant: typeof variantValues[number]; index: number }[] }>
+      >((acc, variant, index) => {
+        const key = variant.size ?? 'Sin talla';
+        if (!acc[key]) {
+          acc[key] = { size: variant.size, items: [] };
+        }
+        acc[key].items.push({ variant, index });
+        return acc;
+      }, {});
+
+      return (
+        <div className="space-y-5">
+          {Object.entries(grouped).map(([sizeKey, group]) => (
+            <div key={sizeKey} className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-primary-prosalud/10 text-primary-prosalud">Talla {group.size ?? '—'}</Badge>
+                <span className="text-xs text-gray-500">
+                  {group.items.length} color{group.items.length !== 1 ? 'es' : ''}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {group.items.map(({ variant, index }) => {
+                  const color = colorOptions.find((option) => option.id === variant.colorId);
+                  return (
+                    <div key={fields[index]?.id ?? index} className="space-y-3 rounded-md border border-gray-200 bg-white p-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-6 w-6 rounded-full border border-gray-200"
+                          style={{ backgroundColor: color?.hex ?? '#ffffff' }}
+                        />
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
+                          <span className="text-xs text-gray-500">{color?.id ?? '—'}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Stock</Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            className="bg-white border-gray-300"
+                            value={variant.stock ?? ''}
+                            onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Mínimo</Label>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            className="bg-white border-gray-300"
+                            value={variant.minStock ?? ''}
+                            onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-gray-600">Máximo</Label>
+                          <Input
+                            type="number"
+                            placeholder="100"
+                            className="bg-white border-gray-300"
+                            value={variant.maxStock ?? ''}
+                            onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+      </div>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="space-y-6">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Información Básica */}
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
               <CardTitle className="text-lg font-semibold text-gray-900">Información Básica</CardTitle>
@@ -181,29 +676,56 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="categoryId" className="text-sm font-medium text-gray-700">
                     Categoría *
                   </Label>
                   <Select
-                    value={form.watch('category')}
-                    onValueChange={(value) => form.setValue('category', value as any)}
+                  value={selectedCategoryId || undefined}
+                  onValueChange={(value) => form.setValue('categoryId', value)}
                   >
                     <SelectTrigger className="bg-gray-50 border-gray-300">
                       <SelectValue placeholder="Seleccionar categoría" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categoryOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                    {sortedCategories.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {form.formState.errors.category && (
-                    <p className="text-sm text-red-500">{form.formState.errors.category.message}</p>
+                {form.formState.errors.categoryId && (
+                  <p className="text-sm text-red-500">{form.formState.errors.categoryId.message}</p>
                   )}
                 </div>
               </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subcategoryId" className="text-sm font-medium text-gray-700">
+                Subcategoría
+              </Label>
+              <Select
+                value={form.watch('subcategoryId') || undefined}
+                onValueChange={(value) => form.setValue('subcategoryId', value === '__none__' ? undefined : value)}
+                disabled={!subcategoryOptions.length}
+              >
+                <SelectTrigger className="bg-gray-50 border-gray-300">
+                  {subcategoryOptions.length ? (
+                    <SelectValue placeholder="Seleccionar subcategoría" />
+                  ) : (
+                    <span className="text-sm text-gray-400">No hay subcategorías disponibles</span>
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin subcategoría</SelectItem>
+                  {subcategoryOptions.map((subcategory) => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-sm font-medium text-gray-700">
@@ -220,158 +742,139 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
             </CardContent>
           </Card>
 
-          {/* Variantes del Producto */}
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-gray-900">Variantes del Producto</CardTitle>
-                <Button type="button" onClick={addVariant} size="sm" variant="outline" className="border-primary-prosalud text-primary-prosalud hover:bg-primary-prosalud hover:text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Variante
-                </Button>
-              </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="bg-white">Variante {index + 1}</Badge>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {hasVariantFields && (
-                      <>
+          <CardContent className="p-6 space-y-6">
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Talla</Label>
+              <Label className="text-sm font-medium text-gray-700">Tipo de variación *</Label>
                           <Select
-                            value={form.watch(`variants.${index}.size`) || ''}
-                            onValueChange={(value) => form.setValue(`variants.${index}.size`, value)}
+                value={variantMode}
+                onValueChange={(value) => form.setValue('variantMode', value as InventoryVariantMode)}
                           >
-                            <SelectTrigger className="bg-white border-gray-300">
-                              <SelectValue placeholder="Seleccionar talla" />
+                <SelectTrigger className="bg-white border-gray-300 justify-start">
+                  <SelectValue className="text-left" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="XS">XS</SelectItem>
-                              <SelectItem value="S">S</SelectItem>
-                              <SelectItem value="M">M</SelectItem>
-                              <SelectItem value="L">L</SelectItem>
-                              <SelectItem value="XL">XL</SelectItem>
-                              <SelectItem value="XXL">XXL</SelectItem>
+                  {variantModeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="group">
+                      <div className="flex flex-col text-left">
+                        <span className="font-medium">{option.label}</span>
+                        <span className="text-xs text-gray-500 group-hover:text-white">{option.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                             </SelectContent>
                           </Select>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Color</Label>
-                          <Select
-                            value={form.watch(`variants.${index}.color`) || ''}
-                            onValueChange={(value) => form.setValue(`variants.${index}.color`, value)}
-                          >
-                            <SelectTrigger className="bg-white border-gray-300">
-                              <SelectValue placeholder="Seleccionar color" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Azul">Azul</SelectItem>
-                              <SelectItem value="Verde">Verde</SelectItem>
-                              <SelectItem value="Blanco">Blanco</SelectItem>
-                              <SelectItem value="Gris">Gris</SelectItem>
-                              <SelectItem value="Rosa">Rosa</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">Stock Actual *</Label>
+            {variantMode !== 'simple' && (
+              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-gray-700">Stock actual por defecto</Label>
                       <Input
                         type="number"
-                        {...form.register(`variants.${index}.stock`, { 
-                          valueAsNumber: true,
-                          setValueAs: (value: string) => {
-                            if (value === '') return 0;
-                            const num = parseFloat(value);
-                            return isNaN(num) ? 0 : num;
-                          }
-                        })}
-                        placeholder="0"
+                      value={defaultVariantValues.stock}
+                      onChange={(event) => updateDefaultValue('stock', Number(event.target.value))}
                         className="bg-white border-gray-300"
-                        value={form.watch(`variants.${index}.stock`) ?? ''}
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">Stock Mínimo *</Label>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-gray-700">Stock mínimo por defecto</Label>
                       <Input
                         type="number"
-                        {...form.register(`variants.${index}.minStock`, { 
-                          valueAsNumber: true,
-                          setValueAs: (value: string) => {
-                            if (value === '') return 0;
-                            const num = parseFloat(value);
-                            return isNaN(num) ? 0 : num;
-                          }
-                        })}
-                        placeholder="0"
+                      value={defaultVariantValues.minStock}
+                      onChange={(event) => updateDefaultValue('minStock', Number(event.target.value))}
                         className="bg-white border-gray-300"
-                        value={form.watch(`variants.${index}.minStock`) ?? ''}
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">Stock Máximo *</Label>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-gray-700">Stock máximo por defecto</Label>
                       <Input
                         type="number"
-                        {...form.register(`variants.${index}.maxStock`, { 
-                          valueAsNumber: true,
-                          setValueAs: (value: string) => {
-                            if (value === '') return 0;
-                            const num = parseFloat(value);
-                            return isNaN(num) ? 0 : num;
-                          }
-                        })}
-                        placeholder="100"
-                        className="bg-white border-gray-300"
-                        value={form.watch(`variants.${index}.maxStock`) ?? ''}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">SKU *</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          {...form.register(`variants.${index}.sku`)}
-                          placeholder="Código único"
+                      value={defaultVariantValues.maxStock}
+                      onChange={(event) => updateDefaultValue('maxStock', Number(event.target.value))}
                           className="bg-white border-gray-300"
                         />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => generateSKU(index)}
-                        >
-                          Generar
-                        </Button>
                       </div>
                     </div>
                   </div>
+            )}
+
+            {(variantMode === 'size' || variantMode === 'size_color') && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">Selecciona las tallas disponibles</Label>
+                <div className="flex flex-wrap gap-2">
+                  {sizeOptions.map((size) => {
+                    const isActive = selectedSizes.includes(size);
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => toggleSize(size)}
+                        className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                            : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                        }`}
+                        aria-pressed={isActive}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+                {form.formState.errors.selectedSizes && (
+                  <p className="text-xs text-red-500">{form.formState.errors.selectedSizes.message}</p>
+                )}
+              </div>
+            )}
+
+            {(variantMode === 'color' || variantMode === 'size_color') && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">Selecciona los colores disponibles</Label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {colorOptions.map((color) => {
+                    const isActive = selectedColors.includes(color.id);
+                    return (
+                      <button
+                        key={color.id}
+                        type="button"
+                        onClick={() => toggleColor(color.id)}
+                        className={`flex flex-col items-center gap-2 rounded-md border p-3 transition-colors ${
+                          isActive
+                            ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                            : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                        }`}
+                        aria-label={`Seleccionar color ${color.label}`}
+                        aria-pressed={isActive}
+                      >
+                        <span
+                          className="h-6 w-6 rounded-full border border-gray-200"
+                          style={{ backgroundColor: color.hex }}
+                        />
+                        <span className="text-xs font-medium text-center leading-tight">{color.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.formState.errors.selectedColors && (
+                  <p className="text-xs text-red-500">{form.formState.errors.selectedColors.message}</p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {renderVariantRows()}
+              {form.formState.errors.variants && 'message' in form.formState.errors.variants && (
+                <p className="text-sm text-red-500">{form.formState.errors.variants.message}</p>
+              )}
+            </div>
             </CardContent>
           </Card>
 
-          {/* Acciones */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
@@ -381,11 +884,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
               disabled={isSubmitting}
               className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
             >
-              {isSubmitting ? 'Guardando...' : (product ? 'Actualizar' : 'Crear')} Producto
+            {isSubmitting ? 'Guardando...' : product ? 'Actualizar Producto' : 'Crear Producto'}
             </Button>
           </div>
         </form>
-      </div>
     </div>
   );
 };

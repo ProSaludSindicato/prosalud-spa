@@ -1,5 +1,5 @@
 
-import { Product, SupplierDelivery, Return, Request as InventoryRequest, Hospital } from '@/types/inventory';
+import { Product, SupplierDelivery, Return, InventoryRequest, Hospital } from './types/mockTypes';
 import { mockProducts, mockSupplierDeliveries, mockReturns, mockInventoryRequests, mockHospitals } from './mockData';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

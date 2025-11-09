@@ -19,6 +19,7 @@ import SupplierDeliveries from '@/components/admin/inventario/SupplierDeliveries
 // import Requests from '@/components/admin/inventario/Requests';
 import QuickActionsDialog from '@/components/admin/inventario/QuickActionsDialog';
 import ExportReportDialog from '@/components/admin/inventario/ExportReportDialog';
+import CategoryManagement from '@/components/admin/inventario/CategoryManagement';
 // import NewRequestForm from '@/components/admin/inventario/NewRequestForm';
 // import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -29,6 +30,7 @@ const AdminInventarioPage: React.FC = () => {
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: BarChart3 },
+    { id: 'categories', label: 'Categorías', icon: FileText },
     { id: 'products', label: 'Productos', icon: Package },
     { id: 'deliveries', label: 'Entregas', icon: Truck },
     // { id: 'requests', label: 'Solicitudes', icon: ClipboardList },
@@ -109,7 +111,7 @@ const AdminInventarioPage: React.FC = () => {
               <CardContent className="p-0">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   <div className="p-6 pb-0">
-                    <TabsList className="grid w-full grid-cols-3 bg-gray-50 border p-1">
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-gray-50 border p-1">
                       {tabs.map((tab) => (
                         <TabsTrigger
                           key={tab.id}
@@ -134,6 +136,10 @@ const AdminInventarioPage: React.FC = () => {
 
                     <TabsContent value="deliveries" className="space-y-6 mt-0">
                       <SupplierDeliveries />
+                    </TabsContent>
+
+                    <TabsContent value="categories" className="space-y-6 mt-0">
+                      <CategoryManagement />
                     </TabsContent>
 
                   </div>

@@ -1,116 +1,87 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Plus,
+  Search,
+  Edit,
   Eye,
   AlertCircle,
   Package,
   Shirt,
   Gift,
   Shield,
-  X
+  Activity,
+  Truck,
+  ClipboardList,
+  ShoppingBag,
+  Boxes,
+  Tag,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ProductForm from './ProductForm';
 import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
-
-interface ProductWithVariants {
-  id: string;
-  name: string;
-  category: 'uniforme' | 'tapabocas' | 'batas' | 'regalo' | 'implemento';
-  description: string;
-  totalStock: number;
-  variants: Array<{
-    size?: string;
-    color?: string;
-    stock: number;
-    minStock: number;
-  }>;
-  lowStock: boolean;
-}
+import { useInventory } from '@/context/InventoryContext';
+import { InventoryCategory, InventoryProduct } from '@/types/inventory';
 
 const ProductManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showLowStock, setShowLowStock] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<ProductWithVariants | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
   const [viewMode, setViewMode] = useState<'form' | 'details'>('form');
+  const { products, categories, colorOptions } = useInventory();
 
-  // Mock data - en producción vendría de una API
-  const mockProducts: ProductWithVariants[] = [
-    {
-      id: '1',
-      name: 'Uniforme Quirúrgico',
-      category: 'uniforme',
-      description: 'Uniforme quirúrgico de algodón con tratamiento antibacterial',
-      totalStock: 145,
-      variants: [
-        { size: 'S', color: 'Azul', stock: 25, minStock: 10 },
-        { size: 'M', color: 'Azul', stock: 3, minStock: 10 },
-        { size: 'L', color: 'Azul', stock: 32, minStock: 10 },
-        { size: 'S', color: 'Verde', stock: 28, minStock: 10 },
-        { size: 'M', color: 'Verde', stock: 35, minStock: 10 },
-        { size: 'L', color: 'Verde', stock: 22, minStock: 10 }
-      ],
-      lowStock: true
-    },
-    {
-      id: '2',
-      name: 'Tapabocas N95',
-      category: 'tapabocas',
-      description: 'Tapabocas de alta filtración N95 certificado',
-      totalStock: 2340,
-      variants: [
-        { stock: 2340, minStock: 500 }
-      ],
-      lowStock: false
-    },
-    {
-      id: '3',
-      name: 'Bata de Laboratorio',
-      category: 'batas',
-      description: 'Bata blanca de laboratorio, manga larga',
-      totalStock: 76,
-      variants: [
-        { size: 'S', stock: 15, minStock: 8 },
-        { size: 'M', stock: 28, minStock: 8 },
-        { size: 'L', stock: 2, minStock: 8 },
-        { size: 'XL', stock: 31, minStock: 8 }
-      ],
-      lowStock: true
-    },
-    {
-      id: '4',
-      name: 'Kit de Bienvenida',
-      category: 'regalo',
-      description: 'Kit con artículos promocionales para nuevos afiliados',
-      totalStock: 38,
-      variants: [
-        { stock: 38, minStock: 20 }
-      ],
-      lowStock: false
-    }
-  ];
+  const categoryOptionsList = useMemo(
+    () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  );
 
-  const filteredProducts = mockProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    const matchesLowStock = !showLowStock || product.lowStock;
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, InventoryCategory>();
+    categories.forEach((category) => {
+      map.set(category.id, category);
+    });
+    return map;
+  }, [categories]);
+
+  const productsWithMeta = useMemo(() => {
+    return products.map((product) => {
+      const category = categoryMap.get(product.categoryId);
+      const subcategory = category?.subcategories.find((sub) => sub.id === product.subcategoryId);
+      const totalStock = product.variants.reduce((acc, variant) => acc + (variant.stock ?? 0), 0);
+      const lowStock = product.variants.some((variant) => variant.stock <= variant.minStock);
+      return {
+        product,
+        category,
+        subcategory,
+        totalStock,
+        lowStock,
+      };
+    });
+  }, [products, categoryMap]);
+
+  const filteredProducts = useMemo(() => {
+    return productsWithMeta.filter(({ product, category, subcategory, lowStock }) => {
+      const term = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        term.length === 0 ||
+        product.name.toLowerCase().includes(term) ||
+        (product.description ?? '').toLowerCase().includes(term) ||
+        (subcategory?.name ?? '').toLowerCase().includes(term);
+    const matchesCategory = selectedCategory === 'all' || product.categoryId === selectedCategory;
+      const matchesLowStock = !showLowStock || lowStock;
     
     return matchesSearch && matchesCategory && matchesLowStock;
   });
+  }, [productsWithMeta, searchTerm, selectedCategory, showLowStock]);
 
   const {
     currentPage,
@@ -122,47 +93,56 @@ const ProductManagement: React.FC = () => {
     setItemsPerPage
   } = usePagination({
     data: filteredProducts,
-    initialItemsPerPage: 10
+    initialItemsPerPage: 10,
   });
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'uniforme': return Shirt;
-      case 'tapabocas': return Shield;
-      case 'batas': return Package;
-      case 'regalo': return Gift;
-      default: return Package;
+  const getCategoryIcon = (category?: InventoryCategory) => {
+    if (!category?.icon) {
+      return Package;
+    }
+
+    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+      Shirt,
+      Shield,
+      Package,
+      Gift,
+      Activity,
+      Truck,
+      ClipboardList,
+      ShoppingBag,
+      Boxes,
+      Tag,
+    };
+
+    return iconMap[category.icon] ?? Package;
+  };
+
+  const getCategoryBadgeClass = (category?: InventoryCategory) => {
+    if (!category) return 'bg-gray-100 text-gray-700';
+
+    switch (category.id) {
+      case 'uniformes':
+        return 'bg-blue-100 text-blue-700';
+      case 'tapabocas':
+        return 'bg-green-100 text-green-700';
+      case 'batas':
+        return 'bg-purple-100 text-purple-700';
+      case 'regalos':
+        return 'bg-pink-100 text-pink-700';
+      case 'implementos':
+        return 'bg-emerald-100 text-emerald-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'uniforme': return 'bg-blue-100 text-blue-700';
-      case 'tapabocas': return 'bg-green-100 text-green-700';
-      case 'batas': return 'bg-purple-100 text-purple-700';
-      case 'regalo': return 'bg-pink-100 text-pink-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'uniforme': return 'Uniformes';
-      case 'tapabocas': return 'Tapabocas';
-      case 'batas': return 'Batas';
-      case 'regalo': return 'Regalos';
-      case 'implemento': return 'Implementos';
-      default: return category;
-    }
-  };
-
-  const handleViewProduct = (product: ProductWithVariants) => {
+  const handleViewProduct = (product: InventoryProduct) => {
     setSelectedProduct(product);
     setViewMode('details');
     setIsProductDialogOpen(true);
   };
 
-  const handleEditProduct = (product: ProductWithVariants) => {
+  const handleEditProduct = (product: InventoryProduct) => {
     setSelectedProduct(product);
     setViewMode('form');
     setIsProductDialogOpen(true);
@@ -182,6 +162,8 @@ const ProductManagement: React.FC = () => {
 
   const renderDialogContent = () => {
     if (viewMode === 'details' && selectedProduct) {
+      const category = categoryMap.get(selectedProduct.categoryId);
+      const subcategory = category?.subcategories.find((sub) => sub.id === selectedProduct.subcategoryId);
       return (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -191,8 +173,17 @@ const ProductManagement: React.FC = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Categoría</label>
-              <p className="text-gray-900 bg-gray-50 p-3 rounded border">{getCategoryLabel(selectedProduct.category)}</p>
+              <p className="text-gray-900 bg-gray-50 p-3 rounded border">
+                {category?.name ?? 'Sin categoría asignada'}
+              </p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Subcategoría</label>
+            <p className="text-gray-900 bg-gray-50 p-3 rounded border">
+              {subcategory?.name ?? 'Sin subcategoría asignada'}
+            </p>
           </div>
           
           <div className="space-y-2">
@@ -202,7 +193,9 @@ const ProductManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Stock Total</label>
-            <p className="text-gray-900 bg-gray-50 p-3 rounded border font-semibold">{selectedProduct.totalStock} unidades</p>
+            <p className="text-gray-900 bg-gray-50 p-3 rounded border font-semibold">
+              {selectedProduct.variants.reduce((acc, variant) => acc + (variant.stock ?? 0), 0)} unidades
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -217,10 +210,19 @@ const ProductManagement: React.FC = () => {
                         <p className="text-gray-900">{variant.size}</p>
                       </div>
                     )}
-                    {variant.color && (
+                    {variant.colorId && (
                       <div>
                         <span className="text-sm font-medium text-gray-600">Color:</span>
-                        <p className="text-gray-900">{variant.color}</p>
+                        <div className="flex items-center gap-2 text-gray-900">
+                          <span
+                            className="h-4 w-4 rounded-full border border-gray-200"
+                            style={{
+                              backgroundColor:
+                                colorOptions.find((option) => option.id === variant.colorId)?.hex ?? '#ffffff',
+                            }}
+                          />
+                          <span>{colorOptions.find((option) => option.id === variant.colorId)?.label ?? 'Sin color'}</span>
+                        </div>
                       </div>
                     )}
                     <div>
@@ -306,11 +308,11 @@ const ProductManagement: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las categorías</SelectItem>
-                  <SelectItem value="uniforme">Uniformes</SelectItem>
-                  <SelectItem value="tapabocas">Tapabocas</SelectItem>
-                  <SelectItem value="batas">Batas</SelectItem>
-                  <SelectItem value="regalo">Regalos</SelectItem>
-                  <SelectItem value="implemento">Implementos</SelectItem>
+                  {categoryOptionsList.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Button
@@ -349,6 +351,7 @@ const ProductManagement: React.FC = () => {
                   <TableRow className="bg-gray-50">
                     <TableHead>Producto</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead>Subcategoría</TableHead>
                     <TableHead>Stock Total</TableHead>
                     <TableHead>Variantes</TableHead>
                     <TableHead>Estado</TableHead>
@@ -356,8 +359,8 @@ const ProductManagement: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedData.map((product) => {
-                    const Icon = getCategoryIcon(product.category);
+                  {paginatedData.map(({ product, category, subcategory, totalStock, lowStock }) => {
+                    const Icon = getCategoryIcon(category);
                     return (
                       <TableRow key={product.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
@@ -367,13 +370,16 @@ const ProductManagement: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getCategoryColor(product.category)}>
+                          <Badge className={getCategoryBadgeClass(category)}>
                             <Icon className="h-3 w-3 mr-1" />
-                            {getCategoryLabel(product.category)}
+                            {category?.name ?? 'Sin categoría'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{product.totalStock}</span>
+                          <span className="text-sm text-gray-700">{subcategory?.name ?? '—'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{totalStock}</span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-gray-600">
@@ -381,7 +387,7 @@ const ProductManagement: React.FC = () => {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {product.lowStock ? (
+                          {lowStock ? (
                             <Badge variant="destructive" className="text-xs">
                               <AlertCircle className="h-3 w-3 mr-1" />
                               Stock Bajo
@@ -434,17 +440,21 @@ const ProductManagement: React.FC = () => {
 
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
-          <div className="absolute top-4 right-4 z-10">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCloseDialog}
-              className="h-8 w-8 p-0 hover:bg-gray-100"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="p-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle>
+              {viewMode === 'details'
+                ? 'Detalles del Producto'
+                : selectedProduct
+                  ? 'Editar Producto'
+                  : 'Nuevo Producto'}
+            </DialogTitle>
+            <DialogDescription>
+              {viewMode === 'details'
+                ? 'Consulta la información completa del producto seleccionado.'
+                : 'Completa los campos para administrar el producto del inventario.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-0">
             {renderDialogContent()}
           </div>
         </DialogContent>

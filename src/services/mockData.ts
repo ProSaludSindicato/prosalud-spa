@@ -1,7 +1,6 @@
 import { Convenio } from '@/types/admin';
-import { Product, SupplierDelivery, Return, Request as InventoryRequest, Hospital } from '@/types/inventory';
 import { User } from '@/types/admin';
-import { SolicitudRequest } from './types/mockTypes';
+import { Product, SupplierDelivery, Return, InventoryRequest, Hospital, SolicitudRequest } from './types/mockTypes';
 
 export const mockConvenios: Convenio[] = [
   {

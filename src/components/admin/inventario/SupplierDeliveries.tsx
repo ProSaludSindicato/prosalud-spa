@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
 import NewDeliveryForm from './NewDeliveryForm';
 import { useToast } from '@/hooks/use-toast';
+import { useInventory } from '@/context/InventoryContext';
 
 interface Delivery {
   id: string;
@@ -30,44 +31,52 @@ const SupplierDeliveries: React.FC = () => {
   const [showNewDeliveryForm, setShowNewDeliveryForm] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const { toast } = useToast();
+  const { deliveries, products, colorOptions } = useInventory();
 
-  const mockDeliveries: Delivery[] = [
-    {
-      id: '1',
-      supplierName: 'MedSupply S.A.S',
-      deliveryDate: '2024-01-15',
-      totalItems: 150,
-      status: 'completed',
-      items: [
-        { productName: 'Uniforme Azul - Talla M', quantity: 50, received: 50 },
-        { productName: 'Uniforme Verde - Talla L', quantity: 30, received: 30 },
-        { productName: 'Bata Blanca - Talla S', quantity: 70, received: 70 }
-      ]
-    },
-    {
-      id: '2',
-      supplierName: 'Textiles ProSalud',
-      deliveryDate: '2024-01-18',
-      totalItems: 200,
-      status: 'received',
-      items: [
-        { productName: 'Tapabocas N95', quantity: 200, received: 180 }
-      ]
-    },
-    {
-      id: '3',
-      supplierName: 'Implementos Médicos',
-      deliveryDate: '2024-01-20',
-      totalItems: 80,
-      status: 'pending',
-      items: [
-        { productName: 'Kit de Bienvenida', quantity: 50, received: 0 },
-        { productName: 'Bata de Laboratorio - Talla M', quantity: 30, received: 0 }
-      ]
-    }
-  ];
+  const colorLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    colorOptions.forEach((color) => map.set(color.id, color.label));
+    return map;
+  }, [colorOptions]);
 
-  const filteredDeliveries = mockDeliveries.filter(delivery =>
+  const productLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    products.forEach((product) => {
+      product.variants.forEach((variant) => {
+        const key = `${product.id}${variant.id ? `__${variant.id}` : ''}`;
+        const variantLabelParts = [
+          product.name,
+          variant.size ? `Talla ${variant.size}` : null,
+          variant.colorId ? (colorLabelMap.get(variant.colorId) ?? variant.colorId) : null,
+        ].filter(Boolean);
+        map.set(key, variantLabelParts.join(' · '));
+      });
+      // fallback entry without variant id
+      map.set(product.id, product.name);
+    });
+    return map;
+  }, [products, colorLabelMap]);
+
+  const normalizedDeliveries = useMemo<Delivery[]>(() => {
+    return deliveries.map((delivery) => ({
+      id: delivery.id,
+      supplierName: delivery.supplierName,
+      deliveryDate: delivery.deliveryDate,
+      totalItems: delivery.totalItems,
+      status: delivery.status,
+      items: delivery.items.map((item) => {
+        const displayKey = item.variantId ? `${item.productId}__${item.variantId}` : item.productId;
+        const displayName = productLookup.get(displayKey) ?? item.productId;
+        return {
+          productName: displayName,
+          quantity: item.quantity,
+          received: item.received,
+        };
+      }),
+    }));
+  }, [deliveries, productLookup]);
+
+  const filteredDeliveries = normalizedDeliveries.filter(delivery =>
     delivery.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     delivery.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
