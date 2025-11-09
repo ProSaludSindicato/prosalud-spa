@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import type { SstDeliveryDraft, SstInventoryItem } from '@/types/adminSst';
+import type { SstDeliveryDraft, SstDeliveryType, SstInventoryItem } from '@/types/adminSst';
 import { logger } from '@/utils/logger';
 
 interface DeliveryConfirmationModalProps {
@@ -66,6 +66,11 @@ const renderColorSwatch = (color?: string) => {
       title={color}
     />
   );
+};
+
+const DELIVERY_TYPE_LABELS: Record<SstDeliveryType, string> = {
+  first_time: 'Primera vez',
+  periodic: 'Periódica',
 };
 
 export function DeliveryConfirmationModal({
@@ -140,6 +145,14 @@ export function DeliveryConfirmationModal({
                 <p className="text-base font-medium text-slate-800">
                   {record.items.length}{' '}
                   {record.items.length === 1 ? 'elemento' : 'elementos'}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Tipo de entrega
+                </span>
+                <p className="text-base font-medium text-slate-800">
+                  {DELIVERY_TYPE_LABELS[record.deliveryType] ?? 'No especificado'}
                 </p>
               </div>
             </div>

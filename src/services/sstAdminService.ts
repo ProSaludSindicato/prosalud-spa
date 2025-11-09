@@ -130,6 +130,7 @@ const mapDeliveryRecord = (record: any): SstDeliveryRecord => {
     signedDocumentType: record.signedDocumentType as SstDocumentType | undefined,
     signedDocumentNumber: record.signedDocumentNumber ?? undefined,
     notes: record.notes ?? null,
+    deliveryType: record.deliveryType ?? record.type ?? undefined,
   };
 };
 
@@ -297,6 +298,7 @@ export const sstAdminService = {
       deliveredBy: draft.deliveredBy,
       deliveredByName: draft.deliveredByName,
       notes: draft.notes ?? null,
+      deliveryType: draft.deliveryType,
     };
 
     const data = await fetchJson<any>(buildAdminApiUrl(endpoints.deliveries), {

@@ -34,6 +34,8 @@ export interface SstAffiliate {
   notes?: string | null;
 }
 
+export type SstDeliveryType = 'first_time' | 'periodic';
+
 export interface SstDeliveryItemSelection {
   itemId: string;
   variant?: SstInventoryVariant;
@@ -58,6 +60,7 @@ export interface SstDeliveryRecord {
   signedDocumentType?: SstDocumentType;
   signedDocumentNumber?: string;
   notes?: string | null;
+  deliveryType?: SstDeliveryType;
 }
 
 export interface SstAffiliatesResponse {
@@ -89,6 +92,7 @@ export interface SstDeliveryDraft {
   signedDocumentType: SstDocumentType;
   signedDocumentNumber: string;
   notes?: string;
+  deliveryType: SstDeliveryType;
 }
 
 

@@ -18,6 +18,7 @@ import type {
   SstDeliveryDraft,
   SstDeliveryItemSelection,
   SstDeliveryRecord,
+  SstDeliveryType,
   SstInventoryItem,
   SstInventoryVariant,
 } from '@/types/adminSst';
@@ -69,6 +70,13 @@ const normalizeColorName = (color?: string) =>
         .trim()
     : undefined;
 
+const DELIVERY_TYPE_LABELS: Record<SstDeliveryType, string> = {
+  first_time: 'Primera vez',
+  periodic: 'Periódica',
+};
+
+const GENERAL_SIZE_DEFAULT_VALUE = '__default__';
+
 export function AffiliateDeliveryPanel({
   affiliate,
   inventory,
@@ -85,12 +93,51 @@ export function AffiliateDeliveryPanel({
   const [isSignatureDrawerOpen, setIsSignatureDrawerOpen] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
   const [itemSearchTerm, setItemSearchTerm] = useState('');
+  const defaultDeliveryType = deliveryHistory.length === 0 ? 'first_time' : 'periodic';
+  const [deliveryType, setDeliveryType] = useState<SstDeliveryType>(defaultDeliveryType);
+  const [generalDotationSize, setGeneralDotationSize] = useState<string | null>(null);
+  const [generalDotationQuantity, setGeneralDotationQuantity] = useState<number | ''>('');
 
   useEffect(() => {
     resetForm();
     setIsSignatureDrawerOpen(false);
     setExpandedHistory({});
   }, [affiliate.id]);
+
+  useEffect(() => {
+    if (!generalDotationSize) return;
+    setSelectedItems((prev) => {
+      const next = { ...prev };
+      Object.entries(next).forEach(([itemId, state]) => {
+        const item = inventory.find((inv) => inv.id === itemId);
+        if (!item || item.category !== 'Dotación' || !item.variants || item.variants.length === 0) {
+          return;
+        }
+        const matchIndex = item.variants.findIndex(
+          (variant) =>
+            variant.size?.trim().toLowerCase() === generalDotationSize.trim().toLowerCase(),
+        );
+        if (matchIndex >= 0) {
+          next[itemId] = { ...state, variantIndex: matchIndex };
+        }
+      });
+      return next;
+    });
+  }, [generalDotationSize, inventory]);
+
+  useEffect(() => {
+    if (generalDotationQuantity === '') return;
+    if (typeof generalDotationQuantity !== 'number' || generalDotationQuantity <= 0) return;
+    setSelectedItems((prev) => {
+      const next: SelectedItemsMap = { ...prev };
+      Object.entries(next).forEach(([itemId, state]) => {
+        const item = inventory.find((inv) => inv.id === itemId);
+        if (!item || item.category !== 'Dotación') return;
+        next[itemId] = { ...state, quantity: generalDotationQuantity };
+      });
+      return next;
+    });
+  }, [generalDotationQuantity, inventory]);
 
   const filteredInventory = useMemo(() => {
     const term = itemSearchTerm.trim().toLowerCase();
@@ -112,6 +159,33 @@ export function AffiliateDeliveryPanel({
   }, [filteredInventory]);
 
   const selectedCount = Object.keys(selectedItems).length;
+
+  const dotationSizeOptions = useMemo(() => {
+    const dotationItems = inventory.filter((item) => item.category === 'Dotación');
+    const sizeSet = new Set<string>();
+
+    dotationItems.forEach((item) => {
+      item.variants?.forEach((variant) => {
+        const size = variant.size?.trim();
+        if (size) {
+          sizeSet.add(size);
+        }
+      });
+    });
+
+    const ORDER = ['XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL'];
+    const orderIndex = (size: string) => {
+      const normalized = size.toUpperCase();
+      const index = ORDER.indexOf(normalized);
+      return index === -1 ? ORDER.length : index;
+    };
+
+    return Array.from(sizeSet).sort((a, b) => {
+      const orderDiff = orderIndex(a) - orderIndex(b);
+      if (orderDiff !== 0) return orderDiff;
+      return a.localeCompare(b);
+    });
+  }, [inventory]);
 
   const renderColorSwatch = (color?: string) => {
     if (!color) return null;
@@ -172,6 +246,7 @@ export function AffiliateDeliveryPanel({
     setNotes('');
     setSignatureDataUrl(null);
     setFormError(null);
+    setDeliveryType(deliveryHistory.length === 0 ? 'first_time' : 'periodic');
   };
 
   const toggleHistoryExpansion = (recordId: string) => {
@@ -185,9 +260,27 @@ export function AffiliateDeliveryPanel({
     setSelectedItems((prev) => {
       const next = { ...prev };
       if (checked) {
+        let resolvedVariantIndex: number | undefined =
+          item.variants && item.variants.length > 0 ? 0 : undefined;
+
+        if (item.category === 'Dotación' && generalDotationSize && item.variants && item.variants.length > 0) {
+          const matchIndex = item.variants.findIndex(
+            (variant) =>
+              variant.size?.trim().toLowerCase() === generalDotationSize.trim().toLowerCase(),
+          );
+          if (matchIndex >= 0) {
+            resolvedVariantIndex = matchIndex;
+          }
+        }
+
+        const rawQuantity =
+          item.category === 'Dotación' && generalDotationQuantity !== '' ? generalDotationQuantity : 1;
+        const resolvedQuantity =
+          typeof rawQuantity === 'number' && rawQuantity > 0 ? rawQuantity : 1;
+
         next[item.id] = {
-          quantity: 1,
-          variantIndex: item.variants && item.variants.length > 0 ? 0 : undefined,
+          quantity: resolvedQuantity,
+          variantIndex: resolvedVariantIndex,
         };
       } else {
         delete next[item.id];
@@ -262,6 +355,7 @@ export function AffiliateDeliveryPanel({
       signedDocumentType: affiliate.documentType,
       signedDocumentNumber: affiliate.documentNumber,
       notes: cleanedNotes ? cleanedNotes : undefined,
+      deliveryType,
     };
 
     onConfirmDelivery?.(draft);
@@ -283,6 +377,17 @@ export function AffiliateDeliveryPanel({
       setFormError(null);
     }
   }, [signatureDataUrl, formError]);
+
+  useEffect(() => {
+    const nextDefault = deliveryHistory.length === 0 ? 'first_time' : 'periodic';
+    setDeliveryType((prev) => (prev === nextDefault ? prev : nextDefault));
+  }, [deliveryHistory.length]);
+
+  useEffect(() => {
+    if (deliveryType && formError?.includes('tipo de entrega')) {
+      setFormError(null);
+    }
+  }, [deliveryType, formError]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -338,6 +443,76 @@ export function AffiliateDeliveryPanel({
                 <h3 className="text-lg font-semibold text-slate-700">{category}</h3>
                 <span className="text-sm text-slate-500">{items.length} artículos</span>
               </div>
+              {category === 'Dotación' && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <Label
+                      htmlFor="general-dotation-size"
+                      className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      Talla general
+                    </Label>
+                    <Select
+                      value={generalDotationSize ?? GENERAL_SIZE_DEFAULT_VALUE}
+                      onValueChange={(value) => {
+                        if (value === GENERAL_SIZE_DEFAULT_VALUE) {
+                          setGeneralDotationSize(null);
+                        } else {
+                          setGeneralDotationSize(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="general-dotation-size">
+                        <SelectValue placeholder="Selecciona una talla para aplicar por defecto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={GENERAL_SIZE_DEFAULT_VALUE}>Usar talla por defecto del artículo</SelectItem>
+                        {dotationSizeOptions.length === 0 ? (
+                          <SelectItem value="__no_sizes" disabled>
+                            No hay tallas registradas
+                          </SelectItem>
+                        ) : (
+                          dotationSizeOptions.map((size) => (
+                            <SelectItem key={size} value={size}>
+                              {size}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-xs text-slate-500">
+                      Al seleccionar un artículo de dotación se asignará esta talla automáticamente, si está disponible.
+                    </span>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label
+                      htmlFor="general-dotation-quantity"
+                      className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      Cantidad general
+                    </Label>
+                    <Input
+                      id="general-dotation-quantity"
+                      type="number"
+                      min={1}
+                      value={generalDotationQuantity}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === '') {
+                          setGeneralDotationQuantity('');
+                          return;
+                        }
+                        const parsed = Number.parseInt(value, 10);
+                        setGeneralDotationQuantity(Number.isNaN(parsed) ? '' : Math.max(1, parsed));
+                      }}
+                      placeholder="Ej. 2"
+                    />
+                    <span className="text-xs text-slate-500">
+                      Al seleccionar un artículo de dotación se usará esta cantidad inicial.
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
@@ -458,6 +633,23 @@ export function AffiliateDeliveryPanel({
               </div>
 
               <div className="grid gap-1.5">
+                <Label>Tipo de entrega</Label>
+                <Select
+                  value={deliveryType}
+                  onValueChange={(value) => setDeliveryType(value as SstDeliveryType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona la periodicidad de la entrega" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="first_time">Primera vez</SelectItem>
+                    <SelectItem value="periodic">Periódica</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-slate-500">Campo requerido.</span>
+              </div>
+
+              <div className="grid gap-1.5">
                 <Label htmlFor="notes">Observaciones</Label>
                 <Textarea
                   id="notes"
@@ -558,10 +750,13 @@ export function AffiliateDeliveryPanel({
                       <span className="font-semibold text-slate-700">
                         {new Date(record.deliveredAt).toLocaleString()}
                       </span>
-                      <Badge variant="outline">
-                        {totalVariants} artículo{totalVariants === 1 ? '' : 's'} · {totalUnits}{' '}
-                        unidad{totalUnits === 1 ? '' : 'es'}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {record.deliveryType && (
+                          <Badge variant="secondary">
+                            {DELIVERY_TYPE_LABELS[record.deliveryType] ?? record.deliveryType}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-slate-500">
                       Entregado por: <span className="font-medium">{record.deliveredBy}</span>

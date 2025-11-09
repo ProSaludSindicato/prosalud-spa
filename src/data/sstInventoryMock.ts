@@ -4,34 +4,10 @@ const standardSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 
 export const sstInventoryMock: SstInventoryItem[] = [
   {
-    id: 'epp-boquilla-alcohol',
-    name: 'Boquilla Alcohol',
-    category: 'EPP',
-    unit: 'unidad',
-  },
-  {
-    id: 'epp-boquilla-jabon-pequeno',
-    name: 'Boquilla Jabón Pequeño',
-    category: 'EPP',
-    unit: 'unidad',
-  },
-  {
     id: 'epp-gorros-quirurgicos',
     name: 'Gorros Quirúrgicos',
     category: 'EPP',
     unit: 'paquete',
-  },
-  {
-    id: 'epp-guardian-grande',
-    name: 'Guardián Grande',
-    category: 'EPP',
-    unit: 'unidad',
-  },
-  {
-    id: 'epp-guardian-pequeno',
-    name: 'Guardián Pequeño',
-    category: 'EPP',
-    unit: 'unidad',
   },
   {
     id: 'epp-tapabocas-n95',
