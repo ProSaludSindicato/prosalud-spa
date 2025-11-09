@@ -52,10 +52,18 @@ import { requestsService } from "@/services/requestsServiceApi";
 import { Request } from "@/types/requests";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
+import { parentescos } from '@/components/actualizar-datos-personales/formOptions';
 
 // Schema para el formulario de respuesta
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
 const MAX_FILES = 4;
+
+const getParentescoLabel = (parentesco?: string) => {
+  if (!parentesco) return '';
+  const normalized = parentesco.toUpperCase();
+  const found = parentescos.find((item) => item.value === normalized);
+  return found?.label ?? parentesco;
+};
 
 const responseFormSchema = z.object({
   newStatus: z.enum(["in_progress", "resolved", "rejected"], {
@@ -1080,7 +1088,9 @@ const AdminSolicitudesPage: React.FC = () => {
                                               </div>
                                               <div>
                                                 <span className="font-medium text-gray-600">Parentesco:</span>{' '}
-                                                <span className="text-gray-900">{beneficiario.parentesco || 'N/A'}</span>
+                                                <span className="text-gray-900">
+                                                  {getParentescoLabel(beneficiario.parentesco || '') || 'N/A'}
+                                                </span>
                                               </div>
                                               <div>
                                                 <span className="font-medium text-gray-600">Sexo:</span>{' '}

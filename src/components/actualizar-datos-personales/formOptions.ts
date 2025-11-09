@@ -208,6 +208,8 @@ export const parentescos = [
   { value: 'HIJA', label: 'Hija' },
   { value: 'HIJO', label: 'Hijo' },
   { value: 'CONYUGUE', label: 'Cónyuge' },
+  { value: 'HIJO_CONYUGUE', label: 'Hijo cónyuge' },
+  { value: 'HIJA_CONYUGUE', label: 'Hija cónyuge' },
 ];
 
 export const tiposDocumento = [
