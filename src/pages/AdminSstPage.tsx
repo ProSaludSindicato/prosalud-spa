@@ -55,6 +55,7 @@ import {
   SstDeliveryRecord,
   SstDocumentType,
   SstInventoryItem,
+  SstDeliveryType,
 } from '@/types/adminSst';
 import { sstAdminService } from '@/services/sstAdminService';
 import { logger } from '@/utils/logger';
@@ -77,6 +78,12 @@ const itemVariants = {
     opacity: 1,
     transition: { type: 'spring', stiffness: 100 },
   },
+};
+
+const getDeliveryTypeLabel = (type?: SstDeliveryType): string => {
+  if (type === 'first_time') return 'Primera vez';
+  if (type === 'periodic') return 'Periódica';
+  return 'No especificado';
 };
 
 const AdminSstPage: React.FC = () => {
@@ -725,13 +732,95 @@ const AdminSstPage: React.FC = () => {
         return;
       }
 
-      const rows: Record<string, any>[] = [];
+      const deliveriesHeader: string[] = [
+        'ID de entrega',
+        'Fecha de entrega',
+        'Hospital',
+        'Afiliado tipo documento',
+        'Afiliado número documento',
+        'Afiliado nombre completo',
+        'Proceso del afiliado',
+        'Responsable de entrega',
+        'Observaciones',
+        'Tipo de entrega',
+        'Artículo',
+        'Categoría artículo',
+        'Color',
+        'Talla',
+        'Cantidad',
+        'Firma URL',
+        'Firma imagen',
+      ];
+      const firmaImageColumnIndex = deliveriesHeader.indexOf('Firma imagen');
+
+      const deliveriesRows: (string | number)[][] = [[...deliveriesHeader]];
+      const signaturePlacements: { row: number; col: number; url: string }[] = [];
+      const blankRowTemplate = Array(deliveriesHeader.length).fill('');
+      let exportedDetailRows = 0;
+      let firstTimeDeliveriesCount = 0;
+      let periodicDeliveriesCount = 0;
+
       const deliveriesByHospital = new Map<string, { deliveries: number; units: number }>();
       const itemsByCategory = new Map<string, number>();
       const itemsByArticle = new Map<string, number>();
       const articleCategoryMap = new Map<string, string>();
       let totalUnitsDelivered = 0;
       let deliveriesWithNotes = 0;
+
+      const imageDataCache = new Map<string, { data: string; extension: string }>();
+      const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize);
+          binary += String.fromCharCode(...chunk);
+        }
+        return btoa(binary);
+      };
+
+      const loadSignatureImage = async (url: string): Promise<{ data: string; extension: string }> => {
+        const cached = imageDataCache.get(url);
+        if (cached) {
+          return cached;
+        }
+
+        if (url.startsWith('data:')) {
+          const [meta, base64Data] = url.split(',', 2);
+          if (!base64Data) {
+            throw new Error('Formato de data URL inválido para la firma');
+          }
+          const mimeMatch = meta.match(/data:(.*?);/);
+          const mime = mimeMatch?.[1] ?? 'image/png';
+          const extension = mime.split('/')[1] ?? 'png';
+          const result = { data: base64Data, extension };
+          imageDataCache.set(url, result);
+          return result;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        const extension = (blob.type || 'image/png').split('/')[1] ?? 'png';
+        const result = {
+          data: arrayBufferToBase64(arrayBuffer),
+          extension,
+        };
+        imageDataCache.set(url, result);
+        return result;
+      };
+
+      const addRow = (row: (string | number)[]): number => {
+        deliveriesRows.push(row);
+        return deliveriesRows.length - 1;
+      };
+
+      const appendSeparatorRow = () => {
+        deliveriesRows.push([...blankRowTemplate]);
+      };
 
       filteredDeliveries.forEach((record) => {
         const affiliate = affiliateMap.get(record.affiliateId);
@@ -774,31 +863,48 @@ const AdminSstPage: React.FC = () => {
         hospitalStats.units += recordUnits;
         deliveriesByHospital.set(hospital, hospitalStats);
 
-        const baseRow = {
-          'ID de entrega': record.id,
-          'Fecha de entrega': format(new Date(record.deliveredAt), 'yyyy-MM-dd HH:mm'),
-          Hospital: hospital,
-          'Afiliado tipo documento': docType,
-          'Afiliado número documento': docNumber,
-          'Afiliado nombre completo': affiliateName || 'Sin información',
-          'Proceso del afiliado': role,
-          'Responsable de entrega': record.deliveredByName ?? record.deliveredBy,
-          Observaciones: record.notes ?? '',
-        };
+        const deliveryTypeLabel = getDeliveryTypeLabel(record.deliveryType as SstDeliveryType | undefined);
+        if (record.deliveryType === 'first_time') {
+          firstTimeDeliveriesCount += 1;
+        } else if (record.deliveryType === 'periodic') {
+          periodicDeliveriesCount += 1;
+        }
+
+        const baseRowData: (string | number)[] = [
+          record.id,
+          format(new Date(record.deliveredAt), 'yyyy-MM-dd HH:mm'),
+          hospital,
+          docType,
+          docNumber,
+          affiliateName || 'Sin información',
+          role,
+          record.deliveredByName ?? record.deliveredBy,
+          record.notes ?? '',
+          deliveryTypeLabel,
+        ];
+        const signatureUrl = record.signedDocumentUrl ?? '';
 
         if (!record.items.length) {
-          rows.push({
-            ...baseRow,
-            Artículo: 'Sin artículos registrados',
-            'Categoría artículo': '',
-            Color: '',
-            Talla: '',
-            Cantidad: 0,
-          });
+          const row = [
+            ...baseRowData,
+            'Sin artículos registrados',
+            '',
+            '',
+            '',
+            0,
+            signatureUrl,
+            '',
+          ];
+          const rowIndex = addRow(row);
+          exportedDetailRows += 1;
+          if (signatureUrl && firmaImageColumnIndex !== -1) {
+            signaturePlacements.push({ row: rowIndex, col: firmaImageColumnIndex, url: signatureUrl });
+          }
+          appendSeparatorRow();
           return;
         }
 
-        record.items.forEach((item) => {
+        record.items.forEach((item, index) => {
           const inventoryItem = inventoryMap.get(item.itemId);
           const category = inventoryItem?.category ?? 'Sin categoría';
           const articleName = inventoryItem?.name ?? item.itemId;
@@ -811,21 +917,61 @@ const AdminSstPage: React.FC = () => {
             articleCategoryMap.set(articleName, category);
           }
 
-          rows.push({
-            ...baseRow,
-            Artículo: articleName,
-            'Categoría artículo': category,
-            Color: colorLabel,
-            Talla: item.variant?.size ?? '',
-            Cantidad: quantity,
-          });
+          const row = [
+            ...baseRowData,
+            articleName,
+            category,
+            colorLabel,
+            item.variant?.size ?? '',
+            quantity,
+            signatureUrl,
+            '',
+          ];
+          const rowIndex = addRow(row);
+          exportedDetailRows += 1;
+
+          if (signatureUrl && firmaImageColumnIndex !== -1 && index === 0) {
+            signaturePlacements.push({ row: rowIndex, col: firmaImageColumnIndex, url: signatureUrl });
+          }
         });
+
+        appendSeparatorRow();
       });
 
+      if (deliveriesRows.length > 1) {
+        const lastRow = deliveriesRows[deliveriesRows.length - 1];
+        if (lastRow.every((cell) => cell === '')) {
+          deliveriesRows.pop();
+        }
+      }
+
       const workbook = XLSX.utils.book_new();
-      const deliveriesSheet = XLSX.utils.json_to_sheet(rows);
+      const deliveriesSheet = XLSX.utils.aoa_to_sheet(deliveriesRows);
+
+      if (signaturePlacements.length > 0 && firmaImageColumnIndex !== -1) {
+        for (const placement of signaturePlacements) {
+          try {
+            const targetRow = deliveriesRows[placement.row];
+            if (!targetRow) continue;
+
+            const targetCell = targetRow[placement.col];
+            if (typeof targetCell === 'object' && targetCell && 'f' in targetCell) continue;
+
+            const { data, extension } = await loadSignatureImage(placement.url);
+            targetRow[placement.col] = {
+              f: `=IMAGE("data:image/${extension};base64,${data}", 4, 48, 48)`,
+            } as unknown as string;
+          } catch (error) {
+            logger.warn(
+              'No fue posible adjuntar la firma en el reporte',
+              error instanceof Error ? error.message : error,
+            );
+          }
+        }
+      }
+
       XLSX.utils.book_append_sheet(workbook, deliveriesSheet, 'Entregas');
-      if (rows.length > 0 && deliveriesSheet['!ref']) {
+      if (deliveriesRows.length > 1 && deliveriesSheet['!ref']) {
         deliveriesSheet['!cols'] = [
           { wch: 18 },
           { wch: 20 },
@@ -836,15 +982,18 @@ const AdminSstPage: React.FC = () => {
           { wch: 24 },
           { wch: 24 },
           { wch: 36 },
+          { wch: 18 },
           { wch: 28 },
           { wch: 20 },
-          { wch: 16 },
-          { wch: 14 },
+          { wch: 18 },
           { wch: 12 },
+          { wch: 14 },
+          { wch: 36 },
+          { wch: 18 },
         ];
         const filterRange = XLSX.utils.encode_range({
           s: { r: 0, c: 0 },
-          e: { r: rows.length, c: 12 },
+          e: { r: deliveriesRows.length - 1, c: deliveriesHeader.length - 1 },
         });
         deliveriesSheet['!autofilter'] = { ref: filterRange };
       }
@@ -861,6 +1010,8 @@ const AdminSstPage: React.FC = () => {
         ['Total entregas registradas', filteredDeliveries.length, ''],
         ['Total unidades entregadas', totalUnitsDelivered, ''],
         ['Entregas con observaciones', deliveriesWithNotes, ''],
+        ['Entregas primera vez', firstTimeDeliveriesCount, ''],
+        ['Entregas periódicas', periodicDeliveriesCount, ''],
         ['Afiliados únicos incluidos', new Set(filteredDeliveries.map((record) => record.affiliateId)).size, ''],
         ['Artículos diferentes entregados', itemsByArticle.size, ''],
         [''],
@@ -941,7 +1092,7 @@ const AdminSstPage: React.FC = () => {
 
       toast({
         title: 'Reporte exportado',
-        description: `Se generaron ${rows.length} filas en el reporte.`,
+        description: `Se generaron ${exportedDetailRows} filas detalladas en el reporte.`,
       });
       handleCloseExportDialog();
     } catch (error) {
