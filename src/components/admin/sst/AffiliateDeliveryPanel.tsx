@@ -34,7 +34,7 @@ interface AffiliateDeliveryPanelProps {
 }
 
 interface SelectedItemState {
-  quantity: number;
+  quantity: number | '';
   variantIndex?: number;
 }
 
@@ -231,11 +231,12 @@ export function AffiliateDeliveryPanel({
         item?.variants && item.variants.length > 0
           ? item.variants[state.variantIndex ?? 0]
           : undefined;
+      const quantity = typeof state.quantity === 'number' ? state.quantity : 0;
 
       return {
         itemId,
         variant,
-        quantity: state.quantity,
+        quantity,
       };
     });
   };
@@ -289,12 +290,28 @@ export function AffiliateDeliveryPanel({
     });
   };
 
-  const handleQuantityChange = (itemId: string, value: number) => {
-    if (Number.isNaN(value)) return;
-    setSelectedItems((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], quantity: Math.max(0, value) },
-    }));
+  const handleQuantityChange = (itemId: string, rawValue: string) => {
+    setSelectedItems((prev) => {
+      const current = prev[itemId];
+      if (!current) return prev;
+
+      if (rawValue === '') {
+        return {
+          ...prev,
+          [itemId]: { ...current, quantity: '' },
+        };
+      }
+
+      const numericValue = Number(rawValue);
+      if (Number.isNaN(numericValue)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [itemId]: { ...current, quantity: Math.max(0, numericValue) },
+      };
+    });
   };
 
   const handleVariantChange = (itemId: string, index: number) => {
@@ -328,7 +345,10 @@ export function AffiliateDeliveryPanel({
       return;
     }
 
-    const hasInvalidQuantities = Object.values(selectedItems).some((item) => (item?.quantity ?? 0) <= 0);
+    const hasInvalidQuantities = Object.values(selectedItems).some((item) => {
+      if (item?.quantity === '' || item?.quantity === undefined) return true;
+      return item.quantity <= 0;
+    });
     if (hasInvalidQuantities) {
       setFormError('Revisa las cantidades. Cada elemento seleccionado debe tener una cantidad mayor a cero.');
       toast({
@@ -588,9 +608,15 @@ export function AffiliateDeliveryPanel({
                             <Input
                               type="number"
                               disabled={!isSelected}
-                              value={itemState?.quantity ?? 1}
+                              value={
+                                !isSelected
+                                  ? ''
+                                  : itemState?.quantity === ''
+                                  ? ''
+                                  : itemState?.quantity ?? ''
+                              }
                               onChange={(event) =>
-                                handleQuantityChange(item.id, Number(event.target.value))
+                                handleQuantityChange(item.id, event.target.value)
                               }
                             />
                           </TableCell>
