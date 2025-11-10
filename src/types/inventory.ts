@@ -67,4 +67,42 @@ export interface SupplierDelivery {
   items: SupplierDeliveryItem[];
 }
 
+export type HospitalRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'preparing'
+  | 'shipped'
+  | 'delivered'
+  | 'rejected';
+
+export interface HospitalRequestItem {
+  productId: string;
+  variantId?: string;
+  variantLabel?: string;
+  size?: string;
+  colorId?: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface HospitalRequestTimelineEvent {
+  id: string;
+  status: HospitalRequestStatus;
+  timestamp: string;
+  description?: string;
+  actor?: string;
+}
+
+export interface HospitalRequest {
+  id: string;
+  hospitalId: string;
+  hospitalName: string;
+  requestedBy?: string;
+  createdAt: string;
+  status: HospitalRequestStatus;
+  items: HospitalRequestItem[];
+  observations?: string;
+  timeline?: HospitalRequestTimelineEvent[];
+}
+
 

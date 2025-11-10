@@ -1,15 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  Plus,
-  Search,
-  Edit,
+import { 
+  Plus, 
+  Search, 
+  Edit, 
   Eye,
   AlertCircle,
   Package,
@@ -22,6 +29,7 @@ import {
   ShoppingBag,
   Boxes,
   Tag,
+  EllipsisVertical,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ProductForm from './ProductForm';
@@ -288,13 +296,15 @@ const ProductManagement: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border shadow-sm">
           <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_200px_auto] items-end">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-search">Buscar</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
+                    id="product-search"
                     placeholder="Buscar productos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -302,19 +312,24 @@ const ProductManagement: React.FC = () => {
                   />
                 </div>
               </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="product-category">Categoría</Label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectTrigger id="product-category" className="w-full">
                   <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categoryOptionsList.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                    {categoryOptionsList.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="sr-only">Stock bajo</Label>
               <Button
                 variant={showLowStock ? "default" : "outline"}
                 onClick={() => setShowLowStock(!showLowStock)}
@@ -323,6 +338,7 @@ const ProductManagement: React.FC = () => {
                 <AlertCircle className="h-4 w-4 mr-2" />
                 Stock Bajo
               </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -334,7 +350,7 @@ const ProductManagement: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="border-0 shadow-md">
+        <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Package className="h-5 w-5" />
@@ -399,24 +415,33 @@ const ProductManagement: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                             <Button 
                               variant="ghost" 
-                              size="sm"
+                                size="icon"
+                                className="text-gray-600 hover:text-white hover:bg-accent"
+                              >
+                                <EllipsisVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
                               onClick={() => handleViewProduct(product)}
-                              className="hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                                className="gap-2"
                             >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
+                                <Eye className="h-4 w-4 text-primary-prosalud" />
+                                Ver detalle
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                               onClick={() => handleEditProduct(product)}
-                              className="hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                                className="gap-2"
                             >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
+                                <Edit className="h-4 w-4 text-primary-prosalud" />
+                                Editar producto
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );

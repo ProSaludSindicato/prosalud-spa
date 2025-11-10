@@ -38,10 +38,10 @@ const variantModeOptions: { value: InventoryVariantMode; label: string; descript
 
 const productSchema = z
   .object({
-    name: z.string().min(1, 'El nombre es requerido'),
+  name: z.string().min(1, 'El nombre es requerido'),
     categoryId: z.string().min(1, 'La categoría es requerida'),
     subcategoryId: z.string().optional(),
-    description: z.string().optional(),
+  description: z.string().optional(),
     variantMode: z.enum(['simple', 'size', 'color', 'size_color']),
     selectedSizes: z.array(z.string()).optional(),
     selectedColors: z.array(z.string()).optional(),
@@ -725,7 +725,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-sm font-medium text-gray-700">

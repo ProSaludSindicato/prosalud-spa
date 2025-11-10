@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import {
+  HospitalRequest,
+  HospitalRequestStatus,
   InventoryCategory,
   InventoryColorOption,
   InventoryProduct,
@@ -12,6 +14,8 @@ interface InventoryContextValue {
   categories: InventoryCategory[];
   products: InventoryProduct[];
   deliveries: SupplierDelivery[];
+  hospitalRequests: HospitalRequest[];
+  hospitalOptions: Array<{ id: string; name: string }>;
   colorOptions: InventoryColorOption[];
   sizeOptions: string[];
   addCategory: (payload: Omit<InventoryCategory, 'id' | 'subcategories'> & { subcategories?: InventorySubcategory[] }) => void;
@@ -23,6 +27,12 @@ interface InventoryContextValue {
   addProduct: (product: Omit<InventoryProduct, 'id'>) => void;
   updateProduct: (id: string, payload: Partial<Omit<InventoryProduct, 'id'>>) => void;
   removeProduct: (id: string) => void;
+  addHospitalRequest: (payload: Omit<HospitalRequest, 'id' | 'status' | 'createdAt' | 'timeline'>) => HospitalRequest;
+  updateHospitalRequestStatus: (
+    id: string,
+    status: HospitalRequestStatus,
+    event?: Omit<HospitalRequest['timeline'][number], 'id' | 'status' | 'timestamp'>,
+  ) => void;
 }
 
 const InventoryContext = createContext<InventoryContextValue | undefined>(undefined);
@@ -212,10 +222,169 @@ const initialDeliveries: SupplierDelivery[] = [
   },
 ];
 
+const hospitalOptions = [
+  { id: 'hospital-marco-fidel', name: 'Hospital Marco Fidel Suárez - Bello' },
+  { id: 'hospital-san-juan', name: 'Hospital San Juan de Dios - Rionegro' },
+  { id: 'hospital-santa-elena', name: 'Hospital Santa Elena - Fredonia' },
+  { id: 'hospital-venancio', name: 'Hospital Venancio Díaz Díaz - La Ceja' },
+  { id: 'hospital-general', name: 'Hospital General de Medellín' },
+  { id: 'clinica-cardio', name: 'Clínica Cardiovascular Santa María' },
+];
+
+const initialHospitalRequests: HospitalRequest[] = [
+  {
+    id: 'req-001',
+    hospitalId: 'hospital-marco-fidel',
+    hospitalName: 'Hospital Marco Fidel Suárez - Bello',
+    requestedBy: 'Laura Gómez',
+    createdAt: '2025-01-10T08:30:00Z',
+    status: 'preparing',
+    observations: 'Prioridad alta por ingreso de nuevo personal.',
+    items: [
+      {
+        productId: 'prod-uniforme-azul',
+        variantId: 'v2',
+        variantLabel: 'Talla M · Azul',
+        size: 'M',
+        colorId: 'AZUL',
+        quantity: 10,
+      },
+      {
+        productId: 'prod-uniforme-azul',
+        variantId: 'v3',
+        variantLabel: 'Talla L · Azul',
+        size: 'L',
+        colorId: 'AZUL',
+        quantity: 8,
+      },
+      {
+        productId: 'prod-tapabocas-n95',
+        variantId: 'v1',
+        variantLabel: 'Estándar',
+        quantity: 250,
+      },
+    ],
+    timeline: [
+      {
+        id: generateId(),
+        status: 'pending',
+        timestamp: '2025-01-10T08:30:00Z',
+        description: 'Solicitud creada por hospital.',
+        actor: 'Laura Gómez',
+      },
+      {
+        id: generateId(),
+        status: 'approved',
+        timestamp: '2025-01-10T12:00:00Z',
+        description: 'Solicitud aprobada por sede principal.',
+        actor: 'Coordinador Inventarios',
+      },
+      {
+        id: generateId(),
+        status: 'preparing',
+        timestamp: '2025-01-11T09:15:00Z',
+        description: 'Preparación de dotaciones en curso.',
+        actor: 'Almacén Central',
+      },
+    ],
+  },
+  {
+    id: 'req-002',
+    hospitalId: 'hospital-san-juan',
+    hospitalName: 'Hospital San Juan de Dios - Rionegro',
+    requestedBy: 'Carlos Ruiz',
+    createdAt: '2025-01-08T14:45:00Z',
+    status: 'delivered',
+    observations: 'Reponer stock utilizado en jornada de brigada.',
+    items: [
+      {
+        productId: 'prod-bata-lab',
+        variantId: 'v2',
+        variantLabel: 'Talla M',
+        size: 'M',
+        quantity: 12,
+      },
+      {
+        productId: 'prod-bata-lab',
+        variantId: 'v3',
+        variantLabel: 'Talla L',
+        size: 'L',
+        quantity: 8,
+      },
+      {
+        productId: 'prod-kit-bienvenida',
+        variantId: 'v1',
+        variantLabel: 'Kit estándar',
+        quantity: 40,
+      },
+    ],
+    timeline: [
+      {
+        id: generateId(),
+        status: 'pending',
+        timestamp: '2025-01-08T14:45:00Z',
+        actor: 'Carlos Ruiz',
+      },
+      {
+        id: generateId(),
+        status: 'approved',
+        timestamp: '2025-01-08T18:10:00Z',
+        actor: 'Coordinador Inventarios',
+      },
+      {
+        id: generateId(),
+        status: 'shipped',
+        timestamp: '2025-01-09T10:30:00Z',
+        description: 'Envío coordinado con transportadora.',
+      },
+      {
+        id: generateId(),
+        status: 'delivered',
+        timestamp: '2025-01-10T16:20:00Z',
+        description: 'Entrega confirmada por hospital.',
+        actor: 'Carlos Ruiz',
+      },
+    ],
+  },
+  {
+    id: 'req-003',
+    hospitalId: 'hospital-santa-elena',
+    hospitalName: 'Hospital Santa Elena - Fredonia',
+    requestedBy: 'Valentina Múnera',
+    createdAt: '2025-01-12T09:05:00Z',
+    status: 'pending',
+    items: [
+      {
+        productId: 'prod-uniforme-verde',
+        variantId: 'v2',
+        variantLabel: 'Talla M · Verde',
+        size: 'M',
+        colorId: 'VERDE',
+        quantity: 5,
+      },
+      {
+        productId: 'prod-uniforme-verde',
+        variantId: 'v3',
+        variantLabel: 'Talla L · Verde',
+        size: 'L',
+        colorId: 'VERDE',
+        quantity: 7,
+      },
+      {
+        productId: 'prod-tapabocas-n95',
+        variantId: 'v1',
+        variantLabel: 'Estándar',
+        quantity: 150,
+      },
+    ],
+  },
+];
+
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [categories, setCategories] = useState<InventoryCategory[]>(initialCategories);
   const [products, setProducts] = useState<InventoryProduct[]>(initialProducts);
   const [deliveries] = useState<SupplierDelivery[]>(initialDeliveries);
+  const [hospitalRequests, setHospitalRequests] = useState<HospitalRequest[]>(initialHospitalRequests);
 
   const addCategory = useCallback<InventoryContextValue['addCategory']>((payload) => {
     const id = generateId();
@@ -348,11 +517,62 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setProducts((prev) => prev.filter((product) => product.id !== id));
   }, []);
 
+  const addHospitalRequest = useCallback<InventoryContextValue['addHospitalRequest']>((payload) => {
+    const newRequest: HospitalRequest = {
+      id: `req-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      timeline: [
+        {
+          id: generateId(),
+          status: 'pending',
+          timestamp: new Date().toISOString(),
+          description: 'Solicitud registrada en el sistema.',
+          actor: payload.requestedBy ?? 'Coordinador Hospital',
+        },
+      ],
+      ...payload,
+    };
+
+    setHospitalRequests((prev) => [newRequest, ...prev]);
+    return newRequest;
+  }, []);
+
+  const updateHospitalRequestStatus = useCallback<InventoryContextValue['updateHospitalRequestStatus']>(
+    (id, status, event) => {
+      setHospitalRequests((prev) =>
+        prev.map((request) => {
+          if (request.id !== id) return request;
+
+          const nextTimeline: HospitalRequest['timeline'] = [
+            ...(request.timeline ?? []),
+            {
+              id: generateId(),
+              status,
+              timestamp: new Date().toISOString(),
+              description: event?.description,
+              actor: event?.actor,
+            },
+          ];
+
+          return {
+            ...request,
+            status,
+            timeline: nextTimeline,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       categories,
       products,
       deliveries,
+      hospitalRequests,
+      hospitalOptions,
       colorOptions: initialColorOptions,
       sizeOptions,
       addCategory,
@@ -364,11 +584,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addProduct,
       updateProduct,
       removeProduct,
+      addHospitalRequest,
+      updateHospitalRequestStatus,
     }),
     [
       categories,
       products,
       deliveries,
+      hospitalRequests,
+      hospitalOptions,
       addCategory,
       updateCategory,
       removeCategory,
@@ -378,6 +602,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addProduct,
       updateProduct,
       removeProduct,
+      addHospitalRequest,
+      updateHospitalRequestStatus,
     ],
   );
 

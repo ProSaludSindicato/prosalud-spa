@@ -12,15 +12,10 @@ import {
   Users,
   Download,
   Info,
+  ClipboardList,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -59,6 +54,7 @@ import {
 } from '@/types/adminSst';
 import { sstAdminService } from '@/services/sstAdminService';
 import { logger } from '@/utils/logger';
+import { Link } from 'react-router-dom';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1139,7 +1135,7 @@ const AdminSstPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
               <CardHeader className="pb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="bg-primary-prosalud/10 p-3 rounded-lg">
                       <ShieldCheck className="h-8 w-8 text-primary-prosalud" />
@@ -1153,6 +1149,24 @@ const AdminSstPage: React.FC = () => {
                         y guarda la firma de recibido como constancia.
                       </CardDescription>
                     </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                      <Link to="/admin/inventario?tab=hospital-requests">
+                        <ClipboardList className="h-4 w-4" />
+                        Solicitudes de hospitales
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleOpenExportDialog}
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar reporte
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -1216,16 +1230,6 @@ const AdminSstPage: React.FC = () => {
                     </CardDescription>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="justify-center gap-2 text-sm"
-                      onClick={handleOpenExportDialog}
-                    >
-                      <Download className="h-4 w-4" />
-                      Exportar reporte
-                    </Button>
                     <Button
                       type="button"
                       variant="ghost"

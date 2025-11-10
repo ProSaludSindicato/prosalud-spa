@@ -1,41 +1,71 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   Package, 
-  Truck, 
   Plus,
   BarChart3,
-  FileText
+  FileText,
+  ClipboardList,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import InventoryOverview from '@/components/admin/inventario/InventoryOverview';
 import ProductManagement from '@/components/admin/inventario/ProductManagement';
-import SupplierDeliveries from '@/components/admin/inventario/SupplierDeliveries';
 // import Returns from '@/components/admin/inventario/Returns';
 // import Requests from '@/components/admin/inventario/Requests';
 import QuickActionsDialog from '@/components/admin/inventario/QuickActionsDialog';
 import ExportReportDialog from '@/components/admin/inventario/ExportReportDialog';
 import CategoryManagement from '@/components/admin/inventario/CategoryManagement';
+import HospitalRequests from '@/components/admin/inventario/HospitalRequests';
 // import NewRequestForm from '@/components/admin/inventario/NewRequestForm';
 // import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const AdminInventarioPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [exportReportOpen, setExportReportOpen] = useState(false);
 
-  const tabs = [
+  const tabs = useMemo(
+    () => [
     { id: 'overview', label: 'Resumen', icon: BarChart3 },
-    { id: 'categories', label: 'Categorías', icon: FileText },
+      { id: 'categories', label: 'Categorías', icon: FileText },
     { id: 'products', label: 'Productos', icon: Package },
-    { id: 'deliveries', label: 'Entregas', icon: Truck },
-    // { id: 'requests', label: 'Solicitudes', icon: ClipboardList },
-    // { id: 'returns', label: 'Devoluciones', icon: RotateCcw }
-  ];
+      // { id: 'deliveries', label: 'Entregas', icon: Truck },
+      { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList },
+    ],
+    [],
+  );
+
+  const tabIds = useMemo(() => tabs.map((tab) => tab.id), [tabs]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabQuery = params.get('tab');
+    const hashTab = location.hash ? location.hash.replace('#', '') : null;
+    const targetTab = tabQuery || hashTab;
+    if (targetTab && tabIds.includes(targetTab) && targetTab !== activeTab) {
+      setActiveTab(targetTab);
+    }
+  }, [location.search, location.hash, tabIds, activeTab]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const params = new URLSearchParams(location.search);
+    if (value === 'overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', value);
+    }
+    const searchString = params.toString();
+    const nextUrl = `${location.pathname}${searchString ? `?${searchString}` : ''}${value !== 'overview' ? `#${value}` : ''}`;
+    navigate(nextUrl, { replace: true });
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -109,14 +139,14 @@ const AdminInventarioPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="bg-white shadow-sm">
               <CardContent className="p-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                   <div className="p-6 pb-0">
                     <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-gray-50 border p-1">
                       {tabs.map((tab) => (
                         <TabsTrigger
                           key={tab.id}
                           value={tab.id}
-                          className="flex items-center space-x-2 data-[state=active]:bg-primary-prosalud data-[state=active]:text-white transition-all duration-200"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
                         >
                           <tab.icon className="h-4 w-4" />
                           <span className="hidden sm:inline">{tab.label}</span>
@@ -130,16 +160,16 @@ const AdminInventarioPage: React.FC = () => {
                       <InventoryOverview />
                     </TabsContent>
 
+                    <TabsContent value="categories" className="space-y-6 mt-0">
+                      <CategoryManagement />
+                    </TabsContent>
+
                     <TabsContent value="products" className="space-y-6 mt-0">
                       <ProductManagement />
                     </TabsContent>
 
-                    <TabsContent value="deliveries" className="space-y-6 mt-0">
-                      <SupplierDeliveries />
-                    </TabsContent>
-
-                    <TabsContent value="categories" className="space-y-6 mt-0">
-                      <CategoryManagement />
+                    <TabsContent value="hospital-requests" className="space-y-6 mt-0">
+                      <HospitalRequests />
                     </TabsContent>
 
                   </div>
