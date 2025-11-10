@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useInventory } from '@/context/InventoryContext';
 import { InventoryProduct, InventoryVariantMode, ProductVariant, InventorySize } from '@/types/inventory';
 
+type NumericVariantField = 'stock' | 'minStock' | 'maxStock';
+
 const variantModeOptions: { value: InventoryVariantMode; label: string; description: string }[] = [
   {
     value: 'simple',
@@ -35,6 +37,20 @@ const variantModeOptions: { value: InventoryVariantMode; label: string; descript
     description: 'Combina tallas y colores para generar todas las variantes necesarias.',
   },
 ];
+
+const parseNumberInput = (value: string): number | undefined => {
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed === '-' || trimmed === '+') {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  if (Number.isNaN(parsed)) {
+    return undefined;
+  }
+
+  return parsed;
+};
 
 const productSchema = z
   .object({
@@ -158,20 +174,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const defaultSelectedColors = extractSelectedColors(product);
 
   const firstVariant = product?.variants?.[0];
-  const [defaultVariantValues, setDefaultVariantValues] = useState(() => ({
-    stock: firstVariant?.stock ?? 0,
-    minStock: firstVariant?.minStock ?? 0,
-    maxStock: firstVariant?.maxStock ?? 100,
+  const [defaultVariantValues, setDefaultVariantValues] = useState<{ stock?: number; minStock?: number; maxStock?: number }>(() => ({
+    stock: firstVariant?.stock,
+    minStock: firstVariant?.minStock,
+    maxStock: firstVariant?.maxStock,
   }));
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: product?.name ?? '',
-      categoryId: product?.categoryId ?? sortedCategories[0]?.id ?? '',
-      subcategoryId: product?.subcategoryId,
+      categoryId: product?.categoryId || product?.category?.id || sortedCategories[0]?.id || '',
+      subcategoryId: product?.subcategoryId || product?.subcategory?.id,
       description: product?.description ?? '',
-      variantMode: defaultVariantMode,
+      variantMode: product?.variantMode || product?.variant_mode || defaultVariantMode,
       selectedSizes: defaultSelectedSizes,
       selectedColors: defaultSelectedColors,
       variants:
@@ -201,6 +217,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
     control: form.control,
     name: 'variants',
   });
+
+  const {
+    formState: { errors: formErrors },
+  } = form;
 
   const selectedCategoryId = useWatch({ control: form.control, name: 'categoryId' });
   const selectedSubcategoryId = useWatch({ control: form.control, name: 'subcategoryId' });
@@ -292,20 +312,18 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   }, [variantMode, selectedSizes.join(','), selectedColors.join(','), defaultVariantValues, replace, form]);
 
   const updateDefaultValue = useCallback(
-    (field: 'stock' | 'minStock' | 'maxStock', rawValue: number) => {
-      const safeValue = Number.isNaN(rawValue) ? undefined : rawValue;
-      setDefaultVariantValues((prev) => ({ ...prev, [field]: safeValue ?? 0 }));
+    (field: NumericVariantField, rawValue: string) => {
+      const safeValue = parseNumberInput(rawValue);
+      setDefaultVariantValues((prev) => ({ ...prev, [field]: safeValue }));
 
       const current = form.getValues('variants');
-      if (!current.length || safeValue === undefined) return;
+      if (!current.length) return;
 
-      const updated = current.map((variant) => ({
-        ...variant,
-        [field]: safeValue,
-      }));
-      replace(updated);
+      current.forEach((_, index) => {
+        form.setValue(`variants.${index}.${field}` as const, safeValue, { shouldDirty: true });
+      });
     },
-    [form, replace],
+    [form],
   );
 
   const onSubmit = async (data: ProductFormData) => {
@@ -379,24 +397,26 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   };
 
   const updateVariantValue = useCallback(
-    (index: number, field: keyof ProductFormData['variants'][number], rawValue: number) => {
-      const safeValue = Number.isNaN(rawValue) ? undefined : rawValue;
-      const current = form.getValues('variants');
-      const updated = current.map((variant, vIndex) =>
-        vIndex === index
-          ? {
-              ...variant,
-              [field]: safeValue,
-            }
-          : variant,
-      );
-      replace(updated);
+    (index: number, field: NumericVariantField, rawValue: string) => {
+      const safeValue = parseNumberInput(rawValue);
+      form.setValue(`variants.${index}.${field}` as const, safeValue, { shouldDirty: true });
     },
-    [form, replace],
+    [form],
+  );
+  const getVariantFieldError = useCallback(
+    (index: number, field: NumericVariantField): string | undefined => {
+      const variantError = (formErrors.variants as Array<any> | undefined)?.[index];
+      if (!variantError) return undefined;
+      const fieldError = variantError?.[field];
+      if (!fieldError) return undefined;
+      if (typeof fieldError === 'string') return fieldError;
+      return fieldError.message;
+    },
+    [formErrors.variants],
   );
 
   const variantValues = useWatch({ control: form.control, name: 'variants' }) ?? [];
-
+      
   const toggleSize = (size: string) => {
     const current = new Set(selectedSizes);
     if (current.has(size)) {
@@ -417,44 +437,63 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
     form.setValue('selectedColors', Array.from(current), { shouldDirty: true });
   };
 
+  const getInputClass = (error?: string) => {
+    if (error) {
+      return 'bg-red-50 border-red-500 text-red-900 placeholder-red-700 focus:ring-red-500 focus:border-red-500';
+    }
+    return 'bg-white border-gray-300';
+  };
+
   const renderVariantRows = () => {
     if (variantMode === 'simple') {
-      return variantValues.map((variant, index) => (
-        <div key={fields[index]?.id ?? index} className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Stock actual *</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                className="bg-white border-gray-300"
-                value={variant.stock ?? ''}
-                onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
-              />
+      return variantValues.map((variant, index) => {
+        const stockError = getVariantFieldError(index, 'stock');
+        const minStockError = getVariantFieldError(index, 'minStock');
+        const maxStockError = getVariantFieldError(index, 'maxStock');
+
+  return (
+          <div key={fields[index]?.id ?? index} className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Stock actual *</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className={getInputClass(stockError)}
+                  aria-invalid={!!stockError}
+                  value={variant.stock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'stock', event.target.value)}
+                />
+                {stockError && <p className="text-xs text-red-500">{stockError}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Stock mínimo *</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  className={getInputClass(minStockError)}
+                  aria-invalid={!!minStockError}
+                  value={variant.minStock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'minStock', event.target.value)}
+                />
+                {minStockError && <p className="text-xs text-red-500">{minStockError}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Stock máximo *</Label>
+                <Input
+                  type="number"
+                  placeholder="100"
+                  className={getInputClass(maxStockError)}
+                  aria-invalid={!!maxStockError}
+                  value={variant.maxStock ?? ''}
+                  onChange={(event) => updateVariantValue(index, 'maxStock', event.target.value)}
+                />
+                {maxStockError && <p className="text-xs text-red-500">{maxStockError}</p>}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Stock mínimo *</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                className="bg-white border-gray-300"
-                value={variant.minStock ?? ''}
-                onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Stock máximo *</Label>
-              <Input
-                type="number"
-                placeholder="100"
-                className="bg-white border-gray-300"
-                value={variant.maxStock ?? ''}
-                onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
-              />
           </div>
-          </div>
-        </div>
-      ));
+        );
+      });
     }
 
     if (!variantValues.length) {
@@ -465,106 +504,75 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
       );
     }
 
-    if (variantMode === 'color') {
+    if (variantMode === 'color' || variantMode === 'size') {
       return (
         <div className="space-y-3">
           {variantValues.map((variant, index) => {
+            const stockError = getVariantFieldError(index, 'stock');
+            const minStockError = getVariantFieldError(index, 'minStock');
+            const maxStockError = getVariantFieldError(index, 'maxStock');
             const color = colorOptions.find((option) => option.id === variant.colorId);
+
             return (
               <div
                 key={fields[index]?.id ?? index}
                 className="grid grid-cols-1 md:grid-cols-5 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
               >
                 <div className="flex items-center gap-3 md:col-span-2">
-                  <span
-                    className="h-8 w-8 rounded-full border border-gray-200"
-                    style={{ backgroundColor: color?.hex ?? '#ffffff' }}
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
-                    <span className="text-xs text-gray-500">Código: {variant.colorId ?? '—'}</span>
-                  </div>
+                  {variantMode === 'color' ? (
+                    <>
+                      <span
+                        className="h-8 w-8 rounded-full border border-gray-200"
+                        style={{ backgroundColor: color?.hex ?? '#ffffff' }}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
+                        <span className="text-xs text-gray-500">Código: {variant.colorId ?? '—'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <Badge className="bg-primary-prosalud/10 text-primary-prosalud">Talla {variant.size ?? '—'}</Badge>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Stock *</Label>
                   <Input
                     type="number"
                     placeholder="0"
-                    className="bg-white border-gray-300"
+                    className={getInputClass(stockError)}
+                    aria-invalid={!!stockError}
                     value={variant.stock ?? ''}
-                    onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+                    onChange={(event) => updateVariantValue(index, 'stock', event.target.value)}
                   />
+                  {stockError && <p className="text-xs text-red-500">{stockError}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Mínimo *</Label>
                   <Input
                     type="number"
                     placeholder="0"
-                    className="bg-white border-gray-300"
+                    className={getInputClass(minStockError)}
+                    aria-invalid={!!minStockError}
                     value={variant.minStock ?? ''}
-                    onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+                    onChange={(event) => updateVariantValue(index, 'minStock', event.target.value)}
                   />
+                  {minStockError && <p className="text-xs text-red-500">{minStockError}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700">Máximo *</Label>
                   <Input
                     type="number"
                     placeholder="100"
-                    className="bg-white border-gray-300"
+                    className={getInputClass(maxStockError)}
+                    aria-invalid={!!maxStockError}
                     value={variant.maxStock ?? ''}
-                    onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+                    onChange={(event) => updateVariantValue(index, 'maxStock', event.target.value)}
                   />
+                  {maxStockError && <p className="text-xs text-red-500">{maxStockError}</p>}
                 </div>
-              </div>
+          </div>
             );
           })}
-        </div>
-      );
-    }
-
-    if (variantMode === 'size') {
-      return (
-        <div className="space-y-3">
-          {variantValues.map((variant, index) => (
-            <div
-              key={fields[index]?.id ?? index}
-              className="grid grid-cols-1 md:grid-cols-5 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
-            >
-              <div className="flex items-center gap-3 md:col-span-2">
-                <Badge className="bg-primary-prosalud/10 text-primary-prosalud">Talla {variant.size ?? '—'}</Badge>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Stock *</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  className="bg-white border-gray-300"
-                  value={variant.stock ?? ''}
-                  onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Mínimo *</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  className="bg-white border-gray-300"
-                  value={variant.minStock ?? ''}
-                  onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Máximo *</Label>
-                <Input
-                  type="number"
-                  placeholder="100"
-                  className="bg-white border-gray-300"
-                  value={variant.maxStock ?? ''}
-                  onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
-                />
-              </div>
-            </div>
-          ))}
         </div>
       );
     }
@@ -594,6 +602,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {group.items.map(({ variant, index }) => {
                   const color = colorOptions.find((option) => option.id === variant.colorId);
+                  const stockError = getVariantFieldError(index, 'stock');
+                  const minStockError = getVariantFieldError(index, 'minStock');
+                  const maxStockError = getVariantFieldError(index, 'maxStock');
+
                   return (
                     <div key={fields[index]?.id ?? index} className="space-y-3 rounded-md border border-gray-200 bg-white p-3">
                       <div className="flex items-center gap-2">
@@ -612,30 +624,36 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                           <Input
                             type="number"
                             placeholder="0"
-                            className="bg-white border-gray-300"
+                            className={getInputClass(stockError)}
+                            aria-invalid={!!stockError}
                             value={variant.stock ?? ''}
-                            onChange={(event) => updateVariantValue(index, 'stock', Number(event.target.value))}
+                            onChange={(event) => updateVariantValue(index, 'stock', event.target.value)}
                           />
+                          {stockError && <p className="text-[11px] text-red-500">{stockError}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs font-medium text-gray-600">Mínimo</Label>
                           <Input
                             type="number"
                             placeholder="0"
-                            className="bg-white border-gray-300"
+                            className={getInputClass(minStockError)}
+                            aria-invalid={!!minStockError}
                             value={variant.minStock ?? ''}
-                            onChange={(event) => updateVariantValue(index, 'minStock', Number(event.target.value))}
+                            onChange={(event) => updateVariantValue(index, 'minStock', event.target.value)}
                           />
+                          {minStockError && <p className="text-[11px] text-red-500">{minStockError}</p>}
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs font-medium text-gray-600">Máximo</Label>
                           <Input
                             type="number"
                             placeholder="100"
-                            className="bg-white border-gray-300"
+                            className={getInputClass(maxStockError)}
+                            aria-invalid={!!maxStockError}
                             value={variant.maxStock ?? ''}
-                            onChange={(event) => updateVariantValue(index, 'maxStock', Number(event.target.value))}
+                            onChange={(event) => updateVariantValue(index, 'maxStock', event.target.value)}
                           />
+                          {maxStockError && <p className="text-[11px] text-red-500">{maxStockError}</p>}
                         </div>
                       </div>
                     </div>
@@ -776,8 +794,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                     <Label className="text-sm font-medium text-gray-700">Stock actual por defecto</Label>
                       <Input
                         type="number"
-                      value={defaultVariantValues.stock}
-                      onChange={(event) => updateDefaultValue('stock', Number(event.target.value))}
+                        value={defaultVariantValues.stock ?? ''}
+                        onChange={(event) => updateDefaultValue('stock', event.target.value)}
                         className="bg-white border-gray-300"
                       />
                     </div>
@@ -785,8 +803,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                     <Label className="text-sm font-medium text-gray-700">Stock mínimo por defecto</Label>
                       <Input
                         type="number"
-                      value={defaultVariantValues.minStock}
-                      onChange={(event) => updateDefaultValue('minStock', Number(event.target.value))}
+                        value={defaultVariantValues.minStock ?? ''}
+                        onChange={(event) => updateDefaultValue('minStock', event.target.value)}
                         className="bg-white border-gray-300"
                       />
                     </div>
@@ -794,8 +812,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                     <Label className="text-sm font-medium text-gray-700">Stock máximo por defecto</Label>
                       <Input
                         type="number"
-                      value={defaultVariantValues.maxStock}
-                      onChange={(event) => updateDefaultValue('maxStock', Number(event.target.value))}
+                        value={defaultVariantValues.maxStock ?? ''}
+                        onChange={(event) => updateDefaultValue('maxStock', event.target.value)}
                           className="bg-white border-gray-300"
                         />
                       </div>

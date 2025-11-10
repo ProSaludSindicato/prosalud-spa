@@ -1,41 +1,65 @@
 
+export type StockStatus = 'ok' | 'low' | 'critical';
+
 export interface ReportMetadata {
-  lastUpdate: string;
-  totalCategories: number;
-  systemVersion: string;
-  generatedBy: string;
+  generatedAt: string;
   reportId: string;
+  generatedBy: string;
   dateRange?: {
     start: string;
     end: string;
   };
 }
 
+export interface ReportSummary {
+  totalCategories: number;
+  totalProducts: number;
+  totalVariants: number;
+  totalStock: number;
+  lowStockCount: number;
+  criticalStockCount: number;
+  pendingHospitalRequests: number;
+  preparingHospitalRequests: number;
+  shippedHospitalRequests: number;
+  deliveredHospitalRequests: number;
+  rejectedHospitalRequests: number;
+  pendingDeliveries: number;
+}
+
 export interface ReportProduct {
+  productId: string;
+  variantId?: string;
+  sku: string;
   name: string;
+  categoryName: string;
   stock: number;
   min: number;
   max: number;
-  status: 'ok' | 'low' | 'critical';
-  value: number;
-  sku: string;
-  location: string;
+  status: StockStatus;
+  pendingRequests: number;
+  pendingHospitals: string[];
+  lastRequestDate?: string;
 }
 
 export interface ReportCategory {
+  id: string;
   name: string;
-  description: string;
+  description?: string;
+  totalProducts: number;
+  lowStockProducts: number;
+  criticalProducts: number;
   products: ReportProduct[];
 }
 
 export interface RequestRecord {
   id: string;
   hospital: string;
-  coordinator: string;
-  date: string;
-  products: string[];
-  status: 'pending' | 'approved' | 'delivered';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  coordinator?: string;
+  createdAt: string;
+  status: string;
+  totalItems: number;
+  pendingItems: number;
+  lastUpdate: string;
 }
 
 export interface ReturnRecord {
@@ -52,21 +76,20 @@ export interface DeliveryRecord {
   id: string;
   supplier: string;
   date: string;
-  products: string[];
-  status: 'pending' | 'received' | 'completed';
   totalItems: number;
+  status: string;
+  products: string[];
 }
 
 export interface ReportData {
   metadata: ReportMetadata;
+  summary: ReportSummary;
   categories: ReportCategory[];
-  requests?: RequestRecord[];
-  returns?: ReturnRecord[];
-  deliveries?: DeliveryRecord[];
+  requests: RequestRecord[];
+  deliveries: DeliveryRecord[];
 }
 
-export type ReportType = 'full' | 'summary' | 'lowstock';
-export type ReportFormat = 'pdf' | 'excel';
+export type ReportType = 'strategic' | 'operational' | 'lowstock';
 
 export interface DateRangeFilter {
   start?: Date;

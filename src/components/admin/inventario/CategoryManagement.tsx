@@ -55,6 +55,8 @@ const getIconComponent = (value?: string) => {
 const CategoryManagement: React.FC = () => {
   const {
     categories,
+    categoriesLoading,
+    categoriesError,
     addCategory,
     updateCategory,
     addSubcategory,
@@ -186,11 +188,13 @@ const CategoryManagement: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
       >
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestión de Categorías</h2>
-          <p className="text-gray-600">
-            Crea y organiza categorías y subcategorías para estructurar el inventario.
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Gestión de Categorías</h2>
+            <p className="text-gray-600">
+              Crea y organiza categorías y subcategorías para estructurar el inventario.
+            </p>
+          </div>
         </div>
         <Button
           onClick={handleCreateCategory}
@@ -201,18 +205,54 @@ const CategoryManagement: React.FC = () => {
         </Button>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        {sortedCategories.length === 0 ? (
-          <div className="py-12 text-center text-gray-500">
-            Aún no has creado categorías. Empieza creando la primera categoría.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {sortedCategories.map((category) => {
+      {/* Loading State */}
+      {categoriesLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="border shadow-sm">
+            <CardContent className="p-8 flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-prosalud mb-4"></div>
+              <p className="text-gray-600">Cargando categorías...</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Error State */}
+      {categoriesError && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="border border-red-200 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <div>
+                  <h3 className="font-semibold text-red-900 mb-1">Error al cargar categorías</h3>
+                  <p className="text-sm text-red-700">{categoriesError}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Categories Grid */}
+      {!categoriesLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          {sortedCategories.length === 0 ? (
+            <div className="py-12 text-center text-gray-500">
+              Aún no has creado categorías. Empieza creando la primera categoría.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {sortedCategories.map((category) => {
               const CategoryIcon = getIconComponent(category.icon);
               return (
                 <motion.div
@@ -221,32 +261,42 @@ const CategoryManagement: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="h-full border border-gray-200">
-                    <CardHeader className="pb-4">
+                  <Card className="flex h-full flex-col overflow-hidden border border-gray-200">
+                    <CardHeader className="pb-4 min-h-[140px]">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
                           <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-prosalud/10 text-primary-prosalud">
                             <CategoryIcon className="h-5 w-5" />
                           </span>
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">{category.name}</h3>
+                          <div className="min-w-0">
+                            <h3
+                              className="text-lg font-semibold text-gray-900 line-clamp-2"
+                              title={category.name}
+                            >
+                              {category.name}
+                            </h3>
                             {category.description && (
-                              <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+                              <p
+                                className="mt-1 text-sm text-gray-600 line-clamp-3"
+                                title={category.description}
+                              >
+                                {category.description}
+                              </p>
                             )}
                           </div>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-gray-600 hover:text-gray-900"
+                          className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                           onClick={() => handleEditCategory(category.id)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-3">
+                    <CardContent className="flex flex-1 flex-col">
+                      <div className="mb-3 flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-gray-700">Subcategorías</span>
                         <Button
                           size="sm"
@@ -260,23 +310,29 @@ const CategoryManagement: React.FC = () => {
                       </div>
 
                       {category.subcategories.length === 0 ? (
-                        <p className="text-sm text-gray-500">
+                        <p className="flex-1 text-sm text-gray-500">
                           Aún no hay subcategorías en esta categoría.
                         </p>
                       ) : (
-                        <ScrollArea className="max-h-52 pr-2">
-                          <div className="space-y-2">
+                        <ScrollArea className="flex-1 max-h-56 pr-2">
+                          <div className="space-y-2 pb-1">
                             {category.subcategories.map((subcategory) => (
                               <div
                                 key={subcategory.id}
                                 className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
                               >
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">
+                                <div className="min-w-0">
+                                  <p
+                                    className="text-sm font-medium text-gray-900 line-clamp-1"
+                                    title={subcategory.name}
+                                  >
                                     {subcategory.name}
                                   </p>
                                   {subcategory.description && (
-                                    <p className="text-xs text-gray-600">
+                                    <p
+                                      className="text-xs text-gray-600 line-clamp-2"
+                                      title={subcategory.description}
+                                    >
                                       {subcategory.description}
                                     </p>
                                   )}
@@ -284,7 +340,7 @@ const CategoryManagement: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="text-gray-600 hover:text-gray-900"
+                                  className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                                   onClick={() =>
                                     handleEditSubcategory(category.id, subcategory.id)
                                   }
@@ -302,8 +358,9 @@ const CategoryManagement: React.FC = () => {
               );
             })}
           </div>
-        )}
-      </motion.div>
+          )}
+        </motion.div>
+      )}
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>

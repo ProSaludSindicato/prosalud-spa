@@ -4,15 +4,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ReportType, ReportFormat, DateRangeFilter } from './types/reportTypes';
-import { getInventoryData, getFilteredData } from './utils/reportData';
-import { generatePDFReport } from './utils/pdfReportGenerator';
+import { ReportType, DateRangeFilter } from './types/reportTypes';
+import { buildReportData, getFilteredData } from './utils/reportData';
 import { generateExcelReport } from './utils/excelReportGenerator';
-import ReportFormatSelector from './components/ReportFormatSelector';
 import ReportTypeSelector from './components/ReportTypeSelector';
 import ReportInfoCard from './components/ReportInfoCard';
 import DateRangeSelector from './components/DateRangeSelector';
 import * as XLSX from 'xlsx';
+import { useInventory } from '@/context/InventoryContext';
 
 interface ExportReportDialogProps {
   open: boolean;
@@ -20,61 +19,46 @@ interface ExportReportDialogProps {
 }
 
 const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenChange }) => {
-  const [format, setFormat] = useState<ReportFormat>('pdf');
-  const [reportType, setReportType] = useState<ReportType>('full');
+  const [reportType, setReportType] = useState<ReportType>('strategic');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
-    includeAll: true
+    includeAll: true,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
+  const { categories, products, hospitalRequests, deliveries } = useInventory();
 
   const handleExport = async () => {
     setIsGenerating(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-      const baseData = getInventoryData();
-      
-      // Add date range to metadata if specified
-      if (!dateRange.includeAll && dateRange.start && dateRange.end) {
-        baseData.metadata.dateRange = {
-          start: dateRange.start.toLocaleDateString('es-ES'),
-          end: dateRange.end.toLocaleDateString('es-ES')
-        };
-      }
+      const baseData = buildReportData({
+        categories,
+        products,
+        hospitalRequests,
+        deliveries,
+        dateRange,
+        reportType,
+      });
 
-      const data = getFilteredData(reportType, baseData);
-
-      const reportTypeText = reportType === 'summary' ? 'Ejecutivo' : 
-                            reportType === 'lowstock' ? 'Stock_Critico' : 'Completo';
-
-      if (format === 'pdf') {
-        const doc = generatePDFReport(data, reportType);
-        doc.save(`Reporte_${reportTypeText}_ProSalud_${new Date().toISOString().split('T')[0]}.pdf`);
+      const filteredData = getFilteredData(reportType, baseData);
+      const workbook = generateExcelReport(filteredData, reportType);
+      const timestamp = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `Reporte_${reportType.toUpperCase()}_${timestamp}.xlsx`);
         
         toast({
-          title: "Reporte PDF Generado",
-          description: `El reporte ${reportTypeText.toLowerCase()} en PDF se ha descargado exitosamente`,
+        title: 'Reporte Excel Generado',
+        description: 'Se descargó el reporte estratégico del inventario en formato Excel.',
           duration: 4000,
         });
-      } else {
-        const wb = generateExcelReport(data, reportType);
-        XLSX.writeFile(wb, `Reporte_${reportTypeText}_ProSalud_${new Date().toISOString().split('T')[0]}.xlsx`);
-        
-        toast({
-          title: "Reporte Excel Generado",
-          description: `El reporte ${reportTypeText.toLowerCase()} en Excel se ha descargado exitosamente`,
-          duration: 4000,
-        });
-      }
 
       onOpenChange(false);
     } catch (error) {
       toast({
-        title: "Error al Generar Reporte",
-        description: "Hubo un problema al generar el reporte. Inténtalo de nuevo.",
-        variant: "destructive",
+        title: 'Error al Generar Reporte',
+        description: 'Hubo un problema al generar el reporte. Inténtalo de nuevo.',
+        variant: 'destructive',
         duration: 4000,
       });
     } finally {
@@ -86,22 +70,18 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg bg-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-gray-900">
-            Exportar Reporte de Inventario
-          </DialogTitle>
+          <DialogTitle className="text-lg font-semibold text-gray-900">Exportar Reporte de Inventario</DialogTitle>
           <DialogDescription>
-            Genera un reporte profesional del inventario en el formato de tu preferencia
+            Genera un reporte en formato Excel con la información clave del inventario, su distribución por categorías y el estado de solicitudes.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          <ReportFormatSelector value={format} onChange={setFormat} />
-          
           <ReportTypeSelector value={reportType} onChange={setReportType} />
           
           <DateRangeSelector value={dateRange} onChange={setDateRange} />
           
-          <ReportInfoCard reportType={reportType} />
+          <ReportInfoCard type={reportType} />
 
           <div className="flex justify-end space-x-2 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -120,7 +100,7 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
               ) : (
                 <>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar Reporte
+                  Exportar a Excel
                 </>
               )}
             </Button>

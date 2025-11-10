@@ -45,7 +45,14 @@ const ProductManagement: React.FC = () => {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
   const [viewMode, setViewMode] = useState<'form' | 'details'>('form');
-  const { products, categories, colorOptions } = useInventory();
+  const { 
+    products, 
+    categories, 
+    colorOptions, 
+    productsLoading, 
+    productsError,
+    categoriesLoading, 
+  } = useInventory();
 
   const categoryOptionsList = useMemo(
     () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
@@ -170,8 +177,12 @@ const ProductManagement: React.FC = () => {
 
   const renderDialogContent = () => {
     if (viewMode === 'details' && selectedProduct) {
-      const category = categoryMap.get(selectedProduct.categoryId);
-      const subcategory = category?.subcategories.find((sub) => sub.id === selectedProduct.subcategoryId);
+      const category =
+        selectedProduct.category ??
+        (selectedProduct.categoryId ? categoryMap.get(selectedProduct.categoryId) : undefined);
+      const subcategoryName =
+        selectedProduct.subcategory?.name ??
+        category?.subcategories?.find((sub) => sub.id === selectedProduct.subcategoryId)?.name;
       return (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -186,18 +197,20 @@ const ProductManagement: React.FC = () => {
               </p>
             </div>
           </div>
-
+          
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Subcategoría</label>
             <p className="text-gray-900 bg-gray-50 p-3 rounded border">
-              {subcategory?.name ?? 'Sin subcategoría asignada'}
+                {subcategoryName ?? 'Sin subcategoría asignada'}
             </p>
           </div>
-          
+
+          {selectedProduct.description && (
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Descripción</label>
             <p className="text-gray-900 bg-gray-50 p-3 rounded border">{selectedProduct.description}</p>
           </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Stock Total</label>
@@ -208,40 +221,69 @@ const ProductManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Variantes del Producto</label>
-            <div className="space-y-3">
-              {selectedProduct.variants.map((variant, index) => (
-                <div key={index} className="bg-gray-50 p-4 rounded border">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {variant.size && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">Talla:</span>
-                        <p className="text-gray-900">{variant.size}</p>
-                      </div>
-                    )}
-                    {variant.colorId && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">Color:</span>
-                        <div className="flex items-center gap-2 text-gray-900">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {selectedProduct.variants.map((variant, index) => {
+                const resolvedColor =
+                  variant.color ??
+                  (variant.colorId ? colorOptions.find((option) => option.id === variant.colorId) : undefined);
+                const isLow =
+                  (variant.is_low_stock ?? false) || (variant.stock ?? 0) <= (variant.minStock ?? 0);
+
+                return (
+                  <div
+                    key={index}
+                    className="flex h-full flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {resolvedColor ? (
                           <span
-                            className="h-4 w-4 rounded-full border border-gray-200"
-                            style={{
-                              backgroundColor:
-                                colorOptions.find((option) => option.id === variant.colorId)?.hex ?? '#ffffff',
-                            }}
+                            className="h-8 w-8 rounded-full border border-gray-200"
+                            style={{ backgroundColor: resolvedColor.hex ?? '#ffffff' }}
+                            title={resolvedColor.label}
                           />
-                          <span>{colorOptions.find((option) => option.id === variant.colorId)?.label ?? 'Sin color'}</span>
+                        ) : (
+                          <span className="grid h-8 w-8 place-items-center rounded-full border border-dashed border-gray-300 text-xs text-gray-400">
+                            —
+                          </span>
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {variant.label ?? variant.sku ?? 'Variante'}
+                          </p>
+                          <p className="text-xs uppercase tracking-wide text-gray-500">
+                            SKU: {variant.sku ?? '—'}
+                          </p>
                         </div>
                       </div>
-                    )}
+                      <Badge variant={isLow ? 'destructive' : 'secondary'} className="text-xs">
+                        Stock {variant.stock ?? 0}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-xs font-medium uppercase text-gray-500">Talla</span>
+                        <p className="text-gray-900">{variant.size ?? '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium uppercase text-gray-500">Color</span>
+                        <p className="text-gray-900">
+                          {resolvedColor?.label ?? variant.colorId ?? '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium uppercase text-gray-500">Stock mínimo</span>
+                        <p className="text-gray-900">{variant.minStock ?? 0}</p>
+                      </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-600">Stock:</span>
-                      <p className={`font-semibold ${variant.stock <= variant.minStock ? 'text-red-600' : 'text-green-600'}`}>
-                        {variant.stock} / {variant.minStock} min
-                      </p>
+                        <span className="text-xs font-medium uppercase text-gray-500">Stock máximo</span>
+                        <p className="text-gray-900">{variant.maxStock ?? 0}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -344,13 +386,48 @@ const ProductManagement: React.FC = () => {
         </Card>
       </motion.div>
 
+      {/* Loading/Error States */}
+      {productsLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="border shadow-sm">
+            <CardContent className="p-8 flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-prosalud mb-4"></div>
+              <p className="text-gray-600">Cargando productos...</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {productsError && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="border border-red-200 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-red-900 mb-1">Error al cargar productos</h3>
+                  <p className="text-sm text-red-700">{productsError}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Products Table */}
+      {!productsLoading && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="border shadow-sm">
+          <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Package className="h-5 w-5" />
@@ -367,7 +444,7 @@ const ProductManagement: React.FC = () => {
                   <TableRow className="bg-gray-50">
                     <TableHead>Producto</TableHead>
                     <TableHead>Categoría</TableHead>
-                    <TableHead>Subcategoría</TableHead>
+                      <TableHead>Subcategoría</TableHead>
                     <TableHead>Stock Total</TableHead>
                     <TableHead>Variantes</TableHead>
                     <TableHead>Estado</TableHead>
@@ -375,7 +452,7 @@ const ProductManagement: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedData.map(({ product, category, subcategory, totalStock, lowStock }) => {
+                    {paginatedData.map(({ product, category, subcategory, totalStock, lowStock }) => {
                     const Icon = getCategoryIcon(category);
                     return (
                       <TableRow key={product.id} className="hover:bg-gray-50 transition-colors">
@@ -462,6 +539,7 @@ const ProductManagement: React.FC = () => {
           </CardContent>
         </Card>
       </motion.div>
+      )}
 
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">

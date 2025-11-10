@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,83 +11,32 @@ import { motion } from 'framer-motion';
 interface LowStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  items?: LowStockItem[];
 }
 
 interface LowStockItem {
-  id: string;
+  id?: string;
   name: string;
   category: string;
   current: number;
   min: number;
-  max: number;
-  status: 'critical' | 'low';
-  lastOrder: string;
-  supplier: string;
+  max?: number;
+  status: 'critical' | 'low' | 'ok';
+  lastOrder?: string;
+  supplier?: string;
 }
 
-const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) => {
+const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange, items = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const lowStockItems: LowStockItem[] = [
-    { 
-      id: '1',
-      name: 'Uniforme Azul - Talla M', 
-      category: 'Uniformes',
-      current: 3, 
-      min: 10, 
-      max: 50,
-      status: 'critical',
-      lastOrder: '2024-01-10',
-      supplier: 'MedSupply S.A.S'
-    },
-    { 
-      id: '2',
-      name: 'Bata Blanca - Talla L', 
-      category: 'Batas',
-      current: 2, 
-      min: 8, 
-      max: 30,
-      status: 'critical',
-      lastOrder: '2024-01-08',
-      supplier: 'Textiles ProSalud'
-    },
-    { 
-      id: '3',
-      name: 'Tapabocas N95', 
-      category: 'Tapabocas',
-      current: 45, 
-      min: 100, 
-      max: 500,
-      status: 'low',
-      lastOrder: '2024-01-15',
-      supplier: 'Implementos Médicos'
-    },
-    { 
-      id: '4',
-      name: 'Uniforme Verde - Talla S', 
-      category: 'Uniformes',
-      current: 1, 
-      min: 5, 
-      max: 25,
-      status: 'critical',
-      lastOrder: '2024-01-05',
-      supplier: 'MedSupply S.A.S'
-    },
-    { 
-      id: '5',
-      name: 'USB Corporativo', 
-      category: 'Regalos',
-      current: 3, 
-      min: 6, 
-      max: 20,
-      status: 'low',
-      lastOrder: '2023-12-20',
-      supplier: 'Promocionales ABC'
-    }
-  ];
+  const normalizedItems = useMemo(
+    () =>
+      items.filter((item) => item.status === 'low' || item.status === 'critical'),
+    [items],
+  );
 
-  const filteredItems = lowStockItems.filter(item => {
+  const filteredItems = normalizedItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
@@ -99,6 +48,7 @@ const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) =
     switch (status) {
       case 'critical': return 'bg-red-100 text-red-700';
       case 'low': return 'bg-amber-100 text-amber-700';
+      case 'ok': return 'bg-green-100 text-green-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -107,6 +57,7 @@ const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) =
     switch (status) {
       case 'critical': return 'Crítico';
       case 'low': return 'Bajo';
+      case 'ok': return 'Adecuado';
       default: return status;
     }
   };
@@ -150,18 +101,18 @@ const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) =
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 border border-red-200 rounded-lg p-4"
+            className="rounded-lg border border-red-200 bg-red-50 p-4"
           >
             <div className="flex items-center space-x-3">
               <AlertTriangle className="h-8 w-8 text-red-600" />
               <div>
                 <p className="text-sm text-red-600">Stock Crítico</p>
                 <p className="text-2xl font-bold text-red-700">
-                  {filteredItems.filter(item => item.status === 'critical').length}
+                  {normalizedItems.filter(item => item.status === 'critical').length}
                 </p>
               </div>
             </div>
@@ -171,14 +122,14 @@ const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) =
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-amber-50 border border-amber-200 rounded-lg p-4"
+            className="rounded-lg border border-amber-200 bg-amber-50 p-4"
           >
             <div className="flex items-center space-x-3">
               <Package className="h-8 w-8 text-amber-600" />
               <div>
                 <p className="text-sm text-amber-600">Stock Bajo</p>
                 <p className="text-2xl font-bold text-amber-700">
-                  {filteredItems.filter(item => item.status === 'low').length}
+                  {normalizedItems.filter(item => item.status === 'low').length}
                 </p>
               </div>
             </div>
@@ -188,75 +139,76 @@ const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange }) =
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-blue-50 border border-blue-200 rounded-lg p-4"
+            className="rounded-lg border border-blue-200 bg-blue-50 p-4"
           >
             <div className="flex items-center space-x-3">
               <Truck className="h-8 w-8 text-blue-600" />
               <div>
                 <p className="text-sm text-blue-600">Total Productos</p>
-                <p className="text-2xl font-bold text-blue-700">{filteredItems.length}</p>
+                <p className="text-2xl font-bold text-blue-700">{normalizedItems.length}</p>
               </div>
             </div>
           </motion.div>
         </div>
 
         {/* Items Table */}
-        <div className="rounded-md border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead>Producto</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Stock Actual</TableHead>
-                <TableHead>Stock Mínimo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Último Pedido</TableHead>
-                <TableHead>Proveedor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">ID: {item.id}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{item.category}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`font-medium ${item.status === 'critical' ? 'text-red-600' : 'text-amber-600'}`}>
-                      {item.current}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-gray-600">{item.min}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(item.status)}>
-                      {getStatusLabel(item.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {new Date(item.lastOrder).toLocaleDateString()}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">{item.supplier}</span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="flex justify-end pt-4">
-          <p className="text-sm text-gray-600">
-            Mostrando {filteredItems.length} productos con stock bajo
-          </p>
+        <div className="overflow-hidden rounded-md border">
+          {normalizedItems.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              No hay productos con alertas de stock en este momento.
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              No se encontraron productos que coincidan con los filtros seleccionados.
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Stock Actual</TableHead>
+                    <TableHead>Stock Mínimo</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredItems.map((item, index) => (
+                    <TableRow key={item.id ?? `${item.name}-${index}`} className="hover:bg-gray-50">
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-gray-900">{item.name}</p>
+                          {item.id && <p className="text-sm text-gray-600">ID: {item.id}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{item.category}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`font-medium ${item.status === 'critical' ? 'text-red-600' : 'text-amber-600'}`}>
+                          {item.current}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">{item.min}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(item.status)}>
+                          {getStatusLabel(item.status)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end border-t bg-gray-50 px-4 py-2">
+                <p className="text-sm text-gray-600">
+                  Mostrando {filteredItems.length} de {normalizedItems.length} productos con alertas.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

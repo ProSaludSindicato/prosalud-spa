@@ -11,6 +11,7 @@ import {
   BarChart3,
   FileText,
   ClipboardList,
+  Tag,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import InventoryOverview from '@/components/admin/inventario/InventoryOverview';
@@ -23,6 +24,7 @@ import CategoryManagement from '@/components/admin/inventario/CategoryManagement
 import HospitalRequests from '@/components/admin/inventario/HospitalRequests';
 // import NewRequestForm from '@/components/admin/inventario/NewRequestForm';
 // import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { InventoryProvider } from '@/context/InventoryContext';
 
 const AdminInventarioPage: React.FC = () => {
   const location = useLocation();
@@ -34,7 +36,7 @@ const AdminInventarioPage: React.FC = () => {
   const tabs = useMemo(
     () => [
     { id: 'overview', label: 'Resumen', icon: BarChart3 },
-      { id: 'categories', label: 'Categorías', icon: FileText },
+      { id: 'categories', label: 'Categorías', icon: Tag },
     { id: 'products', label: 'Productos', icon: Package },
       // { id: 'deliveries', label: 'Entregas', icon: Truck },
       { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList },
@@ -165,8 +167,14 @@ const AdminInventarioPage: React.FC = () => {
                     </TabsContent>
 
                     <TabsContent value="products" className="space-y-6 mt-0">
+                      <InventoryProvider>
                       <ProductManagement />
+                      </InventoryProvider>
                     </TabsContent>
+
+                    {/* <TabsContent value="deliveries" className="space-y-6 mt-0">
+                      <SupplierDeliveries />
+                        </TabsContent> */}
 
                     <TabsContent value="hospital-requests" className="space-y-6 mt-0">
                       <HospitalRequests />

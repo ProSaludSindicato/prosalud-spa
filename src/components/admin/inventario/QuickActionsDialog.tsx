@@ -1,19 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { 
-  Plus, 
   Package, 
-  Truck, 
+  ClipboardList,
   Eye,
-  ArrowRight
+  Tag,
+  ArrowRight,
 } from 'lucide-react';
 import ProductForm from './ProductForm';
-import NewDeliveryForm from './NewDeliveryForm';
-// import NewRequestForm from './NewRequestForm';
 import LowStockDialog from './LowStockDialog';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { useInventory } from '@/context/InventoryContext';
 
 interface QuickActionsDialogProps {
   open: boolean;
@@ -22,39 +22,90 @@ interface QuickActionsDialogProps {
 
 const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenChange }) => {
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { products, categories } = useInventory();
 
-  const actions = [
+  const lowStockItems = useMemo(() => {
+    const categoryMap = new Map(categories.map((category) => [category.id, category.name]));
+
+    return products.flatMap((product) =>
+      product.variants
+        .filter((variant) => (variant.stock ?? 0) <= (variant.minStock ?? 0))
+        .map((variant) => {
+          const stock = variant.stock ?? 0;
+          const minStock = variant.minStock ?? 0;
+          const status = stock <= 0 ? 'critical' : 'low' as const;
+          return {
+            id: `${product.id}-${variant.id}`,
+            name: `${product.name}${variant.size ? ` · Talla ${variant.size}` : ''}${
+              variant.colorId ? ` · ${variant.colorId}` : ''
+            }`,
+            category: categoryMap.get(product.categoryId ?? product.category?.id ?? '') ?? 'Sin categoría',
+            current: stock,
+            min: minStock,
+            status,
+          };
+        }),
+    );
+  }, [products, categories]);
+
+  const actions: Array<{
+    id: string;
+    title: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+    textColor: string;
+    onSelect?: () => void;
+  }> = [
     {
       id: 'add-product',
       title: 'Agregar Producto',
       description: 'Registrar un nuevo producto en el inventario',
       icon: Package,
       color: 'bg-blue-500',
+      textColor: 'text-blue-600',
     },
     {
-      id: 'new-delivery',
-      title: 'Nueva Entrega',
-      description: 'Registrar una nueva entrega de proveedor',
-      icon: Truck,
-      color: 'bg-green-500',
+      id: 'open-categories',
+      title: 'Gestionar Categorías',
+      description: 'Organiza categorías y subcategorías del inventario',
+      icon: Tag,
+      color: 'bg-purple-500',
+      textColor: 'text-purple-600',
+      onSelect: () => {
+        onOpenChange(false);
+        navigate('/admin/inventario?tab=categories');
+      },
     },
-    // {
-    //   id: 'new-request',
-    //   title: 'Nueva Solicitud',
-    //   description: 'Crear una nueva solicitud de productos',
-    //   icon: FileText,
-    //   color: 'bg-purple-500',
-    // },
+    {
+      id: 'open-hospital-requests',
+      title: 'Solicitudes de Hospitales',
+      description: 'Revisa y gestiona las solicitudes de dotación',
+      icon: ClipboardList,
+      color: 'bg-emerald-500',
+      textColor: 'text-emerald-600',
+      onSelect: () => {
+        onOpenChange(false);
+        navigate('/admin/inventario?tab=hospital-requests');
+      },
+    },
     {
       id: 'view-low-stock',
       title: 'Ver Stock Bajo',
       description: 'Revisar productos con stock bajo',
       icon: Eye,
       color: 'bg-orange-500',
-    }
+      textColor: 'text-orange-600',
+    },
   ];
 
   const handleActionSelect = (actionId: string) => {
+    const action = actions.find((item) => item.id === actionId);
+    if (action?.onSelect) {
+      action.onSelect();
+      return;
+    }
     setSelectedAction(actionId);
   };
 
@@ -73,25 +124,15 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
             </DialogContent>
           </Dialog>
         );
-      case 'new-delivery':
-        return <NewDeliveryForm onClose={handleClose} onSuccess={handleClose} />;
-      // case 'new-request':
-      //   return <NewRequestForm onClose={handleClose} onSuccess={handleClose} />;
       case 'view-low-stock':
-        return <LowStockDialog open={true} onOpenChange={() => handleClose()} />;
+        return <LowStockDialog open={true} onOpenChange={() => handleClose()} items={lowStockItems} />;
       default:
         return null;
     }
   };
 
   if (selectedAction) {
-    // Para agregar producto, renderizar directamente el diálogo
-    if (selectedAction === 'add-product') {
-      return renderActionForm();
-    }
-    
-    // Para ver stock bajo, renderizar directamente el componente
-    if (selectedAction === 'view-low-stock') {
+    if (selectedAction === 'add-product' || selectedAction === 'view-low-stock') {
       return renderActionForm();
     }
     
@@ -132,7 +173,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className={`p-3 rounded-lg ${action.color} bg-opacity-10`}>
-                          <Icon className={`h-6 w-6 text-${action.color.split('-')[1]}-600`} />
+                          <Icon className={`h-6 w-6 ${action.textColor}`} />
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">{action.title}</h3>

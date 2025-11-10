@@ -2,165 +2,232 @@
 import * as XLSX from 'xlsx';
 import { ReportData, ReportType } from '../types/reportTypes';
 
+const formatNumber = (value: number) => new Intl.NumberFormat('es-CO').format(value);
+
+const translateRequestStatus = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return 'Pendiente';
+    case 'approved':
+      return 'Aprobada';
+    case 'preparing':
+      return 'Preparando';
+    case 'shipped':
+      return 'Enviada';
+    case 'delivered':
+      return 'Entregada';
+    case 'rejected':
+      return 'Rechazada';
+    default:
+      return status;
+  }
+};
+
+const translateDeliveryStatus = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return 'Pendiente';
+    case 'received':
+      return 'Recibida';
+    case 'completed':
+      return 'Completada';
+    default:
+      return status;
+  }
+};
+
 export const generateExcelReport = (data: ReportData, reportType: ReportType): XLSX.WorkBook => {
   const wb = XLSX.utils.book_new();
   
-  // Summary sheet
-  const summaryData = [
+  const summaryRows = [
     ['REPORTE DE INVENTARIO PROSALUD'],
-    [`Fecha de generación: ${new Date().toLocaleDateString('es-ES')}`],
+    [`Fecha de generación: ${data.metadata.generatedAt}`],
     [`ID del Reporte: ${data.metadata.reportId}`],
-    [`Tipo de Reporte: ${reportType === 'summary' ? 'Ejecutivo' : reportType === 'lowstock' ? 'Stock Crítico' : 'Completo'}`],
+    [`Tipo de Reporte: ${
+      reportType === 'strategic' ? 'Estratégico' : reportType === 'operational' ? 'Operacional' : 'Stock Crítico'
+    }`],
     data.metadata.dateRange ? [`Período: ${data.metadata.dateRange.start} - ${data.metadata.dateRange.end}`] : [],
     [''],
     ['RESUMEN GENERAL'],
     ['Métrica', 'Valor'],
-    ['Total de productos', data.categories.reduce((sum, cat) => sum + cat.products.length, 0).toString()],
-    ['Stock total', data.categories.reduce((sum, cat) => 
-      sum + cat.products.reduce((catSum, prod) => catSum + prod.stock, 0), 0).toString()],
-    ['Valor total inventario', data.categories.reduce((sum, cat) => 
-      sum + cat.products.reduce((catSum, prod) => catSum + (prod.stock * prod.value), 0), 0).toString()],
-    ['Productos con stock bajo', data.categories.reduce((sum, cat) => 
-      sum + cat.products.filter(prod => prod.status === 'low' || prod.status === 'critical').length, 0).toString()],
-    [''],
-    ['ESTADÍSTICAS ADICIONALES'],
-    ['Total de solicitudes', (data.requests || []).length.toString()],
-    ['Total de devoluciones', (data.returns || []).length.toString()],
-    ['Total de entregas', (data.deliveries || []).length.toString()]
-  ].filter(row => row.length > 0);
+    ['Total de categorías activas', formatNumber(data.summary.totalCategories)],
+    ['Total de productos (SKU únicos)', formatNumber(data.summary.totalProducts)],
+    ['Total de variantes', formatNumber(data.summary.totalVariants)],
+    ['Unidades en stock', formatNumber(data.summary.totalStock)],
+    ['Variantes con stock bajo', formatNumber(data.summary.lowStockCount)],
+    ['Variantes con stock crítico', formatNumber(data.summary.criticalStockCount)],
+    ['Solicitudes pendientes', formatNumber(data.summary.pendingHospitalRequests)],
+    ['Solicitudes en preparación', formatNumber(data.summary.preparingHospitalRequests)],
+    ['Solicitudes enviadas', formatNumber(data.summary.shippedHospitalRequests)],
+    ['Solicitudes entregadas', formatNumber(data.summary.deliveredHospitalRequests)],
+    ['Solicitudes rechazadas', formatNumber(data.summary.rejectedHospitalRequests)],
+    ['Entregas pendientes', formatNumber(data.summary.pendingDeliveries)],
+  ].filter((row) => row.length > 0);
 
-  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
+  summaryWs['!cols'] = [{ wch: 35 }, { wch: 25 }];
   XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumen');
 
-  if (reportType !== 'summary') {
-    // Detailed sheet
-    const detailData = [
-      ['Categoría', 'SKU', 'Producto', 'Stock Actual', 'Stock Mínimo', 'Stock Máximo', 'Estado', 'Ubicación', 'Valor Unitario', 'Valor Total']
+  const detailStartRow = 4;
+  const detailRows = [
+    ['DETALLE DE INVENTARIO'],
+    [''],
+    ['Categoría', 'SKU', 'Producto / Variante', 'Stock', 'Mínimo', 'Máximo', 'Estado', 'Solicitudes pendientes', 'Hospitales pendientes', 'Última solicitud'],
     ];
 
-    data.categories.forEach(category => {
-      category.products.forEach(product => {
-        detailData.push([
+  data.categories.forEach((category) => {
+    category.products.forEach((product) => {
+      detailRows.push([
           category.name,
           product.sku,
           product.name,
-          product.stock.toString(),
-          product.min.toString(),
-          product.max.toString(),
-          product.status === 'ok' ? 'Óptimo' : 
-          product.status === 'low' ? 'Bajo' : 'Crítico',
-          product.location,
-          product.value.toString(),
-          (product.stock * product.value).toString()
+        product.stock,
+        product.min,
+        product.max,
+        product.status === 'ok' ? 'Óptimo' : product.status === 'low' ? 'Bajo' : 'Crítico',
+        product.pendingRequests,
+        product.pendingHospitals.join(', ') || '—',
+        product.lastRequestDate ? new Date(product.lastRequestDate).toLocaleString('es-CO') : '—',
         ]);
       });
     });
 
-    const detailWs = XLSX.utils.aoa_to_sheet(detailData);
-    XLSX.utils.book_append_sheet(wb, detailWs, 'Detalle Inventario');
-  }
+  const detailWs = XLSX.utils.aoa_to_sheet(detailRows);
+  detailWs['!cols'] = [
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 45 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 16 },
+    { wch: 20 },
+    { wch: 32 },
+    { wch: 22 },
+  ];
+  const detailHeaderRow = detailStartRow - 1;
+  detailWs['!autofilter'] = {
+    ref: `A${detailHeaderRow}:J${detailRows.length}`,
+    filterCols: [0, 2, 3, 4, 5, 6, 7, 8, 9],
+  } as any;
+  XLSX.utils.book_append_sheet(wb, detailWs, 'Inventario');
 
-  // Low stock sheet
-  const lowStockData = [
-    ['PRODUCTOS CON STOCK BAJO'],
+  const lowStockStartRow = 4;
+  const lowStockRows = [
+    ['VARIANTES CON STOCK CRÍTICO O BAJO'],
     [''],
-    ['Categoría', 'SKU', 'Producto', 'Stock Actual', 'Stock Mínimo', 'Estado', 'Ubicación', 'Acción Requerida']
+    ['Categoría', 'SKU', 'Producto / Variante', 'Stock', 'Mínimo', 'Estado', 'Solicitudes pendientes', 'Hospitales'],
   ];
 
-  data.categories.forEach(category => {
+  data.categories.forEach((category) => {
     category.products
-      .filter(product => product.status === 'low' || product.status === 'critical')
-      .forEach(product => {
-        lowStockData.push([
+      .filter((product) => product.status === 'low' || product.status === 'critical')
+      .forEach((product) => {
+        lowStockRows.push([
           category.name,
           product.sku,
           product.name,
-          product.stock.toString(),
-          product.min.toString(),
-          product.status === 'low' ? 'Stock Bajo' : 'Stock Crítico',
-          product.location,
-          product.status === 'critical' ? 'URGENTE - Reposición inmediata' : 'Planificar reposición'
+          product.stock,
+          product.min,
+          product.status === 'low' ? 'Stock bajo' : 'Stock crítico',
+          product.pendingRequests,
+          product.pendingHospitals.join(', ') || '—',
         ]);
       });
   });
 
-  const lowStockWs = XLSX.utils.aoa_to_sheet(lowStockData);
+  const lowStockWs = XLSX.utils.aoa_to_sheet(lowStockRows);
+  lowStockWs['!cols'] = [
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 45 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 32 },
+  ];
+  const lowStockHeaderRow = lowStockStartRow - 1;
+  lowStockWs['!autofilter'] = {
+    ref: `A${lowStockHeaderRow}:H${lowStockRows.length}`,
+    filterCols: [0, 2, 3, 4, 5, 6, 7],
+  } as any;
   XLSX.utils.book_append_sheet(wb, lowStockWs, 'Stock Bajo');
 
-  // Requests sheet
-  if (data.requests && data.requests.length > 0) {
-    const requestsData = [
-      ['SOLICITUDES DE IMPLEMENTOS'],
+  if (data.requests.length > 0) {
+    const requestStartRow = 4;
+    const requestRows = [
+      ['SOLICITUDES DE HOSPITALES'],
       [''],
-      ['ID', 'Hospital', 'Coordinador', 'Fecha', 'Productos', 'Estado', 'Prioridad']
+      ['ID', 'Hospital', 'Coordinador', 'Fecha creación', 'Estado', 'Total ítems', 'Ítems pendientes', 'Última actualización'],
     ];
 
-    data.requests.forEach(request => {
-      requestsData.push([
+    data.requests.forEach((request) => {
+      requestRows.push([
         request.id,
         request.hospital,
-        request.coordinator,
-        request.date,
-        request.products.join(', '),
-        request.status === 'pending' ? 'Pendiente' : 
-        request.status === 'approved' ? 'Aprobado' : 
-        request.status === 'delivered' ? 'Entregado' : 'Otro',
-        request.priority === 'low' ? 'Baja' : 
-        request.priority === 'medium' ? 'Media' : 
-        request.priority === 'high' ? 'Alta' : 'Urgente'
+        request.coordinator ?? '—',
+        new Date(request.createdAt).toLocaleString('es-CO'),
+        translateRequestStatus(request.status),
+        request.totalItems,
+        request.pendingItems,
+        new Date(request.lastUpdate).toLocaleString('es-CO'),
       ]);
     });
 
-    const requestsWs = XLSX.utils.aoa_to_sheet(requestsData);
-    XLSX.utils.book_append_sheet(wb, requestsWs, 'Solicitudes');
-  }
-
-  // Returns sheet
-  if (data.returns && data.returns.length > 0) {
-    const returnsData = [
-      ['DEVOLUCIONES'],
-      [''],
-      ['ID', 'Hospital', 'Coordinador', 'Fecha', 'Productos', 'Motivo', 'Estado']
+    const requestWs = XLSX.utils.aoa_to_sheet(requestRows);
+    requestWs['!cols'] = [
+      { wch: 18 },
+      { wch: 36 },
+      { wch: 26 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 24 },
     ];
-
-    data.returns.forEach(returnRecord => {
-      returnsData.push([
-        returnRecord.id,
-        returnRecord.hospital,
-        returnRecord.coordinator,
-        returnRecord.date,
-        returnRecord.products.join(', '),
-        returnRecord.reason,
-        returnRecord.status === 'pending' ? 'Pendiente' : 'Procesado'
-      ]);
-    });
-
-    const returnsWs = XLSX.utils.aoa_to_sheet(returnsData);
-    XLSX.utils.book_append_sheet(wb, returnsWs, 'Devoluciones');
+    const requestHeaderRow = requestStartRow - 1;
+    requestWs['!autofilter'] = {
+      ref: `A${requestHeaderRow}:H${requestRows.length}`,
+      filterCols: [1, 4, 5, 6, 7],
+    } as any;
+    XLSX.utils.book_append_sheet(wb, requestWs, 'Solicitudes');
   }
 
-  // Deliveries sheet
-  if (data.deliveries && data.deliveries.length > 0) {
-    const deliveriesData = [
+  if (data.deliveries.length > 0) {
+    const deliveryStartRow = 4;
+    const deliveryRows = [
       ['ENTREGAS DE PROVEEDORES'],
       [''],
-      ['ID', 'Proveedor', 'Fecha', 'Productos', 'Total Items', 'Estado']
+      ['ID', 'Proveedor', 'Fecha', 'Total ítems', 'Estado', 'Productos'],
     ];
 
-    data.deliveries.forEach(delivery => {
-      deliveriesData.push([
+    data.deliveries.forEach((delivery) => {
+      deliveryRows.push([
         delivery.id,
         delivery.supplier,
-        delivery.date,
-        delivery.products.join(', '),
-        delivery.totalItems.toString(),
-        delivery.status === 'pending' ? 'Pendiente' : 
-        delivery.status === 'received' ? 'Recibido' : 'Completado'
+        new Date(delivery.date).toLocaleDateString('es-ES'),
+        delivery.totalItems,
+        translateDeliveryStatus(delivery.status),
+        delivery.products.join(', ') || '—',
       ]);
     });
 
-    const deliveriesWs = XLSX.utils.aoa_to_sheet(deliveriesData);
-    XLSX.utils.book_append_sheet(wb, deliveriesWs, 'Entregas');
+    const deliveryWs = XLSX.utils.aoa_to_sheet(deliveryRows);
+    deliveryWs['!cols'] = [
+      { wch: 18 },
+      { wch: 32 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 60 },
+    ];
+    const deliveryHeaderRow = deliveryStartRow - 1;
+    deliveryWs['!autofilter'] = {
+      ref: `A${deliveryHeaderRow}:F${deliveryRows.length}`,
+      filterCols: [1, 4, 5],
+    } as any;
+    XLSX.utils.book_append_sheet(wb, deliveryWs, 'Entregas');
   }
 
   return wb;
