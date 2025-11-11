@@ -92,13 +92,13 @@ const normalizeHospitalRequest = (request: any): HospitalRequest => ({
   updated_at: request.updated_at,
 });
 
-interface GetCategoriesParams {
+interface GetCategoriesParams extends Record<string, string | number | boolean | undefined> {
   search?: string;
   page?: number;
   pageSize?: number;
 }
 
-interface GetProductsParams {
+interface GetProductsParams extends Record<string, string | number | boolean | undefined> {
   search?: string;
   category?: string;
   lowStock?: boolean;
@@ -108,7 +108,7 @@ interface GetProductsParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-interface GetHospitalRequestsParams {
+interface GetHospitalRequestsParams extends Record<string, string | number | boolean | undefined> {
   hospitalId?: string;
   status?: HospitalRequestStatus | 'all';
   search?: string;
@@ -213,7 +213,7 @@ export const inventoryApiService = {
   // Categories
   async getCategories(params: GetCategoriesParams = {}): Promise<ApiPaginatedResponse<InventoryCategory>> {
     try {
-      const queryString = buildQueryString(params);
+      const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
       const url = buildAdminApiUrl(`${BASE_PATH}/categories${queryString ? `?${queryString}` : ''}`);
       logger.debug('Fetching categories', { url, params });
       
@@ -329,7 +329,7 @@ export const inventoryApiService = {
   // Products
   async getProducts(params: GetProductsParams = {}): Promise<ApiPaginatedResponse<InventoryProduct>> {
     try {
-      const queryString = buildQueryString(params);
+      const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
       const url = buildAdminApiUrl(`${BASE_PATH}/products${queryString ? `?${queryString}` : ''}`);
       logger.debug('Fetching products', { url, params });
       
@@ -418,7 +418,7 @@ export const inventoryApiService = {
     params: GetHospitalRequestsParams = {}
   ): Promise<ApiPaginatedResponse<HospitalRequest> | { success: boolean; data: any }> {
     try {
-      const queryString = buildQueryString(params);
+      const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
       const url = buildAdminApiUrl(`${BASE_PATH}/hospital-requests${queryString ? `?${queryString}` : ''}`);
       logger.debug('Fetching hospital requests', { url, params });
       

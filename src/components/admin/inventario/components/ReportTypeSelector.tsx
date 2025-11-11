@@ -29,7 +29,7 @@ const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({ value, onChange
               <span className="text-xs text-gray-500 group-hover:text-white">Enfoque en tareas pendientes y abastecimiento.</span>
             </div>
           </SelectItem>
-          <SelectItem value="lowstock" className="group">
+          <SelectItem value="critical_stock" className="group">
             <div className="flex flex-col">
               <span className="font-medium group-hover:text-white">Stock Crítico</span>
               <span className="text-xs text-gray-500 group-hover:text-white">Prioriza variantes con riesgo de ruptura.</span>

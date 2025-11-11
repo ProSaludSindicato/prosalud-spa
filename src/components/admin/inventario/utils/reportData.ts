@@ -18,7 +18,6 @@ interface BuildReportParams {
   hospitalRequests: HospitalRequest[];
   deliveries: SupplierDelivery[];
   dateRange: DateRangeFilter;
-  reportType: ReportType;
 }
 
 const isWithinRange = (dateString: string, range: DateRangeFilter): boolean => {
@@ -207,7 +206,7 @@ export const getFilteredData = (reportType: ReportType, data: ReportData): Repor
         requests: data.requests.filter((request) => request.pendingItems > 0),
       };
     }
-    case 'lowstock': {
+    case 'critical_stock': {
       const categories = data.categories
         .map((category) => ({
           ...category,

@@ -62,16 +62,6 @@ export interface RequestRecord {
   lastUpdate: string;
 }
 
-export interface ReturnRecord {
-  id: string;
-  hospital: string;
-  coordinator: string;
-  date: string;
-  products: string[];
-  reason: string;
-  status: 'pending' | 'processed';
-}
-
 export interface DeliveryRecord {
   id: string;
   supplier: string;
@@ -89,7 +79,7 @@ export interface ReportData {
   deliveries: DeliveryRecord[];
 }
 
-export type ReportType = 'strategic' | 'operational' | 'lowstock';
+export type ReportType = 'strategic' | 'operational' | 'critical_stock';
 
 export interface DateRangeFilter {
   start?: Date;

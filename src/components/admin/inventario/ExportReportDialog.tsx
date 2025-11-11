@@ -39,19 +39,25 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
         hospitalRequests,
         deliveries,
         dateRange,
-        reportType,
       });
 
       const filteredData = getFilteredData(reportType, baseData);
       const workbook = generateExcelReport(filteredData, reportType);
       const timestamp = new Date().toISOString().split('T')[0];
       XLSX.writeFile(workbook, `Reporte_${reportType.toUpperCase()}_${timestamp}.xlsx`);
-        
-        toast({
+
+      const reportLabel =
+        reportType === 'strategic'
+          ? 'estratégico'
+          : reportType === 'operational'
+            ? 'operacional'
+            : 'de stock crítico';
+
+      toast({
         title: 'Reporte Excel Generado',
-        description: 'Se descargó el reporte estratégico del inventario en formato Excel.',
-          duration: 4000,
-        });
+        description: `Se descargó el reporte ${reportLabel} del inventario en formato Excel.`,
+        duration: 4000,
+      });
 
       onOpenChange(false);
     } catch (error) {

@@ -39,48 +39,50 @@ const translateDeliveryStatus = (status: string) => {
 export const generateExcelReport = (data: ReportData, reportType: ReportType): XLSX.WorkBook => {
   const wb = XLSX.utils.book_new();
   
-  const summaryRows = [
-    ['REPORTE DE INVENTARIO PROSALUD'],
-    [`Fecha de generación: ${data.metadata.generatedAt}`],
-    [`ID del Reporte: ${data.metadata.reportId}`],
-    [`Tipo de Reporte: ${
-      reportType === 'strategic' ? 'Estratégico' : reportType === 'operational' ? 'Operacional' : 'Stock Crítico'
-    }`],
-    data.metadata.dateRange ? [`Período: ${data.metadata.dateRange.start} - ${data.metadata.dateRange.end}`] : [],
-    [''],
-    ['RESUMEN GENERAL'],
-    ['Métrica', 'Valor'],
-    ['Total de categorías activas', formatNumber(data.summary.totalCategories)],
-    ['Total de productos (SKU únicos)', formatNumber(data.summary.totalProducts)],
-    ['Total de variantes', formatNumber(data.summary.totalVariants)],
-    ['Unidades en stock', formatNumber(data.summary.totalStock)],
-    ['Variantes con stock bajo', formatNumber(data.summary.lowStockCount)],
-    ['Variantes con stock crítico', formatNumber(data.summary.criticalStockCount)],
-    ['Solicitudes pendientes', formatNumber(data.summary.pendingHospitalRequests)],
-    ['Solicitudes en preparación', formatNumber(data.summary.preparingHospitalRequests)],
-    ['Solicitudes enviadas', formatNumber(data.summary.shippedHospitalRequests)],
-    ['Solicitudes entregadas', formatNumber(data.summary.deliveredHospitalRequests)],
-    ['Solicitudes rechazadas', formatNumber(data.summary.rejectedHospitalRequests)],
-    ['Entregas pendientes', formatNumber(data.summary.pendingDeliveries)],
-  ].filter((row) => row.length > 0);
+  const summaryRows: (string | number)[][] = (
+    [
+      ['REPORTE DE INVENTARIO PROSALUD'],
+      [`Fecha de generación: ${data.metadata.generatedAt}`],
+      [`ID del Reporte: ${data.metadata.reportId}`],
+      [`Tipo de Reporte: ${
+        reportType === 'strategic' ? 'Estratégico' : reportType === 'operational' ? 'Operacional' : 'Stock Crítico'
+      }`],
+      data.metadata.dateRange ? [`Período: ${data.metadata.dateRange.start} - ${data.metadata.dateRange.end}`] : [],
+      [''],
+      ['RESUMEN GENERAL'],
+      ['Métrica', 'Valor'],
+      ['Total de categorías activas', formatNumber(data.summary.totalCategories)],
+      ['Total de productos (SKU únicos)', formatNumber(data.summary.totalProducts)],
+      ['Total de variantes', formatNumber(data.summary.totalVariants)],
+      ['Unidades en stock', formatNumber(data.summary.totalStock)],
+      ['Variantes con stock bajo', formatNumber(data.summary.lowStockCount)],
+      ['Variantes con stock crítico', formatNumber(data.summary.criticalStockCount)],
+      ['Solicitudes pendientes', formatNumber(data.summary.pendingHospitalRequests)],
+      ['Solicitudes en preparación', formatNumber(data.summary.preparingHospitalRequests)],
+      ['Solicitudes enviadas', formatNumber(data.summary.shippedHospitalRequests)],
+      ['Solicitudes entregadas', formatNumber(data.summary.deliveredHospitalRequests)],
+      ['Solicitudes rechazadas', formatNumber(data.summary.rejectedHospitalRequests)],
+      ['Entregas pendientes', formatNumber(data.summary.pendingDeliveries)],
+    ] as (string | number)[][]
+  ).filter((row) => row.length > 0);
 
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
   summaryWs['!cols'] = [{ wch: 35 }, { wch: 25 }];
   XLSX.utils.book_append_sheet(wb, summaryWs, 'Resumen');
 
   const detailStartRow = 4;
-  const detailRows = [
+  const detailRows: (string | number)[][] = [
     ['DETALLE DE INVENTARIO'],
     [''],
     ['Categoría', 'SKU', 'Producto / Variante', 'Stock', 'Mínimo', 'Máximo', 'Estado', 'Solicitudes pendientes', 'Hospitales pendientes', 'Última solicitud'],
-    ];
+  ];
 
   data.categories.forEach((category) => {
     category.products.forEach((product) => {
       detailRows.push([
-          category.name,
-          product.sku,
-          product.name,
+        category.name,
+        product.sku,
+        product.name,
         product.stock,
         product.min,
         product.max,
@@ -88,9 +90,9 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
         product.pendingRequests,
         product.pendingHospitals.join(', ') || '—',
         product.lastRequestDate ? new Date(product.lastRequestDate).toLocaleString('es-CO') : '—',
-        ]);
-      });
+      ]);
     });
+  });
 
   const detailWs = XLSX.utils.aoa_to_sheet(detailRows);
   detailWs['!cols'] = [
@@ -113,7 +115,7 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
   XLSX.utils.book_append_sheet(wb, detailWs, 'Inventario');
 
   const lowStockStartRow = 4;
-  const lowStockRows = [
+  const lowStockRows: (string | number)[][] = [
     ['VARIANTES CON STOCK CRÍTICO O BAJO'],
     [''],
     ['Categoría', 'SKU', 'Producto / Variante', 'Stock', 'Mínimo', 'Estado', 'Solicitudes pendientes', 'Hospitales'],
@@ -156,7 +158,7 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
 
   if (data.requests.length > 0) {
     const requestStartRow = 4;
-    const requestRows = [
+    const requestRows: (string | number)[][] = [
       ['SOLICITUDES DE HOSPITALES'],
       [''],
       ['ID', 'Hospital', 'Coordinador', 'Fecha creación', 'Estado', 'Total ítems', 'Ítems pendientes', 'Última actualización'],
@@ -196,7 +198,7 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
 
   if (data.deliveries.length > 0) {
     const deliveryStartRow = 4;
-    const deliveryRows = [
+    const deliveryRows: (string | number)[][] = [
       ['ENTREGAS DE PROVEEDORES'],
       [''],
       ['ID', 'Proveedor', 'Fecha', 'Total ítems', 'Estado', 'Productos'],
@@ -207,7 +209,7 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
         delivery.id,
         delivery.supplier,
         new Date(delivery.date).toLocaleDateString('es-ES'),
-        delivery.totalItems,
+        formatNumber(delivery.totalItems),
         translateDeliveryStatus(delivery.status),
         delivery.products.join(', ') || '—',
       ]);

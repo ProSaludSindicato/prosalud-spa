@@ -15,7 +15,7 @@ const ReportInfoCard: React.FC<ReportInfoCardProps> = ({ type }) => {
         return 'Incluye métricas globales, comportamiento por categoría y estado de solicitudes y entregas.';
       case 'operational':
         return 'Resalta variaciones con potencial riesgo, pendientes de abastecimiento y coordinación logística.';
-      case 'lowstock':
+      case 'critical_stock':
         return 'Enfocado exclusivamente en variantes con stock crítico o bajo para priorizar reposiciones.';
       default:
         return '';

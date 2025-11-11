@@ -34,7 +34,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
         .map((variant) => {
           const stock = variant.stock ?? 0;
           const minStock = variant.minStock ?? 0;
-          const status = stock <= 0 ? 'critical' : 'low' as const;
+          const status: 'critical' | 'low' = stock <= 0 ? 'critical' : 'low';
           return {
             id: `${product.id}-${variant.id}`,
             name: `${product.name}${variant.size ? ` · Talla ${variant.size}` : ''}${

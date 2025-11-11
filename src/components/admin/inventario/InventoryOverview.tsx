@@ -28,7 +28,7 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import QuickActionsDialog from './QuickActionsDialog';
-import LowStockDialog from './LowStockDialog';
+import LowStockDialog, { type LowStockItem } from './LowStockDialog';
 // import HospitalRequestsDialog from './HospitalRequestsDialog';
 import { useInventory } from '@/context/InventoryContext';
 import { Link } from 'react-router-dom';
@@ -54,7 +54,7 @@ const InventoryOverview: React.FC = () => {
     return map;
   }, [colorOptions]);
 
-  const getVariantStatus = (stock: number, minStock: number) => {
+  const getVariantStatus = (stock: number, minStock: number): 'critical' | 'low' | 'ok' => {
     if (stock <= minStock) return 'critical';
     if (stock <= minStock * 1.25) return 'low';
     return 'ok';
@@ -90,6 +90,7 @@ const InventoryOverview: React.FC = () => {
           available: category.available_stock,
           reserved: category.reserved_stock,
           variants: category.low_stock_items.map((item) => ({
+            id: item.variant_id,
             productId: item.product_id,
             productName: item.product_name,
             size: undefined,
@@ -112,14 +113,15 @@ const InventoryOverview: React.FC = () => {
 
       const variants = categoryProducts.flatMap((product) =>
         product.variants.map((variant) => ({
+          id: variant.id ?? `${product.id}-${variant.size ?? 'std'}-${variant.colorId ?? 'color'}`,
           productId: product.id,
           productName: product.name,
           size: variant.size,
           colorLabel: variant.colorId ? colorLabelMap.get(variant.colorId) : undefined,
-          stock: variant.stock,
-          minStock: variant.minStock,
-          maxStock: variant.maxStock,
-          status: getVariantStatus(variant.stock, variant.minStock),
+          stock: variant.stock ?? 0,
+          minStock: variant.minStock ?? 0,
+          maxStock: variant.maxStock ?? 0,
+          status: getVariantStatus(variant.stock ?? 0, variant.minStock ?? 0),
         })),
       );
 
@@ -139,10 +141,11 @@ const InventoryOverview: React.FC = () => {
     });
   }, [dashboardData, categories, products, colorLabelMap]);
 
-  const lowStockItems = useMemo(() => {
+  const lowStockItems = useMemo<LowStockItem[]>(() => {
     if (dashboardData?.low_stock_products) {
       return dashboardData.low_stock_products.flatMap((product) =>
         product.variants.map((variant) => ({
+          id: variant.id,
           name: `${product.name} - ${variant.label}`,
           current: variant.stock,
           min: variant.min_stock,
@@ -156,6 +159,7 @@ const InventoryOverview: React.FC = () => {
       category.variants
         .filter((variant) => variant.status !== 'ok')
         .map((variant) => ({
+          id: variant.id,
           name: `${variant.productName}${variant.size ? ` - Talla ${variant.size}` : ''}${
             variant.colorLabel ? ` - ${variant.colorLabel}` : ''
           }`,

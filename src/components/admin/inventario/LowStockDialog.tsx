@@ -8,13 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertTriangle, Search, Package, Truck } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-interface LowStockDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  items?: LowStockItem[];
-}
-
-interface LowStockItem {
+export interface LowStockItem {
   id?: string;
   name: string;
   category: string;
@@ -24,6 +18,12 @@ interface LowStockItem {
   status: 'critical' | 'low' | 'ok';
   lastOrder?: string;
   supplier?: string;
+}
+
+interface LowStockDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  items?: LowStockItem[];
 }
 
 const LowStockDialog: React.FC<LowStockDialogProps> = ({ open, onOpenChange, items = [] }) => {
