@@ -198,18 +198,26 @@ const ProductManagement: React.FC = () => {
             </div>
           </div>
           
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Subcategoría</label>
-            <p className="text-gray-900 bg-gray-50 p-3 rounded border">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Subcategoría</label>
+              <p className="text-gray-900 bg-gray-50 p-3 rounded border">
                 {subcategoryName ?? 'Sin subcategoría asignada'}
-            </p>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Género</label>
+              <p className="text-gray-900 bg-gray-50 p-3 rounded border">
+                {selectedProduct.gender ?? 'Sin especificar'}
+              </p>
+            </div>
           </div>
 
           {selectedProduct.description && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Descripción</label>
-            <p className="text-gray-900 bg-gray-50 p-3 rounded border">{selectedProduct.description}</p>
-          </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Descripción</label>
+              <p className="text-gray-900 bg-gray-50 p-3 rounded border">{selectedProduct.description}</p>
+            </div>
           )}
 
           <div className="space-y-2">
@@ -262,7 +270,7 @@ const ProductManagement: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
+                      {/*<div>
                         <span className="text-xs font-medium uppercase text-gray-500">Talla</span>
                         <p className="text-gray-900">{variant.size ?? '—'}</p>
                       </div>
@@ -271,7 +279,7 @@ const ProductManagement: React.FC = () => {
                         <p className="text-gray-900">
                           {resolvedColor?.label ?? variant.colorId ?? '—'}
                         </p>
-                      </div>
+                      </div>*/}
                       <div>
                         <span className="text-xs font-medium uppercase text-gray-500">Stock mínimo</span>
                         <p className="text-gray-900">{variant.minStock ?? 0}</p>
@@ -458,7 +466,12 @@ const ProductManagement: React.FC = () => {
                       <TableRow key={product.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           <div>
-                            <p className="font-medium text-gray-900">{product.name}</p>
+                            <p className="font-medium text-gray-900">
+                              {product.name}
+                              {product.gender && (
+                                <span className="font-bold"> ({product.gender})</span>
+                              )}
+                            </p>
                             <p className="text-sm text-gray-600 line-clamp-1">{product.description}</p>
                           </div>
                         </TableCell>

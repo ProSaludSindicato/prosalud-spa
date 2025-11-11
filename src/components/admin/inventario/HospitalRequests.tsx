@@ -752,7 +752,12 @@ const HospitalRequests: React.FC = () => {
                                                                     )}
                                                                 >
                                                                     <div className="min-w-0 px-0 sm:px-0">
-                                                                        <p className="font-semibold text-gray-900 truncate">{product.name}</p>
+                                                                        <p className="font-semibold text-gray-900 truncate">
+                                                                            {product.name}
+                                                                            {product.gender && (
+                                                                                <span className="font-bold"> ({product.gender})</span>
+                                                                            )}
+                                                                        </p>
                                                                         {product.description && (
                                                                             <p className="text-sm text-gray-600 mt-1 line-clamp-2">{product.description}</p>
                                                                         )}
@@ -963,6 +968,9 @@ const HospitalRequests: React.FC = () => {
                                                             <div className="space-y-1">
                                                                 <p className="text-base font-semibold text-gray-900 leading-tight">
                                                                     {product?.name ?? item.productId}
+                                                                    {product?.gender && (
+                                                                        <span className="font-bold"> ({product.gender})</span>
+                                                                    )}
                                                                 </p>
                                                                 <p className="text-xs text-gray-500">
                                                                     {product?.category?.name ?? 'Sin categoría'}

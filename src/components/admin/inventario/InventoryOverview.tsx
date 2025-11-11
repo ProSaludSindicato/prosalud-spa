@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { 
+import {
   Package, 
   AlertTriangle, 
   Activity,
@@ -34,7 +34,8 @@ import { useInventory } from '@/context/InventoryContext';
 import { Link } from 'react-router-dom';
 
 const InventoryOverview: React.FC = () => {
-  const [expandedCategory, setExpandedCategory] = useState<string | undefined>(undefined);
+  const [expandedCategory, setExpandedCategory] = useState<string | undefined>();
+  const [expandedProduct, setExpandedProduct] = useState<string | undefined>();
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [lowStockOpen, setLowStockOpen] = useState(false);
   // const [hospitalRequestsOpen, setHospitalRequestsOpen] = useState(false);
@@ -143,16 +144,19 @@ const InventoryOverview: React.FC = () => {
 
   const lowStockItems = useMemo<LowStockItem[]>(() => {
     if (dashboardData?.low_stock_products) {
-      return dashboardData.low_stock_products.flatMap((product) =>
-        product.variants.map((variant) => ({
+      return dashboardData.low_stock_products.flatMap((product) => {
+        const matchedProduct = products.find((p) => p.id === product.id);
+        const baseName = matchedProduct?.gender ? `${product.name} (${matchedProduct.gender})` : product.name;
+
+        return product.variants.map((variant) => ({
           id: variant.id,
-          name: `${product.name} - ${variant.label}`,
+          name: `${baseName} - ${variant.label}`,
           current: variant.stock,
           min: variant.min_stock,
           category: product.category,
           status: getVariantStatus(variant.stock, variant.min_stock),
-        })),
-      );
+        }));
+      });
     }
 
     return categoryStats.flatMap((category) =>
@@ -160,7 +164,11 @@ const InventoryOverview: React.FC = () => {
         .filter((variant) => variant.status !== 'ok')
         .map((variant) => ({
           id: variant.id,
-          name: `${variant.productName}${variant.size ? ` - Talla ${variant.size}` : ''}${
+          name: `${(() => {
+            const matchedProduct = products.find((p) => p.id === variant.productId);
+            const baseName = matchedProduct ? `${matchedProduct.name}${matchedProduct.gender ? ` (${matchedProduct.gender})` : ''}` : variant.productName;
+            return baseName;
+          })()}${variant.size ? ` - Talla ${variant.size}` : ''}${
             variant.colorLabel ? ` - ${variant.colorLabel}` : ''
           }`,
           current: variant.stock,
@@ -169,7 +177,7 @@ const InventoryOverview: React.FC = () => {
           status: variant.status,
         })),
     );
-  }, [dashboardData, categoryStats]);
+  }, [dashboardData, categoryStats, products]);
 
   const categoryInventory = useMemo(() => {
     return categories.map((category) => {
@@ -186,6 +194,7 @@ const InventoryOverview: React.FC = () => {
         products: categoryProducts.map((product) => ({
           id: product.id,
           name: product.name,
+          gender: product.gender,
           description: product.description,
           variants: product.variants.map((variant) => {
             const resolvedColor =
@@ -285,35 +294,52 @@ const InventoryOverview: React.FC = () => {
     [requestsSummaryEntries],
   );
 
-  const getStockStatusColor = (status: string) => {
-    switch (status) {
-      case 'critical': return 'text-red-600 bg-red-50';
-      case 'low': return 'text-amber-600 bg-amber-50';
-      case 'ok': return 'text-primary-prosalud bg-blue-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getStockStatusBadge = (status: string) => {
-    switch (status) {
-      case 'critical': return 'destructive';
-      case 'low': return 'secondary';
-      case 'ok': return 'default';
-      default: return 'outline';
-    }
-  };
-
-  // const hospitalRequests = [
-  //   { hospital: 'Hospital Marco Fidel Suárez', pending: 6, priority: 'high' },
-  //   { hospital: 'Hospital San Juan de Dios', pending: 4, priority: 'urgent' },
-  //   { hospital: 'Hospital La Merced', pending: 3, priority: 'urgent' },
-  //   { hospital: 'Promotora Médica y Odontológica', pending: 3, priority: 'medium' },
-  //   { hospital: 'Sociedad Médica Rionegro SOMER', pending: 2, priority: 'medium' },
-  //   { hospital: 'Hospital Venancio Díaz', pending: 2, priority: 'high' }
-  // ];
+  const renderCategoryCard = (category: typeof categoryStats[number], index: number) => (
+    <motion.div
+      key={category.name}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      className="h-full"
+    >
+      <Card className="flex h-full min-h-[260px] flex-col border shadow-sm transition-all duration-300 hover:shadow-lg">
+        <CardContent className="flex h-full flex-col p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="rounded-xl bg-primary-prosalud-light p-3">
+              <category.icon className="h-6 w-6 text-primary-prosalud" />
+            </div>
+            <Badge variant="outline" className="font-medium">
+              {category.total} capacidad
+            </Badge>
+          </div>
+          <div className="flex flex-1 flex-col justify-between">
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900 line-clamp-2" title={category.name}>
+                {category.name}
+              </h3>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Disponible</span>
+                  <span className="font-medium text-primary-prosalud">{category.available}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Capacidad restante</span>
+                  <span className="font-medium text-gray-600">{category.reserved}</span>
+                </div>
+              </div>
+            </div>
+            <Progress
+              value={category.total > 0 ? (category.available / category.total) * 100 : 0}
+              className="mt-4 h-2"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       {/* Loading State */}
       {dashboardLoading && (
         <Card className="border shadow-sm">
@@ -353,58 +379,20 @@ const InventoryOverview: React.FC = () => {
         ) : (
           <Carousel
             opts={{ align: 'start', containScroll: 'trimSnaps' }}
-            className="relative overflow-clip px-4 sm:px-6"
+            className="relative w-full overflow-hidden px-2 sm:px-4"
           >
-            <CarouselContent className="-ml-4 pb-4">
-        {categoryStats.map((category, index) => (
+            <CarouselContent className="pb-4">
+              {categoryStats.map((category, index) => (
                 <CarouselItem
                   key={category.name}
-                  className="basis-full pl-4 sm:basis-1/2 xl:basis-1/3 2xl:basis-1/4"
+                  className="basis-full px-2 md:basis-1/2 xl:basis-1/3 2xl:basis-1/4"
                 >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-                    <Card className="flex h-full min-h-[260px] flex-col border shadow-sm transition-all duration-300 hover:shadow-lg">
-                      <CardContent className="flex h-full flex-col p-6">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <div className="rounded-xl bg-primary-prosalud-light p-3">
-                    <category.icon className="h-6 w-6 text-primary-prosalud" />
-                  </div>
-                  <Badge variant="outline" className="font-medium">
-                            {category.total} capacidad
-                  </Badge>
-                </div>
-                        <div className="flex flex-1 flex-col justify-between">
-                <div className="space-y-2">
-                            <h3 className="font-semibold text-gray-900 line-clamp-2" title={category.name}>
-                              {category.name}
-                            </h3>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Disponible</span>
-                      <span className="font-medium text-primary-prosalud">{category.available}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Capacidad restante</span>
-                      <span className="font-medium text-gray-600">{category.reserved}</span>
-                              </div>
-                    </div>
-                  </div>
-                  <Progress 
-                            value={category.total > 0 ? (category.available / category.total) * 100 : 0}
-                            className="mt-4 h-2"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  {renderCategoryCard(category, index)}
                 </CarouselItem>
-        ))}
+              ))}
             </CarouselContent>
-            <CarouselPrevious className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 border border-gray-200 bg-white/90 text-gray-700 shadow transition-colors hover:bg-primary-prosalud hover:text-white hover:-translate-y-1/2 focus-visible:-translate-y-1/2 focus-visible:ring-2 focus-visible:ring-primary-prosalud active:-translate-y-1/2" />
-            <CarouselNext className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 border border-gray-200 bg-white/90 text-gray-700 shadow transition-colors hover:bg-primary-prosalud hover:text-white hover:-translate-y-1/2 focus-visible:-translate-y-1/2 focus-visible:ring-2 focus-visible:ring-primary-prosalud active:-translate-y-1/2" />
+            <CarouselPrevious className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 border border-gray-200 bg-white/90 text-gray-700 shadow transition-all hover:bg-primary-prosalud hover:text-white" />
+            <CarouselNext className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 border border-gray-200 bg-white/90 text-gray-700 shadow transition-all hover:bg-primary-prosalud hover:text-white" />
           </Carousel>
         )}
       </div>
@@ -450,64 +438,79 @@ const InventoryOverview: React.FC = () => {
                         <div className="pl-10 text-sm text-gray-500">No hay productos registrados en esta categoría.</div>
                       ) : (
                         <div className="space-y-3 pl-6">
-                          {category.products.map((product) => (
-                            <div key={product.id} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                <div>
-                                  <p className="text-base font-semibold text-gray-900 leading-tight">{product.name}</p>
-                                  {product.description && (
-                                    <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
-                                  )}
-                                </div>
-                                <Badge className="bg-primary-prosalud/10 text-primary-prosalud">
-                                  {product.variants.length} {product.variants.length === 1 ? 'variante' : 'variantes'}
-                                </Badge>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                                {product.variants.map((variant) => (
-                                  <div key={variant.id} className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div>
-                                        {variant.color ? (
-                                            <div className="mt-1 flex items-center gap-2 text-gray-900">
-                                            <span
-                                                className="h-3 w-3 rounded-full border border-gray-200"
-                                                style={{ backgroundColor: variant.color.hex ?? '#ffffff' }}
-                                            />
-                                              <p className="text-sm font-semibold text-gray-900 leading-tight">
-                                                {variant.label ?? variant.sku ?? 'Variante'}
-                                              </p>
+                          <Accordion
+                            type="single"
+                            collapsible
+                            value={expandedProduct}
+                            onValueChange={setExpandedProduct}
+                            className="space-y-3"
+                          >
+                            {category.products.map((product) => (
+                              <AccordionItem key={product.id} value={product.id} className="border border-gray-200 rounded-lg bg-white shadow-sm">
+                                <AccordionTrigger className="group flex items-center justify-between gap-3 px-4 py-3 hover:no-underline">
+                                  <div className="flex flex-col text-left flex-1">
+                                    <p className="text-base font-semibold text-gray-900 leading-tight">
+                                      {product.name}
+                                      {product.gender && (
+                                        <span className="font-bold"> ({product.gender})</span>
+                                      )}
+                                    </p>
+                                    {product.description && (
+                                      <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                                    )}
+                                  </div>
+                                  <Badge className="bg-primary-prosalud/10 text-primary-prosalud whitespace-nowrap ml-auto">
+                                    {product.variants.length} {product.variants.length === 1 ? 'variante' : 'variantes'}
+                                  </Badge>
+                                </AccordionTrigger>
+                                <AccordionContent className="px-4 pb-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                                    {product.variants.map((variant) => {
+                                      const displayLabel =
+                                        variant.label ||
+                                        [variant.size, variant.color?.label ?? variant.color?.id ?? '']
+                                          .filter(Boolean)
+                                          .join(' · ') ||
+                                        'Variante';
+
+                                      return (
+                                        <div key={variant.id} className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                              {variant.color ? (
+                                                <div className="mt-1 flex items-center gap-2 text-gray-900">
+                                                  <span
+                                                    className="h-3 w-3 rounded-full border border-gray-200"
+                                                    style={{ backgroundColor: variant.color.hex ?? '#ffffff' }}
+                                                  />
+                                                  <p className="text-sm font-semibold text-gray-900 leading-tight">
+                                                    {displayLabel}
+                                                  </p>
+                                                </div>
+                                              ) : (
+                                                <p className="mt-1 text-sm font-semibold text-gray-900 leading-tight">
+                                                  {displayLabel}
+                                                </p>
+                                              )}
                                             </div>
-                                        ) : (
-                                            <p className="mt-1 text-gray-900"> Estándar </p>
-                                        )}
-                                        {/* <p className="text-xs text-gray-500">SKU: {variant.sku ?? '—'}</p> */ }
-                            </div>
-                                      <Badge
-                                        className={`text-xs ${
-                                          (variant.stock ?? 0) <= (variant.minStock ?? 0)
-                                            ? 'bg-red-100 text-red-700 border border-red-200'
-                                            : 'bg-green-100 text-green-700 border border-green-200'
-                                        }`}
-                                      >
-                                        {variant.stock ?? 0} uds
-                              </Badge>
-                            </div>
-                                    {/*<div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
-                                      <div>
-                                        <span className="font-medium text-gray-500 uppercase tracking-wide">Mínimo</span>
-                                        <p className="text-gray-900">{variant.minStock ?? 0}</p>
-                                      </div>
-                                      <div>
-                                        <span className="font-medium text-gray-500 uppercase tracking-wide">Máximo</span>
-                                        <p className="text-gray-900">{variant.maxStock ?? 0}</p>
-                                      </div>
-                                    </div> */ }
-                          </div>
-                        ))}
-                      </div>
-                            </div>
-                          ))}
+                                            <Badge
+                                              className={`text-xs ${
+                                                (variant.stock ?? 0) <= (variant.minStock ?? 0)
+                                                  ? 'bg-red-100 text-red-700 border border-red-200'
+                                                  : 'bg-green-100 text-green-700 border border-green-200'
+                                              }`}
+                                            >
+                                              {variant.stock ?? 0} uds
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            ))}
+                          </Accordion>
                         </div>
                       )}
                     </AccordionContent>

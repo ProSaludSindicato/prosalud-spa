@@ -8,6 +8,7 @@ import {
   InventorySubcategory,
   SupplierDelivery,
   DashboardData,
+  INVENTORY_SIZES,
 } from '@/types/inventory';
 import { inventoryApiService } from '@/services/inventoryApiService';
 import { logger } from '@/utils/logger';
@@ -67,7 +68,7 @@ interface InventoryContextValue {
 
 const InventoryContext = createContext<InventoryContextValue | undefined>(undefined);
 
-const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
+const sizeOptions = [...INVENTORY_SIZES];
 
 // Initial static data for fallback
 const initialColorOptions: InventoryColorOption[] = [

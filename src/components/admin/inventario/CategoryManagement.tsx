@@ -262,7 +262,7 @@ const CategoryManagement: React.FC = () => {
                   transition={{ duration: 0.2 }}
                 >
                   <Card className="flex h-full flex-col overflow-hidden border border-gray-200">
-                    <CardHeader className="pb-4 min-h-[140px]">
+                    <CardHeader className="pb-4 min-h-[100px]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
                           <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-prosalud/10 text-primary-prosalud">

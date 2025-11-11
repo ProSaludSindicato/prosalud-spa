@@ -41,16 +41,16 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
   
   const summaryRows: (string | number)[][] = (
     [
-      ['REPORTE DE INVENTARIO PROSALUD'],
+    ['REPORTE DE INVENTARIO PROSALUD'],
       [`Fecha de generación: ${data.metadata.generatedAt}`],
-      [`ID del Reporte: ${data.metadata.reportId}`],
+    [`ID del Reporte: ${data.metadata.reportId}`],
       [`Tipo de Reporte: ${
         reportType === 'strategic' ? 'Estratégico' : reportType === 'operational' ? 'Operacional' : 'Stock Crítico'
       }`],
-      data.metadata.dateRange ? [`Período: ${data.metadata.dateRange.start} - ${data.metadata.dateRange.end}`] : [],
-      [''],
-      ['RESUMEN GENERAL'],
-      ['Métrica', 'Valor'],
+    data.metadata.dateRange ? [`Período: ${data.metadata.dateRange.start} - ${data.metadata.dateRange.end}`] : [],
+    [''],
+    ['RESUMEN GENERAL'],
+    ['Métrica', 'Valor'],
       ['Total de categorías activas', formatNumber(data.summary.totalCategories)],
       ['Total de productos (SKU únicos)', formatNumber(data.summary.totalProducts)],
       ['Total de variantes', formatNumber(data.summary.totalVariants)],
@@ -75,14 +75,14 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
     ['DETALLE DE INVENTARIO'],
     [''],
     ['Categoría', 'SKU', 'Producto / Variante', 'Stock', 'Mínimo', 'Máximo', 'Estado', 'Solicitudes pendientes', 'Hospitales pendientes', 'Última solicitud'],
-  ];
+    ];
 
   data.categories.forEach((category) => {
     category.products.forEach((product) => {
       detailRows.push([
-        category.name,
-        product.sku,
-        product.name,
+          category.name,
+          product.sku,
+          product.name,
         product.stock,
         product.min,
         product.max,
@@ -90,9 +90,9 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
         product.pendingRequests,
         product.pendingHospitals.join(', ') || '—',
         product.lastRequestDate ? new Date(product.lastRequestDate).toLocaleString('es-CO') : '—',
-      ]);
+        ]);
+      });
     });
-  });
 
   const detailWs = XLSX.utils.aoa_to_sheet(detailRows);
   detailWs['!cols'] = [

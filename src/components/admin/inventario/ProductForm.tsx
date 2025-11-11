@@ -11,7 +11,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useInventory } from '@/context/InventoryContext';
-import { InventoryProduct, InventoryVariantMode, ProductVariant, InventorySize } from '@/types/inventory';
+import {
+  InventoryProduct,
+  InventoryVariantMode,
+  ProductVariant,
+  InventorySize,
+  InventoryGender,
+  INVENTORY_SIZES,
+  INVENTORY_GENDERS,
+  INVENTORY_CLOTHING_SIZES,
+  INVENTORY_FOOTWEAR_SIZES,
+} from '@/types/inventory';
 
 type NumericVariantField = 'stock' | 'minStock' | 'maxStock';
 
@@ -58,13 +68,14 @@ const productSchema = z
     categoryId: z.string().min(1, 'La categoría es requerida'),
     subcategoryId: z.string().optional(),
   description: z.string().optional(),
+    gender: z.enum(INVENTORY_GENDERS).optional(),
     variantMode: z.enum(['simple', 'size', 'color', 'size_color']),
     selectedSizes: z.array(z.string()).optional(),
     selectedColors: z.array(z.string()).optional(),
     variants: z.array(
       z.object({
         id: z.string(),
-        size: z.enum(['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL']).optional(),
+        size: z.enum(INVENTORY_SIZES).optional(),
         colorId: z.string().optional(),
         stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
         minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0'),
@@ -187,6 +198,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
       categoryId: product?.categoryId || product?.category?.id || sortedCategories[0]?.id || '',
       subcategoryId: product?.subcategoryId || product?.subcategory?.id,
       description: product?.description ?? '',
+      gender: product?.gender ?? undefined,
       variantMode: product?.variantMode || product?.variant_mode || defaultVariantMode,
       selectedSizes: defaultSelectedSizes,
       selectedColors: defaultSelectedColors,
@@ -227,6 +239,37 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const variantMode = useWatch({ control: form.control, name: 'variantMode' });
   const selectedSizes = useWatch({ control: form.control, name: 'selectedSizes' }) ?? [];
   const selectedColors = useWatch({ control: form.control, name: 'selectedColors' }) ?? [];
+  const genderValue = useWatch({ control: form.control, name: 'gender' }) as InventoryGender | undefined;
+  const genderSelectValue = (genderValue ?? '__none__') as InventoryGender | '__none__';
+  const clothingSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_CLOTHING_SIZES.includes(size as any)), []);
+  const footwearSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_FOOTWEAR_SIZES.includes(size as any)), []);
+  const selectedClothingSizes = selectedSizes.filter((size) => clothingSizes.includes(size as InventorySize)) as InventorySize[];
+  const selectedFootwearSizes = selectedSizes.filter((size) => footwearSizes.includes(size as InventorySize)) as InventorySize[];
+ 
+   const handleToggleSize = useCallback(
+     (size: InventorySize) => {
+       const isClothing = clothingSizes.includes(size);
+       const isFootwear = footwearSizes.includes(size);
+       const current = new Set(selectedSizes);
+ 
+       if (isClothing && selectedFootwearSizes.length > 0) {
+         footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
+       }
+       if (isFootwear && selectedClothingSizes.length > 0) {
+         clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
+       }
+
+       if (current.has(size)) {
+         current.delete(size);
+       } else {
+         current.add(size);
+       }
+ 
+       const nextSizes = Array.from(current);
+       form.setValue('selectedSizes', nextSizes, { shouldDirty: true, shouldValidate: true });
+     },
+     [clothingSizes, footwearSizes, form, selectedSizes, selectedClothingSizes.length, selectedFootwearSizes.length],
+   );
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
@@ -355,6 +398,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
           categoryId: data.categoryId,
           subcategoryId: data.subcategoryId || undefined,
           description: data.description,
+          gender: data.gender,
           variantMode: data.variantMode,
           variants,
         });
@@ -364,6 +408,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
           categoryId: data.categoryId,
           subcategoryId: data.subcategoryId || undefined,
           description: data.description,
+          gender: data.gender,
           variantMode: data.variantMode,
           variants: data.variants.map((variant) =>
             ensureSku({
@@ -417,16 +462,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
 
   const variantValues = useWatch({ control: form.control, name: 'variants' }) ?? [];
       
-  const toggleSize = (size: string) => {
-    const current = new Set(selectedSizes);
-    if (current.has(size)) {
-      current.delete(size);
-    } else {
-      current.add(size);
-    }
-    form.setValue('selectedSizes', Array.from(current), { shouldDirty: true });
-  };
-
   const toggleColor = (colorId: string) => {
     const current = new Set(selectedColors);
     if (current.has(colorId)) {
@@ -527,7 +562,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                       />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
-                        <span className="text-xs text-gray-500">Código: {variant.colorId ?? '—'}</span>
                       </div>
                     </>
                   ) : (
@@ -615,7 +649,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                         />
                         <div className="flex flex-col leading-tight">
                           <span className="text-sm font-medium text-gray-900">{color?.label ?? 'Color'}</span>
-                          <span className="text-xs text-gray-500">{color?.id ?? '—'}</span>
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
@@ -718,31 +751,60 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                 </div>
               </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="subcategoryId" className="text-sm font-medium text-gray-700">
-                Subcategoría
-              </Label>
-              <Select
-                value={form.watch('subcategoryId') || undefined}
-                onValueChange={(value) => form.setValue('subcategoryId', value === '__none__' ? undefined : value)}
-                disabled={!subcategoryOptions.length}
-              >
-                <SelectTrigger className="bg-gray-50 border-gray-300">
-                  {subcategoryOptions.length ? (
-                    <SelectValue placeholder="Seleccionar subcategoría" />
-                  ) : (
-                    <span className="text-sm text-gray-400">No hay subcategorías disponibles</span>
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin subcategoría</SelectItem>
-                  {subcategoryOptions.map((subcategory) => (
-                    <SelectItem key={subcategory.id} value={subcategory.id}>
-                      {subcategory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="subcategoryId" className="text-sm font-medium text-gray-700">
+                    Subcategoría
+                  </Label>
+                  <Select
+                    value={form.watch('subcategoryId') || undefined}
+                    onValueChange={(value) =>
+                      form.setValue('subcategoryId', value === '__none__' ? undefined : value, {
+                        shouldDirty: true,
+                      })
+                    }
+                    disabled={!subcategoryOptions.length}
+                  >
+                    <SelectTrigger className="bg-gray-50 border-gray-300">
+                      {subcategoryOptions.length ? (
+                        <SelectValue placeholder="Seleccionar subcategoría" />
+                      ) : (
+                        <span className="text-sm text-gray-400">No hay subcategorías disponibles</span>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin subcategoría</SelectItem>
+                      {subcategoryOptions.map((subcategory) => (
+                        <SelectItem key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Género</Label>
+                  <Select
+                    value={genderSelectValue}
+                    onValueChange={(value) =>
+                      form.setValue('gender', value === '__none__' ? undefined : (value as InventoryGender), {
+                        shouldDirty: true,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="bg-gray-50 border-gray-300">
+                      <SelectValue placeholder="Sin especificar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin especificar</SelectItem>
+                      {INVENTORY_GENDERS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -822,28 +884,57 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
             )}
 
             {(variantMode === 'size' || variantMode === 'size_color') && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Label className="text-sm font-medium text-gray-700">Selecciona las tallas disponibles</Label>
-                <div className="flex flex-wrap gap-2">
-                  {sizeOptions.map((size) => {
-                    const isActive = selectedSizes.includes(size);
-                    return (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => toggleSize(size)}
-                        className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
-                            : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
-                        }`}
-                        aria-pressed={isActive}
-                      >
-                        {size}
-                      </button>
-                    );
-                  })}
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ropa / Vestuario</p>
+                  <div className="flex flex-wrap gap-2">
+                    {clothingSizes.map((size) => {
+                      const isActive = selectedClothingSizes.includes(size as InventorySize);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleToggleSize(size as InventorySize)}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                              : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                          }`}
+                          aria-pressed={isActive}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                      </div>
+                    </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Calzado</p>
+                  <div className="flex flex-wrap gap-2">
+                    {footwearSizes.map((size) => {
+                      const isActive = selectedFootwearSizes.includes(size as InventorySize);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleToggleSize(size as InventorySize)}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                              : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                          }`}
+                          aria-pressed={isActive}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
                 {form.formState.errors.selectedSizes && (
                   <p className="text-xs text-red-500">{form.formState.errors.selectedSizes.message}</p>
                 )}

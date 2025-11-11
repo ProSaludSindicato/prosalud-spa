@@ -5,6 +5,7 @@ import type {
   InventoryCategory,
   InventoryProduct,
   InventoryColorOption,
+  InventoryGender,
   HospitalRequest,
   HospitalRequestStatus,
   ApiPaginatedResponse,
@@ -57,6 +58,7 @@ const normalizeProduct = (product: any): InventoryProduct => ({
   subcategoryId: product.subcategory?.id || product.subcategory_id,
   subcategory: product.subcategory,
   description: product.description,
+  gender: product.gender ?? product.genero ?? undefined,
   variantMode: product.variant_mode || product.variantMode,
   variants: Array.isArray(product.variants) ? product.variants.map(normalizeVariant) : [],
   total_stock: product.total_stock,
@@ -147,6 +149,7 @@ interface CreateProductPayload {
   category_id: string;
   subcategory_id?: string;
   description?: string;
+  gender?: InventoryGender;
   variant_mode: string;
   variants: Array<{
     size?: string;
@@ -163,6 +166,7 @@ interface UpdateProductPayload {
   category_id?: string;
   subcategory_id?: string;
   description?: string;
+  gender?: InventoryGender;
   variant_mode?: string;
   variants?: Array<{
     id?: string;

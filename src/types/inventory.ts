@@ -1,15 +1,55 @@
-export type InventoryVariantMode = 'simple' | 'size' | 'color' | 'size_color';
+export const INVENTORY_SIZES = [
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  '3XL',
+  '4XL',
+  '5XL',
+  '35',
+  '36',
+  '37',
+  '38',
+  '39',
+  '37 - 38',
+  '39 - 40',
+  '41 - 42',
+  '43 - 44',
+] as const;
 
-export type InventorySize =
-  | 'XS'
-  | 'S'
-  | 'M'
-  | 'L'
-  | 'XL'
-  | 'XXL'
-  | '3XL'
-  | '4XL'
-  | '5XL';
+export const INVENTORY_CLOTHING_SIZES = [
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  '3XL',
+  '4XL',
+  '5XL',
+] as const;
+
+export const INVENTORY_FOOTWEAR_SIZES = [
+  '35',
+  '36',
+  '37',
+  '38',
+  '39',
+  '37 - 38',
+  '39 - 40',
+  '41 - 42',
+  '43 - 44',
+] as const;
+
+export type InventorySize = typeof INVENTORY_SIZES[number];
+
+export const INVENTORY_GENDERS = ['Hombre', 'Mujer', 'Mixto'] as const;
+
+export type InventoryGender = typeof INVENTORY_GENDERS[number];
+
+export type InventoryVariantMode = 'simple' | 'size' | 'color' | 'size_color';
 
 export interface InventoryColorOption {
   id: string;
@@ -54,6 +94,7 @@ export interface InventoryProduct {
   subcategoryId?: string;
   subcategory?: InventorySubcategory; // Added for API response
   description?: string;
+  gender?: InventoryGender;
   variantMode?: InventoryVariantMode;
   variant_mode?: InventoryVariantMode; // Added for API compatibility
   variants: ProductVariant[];

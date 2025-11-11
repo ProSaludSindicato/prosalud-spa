@@ -52,12 +52,12 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
           : reportType === 'operational'
             ? 'operacional'
             : 'de stock crítico';
-
-      toast({
+        
+        toast({
         title: 'Reporte Excel Generado',
         description: `Se descargó el reporte ${reportLabel} del inventario en formato Excel.`,
-        duration: 4000,
-      });
+          duration: 4000,
+        });
 
       onOpenChange(false);
     } catch (error) {
