@@ -24,6 +24,7 @@ import {
     EllipsisVertical,
     Eye,
     RefreshCw,
+    AlertTriangle,
 } from 'lucide-react';
 import DataPagination from '@/components/ui/data-pagination';
 import {usePagination} from '@/hooks/usePagination';
@@ -180,37 +181,48 @@ const HospitalRequests: React.FC = () => {
         }
 
         const parsed = Math.floor(Number(rawValue));
-        const safeValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 
-        if (available <= 0) {
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            setVariantErrors((prev) => ({
+                ...prev,
+                [key]: 'Ingresa una cantidad válida.',
+            }));
             setVariantQuantities((prev) => {
                 const next = {...prev};
                 delete next[key];
                 return next;
             });
-            setVariantErrors((prev) => ({
-                ...prev,
-                [key]: 'Sin stock disponible para esta variante.',
-            }));
             return;
         }
 
-        if (safeValue > available) {
-            // No sobreescribimos el valor del usuario; solo mostramos el error.
-            setVariantErrors((prev) => ({
-                ...prev,
-                [key]: `Máximo permitido: ${available}`,
-            }));
+        if (parsed === 0) {
+            setVariantQuantities((prev) => {
+                const next = {...prev};
+                delete next[key];
+                return next;
+            });
+            setVariantErrors((prev) => {
+                const next = {...prev};
+                delete next[key];
+                return next;
+            });
             return;
         }
 
         setVariantQuantities((prev) => ({
             ...prev,
-            [key]: safeValue,
+            [key]: parsed,
         }));
         setVariantErrors((prev) => {
             const next = {...prev};
-            delete next[key];
+            if (parsed > available) {
+                next[key] =
+                    available > 0
+                        ? `La cantidad solicitada (${parsed}) supera el stock actual (${available}).`
+                        : 'La cantidad solicitada excede el stock disponible (actualmente 0).';
+            } else {
+                delete next[key];
+            }
             return next;
         });
     };
@@ -289,6 +301,29 @@ const HospitalRequests: React.FC = () => {
         }
     };
 
+    const extractErrorMessage = (error: unknown) => {
+        if (typeof error === 'string' && error.trim().length > 0) {
+            return error;
+        }
+
+        if (error && typeof error === 'object') {
+            const maybeError = error as {
+                message?: string;
+                response?: { data?: { message?: string } };
+            };
+
+            if (maybeError.response?.data?.message) {
+                return maybeError.response.data.message;
+            }
+
+            if (maybeError.message) {
+                return maybeError.message;
+            }
+        }
+
+        return 'Intenta nuevamente.';
+    };
+
     const handleStatusChange = async (request: HospitalRequest, status: HospitalRequestStatus) => {
         setStatusUpdateLoading(request.id);
         try {
@@ -303,7 +338,7 @@ const HospitalRequests: React.FC = () => {
         } catch (error) {
             toast({
                 title: 'Error al actualizar estado',
-                description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+                description: extractErrorMessage(error),
                 variant: 'destructive',
             });
         } finally {
@@ -324,8 +359,6 @@ const HospitalRequests: React.FC = () => {
                 const variantId = variantIdRaw === 'default' ? undefined : variantIdRaw;
                 const product = products.find((p) => p.id === productId);
                 const variant = product?.variants.find((v) => v.id === variantId);
-                const available = variant?.stock ?? 0;
-                const safeQuantity = Math.min(quantity, available || quantity);
 
                 return {
                     productId,
@@ -333,7 +366,7 @@ const HospitalRequests: React.FC = () => {
                     variantLabel: getVariantLabel(product, variant),
                     size: variant?.size,
                     colorId: variant?.colorId,
-                    quantity: safeQuantity,
+                    quantity,
                 };
             })
             .filter((item) => item.quantity > 0);
@@ -380,7 +413,7 @@ const HospitalRequests: React.FC = () => {
         } catch (error) {
             toast({
                 title: 'Error al crear solicitud',
-                description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+                description: extractErrorMessage(error),
                 variant: 'destructive',
             });
         } finally {
@@ -787,7 +820,9 @@ const HospitalRequests: React.FC = () => {
                                                                         const variantKey = `${product.id}__${variant.id ?? 'default'}`;
                                                                         const available = variant.stock ?? 0;
                                                                         const quantityValue = variantQuantities[variantKey];
-                                                                        const errorMessage = variantErrors[variantKey];
+                                                                        const warningMessage = variantErrors[variantKey];
+                                                                        const exceedsStock =
+                                                                            quantityValue !== undefined && quantityValue > available;
                                                                         const label = getVariantLabel(product, variant);
 
                                                                         return (
@@ -798,6 +833,7 @@ const HospitalRequests: React.FC = () => {
                                                                                     quantityValue
                                                                                         ? 'border-primary-prosalud/60 bg-primary-prosalud/5'
                                                                                         : 'border-gray-200 hover:border-primary-prosalud/30',
+                                                                                    exceedsStock && 'border-amber-400 bg-amber-50',
                                                                                 )}
                                                                             >
                                                                                 <div className="flex items-start justify-between gap-2">
@@ -822,7 +858,10 @@ const HospitalRequests: React.FC = () => {
                                                                                         type="number"
                                                                                         min={0}
                                                                                         placeholder="0"
-                                                                                        disabled={available <= 0}
+                                                                                        className={cn(
+                                                                                            exceedsStock &&
+                                                                                                'border-amber-400 text-amber-900 focus-visible:ring-amber-500 focus-visible:border-amber-500',
+                                                                                        )}
                                                                                         value={quantityValue === undefined ? '' : quantityValue}
                                                                                         onChange={(e) =>
                                                                                             handleVariantQuantityChange(
@@ -833,8 +872,14 @@ const HospitalRequests: React.FC = () => {
                                                                                             )
                                                                                         }
                                                                                     />
-                                                                                    {errorMessage && (
-                                                                                        <p className="text-xs text-red-500 mt-1">{errorMessage}</p>
+                                                                                    <p className="mt-1 text-[11px] uppercase tracking-wide text-gray-500">
+                                                                                        Stock actual: {available}
+                                                                                    </p>
+                                                                                    {warningMessage && (
+                                                                                        <div className="mt-2 flex items-center gap-1 text-xs text-amber-700">
+                                                                                            <AlertTriangle className="h-3.5 w-3.5"/>
+                                                                                            <span>{warningMessage}</span>
+                                                                                        </div>
                                                                                     )}
                                                                                 </div>
                                                                             </div>
@@ -958,11 +1003,16 @@ const HospitalRequests: React.FC = () => {
                                                     item.currentStock ??
                                                     variant?.stock ??
                                                     (product?.variantMode === 'simple' ? product?.variants[0]?.stock : undefined);
+                                                const exceedsCurrentStock =
+                                                    typeof currentStock === 'number' && item.quantity > currentStock;
 
                                                 return (
                                                     <div
                                                         key={item.id ?? `${item.productId}-${item.variantId}`}
-                                                        className="flex h-full flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                                                        className={cn(
+                                                            'flex h-full flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm',
+                                                            exceedsCurrentStock && 'border-amber-400 bg-amber-50/70 shadow-md',
+                                                        )}
                                                     >
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="space-y-1">
@@ -978,10 +1028,18 @@ const HospitalRequests: React.FC = () => {
                                                             </div>
                                                             <div className="text-right">
                                                                 <Badge
-                                                                    className="bg-primary-prosalud/10 text-primary-prosalud">
-                                                                    {currentStock !== undefined
-                                                                        ? `${item.quantity} / ${currentStock}`
-                                                                        : `${item.quantity}`}
+                                                                    className={cn(
+                                                                        'bg-primary-prosalud/10 text-primary-prosalud border border-primary-prosalud/20',
+                                                                        exceedsCurrentStock &&
+                                                                            'border-amber-300 bg-amber-100 text-amber-800',
+                                                                    )}
+                                                                >
+                                                                    <span className="flex items-center justify-end gap-1">
+                                                                        {exceedsCurrentStock && <AlertTriangle className="h-3 w-3"/>}
+                                                                        {currentStock !== undefined
+                                                                            ? `${item.quantity} / ${currentStock}`
+                                                                            : `${item.quantity}`}
+                                                                    </span>
                                                                 </Badge>
                                                                 <p className="mt-1 text-[10px] uppercase tracking-wide text-gray-500">
                                                                     {currentStock !== undefined
@@ -1015,6 +1073,21 @@ const HospitalRequests: React.FC = () => {
                                                             </div>
 
                                                         </div>
+
+                                                        {exceedsCurrentStock && (
+                                                            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                                                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/>
+                                                                <div className="space-y-1">
+                                                                    <p className="text-xs font-semibold uppercase tracking-wide">
+                                                                        Excede el stock actual
+                                                                    </p>
+                                                                    <p>
+                                                                        Se solicitaron {item.quantity} unidades y el stock actual es de{' '}
+                                                                        {currentStock ?? 0}. Considera ajustar el inventario o la solicitud.
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        )}
 
                                                         {!finalStatuses.includes(selectedRequest.status) && (
                                                             <div

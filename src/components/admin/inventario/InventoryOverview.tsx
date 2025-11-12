@@ -671,7 +671,7 @@ const InventoryOverview: React.FC = () => {
           <Card className="h-full border shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center space-x-2 text-primary-prosalud">
-                <Package className="h-5 w-5" />
+                <Tag className="h-5 w-5" />
                 <span>Inventario por Categoría</span>
               </CardTitle>
                   <CardDescription>Detalle de productos disponibles por categoría</CardDescription>
