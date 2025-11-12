@@ -205,10 +205,11 @@ const CarouselPrevious = React.forwardRef<
       variant={variant}
       size={size}
       className={cn(
-        "absolute h-8 w-8 rounded-full flex items-center justify-center", // Removed transform and transition classes
+        "absolute h-8 w-8 rounded-full flex items-center justify-center -translate-y-1/2",
         orientation === "horizontal"
-          ? "-left-12 top-1/2"
+          ? "left-2 sm:left-4 top-1/2"
           : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+        !canScrollPrev && "hidden",
         className
       )}
       disabled={!canScrollPrev}
@@ -220,7 +221,6 @@ const CarouselPrevious = React.forwardRef<
     </Button>
   )
 })
-CarouselPrevious.displayName = "CarouselPrevious"
 
 const CarouselNext = React.forwardRef<
   HTMLButtonElement,
@@ -234,10 +234,11 @@ const CarouselNext = React.forwardRef<
       variant={variant}
       size={size}
       className={cn(
-        "absolute h-8 w-8 rounded-full flex items-center justify-center", // Removed transform and transition classes
+        "absolute h-8 w-8 rounded-full flex items-center justify-center -translate-y-1/2",
         orientation === "horizontal"
-          ? "-right-12 top-1/2"
+          ? "right-2 sm:right-4 top-1/2"
           : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+        !canScrollNext && "hidden",
         className
       )}
       disabled={!canScrollNext}
