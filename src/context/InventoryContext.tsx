@@ -4,6 +4,7 @@ import {
   HospitalRequestStatus,
   InventoryCategory,
   InventoryColorOption,
+  InventoryEntry,
   InventoryProduct,
   InventorySubcategory,
   SupplierDelivery,
@@ -18,6 +19,7 @@ interface InventoryContextValue {
   categories: InventoryCategory[];
   products: InventoryProduct[];
   deliveries: SupplierDelivery[];
+  entries: InventoryEntry[];
   hospitalRequests: HospitalRequest[];
   hospitalOptions: Array<{ id: string; name: string }>;
   colorOptions: InventoryColorOption[];
@@ -28,12 +30,14 @@ interface InventoryContextValue {
   categoriesLoading: boolean;
   productsLoading: boolean;
   hospitalRequestsLoading: boolean;
+  entriesLoading: boolean;
   dashboardLoading: boolean;
   
   // Error states
   categoriesError: string | null;
   productsError: string | null;
   hospitalRequestsError: string | null;
+  entriesError: string | null;
   dashboardError: string | null;
   
   // Category operations
@@ -50,6 +54,16 @@ interface InventoryContextValue {
   addProduct: (product: Omit<InventoryProduct, 'id'>) => Promise<void>;
   updateProduct: (id: string, payload: Partial<Omit<InventoryProduct, 'id'>>) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
+  addEntry: (payload: {
+    supplierId: string;
+    supplierName?: string;
+    receivedAt: string;
+    documentNumber?: string;
+    notes?: string;
+    items: Array<{ productId: string; variantId?: string; quantity: number }>;
+  }) => Promise<InventoryEntry>;
+  refreshEntries: () => Promise<void>;
+  getEntryById: (id: string) => Promise<InventoryEntry>;
   
   // Hospital request operations
   addHospitalRequest: (payload: Omit<HospitalRequest, 'id' | 'status' | 'createdAt' | 'timeline'>) => Promise<HospitalRequest>;
@@ -63,6 +77,7 @@ interface InventoryContextValue {
   refreshCategories: () => Promise<void>;
   refreshProducts: () => Promise<void>;
   refreshHospitalRequests: () => Promise<void>;
+  refreshEntries: () => Promise<void>;
   refreshDashboard: () => Promise<void>;
 }
 
@@ -72,18 +87,31 @@ const sizeOptions = [...INVENTORY_SIZES];
 
 // Initial static data for fallback
 const initialColorOptions: InventoryColorOption[] = [
-  { id: 'AGUAMA', label: 'Aguama', hex: '#5FC7C0' },
+  { id: 'AGUAMA', label: 'Aguamarina', hex: '#14B8A6' },
+  { id: 'AMARILLO', label: 'Amarillo', hex: '#FACC15' },
+  { id: 'AZUL', label: 'Azul', hex: '#2563EB' },
+  { id: 'AZUL_CLARO', label: 'Azul Claro', hex: '#93C5FD' },
+  { id: 'AZUL_MARINO', label: 'Azul Marino', hex: '#1E40AF' },
+  { id: 'AZUL_OSCURO', label: 'Azul Oscuro', hex: '#1F2937' },
+  { id: 'AZUL_REY', label: 'Azul Rey', hex: '#1E3A8A' },
+  { id: 'BEIGE', label: 'Beige', hex: '#D4C4A8' },
   { id: 'BLANCO', label: 'Blanco', hex: '#FFFFFF' },
-  { id: 'AZUL', label: 'Azul', hex: '#0056A3' },
-  { id: 'GRIS', label: 'Gris', hex: '#9CA3AF' },
-  { id: 'AZUL_CLARO', label: 'Azul Claro', hex: '#4DA3FF' },
-  { id: 'AZUL_OSCURO', label: 'Azul Oscuro', hex: '#0B1D4D' },
-  { id: 'AZUL_REY', label: 'Azul Rey', hex: '#003DA5' },
-  { id: 'GRIS_RATON', label: 'Gris Ratón', hex: '#6B7280' },
-  { id: 'GRIS_REFLECTIVO', label: 'Gris Reflectivo', hex: '#D1D5DB' },
-  { id: 'NEGRA', label: 'Negra', hex: '#111827' },
-  { id: 'PETROLEO', label: 'Petróleo', hex: '#1C4C5B' },
-  { id: 'VERDE', label: 'Verde', hex: '#1F9D55' },
+  { id: 'CAFE', label: 'Café', hex: '#92400E' },
+  { id: 'GRIS', label: 'Gris', hex: '#6B7280' },
+  { id: 'GRIS_OSCURO', label: 'Gris Oscuro', hex: '#374151' },
+  { id: 'GRIS_RATON', label: 'Gris Ratón', hex: '#4B5563' },
+  { id: 'GRIS_REFLECTIVO', label: 'Gris Reflectivo', hex: '#9CA3AF' },
+  { id: 'MORADO', label: 'Morado', hex: '#A855F7' },
+  { id: 'NARANJA', label: 'Naranja', hex: '#FB923C' },
+  { id: 'NEGRO', label: 'Negro', hex: '#000000' },
+  { id: 'NEGRA', label: 'Negra', hex: '#000000' },
+  { id: 'PETROLEO', label: 'Petróleo', hex: '#0F172A' },
+  { id: 'ROJO', label: 'Rojo', hex: '#EF4444' },
+  { id: 'ROSA', label: 'Rosa', hex: '#F472B6' },
+  { id: 'VERDE', label: 'Verde', hex: '#22C55E' },
+  { id: 'VERDE_AGUA', label: 'Verde Agua', hex: '#5EEAD4' },
+  { id: 'VERDE_QUIRURGICO', label: 'Verde Quirúrgico', hex: '#065F46' },
+  { id: 'VINO_TINTO', label: 'Vino Tinto', hex: '#881337' },
 ];
 
 const hospitalOptions = [
@@ -98,6 +126,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [deliveries] = useState<SupplierDelivery[]>([]); // Deliveries not implemented in API yet
+  const [entries, setEntries] = useState<InventoryEntry[]>([]);
   const [hospitalRequests, setHospitalRequests] = useState<HospitalRequest[]>([]);
   const [colorOptions, setColorOptions] = useState<InventoryColorOption[]>(initialColorOptions);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -106,12 +135,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [hospitalRequestsLoading, setHospitalRequestsLoading] = useState(false);
+  const [entriesLoading, setEntriesLoading] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   
   // Error states
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
   const [hospitalRequestsError, setHospitalRequestsError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Fetch categories
@@ -128,6 +159,22 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       logger.error('Error loading categories', error);
     } finally {
       setCategoriesLoading(false);
+    }
+  }, []);
+
+  const refreshEntries = useCallback(async () => {
+    setEntriesLoading(true);
+    setEntriesError(null);
+    try {
+      const response = await inventoryApiService.getEntries({ page: 1, pageSize: 50 });
+      setEntries(response.data);
+      logger.debug('Inventory entries loaded', { count: response.data.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al cargar entradas de inventario';
+      setEntriesError(message);
+      logger.error('Error loading entries', error);
+    } finally {
+      setEntriesLoading(false);
     }
   }, []);
 
@@ -201,9 +248,10 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshCategories();
     refreshProducts();
     refreshHospitalRequests();
+    refreshEntries();
     refreshDashboard();
     fetchColors();
-  }, [refreshCategories, refreshProducts, refreshHospitalRequests, refreshDashboard, fetchColors]);
+  }, [refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors]);
 
   // Category operations
   const addCategory = useCallback<InventoryContextValue['addCategory']>(
@@ -374,6 +422,47 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [refreshProducts, refreshDashboard]
   );
 
+  const addEntry = useCallback<InventoryContextValue['addEntry']>(
+    async (payload) => {
+      try {
+        const entry = await inventoryApiService.createEntry({
+          supplier_id: payload.supplierId,
+          supplier_name: payload.supplierName,
+          received_at: payload.receivedAt,
+          document_number: payload.documentNumber,
+          notes: payload.notes,
+          items: payload.items.map((item) => ({
+            product_id: item.productId,
+            variant_id: item.variantId,
+            quantity: item.quantity,
+          })),
+        });
+
+        await refreshEntries();
+        await refreshProducts(); // Stock updates
+        await refreshDashboard(); // Overview updates
+
+        return entry;
+      } catch (error) {
+        logger.error('Error adding inventory entry', error);
+        throw error;
+      }
+    },
+    [refreshEntries, refreshProducts, refreshDashboard]
+  );
+
+  const getEntryById = useCallback<InventoryContextValue['getEntryById']>(
+    async (id) => {
+      try {
+        return await inventoryApiService.getEntryById(id);
+      } catch (error) {
+        logger.error('Error fetching inventory entry by id', error);
+        throw error;
+      }
+    },
+    []
+  );
+
   // Hospital request operations
   const addHospitalRequest = useCallback<InventoryContextValue['addHospitalRequest']>(
     async (payload) => {
@@ -425,6 +514,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       categories,
       products,
       deliveries,
+      entries,
       hospitalRequests,
       hospitalOptions,
       colorOptions,
@@ -433,10 +523,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       categoriesLoading,
       productsLoading,
       hospitalRequestsLoading,
+      entriesLoading,
       dashboardLoading,
       categoriesError,
       productsError,
       hospitalRequestsError,
+      entriesError,
       dashboardError,
       addCategory,
       updateCategory,
@@ -447,27 +539,33 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addProduct,
       updateProduct,
       removeProduct,
+      addEntry,
       addHospitalRequest,
       updateHospitalRequestStatus,
       refreshCategories,
       refreshProducts,
       refreshHospitalRequests,
+      refreshEntries,
       refreshDashboard,
+      getEntryById,
     }),
     [
       categories,
       products,
       deliveries,
+      entries,
       hospitalRequests,
       colorOptions,
       dashboardData,
       categoriesLoading,
       productsLoading,
       hospitalRequestsLoading,
+      entriesLoading,
       dashboardLoading,
       categoriesError,
       productsError,
       hospitalRequestsError,
+      entriesError,
       dashboardError,
       addCategory,
       updateCategory,
@@ -478,12 +576,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addProduct,
       updateProduct,
       removeProduct,
+      addEntry,
       addHospitalRequest,
       updateHospitalRequestStatus,
       refreshCategories,
       refreshProducts,
       refreshHospitalRequests,
+      refreshEntries,
       refreshDashboard,
+      getEntryById,
     ]
   );
 

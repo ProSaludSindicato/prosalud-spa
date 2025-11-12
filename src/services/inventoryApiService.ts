@@ -6,6 +6,8 @@ import type {
   InventoryProduct,
   InventoryColorOption,
   InventoryGender,
+  InventoryEntry,
+  InventoryEntryItem,
   HospitalRequest,
   HospitalRequestStatus,
   ApiPaginatedResponse,
@@ -65,6 +67,49 @@ const normalizeProduct = (product: any): InventoryProduct => ({
   is_low_stock: product.is_low_stock,
   created_at: product.created_at,
   updated_at: product.updated_at,
+});
+
+const normalizeEntryItem = (item: any): InventoryEntryItem => {
+  const variant = item.variant ? normalizeVariant(item.variant) : undefined;
+  const variantWithMeta = variant
+    ? {
+        ...variant,
+        productId: item.variant.product_id ?? item.variant.productId,
+        created_at: item.variant.created_at,
+        updated_at: item.variant.updated_at,
+      }
+    : undefined;
+
+  return {
+    id: item.id,
+    productId: item.product_id ?? item.productId,
+    productName: item.product_name ?? item.productName ?? '',
+    variantId: item.variant_id ?? item.variantId ?? undefined,
+    variantLabel: item.variant_label ?? item.variantLabel,
+    quantity: item.quantity ?? 0,
+    previousStock: item.previous_stock ?? item.previousStock ?? 0,
+    newStock: item.new_stock ?? item.newStock ?? 0,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+    variant: variantWithMeta,
+    product: item.product ? normalizeProduct(item.product) : undefined,
+  };
+};
+
+const normalizeEntry = (entry: any): InventoryEntry => ({
+  id: entry.id,
+  supplierId: entry.supplier_id ?? entry.supplierId,
+  supplierName: entry.supplier_name ?? entry.supplierName,
+  receivedAt: entry.received_at ?? entry.receivedAt,
+  documentNumber: entry.document_number ?? entry.documentNumber ?? undefined,
+  notes: entry.notes ?? undefined,
+  createdBy: entry.created_by ?? entry.createdBy ?? '',
+  createdByUserId: entry.created_by_user_id ?? entry.createdByUserId ?? undefined,
+  totalItems: entry.total_items ?? entry.totalItems ?? (Array.isArray(entry.items) ? entry.items.length : 0),
+  totalQuantity: entry.total_quantity ?? entry.totalQuantity ?? 0,
+  items: Array.isArray(entry.items) ? entry.items.map(normalizeEntryItem) : [],
+  createdAt: entry.created_at ?? entry.createdAt,
+  updatedAt: entry.updated_at ?? entry.updatedAt,
 });
 
 const normalizeHospitalRequest = (request: any): HospitalRequest => ({
@@ -197,6 +242,27 @@ interface UpdateHospitalRequestStatusPayload {
   status: HospitalRequestStatus;
   actor?: string;
   description?: string;
+}
+
+interface GetEntriesParams extends Record<string, string | number | boolean | undefined> {
+  page?: number;
+  pageSize?: number;
+  supplierId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface CreateEntryPayload {
+  supplier_id: string;
+  supplier_name?: string;
+  received_at: string;
+  document_number?: string;
+  notes?: string;
+  items: Array<{
+    product_id: string;
+    variant_id?: string;
+    quantity: number;
+  }>;
 }
 
 export const inventoryApiService = {
@@ -399,6 +465,53 @@ export const inventoryApiService = {
       await api.delete(url);
     } catch (error) {
       logger.error('Error deleting product', error);
+      throw error;
+    }
+  },
+
+  // Inventory entries
+  async getEntries(params: GetEntriesParams = {}): Promise<ApiPaginatedResponse<InventoryEntry>> {
+    try {
+      const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
+      const url = buildAdminApiUrl(`${BASE_PATH}/entries${queryString ? `?${queryString}` : ''}`);
+      logger.debug('Fetching inventory entries', { url, params });
+
+      const response = await api.get<ApiPaginatedResponse<any>>(url);
+      const normalizedData = response.data.data.map(normalizeEntry);
+
+      return {
+        ...response.data,
+        data: normalizedData,
+      };
+    } catch (error) {
+      logger.error('Error fetching inventory entries', error);
+      throw error;
+    }
+  },
+
+  async getEntryById(id: string): Promise<InventoryEntry> {
+    try {
+      const url = buildAdminApiUrl(`${BASE_PATH}/entries/${id}`);
+      logger.debug('Fetching inventory entry by ID', { url, id });
+
+      const response = await api.get<ApiSingleResponse<any>>(url);
+      return normalizeEntry(response.data.data);
+    } catch (error) {
+      logger.error('Error fetching inventory entry', error);
+      throw error;
+    }
+  },
+
+  async createEntry(payload: CreateEntryPayload): Promise<InventoryEntry> {
+    try {
+      const url = buildAdminApiUrl(`${BASE_PATH}/entries`);
+      logger.debug('Creating inventory entry', { url, payload });
+
+      const response = await api.post<ApiSingleResponse<any>>(url, payload);
+      const data = 'data' in response.data ? response.data.data : response.data;
+      return normalizeEntry(data);
+    } catch (error) {
+      logger.error('Error creating inventory entry', error);
       throw error;
     }
   },

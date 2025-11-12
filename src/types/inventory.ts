@@ -104,6 +104,43 @@ export interface InventoryProduct {
   updated_at?: string;
 }
 
+export interface EntryVariantDetails extends ProductVariant {
+  productId?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryEntryItem {
+  id: string;
+  productId: string;
+  productName: string;
+  variantId?: string;
+  variantLabel?: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  createdAt?: string;
+  updatedAt?: string;
+  variant?: EntryVariantDetails;
+  product?: InventoryProduct;
+}
+
+export interface InventoryEntry {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  receivedAt: string;
+  documentNumber?: string;
+  notes?: string;
+  createdBy: string;
+  createdByUserId?: string;
+  totalItems: number;
+  totalQuantity: number;
+  items: InventoryEntryItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface SupplierDeliveryItem {
   productId: string;
   variantId?: string;

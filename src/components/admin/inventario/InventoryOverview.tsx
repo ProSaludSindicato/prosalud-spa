@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ import QuickActionsDialog from './QuickActionsDialog';
 import LowStockDialog, { type LowStockItem } from './LowStockDialog';
 // import HospitalRequestsDialog from './HospitalRequestsDialog';
 import { useInventory } from '@/context/InventoryContext';
-import type { InventoryProduct } from '@/types/inventory';
+import type { InventoryEntry, InventoryProduct } from '@/types/inventory';
 import { Link } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
 import { useToast } from '@/hooks/use-toast';
@@ -54,26 +55,6 @@ type EntryItemDraft = {
   variantId?: string;
   quantity: string;
 };
-
-interface InventoryEntryRecord {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  receivedAt: string;
-  documentNumber?: string;
-  notes?: string;
-  createdBy: string;
-  items: Array<{
-    id: string;
-    productId: string;
-    productName: string;
-    variantId?: string;
-    variantLabel?: string;
-    quantity: number;
-    previousStock: number;
-    newStock: number;
-  }>;
-}
 
 const generateTempId = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
@@ -89,22 +70,24 @@ const InventoryOverview: React.FC = () => {
   const [entryDocument, setEntryDocument] = useState('');
   const [entryNotes, setEntryNotes] = useState('');
   const [entryItems, setEntryItems] = useState<EntryItemDraft[]>([]);
-  const [entries, setEntries] = useState<InventoryEntryRecord[]>([]);
-  const [selectedEntry, setSelectedEntry] = useState<InventoryEntryRecord | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<InventoryEntry | null>(null);
+  const [entryDetailLoading, setEntryDetailLoading] = useState(false);
   const [savingEntry, setSavingEntry] = useState(false);
-  const [entriesLoading] = useState(false);
 
   const { toast } = useToast();
 
   const {
     categories,
     products,
+    entries,
+    entriesLoading,
+    entriesError,
     colorOptions,
     dashboardData,
     dashboardLoading,
     dashboardError,
-    refreshProducts,
-    refreshDashboard,
+    addEntry,
+    getEntryById,
   } = useInventory();
 
   const suppliers = useMemo(
@@ -131,12 +114,18 @@ const InventoryOverview: React.FC = () => {
     return map;
   }, [products]);
 
+  const formatGender = (gender?: string | null) => {
+    if (!gender) return undefined;
+    const lower = gender.toString();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  };
+
   const productSelectOptions = useMemo<SearchableSelectOption[]>(
     () =>
       products.map((p) => ({
         value: p.id,
-        label: `${p.name}${p.gender ? ` (${p.gender})` : ''}`,
-        searchText: `${p.name} ${p.gender ?? ''}`,
+        label: `${p.name}${formatGender(p.gender) ? ` (${formatGender(p.gender)})` : ''}`,
+        searchText: `${p.name} ${formatGender(p.gender) ?? ''}`,
       })),
     [products],
   );
@@ -230,55 +219,36 @@ const InventoryOverview: React.FC = () => {
           return;
         }
       }
-      const entryRecord: InventoryEntryRecord = {
-        id: generateTempId(),
+
+      const payload = {
         supplierId: entrySupplier,
-        supplierName: supplier?.name ?? 'Proveedor',
+        supplierName: supplier?.name,
         receivedAt: new Date(entryDate).toISOString(),
         documentNumber: entryDocument || undefined,
         notes: entryNotes || undefined,
-        createdBy: 'Administrador',
-        items: entryItems.map((item) => {
-          const quantityValue = Number(item.quantity || '0');
-          const product = products.find((p) => p.id === item.productId);
-          const variant = product?.variants.find((v) => v.id === item.variantId);
-          const previousStock = variant?.stock ?? 0;
-          const variantLabel =
-            variant?.label ||
-            [variant?.size, variant?.color?.label ?? (variant?.colorId ?? '')]
-              .filter(Boolean)
-              .join(' · ') ||
-            variant?.sku ||
-            'Variante';
-
-          return {
-            id: item.id,
-            productId: item.productId,
-            productName: product?.name ?? 'Producto',
-            variantId: item.variantId,
-            variantLabel,
-            quantity: quantityValue,
-            previousStock,
-            newStock: previousStock + quantityValue,
-          };
-        }),
+        items: entryItems.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: Number(item.quantity || '0'),
+        })),
       };
 
-      setEntries((prev) => [entryRecord, ...prev]);
-
-      await Promise.allSettled([refreshProducts(), refreshDashboard()]);
+      await addEntry(payload);
 
       toast({
         title: 'Entrada registrada',
-        description: 'La información de stock se actualizará con la futura integración de la API.',
+        description: 'La entrada se registró correctamente y el stock ha sido actualizado.',
       });
 
       resetEntryForm();
       setCreateEntryOpen(false);
     } catch (error) {
+      const message = isAxiosError(error)
+        ? error.response?.data?.message ?? error.message
+        : 'Intenta nuevamente.';
       toast({
         title: 'Error al registrar la entrada',
-        description: error instanceof Error ? error.message : 'Intenta nuevamente.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -286,8 +256,24 @@ const InventoryOverview: React.FC = () => {
     }
   };
 
-  const handleViewEntry = (entry: InventoryEntryRecord) => {
+  const handleViewEntry = async (entry: InventoryEntry) => {
     setSelectedEntry(entry);
+    setEntryDetailLoading(true);
+    try {
+      const detailedEntry = await getEntryById(entry.id);
+      setSelectedEntry(detailedEntry);
+    } catch (error) {
+      const message = isAxiosError(error)
+        ? error.response?.data?.message ?? 'No fue posible obtener el detalle.'
+        : 'No fue posible obtener el detalle.';
+      toast({
+        title: 'Error al cargar detalle',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setEntryDetailLoading(false);
+    }
   };
 
   const colorLabelMap = useMemo(() => {
@@ -877,6 +863,12 @@ const InventoryOverview: React.FC = () => {
                         Cargando entradas...
                       </TableCell>
                     </TableRow>
+                  ) : entriesError ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-[180px] text-center text-red-600">
+                        {entriesError}
+                      </TableCell>
+                    </TableRow>
                   ) : entries.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="h-[180px] text-center text-gray-500">
@@ -903,7 +895,7 @@ const InventoryOverview: React.FC = () => {
                         <TableCell>{entry.createdBy}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-xs">
-                            {entry.items.length} productos
+                            {entry.totalItems} productos · {entry.totalQuantity} unidades
                   </Badge>
                         </TableCell>
                         <TableCell className="max-w-[220px] truncate text-xs text-gray-600">{entry.notes ?? '—'}</TableCell>
@@ -1089,7 +1081,15 @@ const InventoryOverview: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={selectedEntry !== null} onOpenChange={(open) => !open && setSelectedEntry(null)}>
+      <Dialog
+        open={selectedEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedEntry(null);
+            setEntryDetailLoading(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl bg-white">
           <DialogHeader>
             <DialogTitle>Detalle de entrada</DialogTitle>
@@ -1144,39 +1144,54 @@ const InventoryOverview: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedEntry.items.map((item) => {
-                      const productDetail = productById.get(item.productId);
-                      const productGender = productDetail?.gender;
-                      const variantDetail = productDetail?.variants?.find((variant) => variant.id === item.variantId);
-                      const variantColorHex = variantDetail?.color?.hex;
-                      const variantColorLabel = variantDetail?.color?.label ?? '';
-                      const variantSizeLabel = variantDetail?.size ?? '';
-                      const variantFallbackLabel = [variantSizeLabel, variantColorLabel].filter(Boolean).join(' · ');
-                      const variantDisplay = item.variantLabel ?? (variantFallbackLabel || '—');
+                    {entryDetailLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-[120px] text-center text-gray-500">
+                          Cargando detalle...
+                        </TableCell>
+                      </TableRow>
+                    ) : selectedEntry.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-[120px] text-center text-gray-500">
+                          No se registraron productos en esta entrada.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      selectedEntry.items.map((item) => {
+                        const productDetail = item.product ?? productById.get(item.productId);
+                        const productGender = formatGender(productDetail?.gender);
+                        const variantDetail =
+                          item.variant ?? productDetail?.variants?.find((variant) => variant.id === item.variantId);
+                        const variantColorHex = variantDetail?.color?.hex;
+                        const variantColorLabel = variantDetail?.color?.label ?? '';
+                        const variantSizeLabel = variantDetail?.size ?? '';
+                        const variantFallbackLabel = [variantSizeLabel, variantColorLabel].filter(Boolean).join(' · ');
+                        const variantDisplay = item.variantLabel ?? (variantFallbackLabel || '—');
 
-                      return (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium text-gray-900">
-                            <span>{item.productName}</span>
-                            {productGender && <span className="font-bold text-gray-700"> ({productGender})</span>}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            <div className="flex items-center gap-2">
-                              {variantColorHex && (
-                                <span
-                                  className="h-3.5 w-3.5 shrink-0 rounded-full border border-white shadow-inner ring-1 ring-black/10"
-                                  style={{ backgroundColor: variantColorHex }}
-                                />
-                              )}
-                              <span>{variantDisplay}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{item.previousStock}</TableCell>
-                          <TableCell>{item.newStock}</TableCell>
-                        </TableRow>
-                      );
-                    })}
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium text-gray-900">
+                              <span>{item.productName}</span>
+                              {productGender && <span className="font-bold text-gray-700"> ({productGender})</span>}
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-600">
+                              <div className="flex items-center gap-2">
+                                {variantColorHex && (
+                                  <span
+                                    className="h-3.5 w-3.5 shrink-0 rounded-full border border-white shadow-inner ring-1 ring-black/10"
+                                    style={{ backgroundColor: variantColorHex }}
+                                  />
+                                )}
+                                <span>{variantDisplay}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{item.previousStock}</TableCell>
+                            <TableCell>{item.newStock}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>

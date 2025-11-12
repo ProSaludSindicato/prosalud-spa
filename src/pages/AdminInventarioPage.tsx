@@ -35,7 +35,7 @@ const AdminInventarioPage: React.FC = () => {
 
   const tabs = useMemo(
     () => [
-    { id: 'overview', label: 'Resumen', icon: BarChart3 },
+    { id: 'overview', label: 'Inicio', icon: BarChart3 },
       { id: 'categories', label: 'Categorías', icon: Tag },
     { id: 'products', label: 'Productos', icon: Package },
       // { id: 'deliveries', label: 'Entregas', icon: Truck },
