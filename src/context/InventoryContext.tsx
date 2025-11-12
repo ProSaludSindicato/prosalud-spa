@@ -5,9 +5,13 @@ import {
   InventoryCategory,
   InventoryColorOption,
   InventoryEntry,
+  InventoryLocation,
+  InventoryLocationDetail,
   InventoryProduct,
   InventorySubcategory,
   SupplierDelivery,
+  InventoryStockMovement,
+  ApiPaginatedResponse,
   DashboardData,
   INVENTORY_SIZES,
 } from '@/types/inventory';
@@ -22,9 +26,24 @@ interface InventoryContextValue {
   entries: InventoryEntry[];
   hospitalRequests: HospitalRequest[];
   hospitalOptions: Array<{ id: string; name: string }>;
+  locations: InventoryLocation[];
+  primaryLocation: InventoryLocation | null;
   colorOptions: InventoryColorOption[];
   sizeOptions: string[];
   dashboardData: DashboardData | null;
+  getLocationDetail: (id: string) => Promise<InventoryLocationDetail>;
+  getStockMovements: (
+    params?: {
+      variantId?: string;
+      reason?: string;
+      fromLocationId?: string;
+      toLocationId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) => Promise<ApiPaginatedResponse<InventoryStockMovement>>;
   
   // Loading states
   categoriesLoading: boolean;
@@ -32,6 +51,7 @@ interface InventoryContextValue {
   hospitalRequestsLoading: boolean;
   entriesLoading: boolean;
   dashboardLoading: boolean;
+  locationsLoading: boolean;
   
   // Error states
   categoriesError: string | null;
@@ -39,6 +59,7 @@ interface InventoryContextValue {
   hospitalRequestsError: string | null;
   entriesError: string | null;
   dashboardError: string | null;
+  locationsError: string | null;
   
   // Category operations
   addCategory: (payload: Omit<InventoryCategory, 'id' | 'subcategories'> & { subcategories?: InventorySubcategory[] }) => Promise<void>;
@@ -58,6 +79,7 @@ interface InventoryContextValue {
     supplierId: string;
     supplierName?: string;
     receivedAt: string;
+    locationId?: string;
     documentNumber?: string;
     notes?: string;
     items: Array<{ productId: string; variantId?: string; quantity: number }>;
@@ -79,6 +101,7 @@ interface InventoryContextValue {
   refreshHospitalRequests: () => Promise<void>;
   refreshEntries: () => Promise<void>;
   refreshDashboard: () => Promise<void>;
+  refreshLocations: () => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextValue | undefined>(undefined);
@@ -114,7 +137,7 @@ const initialColorOptions: InventoryColorOption[] = [
   { id: 'VINO_TINTO', label: 'Vino Tinto', hex: '#881337' },
 ];
 
-const hospitalOptions = [
+const fallbackHospitalOptions = [
   { id: 'hospital-bello', name: 'Hospital Bello' },
   { id: 'hospital-rionegro', name: 'Hospital Rionegro' },
   { id: 'hospital-la-maria', name: 'Hospital La Maria' },
@@ -128,6 +151,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [deliveries] = useState<SupplierDelivery[]>([]); // Deliveries not implemented in API yet
   const [entries, setEntries] = useState<InventoryEntry[]>([]);
   const [hospitalRequests, setHospitalRequests] = useState<HospitalRequest[]>([]);
+  const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [colorOptions, setColorOptions] = useState<InventoryColorOption[]>(initialColorOptions);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   
@@ -137,6 +161,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [hospitalRequestsLoading, setHospitalRequestsLoading] = useState(false);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   
   // Error states
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -144,6 +169,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [hospitalRequestsError, setHospitalRequestsError] = useState<string | null>(null);
   const [entriesError, setEntriesError] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [locationsError, setLocationsError] = useState<string | null>(null);
 
   // Fetch categories
   const refreshCategories = useCallback(async () => {
@@ -159,6 +185,22 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       logger.error('Error loading categories', error);
     } finally {
       setCategoriesLoading(false);
+    }
+  }, []);
+
+  const refreshLocations = useCallback(async () => {
+    setLocationsLoading(true);
+    setLocationsError(null);
+    try {
+      const data = await inventoryApiService.getLocations({ summary: true, withHospital: true });
+      setLocations(data);
+      logger.debug('Inventory locations loaded', { count: data.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al cargar bodegas';
+      setLocationsError(message);
+      logger.error('Error loading inventory locations', error);
+    } finally {
+      setLocationsLoading(false);
     }
   }, []);
 
@@ -251,7 +293,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshEntries();
     refreshDashboard();
     fetchColors();
-  }, [refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors]);
+    refreshLocations();
+  }, [refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors, refreshLocations]);
 
   // Category operations
   const addCategory = useCallback<InventoryContextValue['addCategory']>(
@@ -371,12 +414,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         await refreshProducts();
         await refreshDashboard(); // Dashboard might be affected
+        await refreshLocations(); // Stock distribution updates
+        await refreshHospitalRequests(); // Requests may depend on product metadata
       } catch (error) {
         logger.error('Error adding product', error);
         throw error;
       }
     },
-    [refreshProducts, refreshDashboard]
+    [refreshProducts, refreshDashboard, refreshLocations, refreshHospitalRequests]
   );
 
   const updateProduct = useCallback<InventoryContextValue['updateProduct']>(
@@ -400,12 +445,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         await refreshProducts();
         await refreshDashboard(); // Dashboard might be affected
+        await refreshLocations(); // Stock distribution updates
+        await refreshHospitalRequests(); // Requests may depend on product metadata
       } catch (error) {
         logger.error('Error updating product', error);
         throw error;
       }
     },
-    [refreshProducts, refreshDashboard]
+    [refreshProducts, refreshDashboard, refreshLocations, refreshHospitalRequests]
   );
 
   const removeProduct = useCallback<InventoryContextValue['removeProduct']>(
@@ -414,12 +461,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await inventoryApiService.deleteProduct(id);
         await refreshProducts();
         await refreshDashboard(); // Dashboard might be affected
+        await refreshLocations(); // Stock distribution updates
+        await refreshHospitalRequests(); // Requests may depend on product availability
       } catch (error) {
         logger.error('Error removing product', error);
         throw error;
       }
     },
-    [refreshProducts, refreshDashboard]
+    [refreshProducts, refreshDashboard, refreshLocations, refreshHospitalRequests]
   );
 
   const addEntry = useCallback<InventoryContextValue['addEntry']>(
@@ -429,6 +478,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           supplier_id: payload.supplierId,
           supplier_name: payload.supplierName,
           received_at: payload.receivedAt,
+          location_id: payload.locationId,
           document_number: payload.documentNumber,
           notes: payload.notes,
           items: payload.items.map((item) => ({
@@ -441,14 +491,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await refreshEntries();
         await refreshProducts(); // Stock updates
         await refreshDashboard(); // Overview updates
+        await refreshLocations(); // Stock distribution updates
+        await refreshHospitalRequests(); // Update pending request stock snapshots
 
         return entry;
       } catch (error) {
         logger.error('Error adding inventory entry', error);
         throw error;
       }
-    },
-    [refreshEntries, refreshProducts, refreshDashboard]
+  },
+    [refreshEntries, refreshProducts, refreshDashboard, refreshLocations, refreshHospitalRequests]
   );
 
   const getEntryById = useCallback<InventoryContextValue['getEntryById']>(
@@ -481,13 +533,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         await refreshHospitalRequests();
         await refreshDashboard(); // Dashboard might be affected
+        await refreshLocations(); // Reserved stock updates
+        await refreshProducts(); // Product stock/reservations updates
         return newRequest;
       } catch (error) {
         logger.error('Error adding hospital request', error);
         throw error;
       }
     },
-    [refreshHospitalRequests, refreshDashboard]
+    [refreshHospitalRequests, refreshDashboard, refreshLocations, refreshProducts]
   );
 
   const updateHospitalRequestStatus = useCallback<InventoryContextValue['updateHospitalRequestStatus']>(
@@ -501,12 +555,36 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await refreshHospitalRequests();
         await refreshDashboard(); // Dashboard might be affected
         await refreshProducts(); // Stock might change
+        await refreshLocations(); // Reserved / stock distribution changes
       } catch (error) {
         logger.error('Error updating hospital request status', error);
         throw error;
       }
     },
-    [refreshHospitalRequests, refreshDashboard, refreshProducts]
+    [refreshHospitalRequests, refreshDashboard, refreshProducts, refreshLocations]
+  );
+
+  const hospitalOptions = useMemo(
+    () =>
+      locations.length
+        ? locations
+            .filter((location) => !location.isPrimary)
+            .map((location) => ({
+              id: location.hospital?.id !== undefined ? String(location.hospital.id) : location.hospitalId ? String(location.hospitalId) : location.id,
+              name: location.hospital?.name ?? location.name,
+            }))
+        : fallbackHospitalOptions,
+    [locations],
+  );
+
+  const getLocationDetail = useCallback<InventoryContextValue['getLocationDetail']>(
+    async (id) => inventoryApiService.getLocationById(id),
+    [],
+  );
+
+  const getStockMovements = useCallback<InventoryContextValue['getStockMovements']>(
+    async (params) => inventoryApiService.getStockMovements(params),
+    [],
   );
 
   const value = useMemo(
@@ -517,19 +595,25 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       entries,
       hospitalRequests,
       hospitalOptions,
+      locations,
+      primaryLocation: locations.find((location) => location.isPrimary) ?? null,
       colorOptions,
       sizeOptions,
       dashboardData,
+      getLocationDetail,
+      getStockMovements,
       categoriesLoading,
       productsLoading,
       hospitalRequestsLoading,
       entriesLoading,
       dashboardLoading,
+      locationsLoading,
       categoriesError,
       productsError,
       hospitalRequestsError,
       entriesError,
       dashboardError,
+      locationsError,
       addCategory,
       updateCategory,
       removeCategory,
@@ -547,6 +631,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       refreshHospitalRequests,
       refreshEntries,
       refreshDashboard,
+      refreshLocations,
       getEntryById,
     }),
     [
@@ -555,18 +640,24 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deliveries,
       entries,
       hospitalRequests,
+      hospitalOptions,
+      locations,
       colorOptions,
       dashboardData,
+      getLocationDetail,
+      getStockMovements,
       categoriesLoading,
       productsLoading,
       hospitalRequestsLoading,
       entriesLoading,
       dashboardLoading,
+      locationsLoading,
       categoriesError,
       productsError,
       hospitalRequestsError,
       entriesError,
       dashboardError,
+      locationsError,
       addCategory,
       updateCategory,
       removeCategory,
@@ -584,6 +675,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       refreshHospitalRequests,
       refreshEntries,
       refreshDashboard,
+      refreshLocations,
       getEntryById,
     ]
   );

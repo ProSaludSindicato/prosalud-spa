@@ -51,6 +51,37 @@ export type InventoryGender = typeof INVENTORY_GENDERS[number];
 
 export type InventoryVariantMode = 'simple' | 'size' | 'color' | 'size_color';
 
+export interface InventoryHospital {
+  id: string | number;
+  name: string;
+  type?: string;
+}
+
+export interface InventoryLocation {
+  id: string;
+  name: string;
+  type?: string;
+  isPrimary?: boolean;
+  hospitalId?: string | number;
+  hospital?: InventoryHospital;
+  totalStock?: number;
+  totalReserved?: number;
+  totalVariants?: number;
+  totalProducts?: number;
+  totalValue?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InventoryVariantStock {
+  locationId: string;
+  stock: number;
+  reserved?: number;
+  available?: number;
+  location?: InventoryLocation;
+  updatedAt?: string;
+}
+
 export interface InventoryColorOption {
   id: string;
   label: string;
@@ -84,6 +115,7 @@ export interface ProductVariant {
   sku: string;
   is_low_stock?: boolean; // Added for API response
   label?: string; // Added for API response
+  stocks?: InventoryVariantStock[];
 }
 
 export interface InventoryProduct {
@@ -130,6 +162,8 @@ export interface InventoryEntry {
   supplierId: string;
   supplierName: string;
   receivedAt: string;
+  locationId?: string;
+  location?: InventoryLocation;
   documentNumber?: string;
   notes?: string;
   createdBy: string;
@@ -193,6 +227,9 @@ export interface HospitalRequest {
   hospital_id?: string; // API compatibility
   hospitalName: string;
   hospital_name?: string; // API compatibility
+  hospital?: InventoryHospital;
+  targetLocation?: InventoryLocation;
+  target_location?: InventoryLocation; // API compatibility
   requestedBy?: string;
   requested_by?: string; // API compatibility
   createdAt: string;
@@ -202,6 +239,68 @@ export interface HospitalRequest {
   observations?: string;
   timeline?: HospitalRequestTimelineEvent[];
   updated_at?: string;
+}
+
+export interface InventoryLocationStockItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productCategory?: string;
+  productSubcategory?: string;
+  variantId: string;
+  variantSku?: string;
+  variantLabel?: string;
+  size?: InventorySize;
+  colorId?: string;
+  colorLabel?: string;
+  colorHex?: string;
+  stock: number;
+  reserved?: number;
+  minStock?: number;
+  maxStock?: number;
+  updatedAt?: string;
+}
+
+export interface InventoryLocationDetail extends InventoryLocation {
+  stocks?: InventoryLocationStockItem[];
+}
+
+export type InventoryStockMovementReason =
+  | 'manual_adjustment'
+  | 'inventory_entry'
+  | 'inventory_exit'
+  | 'hospital_request'
+  | 'return'
+  | 'transfer'
+  | string;
+
+export interface InventoryStockMovement {
+  id: string;
+  variantId: string;
+  productId?: string;
+  productName: string;
+  variantLabel?: string;
+  quantity: number;
+  reason: InventoryStockMovementReason;
+  fromLocation?: InventoryLocation | null;
+  fromSupplier?: {
+    id?: string;
+    supplierId?: string;
+    supplierName?: string;
+  } | null;
+  toLocation?: InventoryLocation | null;
+  referenceType?: string;
+  referenceId?: string;
+  movedAt: string;
+  notes?: string;
+  actor?: string;
+  variant?: {
+    id?: string;
+    label?: string;
+    size?: InventorySize | string | null;
+    colorId?: string | null;
+    color?: InventoryColorOption | { id?: string; label?: string; hex?: string } | null;
+  } | null;
 }
 
 // API Response types

@@ -71,6 +71,39 @@ const statusIcons: Record<HospitalRequestStatus, React.ReactNode> = {
     rejected: <Clock className="h-3 w-3 mr-1"/>,
 };
 
+const locationMovementStatuses: HospitalRequestStatus[] = ['shipped', 'delivered'];
+
+const resolveLocationTypeLabel = (location?: HospitalRequest['targetLocation']) => {
+    if (!location) return 'Ubicación';
+    if (location.isPrimary) return 'Principal';
+    switch (location.type) {
+        case 'hospital':
+            return 'Hospital';
+        case 'satellite':
+            return 'Satélite';
+        case 'warehouse':
+            return 'Bodega';
+        default:
+            return location.type ? location.type.charAt(0).toUpperCase() + location.type.slice(1) : 'Secundaria';
+    }
+};
+
+const resolveLocationBadgeClass = (location?: HospitalRequest['targetLocation']) => {
+    if (location?.isPrimary) {
+        return 'bg-primary-prosalud/10 text-primary-prosalud border border-primary-prosalud/30';
+    }
+    switch (location?.type) {
+        case 'hospital':
+            return 'bg-sky-100 text-sky-800 border border-sky-200';
+        case 'satellite':
+            return 'bg-purple-100 text-purple-800 border border-purple-200';
+        default:
+            return 'bg-gray-100 text-gray-700 border border-gray-200';
+    }
+};
+
+const hasInventoryMovement = (status: HospitalRequestStatus) => locationMovementStatuses.includes(status);
+
 const HospitalRequests: React.FC = () => {
     const {toast} = useToast();
     const {requests, hospitalOptions, products, categories, colorOptions, createRequest, changeStatus} =
@@ -289,7 +322,7 @@ const HospitalRequests: React.FC = () => {
     const getAvailableNextStatuses = (status: HospitalRequestStatus) => {
         switch (status) {
             case 'pending':
-                return ['approved', 'preparing'] as HospitalRequestStatus[];
+                return ['approved', 'rejected'] as HospitalRequestStatus[];
             case 'approved':
                 return ['preparing', 'rejected'] as HospitalRequestStatus[];
             case 'preparing':
@@ -556,8 +589,20 @@ const HospitalRequests: React.FC = () => {
                                                     day: 'numeric',
                                                 })}
                                             </TableCell>
-                                            <TableCell className="max-w-[220px]">
-                                                <p className="font-medium text-gray-900">{request.hospitalName}</p>
+                                            <TableCell className="max-w-[240px] space-y-1">
+                                                <p className="font-medium text-gray-900">
+                                                    {request.hospital?.name ?? request.hospitalName}
+                                                </p>
+                                                { /*{request.targetLocation && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge className={`text-[10px] ${resolveLocationBadgeClass(request.targetLocation)}`}>
+                                                            {resolveLocationTypeLabel(request.targetLocation)}
+                                                        </Badge>
+                                                        <span className="text-xs text-gray-600">
+                                                            {request.targetLocation.name}
+                                                        </span>
+                                                    </div>
+                                                )}*/ }
                                                 {request.requestedBy && (
                                                     <p className="text-xs text-gray-500">Solicitó: {request.requestedBy}</p>
                                                 )}
@@ -566,7 +611,7 @@ const HospitalRequests: React.FC = () => {
                                                 <p className="font-medium text-gray-900">{request.items.length}</p>
                                                 <p className="text-xs text-gray-500">ítems solicitados</p>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="space-y-1">
                                                 <Badge className={statusBadgeStyles[request.status]}>
                                                     {statusIcons[request.status]}
                                                     {statusOptions.find((option) => option.value === request.status)?.label ?? request.status}
@@ -574,6 +619,12 @@ const HospitalRequests: React.FC = () => {
                                                 <p className="text-xs text-gray-500 mt-1">
                                                     {formatDateTime(getLastUpdateDate(request))}
                                                 </p>
+                                                {/* hasInventoryMovement(request.status) && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                                        <Truck className="h-3 w-3"/>
+                                                        Inventario movido
+                                                    </span>
+                                                ) */}
                                             </TableCell>
                                             <TableCell className="hidden lg:table-cell">
                                                 <p className="text-xs text-gray-600 truncate max-w-xs">
@@ -953,10 +1004,12 @@ const HospitalRequests: React.FC = () => {
                                             general</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-6 space-y-3 text-sm text-gray-700">
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <span className="font-medium text-gray-600 block">Hospital:</span>
-                                                <span className="text-gray-900">{selectedRequest.hospitalName}</span>
+                                                <span className="text-gray-900">
+                                                    {selectedRequest.hospital?.name ?? selectedRequest.hospitalName}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span
@@ -966,11 +1019,26 @@ const HospitalRequests: React.FC = () => {
                                                 </span>
                                             </div>
                                             <div>
+                                                <span className="font-medium text-gray-600 block">Bodega destino:</span>
+                                                {selectedRequest.targetLocation ? (
+                                                    <div className="mt-1 flex items-center gap-2">
+                                                        <Badge className={`text-[10px] ${resolveLocationBadgeClass(selectedRequest.targetLocation)}`}>
+                                                            {resolveLocationTypeLabel(selectedRequest.targetLocation)}
+                                                        </Badge>
+                                                        <span className="text-gray-900">
+                                                            {selectedRequest.targetLocation.name}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-900">Pendiente de asignar</span>
+                                                )}
+                                            </div>
+                                            <div>
                                                 <span className="font-medium text-gray-600 block">Solicitante:</span>
                                                 <span
                                                     className="text-gray-900">{selectedRequest.requestedBy ?? 'No registrado'}</span>
                                             </div>
-                                            <div>
+                                            <div className="md:col-span-2">
                                                 <span className="font-medium text-gray-600 block">Observaciones:</span>
                                                 <span
                                                     className="text-gray-900">{selectedRequest.observations ?? '—'}</span>
@@ -978,6 +1046,22 @@ const HospitalRequests: React.FC = () => {
                                         </div>
                                     </CardContent>
                                 </Card>
+
+                                {hasInventoryMovement(selectedRequest.status) && selectedRequest.targetLocation && (
+                                    <div className="flex items-start gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                                        <Truck className="mt-0.5 h-4 w-4 shrink-0"/>
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-semibold uppercase tracking-wide">
+                                                Inventario distribuido
+                                            </p>
+                                            <p>
+                                                {selectedRequest.status === 'delivered'
+                                                    ? `La solicitud se marcó como entregada. El stock figura ahora en ${selectedRequest.targetLocation.name}.`
+                                                    : `El inventario salió de la bodega principal y se dirige a ${selectedRequest.targetLocation.name}.`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <Card className="border border-gray-200 shadow-sm">
                                     <CardHeader className="bg-gray-50 border-b border-gray-200">
