@@ -48,7 +48,6 @@ const statusOptions: { value: HospitalRequestStatus | 'all'; label: string }[] =
     {value: 'pending', label: 'Pendiente'},
     {value: 'approved', label: 'Aprobada'},
     {value: 'preparing', label: 'Preparando'},
-    {value: 'shipped', label: 'Enviada'},
     {value: 'delivered', label: 'Entregada'},
     {value: 'rejected', label: 'Rechazada'},
 ];
@@ -57,8 +56,7 @@ const statusBadgeStyles: Record<HospitalRequestStatus, string> = {
     pending: 'bg-amber-100 text-amber-800 border border-amber-200',
     approved: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
     preparing: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
-    shipped: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
-    delivered: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    delivered: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
     rejected: 'bg-red-100 text-red-700 border border-red-200',
 };
 
@@ -66,12 +64,11 @@ const statusIcons: Record<HospitalRequestStatus, React.ReactNode> = {
     pending: <Clock className="h-3 w-3 mr-1"/>,
     approved: <CheckCircle2 className="h-3 w-3 mr-1"/>,
     preparing: <ClipboardList className="h-3 w-3 mr-1"/>,
-    shipped: <Truck className="h-3 w-3 mr-1"/>,
     delivered: <Archive className="h-3 w-3 mr-1"/>,
     rejected: <Clock className="h-3 w-3 mr-1"/>,
 };
 
-const locationMovementStatuses: HospitalRequestStatus[] = ['shipped', 'delivered'];
+const locationMovementStatuses: HospitalRequestStatus[] = ['delivered'];
 
 const resolveLocationTypeLabel = (location?: HospitalRequest['targetLocation']) => {
     if (!location) return 'Ubicación';
@@ -326,8 +323,6 @@ const HospitalRequests: React.FC = () => {
             case 'approved':
                 return ['preparing', 'rejected'] as HospitalRequestStatus[];
             case 'preparing':
-                return ['shipped', 'rejected'] as HospitalRequestStatus[];
-            case 'shipped':
                 return ['delivered'] as HospitalRequestStatus[];
             default:
                 return [];

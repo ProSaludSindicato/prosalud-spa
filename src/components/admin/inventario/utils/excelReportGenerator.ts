@@ -59,7 +59,6 @@ export const generateExcelReport = (data: ReportData, reportType: ReportType): X
       ['Variantes con stock crítico', formatNumber(data.summary.criticalStockCount)],
       ['Solicitudes pendientes', formatNumber(data.summary.pendingHospitalRequests)],
       ['Solicitudes en preparación', formatNumber(data.summary.preparingHospitalRequests)],
-      ['Solicitudes enviadas', formatNumber(data.summary.shippedHospitalRequests)],
       ['Solicitudes entregadas', formatNumber(data.summary.deliveredHospitalRequests)],
       ['Solicitudes rechazadas', formatNumber(data.summary.rejectedHospitalRequests)],
       ['Entregas pendientes', formatNumber(data.summary.pendingDeliveries)],

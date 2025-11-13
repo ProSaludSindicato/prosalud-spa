@@ -499,7 +499,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         logger.error('Error adding inventory entry', error);
         throw error;
       }
-  },
+    },
     [refreshEntries, refreshProducts, refreshDashboard, refreshLocations, refreshHospitalRequests]
   );
 

@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import type { SstDeliveryDraft, SstDeliveryType, SstInventoryItem } from '@/types/adminSst';
 import { logger } from '@/utils/logger';
+import { resolveSstColorInfo } from './color-utils';
 
 interface DeliveryConfirmationModalProps {
   open: boolean;
@@ -23,62 +24,17 @@ interface DeliveryConfirmationModalProps {
   onConfirm: (record: SstDeliveryDraft) => Promise<void>;
 }
 
-const colorPalette: Record<string, string> = {
-  aguamarina: '#14B8A6',
-  aguama: '#14B8A6',
-  'aguama ': '#14B8A6',
-  aquamarina: '#14B8A6',
-  amarillo: '#FACC15',
-  azul: '#2563EB',
-  'azul claro': '#93C5FD',
-  'azul cielo': '#38BDF8',
-  'azul marino': '#1E40AF',
-  'azul oscuro': '#1F2937',
-  'azul rey': '#1E3A8A',
-  beige: '#D4C4A8',
-  blanco: '#FFFFFF',
-  cafe: '#92400E',
-  café: '#92400E',
-  gris: '#6B7280',
-  'gris raton': '#4B5563',
-  'gris ratón': '#4B5563',
-  'gris oscuro': '#374151',
-  'gris reflectivo': '#9CA3AF',
-  morado: '#A855F7',
-  naranja: '#FB923C',
-  negro: '#000000',
-  negra: '#000000',
-  petroleo: '#0F172A',
-  petróleo: '#0F172A',
-  rojo: '#EF4444',
-  rosa: '#F472B6',
-  verde: '#22C55E',
-  'verde agua': '#5EEAD4',
-  'verde quirurgico': '#065F46',
-  'verde quirúrgico': '#065F46',
-  'vino tinto': '#881337',
-};
-
-const normalizeColorName = (color?: string) =>
-  color
-    ? color
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-    : undefined;
-
 const renderColorSwatch = (color?: string) => {
   if (!color) return null;
-  const normalized = normalizeColorName(color);
-  const background = (normalized && colorPalette[normalized]) || '#cbd5f5';
+  const colorInfo = resolveSstColorInfo(color);
+  const background = colorInfo?.hex ?? '#cbd5f5';
 
   return (
     <span
       className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border border-slate-200"
       style={{ backgroundColor: background }}
-      aria-label={color}
-      title={color}
+      aria-label={colorInfo?.label ?? color}
+      title={colorInfo?.label ?? color}
     />
   );
 };
@@ -192,15 +148,20 @@ export function DeliveryConfirmationModal({
             <ul className="space-y-2">
               {record.items.map((item, index) => {
                 const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
-                const resolvedColor = item.variant?.color || inventoryItem?.defaultColor;
+                const rawColor = item.variant?.color || inventoryItem?.defaultColor;
+                const colorInfo = resolveSstColorInfo(rawColor);
+                const resolvedColor = colorInfo?.label ?? rawColor;
                 return (
                   <li
                     key={`${item.itemId}-${index}`}
                     className="flex flex-wrap items-center gap-2.5 rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
                   >
-                    {resolvedColor && renderColorSwatch(resolvedColor)}
+                    {rawColor && renderColorSwatch(rawColor)}
                     <span className="font-semibold text-slate-800">
                       {inventoryItem?.name ?? item.itemId}
+                      {inventoryItem?.gender && (
+                        <span className="font-bold"> ({inventoryItem.gender})</span>
+                      )}
                     </span>
                     {resolvedColor && (
                       <span className="text-xs text-slate-500">

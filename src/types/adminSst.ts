@@ -10,12 +10,14 @@ export interface SstInventoryVariant {
 
 export interface SstInventoryItem {
   id: string;
+  baseId?: string;
   name: string;
   category: SstInventoryCategory;
   variants?: SstInventoryVariant[];
   defaultColor?: string;
   description?: string;
   unit?: string;
+  gender?: string;
 }
 
 export interface SstAffiliate {

@@ -31,7 +31,7 @@ interface HospitalRequest {
   requestDate: string;
   totalItems: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'approved' | 'preparing' | 'shipped' | 'delivered' | 'rejected';
+  status: 'pending' | 'approved' | 'preparing' | 'delivered' | 'rejected';
   items: Array<{
     productName: string;
     quantity: number;
@@ -100,8 +100,7 @@ const HospitalRequestsDialog: React.FC<HospitalRequestsDialogProps> = ({ open, o
       case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'approved': return 'bg-blue-100 text-blue-700';
       case 'preparing': return 'bg-purple-100 text-purple-700';
-      case 'shipped': return 'bg-orange-100 text-orange-700';
-      case 'delivered': return 'bg-green-100 text-green-700';
+      case 'delivered': return 'bg-cyan-100 text-cyan-800';
       case 'rejected': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
@@ -122,7 +121,6 @@ const HospitalRequestsDialog: React.FC<HospitalRequestsDialogProps> = ({ open, o
       case 'pending': return 'Pendiente';
       case 'approved': return 'Aprobado';
       case 'preparing': return 'Preparando';
-      case 'shipped': return 'Enviado';
       case 'delivered': return 'Entregado';
       case 'rejected': return 'Rechazado';
       default: return status;

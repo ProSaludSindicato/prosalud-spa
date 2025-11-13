@@ -24,6 +24,7 @@ import type {
 } from '@/types/adminSst';
 import { cn } from '@/lib/utils';
 import { SignatureCaptureDrawer } from '@/components/admin/sst/SignatureCaptureDrawer';
+import { normalizeSstColorKey, resolveSstColorInfo } from './color-utils';
 
 interface AffiliateDeliveryPanelProps {
   affiliate: SstAffiliate;
@@ -40,54 +41,36 @@ interface SelectedItemState {
 
 type SelectedItemsMap = Record<string, SelectedItemState>;
 
-const colorPalette: Record<string, string> = {
-  aguamarina: '#14B8A6',
-  aguama: '#14B8A6',
-  'aguama ': '#14B8A6',
-  aquamarina: '#14B8A6',
-  amarillo: '#FACC15',
-  azul: '#2563EB',
-  'azul claro': '#93C5FD',
-  'azul cielo': '#38BDF8',
-  'azul marino': '#1E40AF',
-  'azul oscuro': '#1F2937',
-  'azul rey': '#1E3A8A',
-  beige: '#D4C4A8',
-  blanco: '#FFFFFF',
-  cafe: '#92400E',
-  café: '#92400E',
-  gris: '#6B7280',
-  'gris raton': '#4B5563',
-  'gris ratón': '#4B5563',
-  'gris oscuro': '#374151',
-  'gris reflectivo': '#9CA3AF',
-  morado: '#A855F7',
-  naranja: '#FB923C',
-  negro: '#000000',
-  negra: '#000000',
-  petroleo: '#0F172A',
-  petróleo: '#0F172A',
-  rojo: '#EF4444',
-  rosa: '#F472B6',
-  verde: '#22C55E',
-  'verde agua': '#5EEAD4',
-  'verde quirurgico': '#065F46',
-  'verde quirúrgico': '#065F46',
-  'vino tinto': '#881337',
+const getInventoryItemSearchValue = (item: SstInventoryItem | undefined) => {
+  if (!item) return '';
+  const colorInfo = resolveSstColorInfo(item.defaultColor);
+  const colorText = colorInfo?.label ?? '';
+  const rawColor = item.defaultColor ?? '';
+  return `${item.name} ${item.gender ?? ''} ${colorText} ${rawColor}`.toLowerCase();
 };
-
-const normalizeColorName = (color?: string) =>
-  color
-    ? color
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-    : undefined;
 
 const DELIVERY_TYPE_LABELS: Record<SstDeliveryType, string> = {
   first_time: 'Primera vez',
   periodic: 'Periódica',
+};
+
+const resolveRecordInventoryItem = (
+  expandedInventory: SstInventoryItem[],
+  recordItem: SstDeliveryItemSelection,
+) => {
+  const normalizedVariantColor = normalizeSstColorKey(recordItem.variant?.color);
+  if (normalizedVariantColor) {
+    const colorMatch = expandedInventory.find(
+      (inv) =>
+        (inv.baseId ?? inv.id) === recordItem.itemId &&
+        normalizeSstColorKey(inv.defaultColor) === normalizedVariantColor,
+    );
+    if (colorMatch) {
+      return colorMatch;
+    }
+  }
+
+  return expandedInventory.find((inv) => (inv.baseId ?? inv.id) === recordItem.itemId) ?? undefined;
 };
 
 const GENERAL_SIZE_DEFAULT_VALUE = '__default__';
@@ -113,6 +96,86 @@ export function AffiliateDeliveryPanel({
   const [generalDotationSize, setGeneralDotationSize] = useState<string | null>(null);
   const [generalDotationQuantity, setGeneralDotationQuantity] = useState<number | ''>('');
 
+  const expandedInventory = useMemo(() => {
+    return inventory.flatMap((item) => {
+      const baseId = item.baseId ?? item.id;
+      const variants = Array.isArray(item.variants) ? item.variants : [];
+      const colorGroups = new Map<
+        string,
+        {
+          label?: string;
+          colorId?: string;
+          hex?: string;
+          variants: SstInventoryVariant[];
+        }
+      >();
+
+      if (variants.length === 0) {
+        const colorInfo = resolveSstColorInfo(item.defaultColor);
+        const key = normalizeSstColorKey(item.defaultColor) ?? '__no_color__';
+        colorGroups.set(key, {
+          label: colorInfo?.label ?? item.defaultColor ?? undefined,
+          colorId: colorInfo?.id ?? item.defaultColor ?? undefined,
+          hex: colorInfo?.hex,
+          variants,
+        });
+      } else {
+        variants.forEach((variant) => {
+          const colorLabel = variant.color ?? item.defaultColor ?? undefined;
+        const colorInfo = resolveSstColorInfo(colorLabel);
+          const key = normalizeSstColorKey(colorLabel) ?? '__no_color__';
+          const existing =
+            colorGroups.get(key) ??
+            {
+              label: colorInfo?.label ?? colorLabel,
+              colorId: colorInfo?.id ?? colorLabel,
+              hex: colorInfo?.hex,
+              variants: [] as SstInventoryVariant[],
+            };
+          if (!existing.label && colorLabel) {
+            existing.label = colorInfo?.label ?? colorLabel;
+          }
+          if (!existing.colorId && (colorInfo?.id ?? colorLabel)) {
+            existing.colorId = colorInfo?.id ?? colorLabel;
+          }
+          if (!existing.hex && colorInfo?.hex) {
+            existing.hex = colorInfo.hex;
+          }
+          existing.variants.push(variant);
+          colorGroups.set(key, existing);
+        });
+      }
+
+      if (colorGroups.size <= 1) {
+        const entry = colorGroups.values().next().value as
+          | { label?: string; hex?: string; variants: SstInventoryVariant[] }
+          | undefined;
+        return [
+          {
+            ...item,
+            id: baseId,
+            baseId,
+            defaultColor: entry?.colorId ?? item.defaultColor ?? undefined,
+            variants: entry?.variants ?? variants,
+          },
+        ];
+      }
+
+      return Array.from(colorGroups.entries()).map(([key, entry]) => ({
+        ...item,
+        id: `${baseId}::${key}`,
+        baseId,
+        defaultColor: entry.colorId ?? item.defaultColor ?? undefined,
+        variants: entry.variants,
+      }));
+    });
+  }, [inventory]);
+
+  const expandedInventoryMap = useMemo(
+    () => new Map(expandedInventory.map((item) => [item.id, item])),
+    [expandedInventory],
+  );
+
   useEffect(() => {
     resetForm();
     setIsSignatureDrawerOpen(false);
@@ -124,7 +187,7 @@ export function AffiliateDeliveryPanel({
     setSelectedItems((prev) => {
       const next = { ...prev };
       Object.entries(next).forEach(([itemId, state]) => {
-        const item = inventory.find((inv) => inv.id === itemId);
+        const item = expandedInventoryMap.get(itemId);
         if (!item || item.category !== 'Dotación' || !item.variants || item.variants.length === 0) {
           return;
         }
@@ -138,7 +201,7 @@ export function AffiliateDeliveryPanel({
       });
       return next;
     });
-  }, [generalDotationSize, inventory]);
+  }, [generalDotationSize, expandedInventoryMap]);
 
   useEffect(() => {
     if (generalDotationQuantity === '') return;
@@ -146,21 +209,22 @@ export function AffiliateDeliveryPanel({
     setSelectedItems((prev) => {
       const next: SelectedItemsMap = { ...prev };
       Object.entries(next).forEach(([itemId, state]) => {
-        const item = inventory.find((inv) => inv.id === itemId);
+        const item = expandedInventoryMap.get(itemId);
         if (!item || item.category !== 'Dotación') return;
         next[itemId] = { ...state, quantity: generalDotationQuantity };
       });
       return next;
     });
-  }, [generalDotationQuantity, inventory]);
+  }, [generalDotationQuantity, expandedInventoryMap]);
 
   const filteredInventory = useMemo(() => {
     const term = itemSearchTerm.trim().toLowerCase();
 
-    return inventory.filter((item) => {
-      return term === '' || item.name.toLowerCase().includes(term);
+    return expandedInventory.filter((item) => {
+      if (term === '') return true;
+      return getInventoryItemSearchValue(item).includes(term);
     });
-  }, [inventory, itemSearchTerm]);
+  }, [expandedInventory, itemSearchTerm]);
 
   const inventoryByCategory = useMemo(() => {
     return filteredInventory.reduce<Record<string, SstInventoryItem[]>>((acc, item) => {
@@ -176,7 +240,7 @@ export function AffiliateDeliveryPanel({
   const selectedCount = Object.keys(selectedItems).length;
 
   const dotationSizeOptions = useMemo(() => {
-    const dotationItems = inventory.filter((item) => item.category === 'Dotación');
+    const dotationItems = expandedInventory.filter((item) => item.category === 'Dotación');
     const sizeSet = new Set<string>();
 
     dotationItems.forEach((item) => {
@@ -202,20 +266,20 @@ export function AffiliateDeliveryPanel({
     });
   }, [inventory]);
 
-  const renderColorSwatch = (color?: string) => {
-    if (!color) return null;
-    const normalized = normalizeColorName(color);
-    const background = (normalized && colorPalette[normalized]) || '#cbd5f5';
+const renderColorSwatch = (color?: string) => {
+  if (!color) return null;
+  const colorInfo = resolveSstColorInfo(color);
+  const background = colorInfo?.hex ?? '#cbd5f5';
 
-    return (
-      <span
-        className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border border-slate-200"
-        style={{ backgroundColor: background }}
-        aria-label={color}
-        title={color}
-      />
-    );
-  };
+  return (
+    <span
+      className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border border-slate-200"
+      style={{ backgroundColor: background }}
+      aria-label={colorInfo?.label ?? color}
+      title={colorInfo?.label ?? color}
+    />
+  );
+};
 
   const VariantMeta = ({ variant }: { variant?: SstInventoryVariant }) => {
     if (!variant?.color && !variant?.size) {
@@ -227,7 +291,9 @@ export function AffiliateDeliveryPanel({
         {variant?.color && (
           <div className="flex items-center gap-2">
             {renderColorSwatch(variant.color)}
-            <span className="text-xs font-medium text-slate-600">{variant.color}</span>
+            <span className="text-xs font-medium text-slate-600">
+              {resolveSstColorInfo(variant.color)?.label ?? variant.color}
+            </span>
           </div>
         )}
         {variant?.size && (
@@ -241,15 +307,13 @@ export function AffiliateDeliveryPanel({
 
   const asDeliveryItems = (): SstDeliveryItemSelection[] => {
     return Object.entries(selectedItems).map(([itemId, state]) => {
-      const item = inventory.find((inv) => inv.id === itemId);
+      const item = expandedInventoryMap.get(itemId);
       const variant =
-        item?.variants && item.variants.length > 0
-          ? item.variants[state.variantIndex ?? 0]
-          : undefined;
+        item?.variants && item.variants.length > 0 ? item.variants[state.variantIndex ?? 0] : undefined;
       const quantity = typeof state.quantity === 'number' ? state.quantity : 0;
 
       return {
-        itemId,
+        itemId: item?.baseId ?? itemId,
         variant,
         quantity,
       };
@@ -569,23 +633,26 @@ export function AffiliateDeliveryPanel({
                           <TableCell>
                             <Checkbox
                               checked={isSelected}
-                              onCheckedChange={(checked) =>
-                                handleToggleItem(item, Boolean(checked))
-                              }
-                              aria-label={`Seleccionar ${item.name}`}
+                              onCheckedChange={(checked) => handleToggleItem(item, Boolean(checked))}
+                              aria-label={`Seleccionar ${item.name}${item.gender ? ` (${item.gender})` : ''}`}
                             />
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2.5">
                               {item.defaultColor && renderColorSwatch(item.defaultColor)}
                             <div className="flex flex-col">
-                              <span className="font-medium text-slate-800">{item.name}</span>
+                              <span className="font-medium text-slate-800">
+                                {item.name}
+                                {item.gender && <span className="font-bold"> ({item.gender})</span>}
+                              </span>
                                 {item.defaultColor && (
-                                  <span className="text-xs text-slate-600">{item.defaultColor}</span>
+                                  <span className="text-xs text-slate-600">
+                                    {resolveSstColorInfo(item.defaultColor)?.label ?? item.defaultColor}
+                                  </span>
                                 )}
-                              {item.unit && (
+                              {/* item.unit && (
                                 <span className="text-xs text-slate-500">Unidad: {item.unit}</span>
-                              )}
+                              ))*/}
                               </div>
                             </div>
                           </TableCell>
@@ -831,8 +898,12 @@ export function AffiliateDeliveryPanel({
                               </tr>
                             ) : (
                               visibleItems.map((item) => {
-                                const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
-                                const colorLabel = item.variant?.color ?? inventoryItem?.defaultColor ?? null;
+                                const inventoryItem =
+                                  resolveRecordInventoryItem(expandedInventory, item) ??
+                                  inventory.find((inv) => inv.id === item.itemId);
+                                const rawColor = item.variant?.color ?? inventoryItem?.defaultColor ?? null;
+                                const colorInfo = resolveSstColorInfo(rawColor ?? undefined);
+                                const colorLabel = colorInfo?.label ?? rawColor;
                                 const sizeLabel = item.variant?.size ?? 'Única';
 
                                 return (
@@ -843,7 +914,12 @@ export function AffiliateDeliveryPanel({
                                     className="hover:bg-primary-prosalud/5 transition-colors"
                                   >
                                     <td className="px-4 py-2 align-top font-medium text-slate-700">
-                                      {inventoryItem?.name ?? item.itemId}
+                                      <span className="font-medium text-slate-700">
+                                        {inventoryItem?.name ?? item.itemId}
+                                        {inventoryItem?.gender && (
+                                          <span className="font-bold"> ({inventoryItem.gender})</span>
+                                        )}
+                                      </span>
                                       {inventoryItem?.category && (
                                         <span className="block text-xs font-normal text-slate-500">
                                           {inventoryItem.category}
@@ -853,7 +929,7 @@ export function AffiliateDeliveryPanel({
                                     <td className="px-4 py-2 align-top">
                                       {colorLabel ? (
                                         <span className="inline-flex items-center gap-2 text-sm text-slate-600">
-                                          {renderColorSwatch(colorLabel)}
+                                          {renderColorSwatch(rawColor ?? colorLabel)}
                                           <span>{colorLabel}</span>
                                         </span>
                                       ) : (

@@ -195,7 +195,6 @@ export type HospitalRequestStatus =
   | 'pending'
   | 'approved'
   | 'preparing'
-  | 'shipped'
   | 'delivered'
   | 'rejected';
 

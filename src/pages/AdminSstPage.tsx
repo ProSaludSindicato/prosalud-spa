@@ -32,6 +32,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { AffiliateDeliveryPanel } from '@/components/admin/sst/AffiliateDeliveryPanel';
 import { DeliveryConfirmationModal } from '@/components/admin/sst/DeliveryConfirmationModal';
+import { resolveSstColorInfo } from '@/components/admin/sst/color-utils';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -903,14 +904,21 @@ const AdminSstPage: React.FC = () => {
         record.items.forEach((item, index) => {
           const inventoryItem = inventoryMap.get(item.itemId);
           const category = inventoryItem?.category ?? 'Sin categoría';
-          const articleName = inventoryItem?.name ?? item.itemId;
-          const colorLabel = item.variant?.color ?? inventoryItem?.defaultColor ?? '';
+          const baseArticleName = inventoryItem?.name ?? item.itemId;
+          const articleName =
+            inventoryItem?.gender && inventoryItem.gender.trim().length > 0
+              ? `${baseArticleName} (${inventoryItem.gender})`
+              : baseArticleName;
+          const rawColor = item.variant?.color ?? inventoryItem?.defaultColor ?? '';
+          const colorInfo = resolveSstColorInfo(rawColor);
+          const colorLabel = colorInfo?.label ?? rawColor;
+          const articleAggregationKey = colorLabel ? `${articleName} - ${colorLabel}` : articleName;
           const quantity = item.quantity ?? 0;
 
           itemsByCategory.set(category, (itemsByCategory.get(category) ?? 0) + quantity);
-          itemsByArticle.set(articleName, (itemsByArticle.get(articleName) ?? 0) + quantity);
-          if (!articleCategoryMap.has(articleName)) {
-            articleCategoryMap.set(articleName, category);
+          itemsByArticle.set(articleAggregationKey, (itemsByArticle.get(articleAggregationKey) ?? 0) + quantity);
+          if (!articleCategoryMap.has(articleAggregationKey)) {
+            articleCategoryMap.set(articleAggregationKey, category);
           }
 
           const row = [

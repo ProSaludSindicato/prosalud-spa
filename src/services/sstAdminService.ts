@@ -136,12 +136,14 @@ const mapDeliveryRecord = (record: any): SstDeliveryRecord => {
 
 const mapInventoryItem = (item: any): SstInventoryItem => ({
   id: item.id,
+  baseId: item.baseId ?? item.id,
   name: item.name,
   category: item.category,
-  defaultColor: item.defaultColor ?? undefined,
+  defaultColor: item.defaultColor ?? item.default_color ?? undefined,
   description: item.description ?? undefined,
   unit: item.unit ?? undefined,
   variants: Array.isArray(item.variants) ? item.variants : undefined,
+  gender: item.gender ?? item.genero ?? undefined,
 });
 
 const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T | undefined> => {
