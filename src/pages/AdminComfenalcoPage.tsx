@@ -203,11 +203,13 @@ const AdminComfenalcoPage: React.FC = () => {
     },
   });
 
+
   const filteredEvents = events.filter(event => {
     const searchTermLower = searchTerm.toLowerCase();
-    const titleLower = event.title.toLowerCase();
+    const titleLower = (event.title ?? '').toLowerCase();
+    const idText = String(event.id ?? '');
   
-    const matchesSearchTerm = event.id.toString().includes(searchTerm) ||
+    const matchesSearchTerm = idText.includes(searchTerm) ||
                               titleLower.includes(searchTermLower);
     const matchesCategory = filters.category === 'all' || event.category === filters.category;
     const matchesDisplaySize = filters.displaySize === 'all' || event.display_size === filters.displaySize;
