@@ -327,10 +327,21 @@ const AdminSstPage: React.FC = () => {
     const trimmed = searchTerm.trim();
 
     if (!trimmed) {
-      showFeedbackBanner('error', 'Búsqueda requerida', 'Ingresa un documento o nombre para realizar la búsqueda.');
+      showFeedbackBanner('error', 'Búsqueda requerida', 'Ingresa un número de documento para realizar la búsqueda.');
       toast({
         title: 'Búsqueda requerida',
-        description: 'Ingresa un documento o nombre para realizar la búsqueda.',
+        description: 'Ingresa un número de documento para realizar la búsqueda.',
+        variant: 'destructive',
+        duration: 5000,
+      });
+      return;
+    }
+
+    if (!/^\d+$/.test(trimmed)) {
+      showFeedbackBanner('error', 'Documento inválido', 'El número de documento solo debe contener caracteres numéricos.');
+      toast({
+        title: 'Documento inválido',
+        description: 'El número de documento solo debe contener caracteres numéricos.',
         variant: 'destructive',
         duration: 5000,
       });
@@ -340,53 +351,17 @@ const AdminSstPage: React.FC = () => {
     const controller = new AbortController();
     setIsSearchingAffiliate(true);
     try {
-      // Try searching by document first
-      let affiliate = await sstAdminService.getAffiliateByDocument('CC', trimmed, controller.signal);
-      
-      // If not found by document, search by name in the full list
-      if (!affiliate) {
-        const response = await sstAdminService.getAffiliates({
-          page: 1,
-          pageSize: itemsPerPage,
-          searchTerm: trimmed,
-          status: 'all',
-          signal: controller.signal,
-        });
-        const totalMatches = response.total ?? response.items.length;
+      const affiliate = await sstAdminService.getAffiliateByDocument('CC', trimmed, controller.signal);
 
-        if (response.items.length === 1 && totalMatches === 1) {
-          affiliate = response.items[0];
-        } else if (totalMatches > 1) {
-          showFeedbackBanner(
-            'info',
-            'Múltiples resultados',
-            `Se encontraron ${totalMatches} afiliados. Por favor, verifica la tabla de resultados.`,
-          );
-          toast({
-            title: 'Múltiples resultados',
-            description: `Se encontraron ${totalMatches} afiliados. Por favor, verifica la tabla.`,
-            duration: 5000,
-          });
-          setAffiliates(response.items);
-          setTotalAffiliates(totalMatches);
-          setListFilterTerm(trimmed);
-          setCurrentPage(1);
-          setSelectedAffiliate(null);
-          setShowAffiliateList(true);
-          setIsSearchingAffiliate(false);
-          return;
-        }
-      }
-      
       if (!affiliate) {
         showFeedbackBanner(
           'error',
           'Afiliado no encontrado',
-          'No se encontró un afiliado con el documento o nombre proporcionado.',
+          'No se encontró un afiliado con el número de documento proporcionado.',
         );
         toast({
           title: 'Afiliado no encontrado',
-          description: 'No se encontró un afiliado con el documento o nombre proporcionado.',
+          description: 'No se encontró un afiliado con el número de documento proporcionado.',
           variant: 'destructive',
           duration: 5000,
         });
@@ -1234,7 +1209,7 @@ const AdminSstPage: React.FC = () => {
                       Buscar afiliado
                     </CardTitle>
                     <CardDescription>
-                      Ingresa el documento o nombre del afiliado para registrar la entrega.
+                      Ingresa el número de documento del afiliado para registrar la entrega.
                     </CardDescription>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -1265,9 +1240,33 @@ const AdminSstPage: React.FC = () => {
                   <div className="space-y-1">
                     <Input
                       value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Número de documento o nombre completo"
+                      onChange={(event) => {
+                        const digitsOnly = event.target.value.replace(/\D/g, '');
+                        setSearchTerm(digitsOnly);
+                      }}
+                      onPaste={(event) => {
+                        const pasted = event.clipboardData.getData('text');
+                        if (/^\d+$/.test(pasted)) {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        const digitsOnly = pasted.replace(/\D/g, '');
+                        if (!digitsOnly) {
+                          return;
+                        }
+
+                        const input = event.target as HTMLInputElement;
+                        const { selectionStart, selectionEnd, value } = input;
+                        const start = selectionStart ?? value.length;
+                        const end = selectionEnd ?? value.length;
+                        const nextValue = `${value.slice(0, start)}${digitsOnly}${value.slice(end)}`;
+                        setSearchTerm(nextValue);
+                      }}
+                      placeholder="Número de documento"
                       autoComplete="off"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                     />
                   </div>
 
