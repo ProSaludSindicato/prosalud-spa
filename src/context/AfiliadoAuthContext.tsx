@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import api from '@/services/api';
 import { API_CONFIG } from '@/config/api';
 import { toast } from 'sonner';
-import axios from "axios";
 import { verifyOtp, VerifyOtpResponse } from '@/services/afiliadosOtpService';
 
 export interface Convenio {
@@ -197,18 +196,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const authenticate = useCallback(async (tipoDoc: string, numDoc: string, fechaExp: string): Promise<AfiliadoData> => {
     try {
-      const apiTest = axios.create({
-        baseURL: 'https://prosalud.test',
-        withCredentials: false, // Cambiar a false para APIs públicas
-        timeout: 10000, // 10 segundos timeout
-        // Ensure that status codes 200-299 are treated as success
-        validateStatus: function (status) {
-          return status >= 200 && status < 300;
-        },
-      });
-
-      // const response = await api.post(API_CONFIG.ENDPOINTS.AFILIADOS_AUTHENTICATE, {
-      const response = await apiTest.post(API_CONFIG.ENDPOINTS.AFILIADOS_AUTHENTICATE, {
+      const response = await api.post(API_CONFIG.ENDPOINTS.AFILIADOS_AUTHENTICATE, {
         tipo_documento: tipoDoc,
         documento: numDoc,
         fecha_expedicion: fechaExp,
