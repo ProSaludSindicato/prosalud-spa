@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, CreditCard } from 'lucide-react';
 import type { SstDeliveryDraft, SstDeliveryType, SstInventoryItem } from '@/types/adminSst';
 import { logger } from '@/utils/logger';
 import { resolveSstColorInfo } from './color-utils';
@@ -147,6 +147,27 @@ export function DeliveryConfirmationModal({
             </h4>
             <ul className="space-y-2">
               {record.items.map((item, index) => {
+                // Handle special "Carnet" item
+                if (item.itemId === '__carnet__') {
+                  return (
+                    <li
+                      key={`carnet-${index}`}
+                      className="flex flex-wrap items-center gap-2.5 rounded-lg border border-primary-prosalud/30 bg-gradient-to-br from-primary-prosalud/5 to-primary-prosalud/10 p-3 shadow-sm"
+                    >
+                      <CreditCard className="h-5 w-5 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-semibold text-slate-800">
+                        Carnet
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        (Documento de identificación)
+                      </span>
+                      <Badge variant="outline" className="ml-auto">
+                        × {item.quantity}
+                      </Badge>
+                    </li>
+                  );
+                }
+
                 const inventoryItem = inventory.find((inv) => inv.id === item.itemId);
                 const rawColor = item.variant?.color || inventoryItem?.defaultColor;
                 const colorInfo = resolveSstColorInfo(rawColor);

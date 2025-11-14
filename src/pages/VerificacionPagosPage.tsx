@@ -184,12 +184,13 @@ const VerificacionPagosPageContent: React.FC = () => {
                             <SelectValue placeholder="Selecciona el tipo" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Auxilio de Escolaridad">Auxilio de Escolaridad</SelectItem>
-                            <SelectItem value="Auxilio de Salud">Auxilio de Salud</SelectItem>
-                            <SelectItem value="Auxilio de Solidaridad">Auxilio de Solidaridad</SelectItem>
+                            <SelectItem value="Compensación Final">Compensación Final</SelectItem>
                             <SelectItem value="Compensación Anual Diferida">Compensación Anual Diferida</SelectItem>
                             <SelectItem value="Compensación por Descanso">Compensación por Descanso</SelectItem>
-                            <SelectItem value="Otro">Otro</SelectItem>
+                            <SelectItem value="Descuentos Seguridad Social">Descuentos Seguridad Social</SelectItem>
+                            <SelectItem value="Duplicado de Colillas">Duplicado de Colillas</SelectItem>
+                            <SelectItem value="Viático">Viático</SelectItem>
+                            <SelectItem value="Ceiisas">Ceiisas</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>

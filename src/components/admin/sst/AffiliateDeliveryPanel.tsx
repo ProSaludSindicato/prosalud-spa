@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ClipboardCheck, ClipboardList, Eye, Signature, UploadCloud, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Eye, Signature, UploadCloud, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
 import type {
   SstAffiliate,
   SstDeliveryDraft,
@@ -32,6 +32,8 @@ interface AffiliateDeliveryPanelProps {
   deliveryHistory: SstDeliveryRecord[];
   onConfirmDelivery?: (draft: SstDeliveryDraft) => void;
   confirmedRecordId?: string | null;
+  highlightedRecordId?: string | null;
+  historyScrollRef?: React.RefObject<HTMLDivElement>;
 }
 
 interface SelectedItemState {
@@ -81,6 +83,8 @@ export function AffiliateDeliveryPanel({
   deliveryHistory,
   onConfirmDelivery,
   confirmedRecordId,
+  highlightedRecordId,
+  historyScrollRef,
 }: AffiliateDeliveryPanelProps) {
   const { toast } = useToast();
   const [selectedItems, setSelectedItems] = useState<SelectedItemsMap>({});
@@ -95,6 +99,7 @@ export function AffiliateDeliveryPanel({
   const [deliveryType, setDeliveryType] = useState<SstDeliveryType>(defaultDeliveryType);
   const [generalDotationSize, setGeneralDotationSize] = useState<string | null>(null);
   const [generalDotationQuantity, setGeneralDotationQuantity] = useState<number | ''>('');
+  const [carnetSelected, setCarnetSelected] = useState(false);
 
   const expandedInventory = useMemo(() => {
     return inventory.flatMap((item) => {
@@ -237,7 +242,7 @@ export function AffiliateDeliveryPanel({
     }, {});
   }, [filteredInventory]);
 
-  const selectedCount = Object.keys(selectedItems).length;
+  const selectedCount = Object.keys(selectedItems).length + (carnetSelected ? 1 : 0);
 
   const dotationSizeOptions = useMemo(() => {
     const dotationItems = expandedInventory.filter((item) => item.category === 'Dotación');
@@ -306,7 +311,7 @@ const renderColorSwatch = (color?: string) => {
   };
 
   const asDeliveryItems = (): SstDeliveryItemSelection[] => {
-    return Object.entries(selectedItems).map(([itemId, state]) => {
+    const items = Object.entries(selectedItems).map(([itemId, state]) => {
       const item = expandedInventoryMap.get(itemId);
       const variant =
         item?.variants && item.variants.length > 0 ? item.variants[state.variantIndex ?? 0] : undefined;
@@ -318,6 +323,16 @@ const renderColorSwatch = (color?: string) => {
         quantity,
       };
     });
+
+    // Add Carnet if selected
+    if (carnetSelected) {
+      items.push({
+        itemId: '__carnet__',
+        quantity: 1,
+      });
+    }
+
+    return items;
   };
 
   const resetForm = () => {
@@ -327,6 +342,7 @@ const renderColorSwatch = (color?: string) => {
     setSignatureDataUrl(null);
     setFormError(null);
     setDeliveryType(deliveryHistory.length === 0 ? 'first_time' : 'periodic');
+    setCarnetSelected(false);
   };
 
   const toggleHistoryExpansion = (recordId: string) => {
@@ -412,6 +428,27 @@ const renderColorSwatch = (color?: string) => {
       return;
     }
 
+    // Validate that if only Carnet is selected, it's still valid
+    if (selectedCount === 1 && carnetSelected && Object.keys(selectedItems).length === 0) {
+      // This is valid - only Carnet selected
+    } else if (Object.keys(selectedItems).length > 0) {
+      // Validate quantities for inventory items
+      const hasInvalidQuantities = Object.values(selectedItems).some((item) => {
+        if (item?.quantity === '' || item?.quantity === undefined) return true;
+        return item.quantity <= 0;
+      });
+      if (hasInvalidQuantities) {
+        setFormError('Revisa las cantidades. Cada elemento seleccionado debe tener una cantidad mayor a cero.');
+        toast({
+          title: 'Cantidad inválida',
+          description: 'Ajusta las cantidades de los elementos seleccionados antes de registrar la entrega.',
+          variant: 'destructive',
+          duration: 5000,
+        });
+        return;
+      }
+    }
+
     if (!signatureDataUrl) {
       setFormError('Captura la firma del afiliado para poder continuar.');
       toast({
@@ -421,21 +458,6 @@ const renderColorSwatch = (color?: string) => {
         duration: 5000,
       });
       setIsSignatureDrawerOpen(true);
-      return;
-    }
-
-    const hasInvalidQuantities = Object.values(selectedItems).some((item) => {
-      if (item?.quantity === '' || item?.quantity === undefined) return true;
-      return item.quantity <= 0;
-    });
-    if (hasInvalidQuantities) {
-      setFormError('Revisa las cantidades. Cada elemento seleccionado debe tener una cantidad mayor a cero.');
-      toast({
-        title: 'Cantidad inválida',
-        description: 'Ajusta las cantidades de los elementos seleccionados antes de registrar la entrega.',
-        variant: 'destructive',
-        duration: 5000,
-      });
       return;
     }
 
@@ -536,12 +558,38 @@ const renderColorSwatch = (color?: string) => {
               No se encontraron artículos con los filtros aplicados.
             </div>
           ) : (
-            Object.entries(inventoryByCategory).map(([category, items]) => (
+            Object.entries(inventoryByCategory).map(([category, items]) => {
+              const showCarnet = category === 'Dotación' || category === 'EPP';
+              return (
             <div key={category} className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-slate-700">{category}</h3>
                 <span className="text-sm text-slate-500">{items.length} artículos</span>
               </div>
+              {showCarnet && (
+                <div className="rounded-lg border-2 border-primary-prosalud/30 bg-gradient-to-br from-primary-prosalud/5 to-primary-prosalud/10 p-4 shadow-sm">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id={`carnet-${category}`}
+                      checked={carnetSelected}
+                      onCheckedChange={(checked) => setCarnetSelected(Boolean(checked))}
+                      className="h-5 w-5 border-2 border-primary-prosalud/50 data-[state=checked]:bg-primary-prosalud data-[state=checked]:border-primary-prosalud"
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`carnet-${category}`}
+                        className="text-sm font-semibold text-slate-800 cursor-pointer flex items-center gap-2"
+                      >
+                        Carnet
+                        <CreditCard className="h-4 w-4 text-primary-prosalud" />
+                      </Label>
+                      <p className="text-xs text-slate-600 ml-1">
+                        Marca esta opción para indicar que la persona recibió el carnet. Esta opción no depende del inventario.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {category === 'Dotación' && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-1.5">
@@ -709,7 +757,8 @@ const renderColorSwatch = (color?: string) => {
                 </Table>
               </div>
             </div>
-            ))
+            );
+            })
           )}
         </CardContent>
       </Card>
@@ -824,7 +873,7 @@ const renderColorSwatch = (color?: string) => {
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm w-full overflow-hidden">
+        <Card className="border shadow-sm w-full overflow-hidden" ref={historyScrollRef}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <UploadCloud className="h-5 w-5 text-primary-prosalud" />
@@ -849,10 +898,15 @@ const renderColorSwatch = (color?: string) => {
                   const totalUnits = record.items.reduce((acc, item) => acc + item.quantity, 0);
                   const totalVariants = record.items.length;
 
+                  const isHighlighted = highlightedRecordId === record.id;
                   return (
                   <div
                     key={record.id}
-                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    className={`rounded-lg border p-4 shadow-sm transition-all duration-500 ${
+                      isHighlighted
+                        ? 'border-primary-prosalud bg-primary-prosalud/10 shadow-lg ring-2 ring-primary-prosalud/30'
+                        : 'border-slate-200 bg-white'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-700">
@@ -898,6 +952,37 @@ const renderColorSwatch = (color?: string) => {
                               </tr>
                             ) : (
                               visibleItems.map((item) => {
+                                // Handle special "Carnet" item
+                                if (item.itemId === '__carnet__') {
+                                  return (
+                                    <tr
+                                      key={`${record.id}-carnet`}
+                                      className="hover:bg-primary-prosalud/5 transition-colors"
+                                    >
+                                      <td className="px-4 py-2 align-top font-medium text-slate-700">
+                                        <div className="flex items-center gap-2">
+                                          <CreditCard className="h-4 w-4 text-primary-prosalud flex-shrink-0" />
+                                          <div>
+                                            <span className="font-medium text-slate-700">Carnet</span>
+                                            <span className="block text-xs font-normal text-slate-500">
+                                              Documento de identificación
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2 align-top">
+                                        <span className="text-sm text-slate-400">—</span>
+                                      </td>
+                                      <td className="px-4 py-2 align-top">
+                                        <span className="text-sm text-slate-400">—</span>
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-semibold text-slate-700">
+                                        {item.quantity}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
                                 const inventoryItem =
                                   resolveRecordInventoryItem(expandedInventory, item) ??
                                   inventory.find((inv) => inv.id === item.itemId);

@@ -13,6 +13,9 @@ import {
   Download,
   Info,
   ClipboardList,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,6 +86,50 @@ const getDeliveryTypeLabel = (type?: SstDeliveryType): string => {
   return 'No especificado';
 };
 
+const formatTimeElapsed = (dateString: string): string => {
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffMs = now.getTime() - past.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
+
+  if (diffDays === 0) {
+    return 'hoy';
+  } else if (diffDays === 1) {
+    return 'ayer';
+  } else if (diffDays < 30) {
+    return `hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
+  } else if (diffMonths < 12) {
+    return `hace ${diffMonths} mes${diffMonths > 1 ? 'es' : ''}`;
+  } else {
+    return `hace ${diffYears} año${diffYears > 1 ? 's' : ''}`;
+  }
+};
+
+const formatDateSpanish = (date: Date): string => {
+  const months = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+  
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${day} de ${month} del ${year} a las ${hours}:${minutes}`;
+};
+
+const isRecentDelivery = (dateString: string): boolean => {
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffMs = now.getTime() - past.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return diffDays <= 30; // Last month
+};
+
 const AdminSstPage: React.FC = () => {
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<SstAffiliate[]>([]);
@@ -125,8 +172,11 @@ const AdminSstPage: React.FC = () => {
     | null
   >(null);
   const [showAffiliateList, setShowAffiliateList] = useState(true);
+  const [highlightedRecordId, setHighlightedRecordId] = useState<string | null>(null);
+  const [showLastDeliveryItems, setShowLastDeliveryItems] = useState(false);
 
   const deliveryPanelRef = useRef<HTMLDivElement>(null);
+  const historyScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!feedbackBanner) return;
@@ -1494,6 +1544,135 @@ const AdminSstPage: React.FC = () => {
                   <CardDescription>
                     Completa la selección de elementos de protección y captura la firma del afiliado como constancia.
                   </CardDescription>
+                  {deliveryHistory.length > 0 && (() => {
+                    const lastDelivery = deliveryHistory[0]; // Most recent delivery is first
+                    const lastDeliveryDate = new Date(lastDelivery.deliveredAt);
+                    const timeElapsed = formatTimeElapsed(lastDelivery.deliveredAt);
+                    const formattedDate = formatDateSpanish(lastDeliveryDate);
+                    const isRecent = isRecentDelivery(lastDelivery.deliveredAt);
+
+                    const handleGoToHistory = () => {
+                      setHighlightedRecordId(lastDelivery.id);
+                      setTimeout(() => {
+                        historyScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 100);
+                      setTimeout(() => {
+                        setHighlightedRecordId(null);
+                      }, 3000);
+                    };
+
+                    return (
+                      <div className={`mt-3 rounded-lg border p-3 ${
+                        isRecent 
+                          ? 'border-yellow-300 bg-yellow-50' 
+                          : 'border-blue-200 bg-blue-50'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                            isRecent ? 'text-yellow-700' : 'text-blue-600'
+                          }`} />
+                          <div className="flex-1">
+                            <p className={`text-sm font-medium ${
+                              isRecent ? 'text-yellow-900' : 'text-blue-900'
+                            }`}>
+                              Última entrega registrada
+                            </p>
+                            <p className={`text-xs mt-1 ${
+                              isRecent ? 'text-yellow-800' : 'text-blue-700'
+                            }`}>
+                              {formattedDate} ({timeElapsed})
+                            </p>
+                            {(lastDelivery.deliveredBy || lastDelivery.deliveredByName) && (
+                              <p className={`text-xs mt-1 ${
+                                isRecent ? 'text-yellow-700' : 'text-blue-600'
+                              }`}>
+                                Entregado por: <span className="font-medium">{lastDelivery.deliveredByName || lastDelivery.deliveredBy}</span>
+                              </p>
+                            )}
+                            {lastDelivery.items.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className={`text-xs ${
+                                    isRecent ? 'text-yellow-700' : 'text-blue-600'
+                                  }`}>
+                                    {lastDelivery.items.length} elemento{lastDelivery.items.length > 1 ? 's' : ''} entregado{lastDelivery.items.length > 1 ? 's' : ''}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowLastDeliveryItems(!showLastDeliveryItems)}
+                                      className={`h-6 px-2 text-xs ${
+                                        isRecent
+                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100'
+                                          : 'text-blue-600 hover:text-blue-600 hover:bg-blue-100'
+                                      }`}
+                                    >
+                                      {showLastDeliveryItems ? (
+                                        <>
+                                          <ChevronUp className="h-3 w-3 mr-1" />
+                                          Ocultar elementos
+                                        </>
+                                      ) : (
+                                        <>
+                                          <ChevronDown className="h-3 w-3 mr-1" />
+                                          Ver elementos
+                                        </>
+                                      )}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleGoToHistory}
+                                      className={`h-6 px-2 text-xs ${
+                                        isRecent 
+                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100' 
+                                          : 'text-blue-600 hover:text-blue-600 hover:bg-blue-100'
+                                      }`}
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      Ir al historial
+                                    </Button>
+                                  </div>
+                                </div>
+                                {showLastDeliveryItems && (
+                                  <div className="mt-2 rounded border border-slate-200 bg-white p-2 space-y-1.5">
+                                    {lastDelivery.items.map((item, idx) => {
+                                      const isCarnet = item.itemId === '__carnet__';
+                                      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
+                                      const itemName = isCarnet 
+                                        ? 'Carnet' 
+                                        : inventoryItem?.name ?? item.itemId;
+                                      const variantInfo = item.variant?.size 
+                                        ? ` - Talla: ${item.variant.size}` 
+                                        : '';
+                                      const colorInfo = item.variant?.color 
+                                        ? ` - Color: ${item.variant.color}` 
+                                        : '';
+                                      
+                                      return (
+                                        <div key={idx} className="text-xs flex items-center gap-2 p-1.5 rounded bg-slate-50">
+                                          <span className="text-slate-400">•</span>
+                                          <span className="flex-1 text-slate-700">
+                                            <span className="font-medium text-slate-800">{itemName}</span>
+                                            {variantInfo && <span className="text-slate-500">{variantInfo}</span>}
+                                            {colorInfo && <span className="text-slate-500">{colorInfo}</span>}
+                                            <span className="ml-1 font-semibold text-slate-600">× {item.quantity}</span>
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-3">
@@ -1540,6 +1719,8 @@ const AdminSstPage: React.FC = () => {
                       deliveryHistory={deliveryHistory}
                       onConfirmDelivery={handleOpenConfirmationModal}
                       confirmedRecordId={lastConfirmedRecordId}
+                      highlightedRecordId={highlightedRecordId}
+                      historyScrollRef={historyScrollRef}
                     />
                   )}
 

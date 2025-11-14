@@ -15,7 +15,7 @@ const InformacionAnualDiferidaSection = <TFieldValues extends FieldValues>({
   // Proceso y ubicación se obtienen del convenio activo y se envían por debajo
 
   const motivosSolicitud = [
-    "Compra de vivienda", "Remodelación /Reforma", "Estudio", "CEII"
+    "Vivienda", "Estudio"
   ];
 
   return (
