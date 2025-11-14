@@ -33,7 +33,6 @@ const formSchema = z.object({
     paraSubsidioVivienda: z.boolean().default(false),
     dirigidoFondoPensiones: z.boolean().default(false),
     adicionarActividades: z.boolean().default(false),
-    dirigidoTransitoPicoPlaca: z.boolean().default(false),
     dirigidoBancolombia: z.boolean().default(false),
     otros: z.boolean().default(false),
   }).default({}),
@@ -49,8 +48,6 @@ const formSchema = z.object({
     return ALLOWED_FILE_TYPES_PDF.includes(file.type);
   }, 'Solo se permiten archivos PDF.'),
   
-  tipoVehiculo: z.string().optional(),
-  placaVehiculo: z.string().optional(),
   otrosDescripcion: z.string().optional(),
 
   adjuntarArchivoAdicional: z.any().optional().refine(files => {
@@ -82,14 +79,6 @@ const formSchema = z.object({
         });
     } 
   }
-  if (data.infoCertificado.dirigidoTransitoPicoPlaca) {
-    if (!data.tipoVehiculo?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tipoVehiculo'], message: 'Este campo es requerido.' });
-    }
-    if (!data.placaVehiculo?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['placaVehiculo'], message: 'Este campo es requerido.' });
-    }
-  }
   if (data.infoCertificado.otros && !data.otrosDescripcion?.trim()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -116,14 +105,11 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         paraSubsidioVivienda: false,
         dirigidoFondoPensiones: false,
         adicionarActividades: false,
-        dirigidoTransitoPicoPlaca: false,
         dirigidoBancolombia: false,
         otros: false,
       },
       dirigidoAQuien: '',
       actividadesPdf: undefined,
-      tipoVehiculo: '',
-      placaVehiculo: '',
       otrosDescripcion: '',
       adjuntarArchivoAdicional: undefined,
     },
@@ -153,8 +139,6 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         payload: {
           infoCertificado: data.infoCertificado,
           dirigidoAQuien: data.dirigidoAQuien,
-          tipoVehiculo: data.tipoVehiculo,
-          placaVehiculo: data.placaVehiculo,
           otrosDescripcion: data.otrosDescripcion
         },
         files

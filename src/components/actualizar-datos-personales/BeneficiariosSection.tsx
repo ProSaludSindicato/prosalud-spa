@@ -28,7 +28,7 @@ interface BeneficiariosSectionProps {
 const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) => {
   const { afiliado } = useAfiliadoAuth();
   const beneficiariosActuales = afiliado?.beneficiarios || [];
-  const { setValue, trigger } = useFormContext();
+  const { setValue } = useFormContext();
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -162,10 +162,10 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
             Si observa que alguna persona que no pertenece a su grupo familiar está registrada, 
             comuníquese a través del correo{' '}
             <a 
-              href="mailto:comunicaciones@sindicatoprosalud.co" 
+              href="mailto:comunicaciones@sindicatoprosalud.com"
               className="font-semibold underline hover:text-blue-900"
             >
-              comunicaciones@sindicatoprosalud.co
+              comunicaciones@sindicatoprosalud.com
             </a>
           </AlertDescription>
         </Alert>
@@ -294,40 +294,6 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                               if (documento && isBeneficiarioDuplicado(documento, value, index)) {
                                 toast.error('Este miembro ya está registrado');
                               }
-                              
-                              // Validar y actualizar fecha de nacimiento si es necesario
-                              const fechaActual = beneficiario?.fecha_nacimiento || '';
-                              if (fechaActual) {
-                                const fechaNac = new Date(fechaActual + 'T00:00:00');
-                                const hoy = new Date();
-                                hoy.setHours(0, 0, 0, 0);
-                                fechaNac.setHours(0, 0, 0, 0);
-                                
-                                let edad = hoy.getFullYear() - fechaNac.getFullYear();
-                                const mesDiff = hoy.getMonth() - fechaNac.getMonth();
-                                const diaDiff = hoy.getDate() - fechaNac.getDate();
-                                if (mesDiff < 0 || (mesDiff === 0 && diaDiff < 0)) {
-                                  edad = edad - 1;
-                                }
-                                
-                                // Si cambió a CC y la edad es menor a 18, limpiar fecha
-                                if (value === 'CC' && edad < 18) {
-                                  setValue(`beneficiariosNuevos.${index}.fecha_nacimiento`, '', {
-                                    shouldValidate: true,
-                                  });
-                                }
-                                // Si cambió a TI o RC y la edad es mayor o igual a 18, limpiar fecha
-                                if ((value === 'TI' || value === 'RC') && edad >= 18) {
-                                  setValue(`beneficiariosNuevos.${index}.fecha_nacimiento`, '', {
-                                    shouldValidate: true,
-                                  });
-                                }
-                              }
-                              
-                              // Forzar validación de fecha después de cambiar tipo de documento
-                              setTimeout(() => {
-                                trigger(`beneficiariosNuevos.${index}.fecha_nacimiento`);
-                              }, 100);
                             }}
                           >
                             <FormControl>
@@ -420,94 +386,20 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                     name={`beneficiariosNuevos.${index}.fecha_nacimiento`}
                     rules={{
                       required: 'La fecha de nacimiento es requerida',
-                      validate: (value) => {
-                        const beneficiario = beneficiariosNuevos[index];
-                        const tipoDoc = beneficiario?.tipo_documento || '';
-                        
-                        if (!value) return true; // La validación required ya maneja el caso vacío
-                        if (!tipoDoc) return true; // Si no hay tipo de documento, no validar aún
-                        
-                        const fechaNacimiento = new Date(value + 'T00:00:00'); // Agregar hora para evitar problemas de zona horaria
-                        const hoy = new Date();
-                        hoy.setHours(0, 0, 0, 0); // Normalizar a medianoche
-                        fechaNacimiento.setHours(0, 0, 0, 0);
-                        
-                        // Calcular edad exacta
-                        let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
-                        const mesDiff = hoy.getMonth() - fechaNacimiento.getMonth();
-                        const diaDiff = hoy.getDate() - fechaNacimiento.getDate();
-                        
-                        // Ajustar edad si aún no ha cumplido años
-                        if (mesDiff < 0 || (mesDiff === 0 && diaDiff < 0)) {
-                          edad = edad - 1;
-                        }
-                        
-                        // CC: debe tener al menos 18 años
-                        if (tipoDoc === 'CC') {
-                          if (edad < 18) {
-                            return 'La cédula de ciudadanía (CC) requiere que la persona tenga al menos 18 años';
-                          }
-                        }
-                        
-                        // TI o RC: debe tener menos de 18 años (no puede tener 18 o más)
-                        if (tipoDoc === 'TI' || tipoDoc === 'RC') {
-                          if (edad >= 18) {
-                            return 'La tarjeta de identidad (TI) o registro civil (RC) requiere que la persona tenga menos de 18 años';
-                          }
-                        }
-                        
-                        return true;
-                      },
                     }}
-                    render={({ field }) => {
-                      const beneficiario = beneficiariosNuevos[index];
-                      const tipoDoc = beneficiario?.tipo_documento || '';
-                      
-                      // Calcular límites de fecha según tipo de documento
-                      let maxDate = new Date().toISOString().split('T')[0];
-                      let minDate = '';
-                      
-                      if (tipoDoc === 'CC') {
-                        // Mínimo: hace exactamente 18 años (debe tener al menos 18 años)
-                        const fechaMinima = new Date();
-                        fechaMinima.setFullYear(fechaMinima.getFullYear() - 18);
-                        fechaMinima.setHours(0, 0, 0, 0);
-                        minDate = fechaMinima.toISOString().split('T')[0];
-                        // Para CC, no hay máximo
-                        maxDate = new Date().toISOString().split('T')[0];
-                      } else if (tipoDoc === 'TI' || tipoDoc === 'RC') {
-                        // Máximo: hace 18 años menos 1 día (para que tenga menos de 18 años)
-                        const fechaMaxima = new Date();
-                        fechaMaxima.setFullYear(fechaMaxima.getFullYear() - 18);
-                        fechaMaxima.setDate(fechaMaxima.getDate() - 1); // Un día antes para que tenga menos de 18
-                        fechaMaxima.setHours(0, 0, 0, 0);
-                        maxDate = fechaMaxima.toISOString().split('T')[0];
-                        // No hay mínimo para TI/RC
-                        minDate = '';
-                      }
-                      
-                      return (
-                        <FormItem>
-                          <FormLabel>Fecha de Nacimiento *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field}
-                              max={maxDate}
-                              min={minDate}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                // Forzar validación después de cambiar la fecha
-                                setTimeout(() => {
-                                  trigger(`beneficiariosNuevos.${index}.fecha_nacimiento`);
-                                }, 100);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha de Nacimiento *</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field}
+                            max={new Date().toISOString().split('T')[0]}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
 
                   <FormField

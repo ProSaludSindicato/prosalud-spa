@@ -9,8 +9,8 @@ Este formulario permite a los afiliados actualizar su información personal, inc
 - Puede actualizar solo los campos que desee modificar. No es necesario completar todas las secciones.
 - Si actualiza información bancaria: la certificación debe llegar **ANTES del día 24 del mes** para procesar los registros bancarios y contables. Solo se permiten pagos a la cuenta del afiliado como titular.
 - Si actualiza información bancaria: la certificación bancaria debe ser no superior a 1 mes y la cuenta debe estar a nombre del afiliado.
-- Si actualiza EPS/AFP: los certificados deben estar vigentes.
 - Si actualiza nivel educativo: debe adjuntar tanto el diploma como el acta de grado.
+- En caso de que usted haya realizado cambio de EPS o fondo de pensión por favor adjunte el certificado vigente no superior a un mes
 
 ## Datos del Formulario
 

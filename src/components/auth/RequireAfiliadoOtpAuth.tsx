@@ -7,18 +7,19 @@ interface RequireAfiliadoOtpAuthProps {
 }
 
 const RequireAfiliadoOtpAuth: React.FC<RequireAfiliadoOtpAuthProps> = ({ children }) => {
-  const { isAuthenticated } = useAfiliadoAuth();
+  const { isAuthenticated, isOtpAuthenticated } = useAfiliadoAuth();
   const [showModal, setShowModal] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
     if (!hasChecked) {
-      if (!isAuthenticated) {
+      // Mostrar modal si no está autenticado O si está autenticado pero NO con OTP
+      if (!isAuthenticated || !isOtpAuthenticated) {
         setShowModal(true);
       }
       setHasChecked(true);
     }
-  }, [isAuthenticated, hasChecked]);
+  }, [isAuthenticated, isOtpAuthenticated, hasChecked]);
 
   const handleSuccess = () => {
     setShowModal(false);
@@ -29,7 +30,8 @@ const RequireAfiliadoOtpAuth: React.FC<RequireAfiliadoOtpAuthProps> = ({ childre
     window.location.href = '/';
   };
 
-  if (!isAuthenticated && hasChecked) {
+  // Mostrar modal si no está autenticado O si está autenticado pero NO con OTP
+  if (hasChecked && (!isAuthenticated || !isOtpAuthenticated)) {
     return (
       <AfiliadoOtpAuthModal
         open={showModal}

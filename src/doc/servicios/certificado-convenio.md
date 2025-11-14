@@ -39,10 +39,8 @@ Puede solicitar que el certificado incluya la siguiente información:
 5. **Para Subsidio de Vivienda**
 6. **Dirigido a Fondo de Pensiones**
 7. **Adicionar Actividades (PDF)**
-8. **Dirigido a Tránsito (Pico y Placa)**
-   - Requiere: Tipo de Vehículo (Automóvil, Motocicleta, Ambulancia) y Placa del Vehículo
-9. **Dirigido a Bancolombia**
-10. **Otros (Especificar)**
+8. **Dirigido a Bancolombia**
+9. **Otros (Especificar)**
     - Campo obligatorio: Descripción detallada del requerimiento
 
 ## Archivos Adicionales

@@ -4,7 +4,6 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescripti
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText } from 'lucide-react';
 import FileUploadField from './FileUploadField'; // Assuming FormValues type is defined elsewhere or passed
 
@@ -86,44 +85,6 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                 <FormLabel className="font-normal">Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud</FormLabel>
             </FormItem>
         )}/>
-        <FormField control={control} name={"infoCertificado.dirigidoTransitoPicoPlaca" as any} render={({ field }) => (
-             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                 <div className="leading-none">
-                    <FormLabel className="font-normal">Dirigido a Secretaría de Tránsito y Movilidad para trámites de Exención de Pico y Placa</FormLabel>
-                    <FormDescription className="text-xs">Debe indicar tipo de vehículo y placa.</FormDescription>
-                </div>
-            </FormItem>
-        )}/>
-        {watchInfoCertificado?.dirigidoTransitoPicoPlaca && (
-            <div className="ml-7 space-y-4">
-                <FormField control={control} name={"tipoVehiculo" as any} render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Tipo de vehículo *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione el tipo de vehículo" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                <SelectItem value="Automóvil">Automóvil</SelectItem>
-                                <SelectItem value="Motocicleta">Motocicleta</SelectItem>
-                                <SelectItem value="Ambulancia">Ambulancia</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                )}/>
-                <FormField control={control} name={"placaVehiculo" as any} render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Placa del vehículo *</FormLabel>
-                        <FormControl><Input placeholder="Ej: ABC123" {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}/>
-            </div>
-        )}
         <FormField control={control} name={"infoCertificado.adicionarActividades" as any} render={({ field }) => (
             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                 <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>

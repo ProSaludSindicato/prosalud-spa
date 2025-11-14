@@ -51,6 +51,7 @@ export interface AfiliadoData {
 interface AfiliadoAuthContextType {
   afiliado: AfiliadoData | null;
   isAuthenticated: boolean;
+  isOtpAuthenticated: boolean;
   authenticate: (tipoDoc: string, numDoc: string, fechaExp: string) => Promise<AfiliadoData>;
   authenticateWithOtp: (tipoDoc: string, numDoc: string, fechaExp: string, sessionId: string, otp: string) => Promise<AfiliadoData>;
   logout: () => void;
@@ -66,6 +67,7 @@ const STORAGE_KEY = 'afiliado_auth';
 export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [afiliado, setAfiliado] = useState<AfiliadoData | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [isOtpAuthenticated, setIsOtpAuthenticated] = useState<boolean>(false);
   const lastActivityRef = useRef<number>(Date.now());
   const expirationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownExpirationToastRef = useRef<boolean>(false);
@@ -85,6 +87,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hasShownExpirationToastRef.current = true;
       setAfiliado(null);
       setExpiresAt(null);
+      setIsOtpAuthenticated(false);
       localStorage.removeItem(STORAGE_KEY);
       
       // Mostrar toast y redirigir
@@ -105,10 +108,11 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        const { afiliado: storedAfiliado, expiresAt: storedExpiry } = JSON.parse(stored);
+        const { afiliado: storedAfiliado, expiresAt: storedExpiry, isOtpAuthenticated: storedOtpAuth } = JSON.parse(stored);
         if (storedExpiry && Date.now() < storedExpiry) {
           setAfiliado(storedAfiliado);
           setExpiresAt(storedExpiry);
+          setIsOtpAuthenticated(storedOtpAuth || false);
           lastActivityRef.current = Date.now();
           hasShownExpirationToastRef.current = false;
         } else {
@@ -144,9 +148,13 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
-            const data = JSON.parse(stored);
-            data.expiresAt = newExpiresAt;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        const data = JSON.parse(stored);
+        data.expiresAt = newExpiresAt;
+        // Preservar isOtpAuthenticated al extender sesión
+        if (data.isOtpAuthenticated === undefined) {
+          data.isOtpAuthenticated = isOtpAuthenticated;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           } catch {
             // Ignorar errores de parsing
           }
@@ -210,6 +218,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const newExpiresAt = Date.now() + SESSION_DURATION;
       setAfiliado(data.afiliado);
       setExpiresAt(newExpiresAt);
+      setIsOtpAuthenticated(false); // Autenticación básica, no OTP
       lastActivityRef.current = Date.now();
       hasShownExpirationToastRef.current = false;
 
@@ -217,6 +226,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         afiliado: data.afiliado,
         expiresAt: newExpiresAt,
+        isOtpAuthenticated: false,
       }));
 
       return data.afiliado;
@@ -256,6 +266,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const logout = useCallback(() => {
     setAfiliado(null);
     setExpiresAt(null);
+    setIsOtpAuthenticated(false);
     lastActivityRef.current = Date.now();
     hasShownExpirationToastRef.current = false;
     localStorage.removeItem(STORAGE_KEY);
@@ -361,6 +372,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const newExpiresAt = Date.now() + SESSION_DURATION;
       setAfiliado(afiliadoData);
       setExpiresAt(newExpiresAt);
+      setIsOtpAuthenticated(true); // Autenticación con OTP
       lastActivityRef.current = Date.now();
       hasShownExpirationToastRef.current = false;
 
@@ -368,6 +380,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         afiliado: afiliadoData,
         expiresAt: newExpiresAt,
+        isOtpAuthenticated: true,
       }));
 
       return afiliadoData;
@@ -397,11 +410,12 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const value = useMemo(() => ({
     afiliado,
     isAuthenticated: !!afiliado,
+    isOtpAuthenticated,
     authenticate,
     authenticateWithOtp,
     logout,
     getActiveConvenio,
-  }), [afiliado, authenticate, authenticateWithOtp, logout, getActiveConvenio]);
+  }), [afiliado, isOtpAuthenticated, authenticate, authenticateWithOtp, logout, getActiveConvenio]);
 
   return (
     <AfiliadoAuthContext.Provider value={value}>

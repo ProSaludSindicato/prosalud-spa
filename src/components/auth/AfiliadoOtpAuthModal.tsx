@@ -19,7 +19,7 @@ interface AfiliadoOtpAuthModalProps {
 type Step = 'request' | 'verify';
 
 const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClose, onSuccess }) => {
-  const { authenticateWithOtp } = useAfiliadoAuth();
+  const { authenticateWithOtp, afiliado, isAuthenticated } = useAfiliadoAuth();
   const [step, setStep] = useState<Step>('request');
   const [loading, setLoading] = useState(false);
   const [requestingOtp, setRequestingOtp] = useState(false);
@@ -36,6 +36,37 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
   const [otpSuccess, setOtpSuccess] = useState(false);
   const [emailObfuscated, setEmailObfuscated] = useState<string | null>(null);
 
+  // Si el usuario ya está autenticado, usar sus datos
+  React.useEffect(() => {
+    if (open) {
+      // Resetear al estado inicial cuando se abre el modal
+      setStep('request');
+      setOtp('');
+      setSessionId(null);
+      setCanResendOtp(false);
+      setResendCooldown(0);
+      setOtpError(false);
+      setOtpSuccess(false);
+      setEmailObfuscated(null);
+      
+      if (isAuthenticated && afiliado) {
+        // Usar los datos del usuario autenticado
+        setFormData({
+          tipoDocumento: afiliado.tipo_documento || 'CC',
+          numeroDocumento: afiliado.documento || '',
+          fechaExpedicion: '', // La fecha de expedición aún se necesita
+        });
+      } else {
+        // Resetear formulario si no está autenticado
+        setFormData({
+          tipoDocumento: 'CC',
+          numeroDocumento: '',
+          fechaExpedicion: '',
+        });
+      }
+    }
+  }, [open, isAuthenticated, afiliado]);
+
   // Timer para el cooldown de reenvío
   React.useEffect(() => {
     if (resendCooldown > 0) {
@@ -48,12 +79,23 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
     }
   }, [resendCooldown, step]);
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     
-    if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
-      toast.error('Todos los campos son obligatorios');
-      return;
+    // Si el usuario ya está autenticado, solo necesita la fecha de expedición
+    if (isAuthenticated && afiliado) {
+      if (!formData.fechaExpedicion) {
+        toast.error('La fecha de expedición es obligatoria');
+        return;
+      }
+    } else {
+      // Si no está autenticado, necesita todos los campos
+      if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
+        toast.error('Todos los campos son obligatorios');
+        return;
+      }
     }
 
     setRequestingOtp(true);
@@ -175,11 +217,20 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
     setStep('request');
     setOtp('');
     setSessionId(null);
-    setFormData({
-      tipoDocumento: 'CC',
-      numeroDocumento: '',
-      fechaExpedicion: '',
-    });
+    // Si el usuario está autenticado, mantener sus datos; si no, resetear todo
+    if (isAuthenticated && afiliado) {
+      setFormData({
+        tipoDocumento: afiliado.tipo_documento || 'CC',
+        numeroDocumento: afiliado.documento || '',
+        fechaExpedicion: '',
+      });
+    } else {
+      setFormData({
+        tipoDocumento: 'CC',
+        numeroDocumento: '',
+        fechaExpedicion: '',
+      });
+    }
     setCanResendOtp(false);
     setResendCooldown(0);
     setOtpError(false);
@@ -210,11 +261,15 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
             />
           </div>
           <DialogTitle className="text-2xl font-bold text-center text-gray-900">
-            {step === 'request' ? 'Autenticación requerida' : 'Verificación de código'}
+            {step === 'request' 
+              ? (isAuthenticated && afiliado ? 'Verificación adicional requerida' : 'Autenticación requerida')
+              : 'Verificación de código'}
           </DialogTitle>
           <DialogDescription className="text-center text-gray-600 mt-2 text-base">
             {step === 'request' 
-              ? 'Para acceder a este trámite, por favor ingresa tus datos de identificación y recibirás un código de verificación por correo electrónico.'
+              ? (isAuthenticated && afiliado
+                  ? 'Para acceder a este trámite, necesitamos verificar tu identidad con un código de verificación que recibirás por correo electrónico.'
+                  : 'Para acceder a este trámite, por favor ingresa tus datos de identificación y recibirás un código de verificación por correo electrónico.')
               : 'Ingresa el código de 6 dígitos que recibiste en tu correo electrónico.'}
           </DialogDescription>
           <div className="h-px bg-gray-200 mt-4"></div>
@@ -223,64 +278,109 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
         {step === 'request' ? (
           <form onSubmit={handleRequestOtp} className="px-6 pb-6 pt-4">
             <div className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
-                  <span className="inline-flex items-center gap-2">
-                    <IdCard className="h-4 w-4 text-gray-500" />
-                    Tipo de documento
-                  </span>
-                </Label>
-                <Select
-                  value={formData.tipoDocumento}
-                  onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
-                  disabled={requestingOtp}
-                >
-                  <SelectTrigger className="bg-indigo-50 border-indigo-200">
-                    <SelectValue placeholder="Seleccione un tipo de documento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
-                    <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
-                    <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
-                    <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAuthenticated && afiliado ? (
+                // Si ya está autenticado, mostrar solo información y fecha de expedición
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ya estás autenticado. Solo necesitamos tu fecha de expedición para enviar el código de verificación.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <IdCard className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700">Tipo de documento:</span>
+                      <span className="text-sm text-gray-900">{formData.tipoDocumento}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700">Número de documento:</span>
+                      <span className="text-sm text-gray-900">{formData.numeroDocumento}</span>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
-                  <span className="inline-flex items-center gap-2">
-                    <Hash className="h-4 w-4 text-gray-500" />
-                    Número de documento
-                  </span>
-                </Label>
-                <Input
-                  id="numeroDocumento"
-                  type="text"
-                  value={formData.numeroDocumento}
-                  onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
-                  placeholder="Ingrese su número de documento"
-                  disabled={requestingOtp}
-                  className="w-full bg-indigo-50 border-indigo-200"
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        Fecha de expedición *
+                      </span>
+                    </Label>
+                    <Input
+                      id="fechaExpedicion"
+                      type="date"
+                      value={formData.fechaExpedicion}
+                      onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                      disabled={requestingOtp}
+                      className="w-full bg-indigo-50 border-indigo-200"
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                // Si no está autenticado, mostrar todos los campos
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-2">
+                        <IdCard className="h-4 w-4 text-gray-500" />
+                        Tipo de documento
+                      </span>
+                    </Label>
+                    <Select
+                      value={formData.tipoDocumento}
+                      onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
+                      disabled={requestingOtp}
+                    >
+                      <SelectTrigger className="bg-indigo-50 border-indigo-200">
+                        <SelectValue placeholder="Seleccione un tipo de documento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                        <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                        <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                        <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
-                  <span className="inline-flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    Fecha de expedición
-                  </span>
-                </Label>
-                <Input
-                  id="fechaExpedicion"
-                  type="date"
-                  value={formData.fechaExpedicion}
-                  onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-                  disabled={requestingOtp}
-                  className="w-full bg-indigo-50 border-indigo-200"
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-gray-500" />
+                        Número de documento
+                      </span>
+                    </Label>
+                    <Input
+                      id="numeroDocumento"
+                      type="text"
+                      value={formData.numeroDocumento}
+                      onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
+                      placeholder="Ingrese su número de documento"
+                      disabled={requestingOtp}
+                      className="w-full bg-indigo-50 border-indigo-200"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        Fecha de expedición
+                      </span>
+                    </Label>
+                    <Input
+                      id="fechaExpedicion"
+                      type="date"
+                      value={formData.fechaExpedicion}
+                      onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                      disabled={requestingOtp}
+                      className="w-full bg-indigo-50 border-indigo-200"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
