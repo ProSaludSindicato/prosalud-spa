@@ -77,7 +77,7 @@ const formSchema = z.object({
             path: ['actividadesPdf'],
             message: 'Debe adjuntar un archivo PDF con las actividades si selecciona esta opción.',
         });
-    } 
+    }
   }
   if (data.infoCertificado.otros && !data.otrosDescripcion?.trim()) {
     ctx.addIssue({

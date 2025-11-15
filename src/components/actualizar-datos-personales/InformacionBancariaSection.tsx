@@ -6,22 +6,31 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import FileUploadField from '../solicitud-certificado/FileUploadField';
 import { tiposCuenta, bancos } from './formOptions';
+import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 
 interface InformacionBancariaSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
   modifiedFields?: Set<string>;
   onFileChange?: (fieldName: string) => void;
+  initialValues?: Partial<TFieldValues>;
 }
 
 const InformacionBancariaSection = <TFieldValues extends FieldValues>({
   control,
   modifiedFields,
   onFileChange,
+  initialValues,
 }: InformacionBancariaSectionProps<TFieldValues>) => {
-  const numeroCuenta = useWatch({
-    control,
-    name: 'numeroCuenta' as any,
-  });
+  const watchValues = useWatch({ control });
+  const numeroCuenta = watchValues?.numeroCuenta || '';
+
+  const shouldObfuscate = (fieldName: string): boolean => {
+    if (modifiedFields?.has(fieldName)) {
+      return false;
+    }
+    const initialValue = initialValues?.[fieldName as keyof typeof initialValues];
+    return !!initialValue && String(initialValue).trim() !== '';
+  };
 
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white space-y-6">
@@ -34,19 +43,57 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
             <FormField
               control={control}
               name={"numeroCuenta" as any}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Cuenta</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Ej: 1234567890"
-                      {...field}
-                      className={modifiedFields?.has('numeroCuenta') ? 'border-green-500 bg-green-50' : ''}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const currentValue = watchValues?.numeroCuenta || '';
+                const initialValue = initialValues?.numeroCuenta || '';
+                const isObfuscated = shouldObfuscate('numeroCuenta');
+                
+                // Verificar si el valor inicial ya viene ofuscado del backend
+                const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                
+                const displayValue = isObfuscated && currentValue === initialValue
+                  ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'account'))
+                  : currentValue;
+
+                return (
+                  <FormItem>
+                    <FormLabel>Número de Cuenta</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ej: 1234567890"
+                        {...field}
+                        value={displayValue}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          field.onChange(newValue);
+                        }}
+                        onFocus={() => {
+                          // Si está ofuscado y el usuario hace focus, limpiar o restaurar según corresponda
+                          if (isObfuscated && currentValue === displayValue) {
+                            if (initialIsObfuscated) {
+                              // Si viene ofuscado del backend, limpiar para que escriba el valor real
+                              field.onChange('');
+                            } else {
+                              // Si no viene ofuscado, restaurar el valor real para edición
+                              field.onChange(initialValue);
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Si el campo quedó vacío y debería estar ofuscado, restaurar el valor inicial
+                          const currentVal = e.target.value || '';
+                          if (isObfuscated && !currentVal.trim() && initialValue) {
+                            // Restaurar el valor inicial (se mostrará ofuscado automáticamente)
+                            field.onChange(initialValue);
+                          }
+                        }}
+                        className={modifiedFields?.has('numeroCuenta') ? 'border-green-500 bg-green-50' : ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField

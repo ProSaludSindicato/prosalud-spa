@@ -148,13 +148,13 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
-        const data = JSON.parse(stored);
-        data.expiresAt = newExpiresAt;
+            const data = JSON.parse(stored);
+            data.expiresAt = newExpiresAt;
         // Preservar isOtpAuthenticated al extender sesión
         if (data.isOtpAuthenticated === undefined) {
           data.isOtpAuthenticated = isOtpAuthenticated;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           } catch {
             // Ignorar errores de parsing
           }

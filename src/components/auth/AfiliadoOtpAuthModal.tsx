@@ -81,7 +81,7 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
 
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) {
-      e.preventDefault();
+    e.preventDefault();
     }
     
     // Si el usuario ya está autenticado, solo necesita la fecha de expedición
@@ -92,9 +92,9 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
       }
     } else {
       // Si no está autenticado, necesita todos los campos
-      if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
-        toast.error('Todos los campos son obligatorios');
-        return;
+    if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
+      toast.error('Todos los campos son obligatorios');
+      return;
       }
     }
 
@@ -225,11 +225,11 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
         fechaExpedicion: '',
       });
     } else {
-      setFormData({
-        tipoDocumento: 'CC',
-        numeroDocumento: '',
-        fechaExpedicion: '',
-      });
+    setFormData({
+      tipoDocumento: 'CC',
+      numeroDocumento: '',
+      fechaExpedicion: '',
+    });
     }
     setCanResendOtp(false);
     setResendCooldown(0);
@@ -321,64 +321,64 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
               ) : (
                 // Si no está autenticado, mostrar todos los campos
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
-                      <span className="inline-flex items-center gap-2">
-                        <IdCard className="h-4 w-4 text-gray-500" />
-                        Tipo de documento
-                      </span>
-                    </Label>
-                    <Select
-                      value={formData.tipoDocumento}
-                      onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
-                      disabled={requestingOtp}
-                    >
-                      <SelectTrigger className="bg-indigo-50 border-indigo-200">
-                        <SelectValue placeholder="Seleccione un tipo de documento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
-                        <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
-                        <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
-                        <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="tipoDocumento" className="text-sm font-medium text-gray-700">
+                  <span className="inline-flex items-center gap-2">
+                    <IdCard className="h-4 w-4 text-gray-500" />
+                    Tipo de documento
+                  </span>
+                </Label>
+                <Select
+                  value={formData.tipoDocumento}
+                  onValueChange={(value) => setFormData({ ...formData, tipoDocumento: value })}
+                  disabled={requestingOtp}
+                >
+                  <SelectTrigger className="bg-indigo-50 border-indigo-200">
+                    <SelectValue placeholder="Seleccione un tipo de documento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                    <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                    <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                    <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
-                      <span className="inline-flex items-center gap-2">
-                        <Hash className="h-4 w-4 text-gray-500" />
-                        Número de documento
-                      </span>
-                    </Label>
-                    <Input
-                      id="numeroDocumento"
-                      type="text"
-                      value={formData.numeroDocumento}
-                      onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
-                      placeholder="Ingrese su número de documento"
-                      disabled={requestingOtp}
-                      className="w-full bg-indigo-50 border-indigo-200"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="numeroDocumento" className="text-sm font-medium text-gray-700">
+                  <span className="inline-flex items-center gap-2">
+                    <Hash className="h-4 w-4 text-gray-500" />
+                    Número de documento
+                  </span>
+                </Label>
+                <Input
+                  id="numeroDocumento"
+                  type="text"
+                  value={formData.numeroDocumento}
+                  onChange={(e) => setFormData({ ...formData, numeroDocumento: e.target.value })}
+                  placeholder="Ingrese su número de documento"
+                  disabled={requestingOtp}
+                  className="w-full bg-indigo-50 border-indigo-200"
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
-                      <span className="inline-flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-500" />
-                        Fecha de expedición
-                      </span>
-                    </Label>
-                    <Input
-                      id="fechaExpedicion"
-                      type="date"
-                      value={formData.fechaExpedicion}
-                      onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
-                      disabled={requestingOtp}
-                      className="w-full bg-indigo-50 border-indigo-200"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="fechaExpedicion" className="text-sm font-medium text-gray-700">
+                  <span className="inline-flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    Fecha de expedición
+                  </span>
+                </Label>
+                <Input
+                  id="fechaExpedicion"
+                  type="date"
+                  value={formData.fechaExpedicion}
+                  onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
+                  disabled={requestingOtp}
+                  className="w-full bg-indigo-50 border-indigo-200"
+                />
+              </div>
                 </>
               )}
             </div>

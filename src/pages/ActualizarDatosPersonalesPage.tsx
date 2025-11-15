@@ -710,6 +710,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
             <DatosPersonalesSection 
               control={form.control} 
               modifiedFields={modifiedFields}
+              initialValues={initialValues}
             />
             <NivelEducativoSection 
               control={form.control} 
@@ -722,6 +723,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
             <InformacionBancariaSection 
               control={form.control} 
               modifiedFields={modifiedFields}
+              initialValues={initialValues}
               onFileChange={(fieldName: string) => {
                 form.clearErrors(fieldName as any);
                 form.trigger(fieldName as any);

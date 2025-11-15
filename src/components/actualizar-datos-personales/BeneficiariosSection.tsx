@@ -388,17 +388,17 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                       required: 'La fecha de nacimiento es requerida',
                     }}
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Fecha de Nacimiento *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="date" 
-                            {...field}
+                        <FormItem>
+                          <FormLabel>Fecha de Nacimiento *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field}
                             max={new Date().toISOString().split('T')[0]}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                     )}
                   />
 
