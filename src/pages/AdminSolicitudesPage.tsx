@@ -134,21 +134,8 @@ const AdminSolicitudesPage: React.FC = () => {
       "actualizar-datos-personales": "Actualizar Datos Personales",
       "solicitud-microcredito": "Solicitud de Microcrédito",
       "solicitud-retiro-sindical": "Solicitud de Retiro Sindical",
-      "solicitud-descanso-laboral": "Solicitud de Descanso Laboral",
-      "certificado-seguridad-social": "Certificado de Seguridad Social",
-      "contrato-sindical": "Contrato Sindical",
-      "estatutos-beneficios": "Estatutos y Beneficios",
-      "cuadro-turnos": "Cuadro de Turnos",
       "permisos-cambio-turnos": "Permisos y Cambio de Turnos",
       "incapacidades-licencias": "Incapacidades y Licencias",
-      "informacion-contacto": "Información de Contacto",
-      "eps-sura": "EPS Sura",
-      "convenios-alianzas": "Convenios y Alianzas",
-      "mision-vision": "Misión y Visión",
-      "valores": "Valores",
-      "principios": "Principios",
-      "estructura-organizacional": "Estructura Organizacional",
-      "sst": "SST",
     };
     return labels[type] || type;
   };
@@ -633,14 +620,13 @@ const AdminSolicitudesPage: React.FC = () => {
                       <SelectContent>
                         <SelectItem value="all">Todos los tipos</SelectItem>
                         <SelectItem value="certificado-convenio">Certificado de Convenio</SelectItem>
+                        <SelectItem value="compensacion-descanso">Compensación por Descanso</SelectItem>
                         <SelectItem value="compensacion-anual">Compensación Anual</SelectItem>
                         <SelectItem value="verificacion-pagos">Verificación de Pagos</SelectItem>
-                        <SelectItem value="compensacion-descanso">Compensación por Descanso</SelectItem>
                         <SelectItem value="actualizar-datos-personales">Actualizar Datos Personales</SelectItem>
-                        <SelectItem value="retiro-sindical">Retiro Sindical</SelectItem>
+                        <SelectItem value="incapacidad-maternidad">Incapacidades y Licencias</SelectItem>
                         <SelectItem value="microcredito">Microcrédito</SelectItem>
-                        <SelectItem value="incapacidad-maternidad">Incapacidad Maternidad</SelectItem>
-                        <SelectItem value="permisos-turnos">Permisos y Turnos</SelectItem>
+                        <SelectItem value="retiro-sindical">Retiro Sindical</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

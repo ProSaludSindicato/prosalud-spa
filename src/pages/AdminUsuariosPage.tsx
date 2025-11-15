@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, Plus, Search, Filter, Edit, UserX, UserCheck, MoreVertical } from 'lucide-react';
+import { Users, Plus, Search, Filter, Edit, UserX, UserCheck, MoreVertical, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminLayout from '@/components/admin/AdminLayout';
 import UserFormModal from '@/components/admin/usuarios/UserFormModal';
 import UserStatusConfirmationDialog from '@/components/admin/usuarios/UserStatusConfirmationDialog';
+import RequestAssignmentManager from '@/components/admin/usuarios/RequestAssignmentManager';
 import UserAvatar from '@/components/admin/UserAvatar';
 import DataPagination from '@/components/ui/data-pagination';
 import { usePagination } from '@/hooks/usePagination';
@@ -29,6 +31,7 @@ const AdminUsuariosPage: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('users');
 
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
@@ -123,10 +126,11 @@ const AdminUsuariosPage: React.FC = () => {
                         Gestión de Usuarios
                       </CardTitle>
                       <CardDescription className="text-base mt-2">
-                        Administra los usuarios del panel administrativo
+                        Administra los usuarios del panel administrativo y las asignaciones de solicitudes
                       </CardDescription>
                     </div>
                   </div>
+                  {activeTab === 'users' && (
                   <Button
                     onClick={handleCreate}
                     className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
@@ -134,10 +138,38 @@ const AdminUsuariosPage: React.FC = () => {
                     <Plus className="h-5 w-5 mr-2" />
                     Nuevo Usuario
                   </Button>
+                  )}
                 </div>
               </CardHeader>
             </Card>
           </motion.div>
+
+          {/* Tabs */}
+          <motion.div variants={itemVariants}>
+            <Card className="bg-white shadow-sm">
+              <CardContent className="p-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                  <div className="p-6 pb-0">
+                    <TabsList className="grid w-full grid-cols-2 bg-gray-50 border p-1">
+                      <TabsTrigger
+                        value="users"
+                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span>Usuarios</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="assignments"
+                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span>Asignación de Solicitudes</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  <div className="p-6 pt-0">
+                    <TabsContent value="users" className="space-y-6 mt-0">
 
           {/* Filters */}
           <Card className="bg-white border shadow-sm">
@@ -280,6 +312,16 @@ const AdminUsuariosPage: React.FC = () => {
               />
             </CardContent>
           </Card>
+                    </TabsContent>
+
+                    <TabsContent value="assignments" className="space-y-6 mt-0">
+                      <RequestAssignmentManager />
+                    </TabsContent>
+                  </div>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
       </div>
 
