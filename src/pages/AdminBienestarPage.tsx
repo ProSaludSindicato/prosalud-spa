@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import BienestarEventForm from '@/components/admin/bienestar/BienestarEventForm'
 import { logger } from '@/utils/logger';
 
 const AdminBienestarPage: React.FC = () => {
+  const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<BienestarEvent | null>(null);
@@ -144,13 +146,15 @@ const AdminBienestarPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button 
-                    onClick={() => setShowForm(true)}
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Evento
-                  </Button>
+                  {can('wellness_events.create') && (
+                    <Button 
+                      onClick={() => setShowForm(true)}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nuevo Evento
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
             </Card>
@@ -284,14 +288,16 @@ const AdminBienestarPage: React.FC = () => {
                             </div>
 
                             {/* Edit Button */}
-                            <Button
-                              variant="outline"
-                              onClick={() => handleEdit(event)}
-                              className="w-full"
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar
-                            </Button>
+                            {can('wellness_events.edit') && (
+                              <Button
+                                variant="outline"
+                                onClick={() => handleEdit(event)}
+                                className="w-full"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </Button>
+                            )}
                           </div>
                         </CardContent>
                       </Card>

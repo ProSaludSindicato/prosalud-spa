@@ -15,6 +15,8 @@ import UserFormModal from '@/components/admin/usuarios/UserFormModal';
 import { configApi } from '@/services/adminApi';
 import { adminExcelFilesService, type AdminExcelFileType } from '@/services/adminExcelFilesService';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
+import { FILE_PERMISSIONS } from '@/config/permissions';
 
 type DashboardUploadType = Extract<AdminExcelFileType, 'afiliados' | 'incapacidades' | 'liquidaciones'>;
 
@@ -72,6 +74,7 @@ const dashboardUploadConfigs: Record<DashboardUploadType, DashboardUploadConfig>
 };
 
 const AdminDashboard: React.FC = () => {
+  const { can } = usePermissions();
   const [stats, setStats] = useState([
     {
       title: "Usuarios Activos",
@@ -363,29 +366,33 @@ const AdminDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <motion.button
-                    type="button"
-                    onClick={() => setShowUserModal(true)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
-                  >
-                    <Users className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
-                    <span className="font-medium text-text-dark">Crear Usuario</span>
-                  </motion.button>
+                  {can('users.create') && (
+                    <motion.button
+                      type="button"
+                      onClick={() => setShowUserModal(true)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <Users className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Crear Usuario</span>
+                    </motion.button>
+                  )}
                   
-                  <motion.a
-                    href="/admin/bienestar?action=create"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
-                  >
-                    <Heart className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
-                    <span className="font-medium text-text-dark">Nuevo Evento</span>
-                  </motion.a>
-                  {renderUploadButton('afiliados')}
-                  {renderUploadButton('incapacidades')}
-                  {renderUploadButton('liquidaciones')}
+                  {can('wellness_events.create') && (
+                    <motion.a
+                      href="/admin/bienestar?action=create"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <Heart className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Nuevo Evento</span>
+                    </motion.a>
+                  )}
+                  {can(FILE_PERMISSIONS.afiliados) && renderUploadButton('afiliados')}
+                  {can(FILE_PERMISSIONS.incapacidades) && renderUploadButton('incapacidades')}
+                  {can(FILE_PERMISSIONS.liquidaciones) && renderUploadButton('liquidaciones')}
                   <input
                     ref={fileInputRef}
                     type="file"

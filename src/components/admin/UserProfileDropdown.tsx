@@ -24,8 +24,8 @@ interface UserProfileDropdownProps {
 }
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ 
-  userEmail = 'admin@prosalud.com', 
-  userName = 'Administrador' 
+  userEmail,
+  userName
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -33,8 +33,11 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showUpdateProfile, setShowUpdateProfile] = useState(false);
 
-  const { logout } = useAuth();
-  const initials = getInitialsFromEmail(userEmail);
+  const { logout, user } = useAuth();
+  // Usar el usuario del contexto si está disponible, sino usar los props
+  const displayEmail = userEmail || user?.email || '';
+  const displayName = userName || user?.name || '';
+  const initials = getInitialsFromEmail(displayEmail);
 
   const handleLogout = async () => {
     setIsOpen(false);
@@ -81,9 +84,9 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{userName}</p>
+              <p className="text-sm font-medium leading-none">{displayName}</p>
               <p className="text-xs leading-none text-muted-foreground">
-                {userEmail}
+                {displayEmail}
               </p>
             </div>
           </DropdownMenuLabel>

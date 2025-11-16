@@ -6,14 +6,17 @@ function adaptBackendRoleToFrontend(backendRole: any): Role {
   return {
     id: backendRole.id,
     name: backendRole.name,
+    description: backendRole.description,
     guard_name: backendRole.guard_name,
-    permissions: backendRole.permissions.map((p: any) => ({
+    permissions: (backendRole.permissions || []).map((p: any) => ({
       id: p.id,
       name: p.name,
+      description: p.description,
       guard_name: p.guard_name,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     })),
+    users: backendRole.users || [],
     createdAt: backendRole.created_at,
     updatedAt: backendRole.updated_at,
   };
@@ -23,6 +26,7 @@ function adaptBackendPermissionToFrontend(backendPermission: any): Permission {
   return {
     id: backendPermission.id,
     name: backendPermission.name,
+    description: backendPermission.description,
     guard_name: backendPermission.guard_name,
     createdAt: backendPermission.created_at,
     updatedAt: backendPermission.updated_at,
@@ -41,7 +45,12 @@ export const rolesApiAdapter = {
     return adaptBackendRoleToFrontend(response.data);
   },
 
-  async updateRole(id: number, data: { name?: string; permissions?: number[] }): Promise<Role> {
+  async createRole(data: { name: string; description?: string; permissions?: number[] }): Promise<Role> {
+    const response = await realRolesApi.createRole(data);
+    return adaptBackendRoleToFrontend(response.data);
+  },
+
+  async updateRole(id: number, data: { name?: string; description?: string; permissions?: number[] }): Promise<Role> {
     const response = await realRolesApi.updateRole(id, data);
     return adaptBackendRoleToFrontend(response.data);
   },
@@ -60,4 +69,5 @@ export const rolesApiAdapter = {
     const response = await realRolesApi.updatePermission(id, data);
     return adaptBackendPermissionToFrontend(response.data);
   },
+
 };

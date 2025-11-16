@@ -40,8 +40,10 @@ import { Separator } from '@/components/ui/separator';
 import { FieldError } from '@/components/ui/field-error';
 import DeleteComfenalcoEventDialog from '@/components/admin/comfenalco/DeleteComfenalcoEventDialog';
 import { logger } from '@/utils/logger';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const AdminComfenalcoPage: React.FC = () => {
+  const { can } = usePermissions();
   const [eventFormOpen, setEventFormOpen] = useState(false);
   const [viewEventOpen, setViewEventOpen] = useState(false);
   const [deleteEventOpen, setDeleteEventOpen] = useState(false);
@@ -516,17 +518,19 @@ const AdminComfenalcoPage: React.FC = () => {
                         Administra las experiencias y beneficios de Comfenalco para los afiliados
                       </CardDescription>
                     </div>
-                  </div>
-                  <Button 
-                    onClick={() => {
-                      resetForm();
-                      setEventFormOpen(true);
-                    }}
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Experiencia
-                  </Button>
+                    </div>
+                    {can('comfenalco_events.create') && (
+                      <Button 
+                        onClick={() => {
+                          resetForm();
+                          setEventFormOpen(true);
+                        }}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nueva Experiencia
+                      </Button>
+                    )}
                 </div>
               </CardHeader>
             </Card>
@@ -677,7 +681,8 @@ const AdminComfenalcoPage: React.FC = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1">
+                            {(can('comfenalco_events.edit') || can('comfenalco_events.delete')) && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="sm">
@@ -685,19 +690,24 @@ const AdminComfenalcoPage: React.FC = () => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
-                                  <DropdownMenuItem onClick={() => handleEdit(event)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => handleDelete(event)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
+                                  {can('comfenalco_events.edit') && (
+                                    <DropdownMenuItem onClick={() => handleEdit(event)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                  )}
+                                  {can('comfenalco_events.delete') && (
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDelete(event)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
+                            )}
                               {event.registration_link && (
                                 <a href={event.registration_link} target="_blank" rel="noopener noreferrer">
                                   <Button variant="ghost" size="sm">

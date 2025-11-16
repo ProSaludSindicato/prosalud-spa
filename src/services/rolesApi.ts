@@ -1,24 +1,29 @@
-import axios from "axios";
+import { authenticatedApi } from "./api";
 import { logger } from "@/utils/logger";
-
-import { API_CONFIG } from "../config/api";
-
-const API_BASE_URL = `${API_CONFIG.ADMIN_BASE_URL}/api`;
 
 // Backend types
 interface BackendPermission {
   id: number;
   name: string;
+  description?: string;
   guard_name?: string;
   created_at?: string;
   updated_at?: string;
 }
 
+interface BackendUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
 interface BackendRole {
   id: number;
   name: string;
+  description?: string;
   guard_name: string;
   permissions: BackendPermission[];
+  users?: BackendUser[];
   created_at: string;
   updated_at: string;
 }
@@ -43,85 +48,43 @@ interface BackendPermissionResponse {
   data: BackendPermission;
 }
 
-// Axios instance
-const rolesApi = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-  timeout: 30000,
-});
-
-// Request interceptor
-rolesApi.interceptors.request.use(
-  (config) => {
-    logger.debug("Roles API request", {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-    });
-    return config;
-  },
-  (error) => {
-    logger.error("Roles API request error", error?.message || error);
-    return Promise.reject(error);
-  },
-);
-
-// Response interceptor
-rolesApi.interceptors.response.use(
-  (response) => {
-    logger.debug("Roles API response", {
-      status: response.status,
-      url: response.config.url,
-    });
-    return response;
-  },
-  (error) => {
-    logger.error("Roles API response error", error.response?.data?.message || error.message);
-
-    if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-      throw new Error("No se pudo conectar con el servidor. Verifica tu conexión a internet.");
-    }
-
-    if (error.response) {
-      const message = error.response.data?.message || "Error en la solicitud";
-      throw new Error(message);
-    }
-
-    throw error;
-  },
-);
+// Use authenticated API instance
+const rolesApi = authenticatedApi;
 
 // API methods
 export const realRolesApi = {
   async getRoles(): Promise<BackendRolesResponse> {
-    const response = await rolesApi.get<BackendRolesResponse>("/roles");
+    const response = await rolesApi.get<BackendRolesResponse>("/api/roles");
     return response.data;
   },
 
   async getRoleById(id: number): Promise<BackendRoleResponse> {
-    const response = await rolesApi.get<BackendRoleResponse>(`/roles/${id}`);
+    const response = await rolesApi.get<BackendRoleResponse>(`/api/roles/${id}`);
     return response.data;
   },
 
-  async updateRole(id: number, data: { name?: string; permissions?: number[] }): Promise<BackendRoleResponse> {
-    const response = await rolesApi.put<BackendRoleResponse>(`/roles/${id}`, data);
+  async createRole(data: { name: string; description?: string; permissions?: number[] }): Promise<BackendRoleResponse> {
+    const response = await rolesApi.post<BackendRoleResponse>('/api/roles', data);
+    return response.data;
+  },
+
+  async updateRole(id: number, data: { name?: string; description?: string; permissions?: number[] }): Promise<BackendRoleResponse> {
+    const response = await rolesApi.put<BackendRoleResponse>(`/api/roles/${id}`, data);
     return response.data;
   },
 
   async getPermissions(): Promise<BackendPermissionsResponse> {
-    const response = await rolesApi.get<BackendPermissionsResponse>("/permissions");
+    const response = await rolesApi.get<BackendPermissionsResponse>("/api/permissions");
     return response.data;
   },
 
   async getPermissionById(id: number): Promise<BackendPermissionResponse> {
-    const response = await rolesApi.get<BackendPermissionResponse>(`/permissions/${id}`);
+    const response = await rolesApi.get<BackendPermissionResponse>(`/api/permissions/${id}`);
     return response.data;
   },
 
   async updatePermission(id: number, data: { name?: string }): Promise<BackendPermissionResponse> {
-    const response = await rolesApi.put<BackendPermissionResponse>(`/permissions/${id}`, data);
+    const response = await rolesApi.put<BackendPermissionResponse>(`/api/permissions/${id}`, data);
     return response.data;
   },
 };

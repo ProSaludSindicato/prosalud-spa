@@ -1,10 +1,12 @@
-const DEFAULT_DEBUG_ENABLED = import.meta.env.DEV;
+// Enable debug logs in development mode or when explicitly enabled
+const DEFAULT_DEBUG_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'development';
 const EXPLICIT_DEBUG_FLAG =
   typeof import.meta.env.VITE_APP_ENABLE_DEBUG_LOGS === "string"
     ? import.meta.env.VITE_APP_ENABLE_DEBUG_LOGS === "true"
     : false;
 
-const isDebugEnabled = DEFAULT_DEBUG_ENABLED || EXPLICIT_DEBUG_FLAG;
+// Always enable logs in development/test environments
+const isDebugEnabled = DEFAULT_DEBUG_ENABLED || EXPLICIT_DEBUG_FLAG || import.meta.env.MODE !== 'production';
 
 const originalConsole = {
   log: globalThis.console.log.bind(globalThis.console),
@@ -52,15 +54,20 @@ export const logger = {
     originalConsole.info(...redactSensitive(...args));
   },
   warn: (...args: unknown[]) => {
-    if (!isDebugEnabled) return;
-    originalConsole.warn(...redactSensitive(...args));
+    // Siempre mostrar warnings en desarrollo
+    if (isDebugEnabled || import.meta.env.DEV) {
+      originalConsole.warn(...redactSensitive(...args));
+    } else {
+      originalConsole.warn("Se registró un evento. Consulte el sistema de monitoreo para más detalles.");
+    }
   },
   error: (...args: unknown[]) => {
-    if (!isDebugEnabled) {
+    // Siempre mostrar errores, especialmente en desarrollo
+    if (isDebugEnabled || import.meta.env.DEV || import.meta.env.MODE !== 'production') {
+      originalConsole.error(...redactSensitive(...args));
+    } else {
       originalConsole.error("Se produjo un error. Consulte el sistema de monitoreo para más detalles.");
-      return;
     }
-    originalConsole.error(...redactSensitive(...args));
   },
 } as const;
 

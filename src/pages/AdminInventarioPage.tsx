@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,21 +28,23 @@ import HospitalRequests from '@/components/admin/inventario/HospitalRequests';
 import { InventoryProvider } from '@/context/InventoryContext';
 
 const AdminInventarioPage: React.FC = () => {
+  const { can } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [exportReportOpen, setExportReportOpen] = useState(false);
 
+  // Tabs con permisos requeridos
   const tabs = useMemo(
     () => [
-    { id: 'overview', label: 'Inicio', icon: BarChart3 },
-      { id: 'categories', label: 'Categorías', icon: Tag },
-    { id: 'products', label: 'Productos', icon: Package },
+    { id: 'overview', label: 'Inicio', icon: BarChart3, permission: 'inventory.view_dashboard' },
+      { id: 'categories', label: 'Categorías', icon: Tag, permission: 'inventory.categories.view' },
+    { id: 'products', label: 'Productos', icon: Package, permission: 'inventory.products.view' },
       // { id: 'deliveries', label: 'Entregas', icon: Truck },
-      { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList },
-    ],
-    [],
+      { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList, permission: 'hospital_requests.view' },
+    ].filter(tab => can(tab.permission)), // Filtrar tabs según permisos
+    [can],
   );
 
   const tabIds = useMemo(() => tabs.map((tab) => tab.id), [tabs]);
@@ -158,27 +161,35 @@ const AdminInventarioPage: React.FC = () => {
                   </div>
 
                   <div className="p-6 pt-0">
-                    <TabsContent value="overview" className="space-y-6 mt-0">
-                      <InventoryOverview />
-                    </TabsContent>
+                    {can('inventory.view_dashboard') && (
+                      <TabsContent value="overview" className="space-y-6 mt-0">
+                        <InventoryOverview />
+                      </TabsContent>
+                    )}
 
-                    <TabsContent value="categories" className="space-y-6 mt-0">
-                      <CategoryManagement />
-                    </TabsContent>
+                    {can('inventory.categories.view') && (
+                      <TabsContent value="categories" className="space-y-6 mt-0">
+                        <CategoryManagement />
+                      </TabsContent>
+                    )}
 
-                    <TabsContent value="products" className="space-y-6 mt-0">
-                      <InventoryProvider>
-                      <ProductManagement />
-                      </InventoryProvider>
-                    </TabsContent>
+                    {can('inventory.products.view') && (
+                      <TabsContent value="products" className="space-y-6 mt-0">
+                        <InventoryProvider>
+                        <ProductManagement />
+                        </InventoryProvider>
+                      </TabsContent>
+                    )}
 
                     {/* <TabsContent value="deliveries" className="space-y-6 mt-0">
                       <SupplierDeliveries />
                         </TabsContent> */}
 
-                    <TabsContent value="hospital-requests" className="space-y-6 mt-0">
-                      <HospitalRequests />
-                    </TabsContent>
+                    {can('hospital_requests.view') && (
+                      <TabsContent value="hospital-requests" className="space-y-6 mt-0">
+                        <HospitalRequests />
+                      </TabsContent>
+                    )}
 
                   </div>
                 </Tabs>

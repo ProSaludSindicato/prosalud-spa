@@ -144,8 +144,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         name: data.name,
         email: data.email,
         role: data.role,
-        password: data.password || 'ProSalud2024.*',
-        password_confirmation: data.password_confirmation || 'ProSalud2024.*',
+        password: data.password,
+        password_confirmation: data.password_confirmation,
       };
       createMutation.mutate(userData);
     }

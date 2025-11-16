@@ -20,6 +20,9 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminUsuariosPage from '@/pages/AdminUsuariosPage';
 import AdminRolesPage from '@/pages/AdminRolesPage';
+import AdminRolesListPage from '@/pages/AdminRolesListPage';
+import AdminRoleDetailPage from '@/pages/AdminRoleDetailPage';
+import AdminRoleEditPage from '@/pages/AdminRoleEditPage';
 import AdminSolicitudesPage from '@/pages/AdminSolicitudesPage';
 import AdminSolicitudBienestarPage from '@/pages/AdminSolicitudBienestarPage';
 import AdminInventarioPage from '@/pages/AdminInventarioPage';
@@ -51,6 +54,168 @@ import ContratoSindicalPage from '@/pages/ContratoSindicalPage';
 import EpsSuraPage from '@/pages/EpsSuraPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
+import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
+
+const AppContent = () => {
+  // Manejar errores de API globalmente (403, etc.)
+  useApiErrorHandler();
+  
+  return (
+    <div className="App">
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/nosotros" element={<AboutPage />} />
+        <Route path="/servicios" element={<ServiciosPage />} />
+        <Route path="/convenios" element={<ConveniosPage />} />
+        <Route path="/contacto" element={<ContactoPage />} />
+        <Route path="/servicios/incapacidades" element={<ConsultaIncapacidadPage />} />
+        <Route path="/servicios/liquidaciones" element={<ConsultaLiquidacionPage />} />
+        <Route path="/servicios/consulta-delegado" element={<ConsultaDelegadoPage />} />
+        <Route path="/servicios/beneficios-afiliado" element={<ConsultaAfiliadoPage />} />
+        <Route path="/servicios/chatbot" element={<ChatbotPage />} />
+        <Route path="/servicios/votaciones" element={<VotacionesPage />} />
+        <Route path="/servicios/requisitos-afiliacion" element={<RequisitosAfiliacionPage />} />
+        <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />
+
+        {/* Authentication Routes */}
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+
+        {/* Service Request Routes */}
+        <Route path="/servicios/auxilio-funerario" element={<SolicitudAuxilioFunerarioPage />} />
+        <Route path="/servicios/auxilio-educativo" element={<SolicitudAuxilioEducativoPage />} />
+        <Route path="/servicios/credito-vivienda" element={<SolicitudCreditoViviendaPage />} />
+        <Route path="/servicios/auxilio-lentes" element={<SolicitudAuxilioLentesPage />} />
+        <Route path="/servicios/permisos-turnos" element={<SolicitudPermisosCambioTurnosPage />} />
+        <Route path="/servicios/microcredito" element={<SolicitudMicrocreditoPage />} />
+        <Route path="/servicios/retiro-sindical" element={<SolicitudRetiroSindicalPage />} />
+        <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
+        <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
+
+        {/* Admin Routes - Protected */}
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        
+        <Route 
+          path="/admin/usuarios" 
+          element={
+            <ProtectedRoute requiredPermissions={['users.view']}>
+              <AdminUsuariosPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/roles" 
+          element={
+            <ProtectedRoute requiredPermissions={['roles.manage']}>
+              <AdminRolesListPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/roles/:id" 
+          element={
+            <ProtectedRoute requiredPermissions={['roles.manage']}>
+              <AdminRoleDetailPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/roles/:id/edit" 
+          element={
+            <ProtectedRoute requiredPermissions={['roles.manage']}>
+              <AdminRoleEditPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/roles/new" 
+          element={
+            <ProtectedRoute requiredPermissions={['roles.manage']}>
+              <AdminRolesPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/solicitudes" 
+          element={
+            <ProtectedRoute requiredPermissions={['requests.view']}>
+              <AdminSolicitudesPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/solicitudes-bienestar" 
+          element={
+            <ProtectedRoute requiredPermissions={['wellness_requests.view']}>
+              <AdminSolicitudBienestarPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/inventario" 
+          element={
+            <ProtectedRoute requiredPermissions={['inventory.view_dashboard', 'inventory.categories.view', 'inventory.products.view', 'inventory.entries.view', 'inventory.locations.view', 'inventory.stock_movements.view', 'hospital_requests.view']}>
+              <AdminInventarioPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/bienestar" 
+          element={
+            <ProtectedRoute requiredPermissions={['wellness_events.view']}>
+              <AdminBienestarPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/comfenalco" 
+          element={
+            <ProtectedRoute requiredPermissions={['comfenalco_events.view']}>
+              <AdminComfenalcoPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/chatbot" 
+          element={
+            <ProtectedRoute requiredPermissions={['chatbot.manage']}>
+              <AdminChatbotPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/votaciones" 
+          element={
+            <ProtectedRoute requiredPermissions={['votes.statistics.view', 'votes.audit.view']}>
+              <AdminVotacionesPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/admin/dotacion-epp" 
+          element={
+            <ProtectedRoute requiredPermissions={['dotacion.view']}>
+              <AdminSstPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* 404 Route */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
+  );
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,26 +265,122 @@ function App() {
             <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
             <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
 
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
-            <Route path="/admin/roles" element={<AdminRolesPage />} />
-            <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
-            <Route path="/admin/solicitudes-bienestar" element={<AdminSolicitudBienestarPage />} />
-            <Route path="/admin/inventario" element={<AdminInventarioPage />} />
-            <Route path="/admin/bienestar" element={<AdminBienestarPage />} />
-            <Route path="/admin/comfenalco" element={<AdminComfenalcoPage />} />
-            <Route path="/admin/chatbot" element={<AdminChatbotPage />} />
-            <Route path="/admin/votaciones" element={<AdminVotacionesPage />} />
-            <Route path="/admin/dotacion-epp" element={<AdminSstPage />} />
-
-            {/* Admin Routes
+            {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsuariosPage /></ProtectedRoute>} />
-            <Route path="/admin/solicitudes" element={<ProtectedRoute><AdminSolicitudesPage /></ProtectedRoute>} />
-            <Route path="/admin/inventario" element={<ProtectedRoute><AdminInventarioPage /></ProtectedRoute>} />
-            <Route path="/admin/bienestar" element={<ProtectedRoute><AdminBienestarPage /></ProtectedRoute>} />
-            <Route path="/admin/comfenalco" element={<ProtectedRoute><AdminComfenalcoPage /></ProtectedRoute>} />
-            */}
+            
+            <Route 
+              path="/admin/usuarios" 
+              element={
+                <ProtectedRoute requiredPermissions={['users.view']}>
+                  <AdminUsuariosPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/roles" 
+              element={
+                <ProtectedRoute requiredPermissions={['roles.manage']}>
+                  <AdminRolesListPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/roles/:id" 
+              element={
+                <ProtectedRoute requiredPermissions={['roles.manage']}>
+                  <AdminRoleDetailPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/roles/:id/edit" 
+              element={
+                <ProtectedRoute requiredPermissions={['roles.manage']}>
+                  <AdminRoleEditPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/roles/new" 
+              element={
+                <ProtectedRoute requiredPermissions={['roles.manage']}>
+                  <AdminRolesPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/solicitudes" 
+              element={
+                <ProtectedRoute requiredPermissions={['requests.view']}>
+                  <AdminSolicitudesPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/solicitudes-bienestar" 
+              element={
+                <ProtectedRoute requiredPermissions={['wellness_requests.view']}>
+                  <AdminSolicitudBienestarPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/inventario" 
+              element={
+                <ProtectedRoute requiredPermissions={['inventory.view_dashboard', 'inventory.categories.view', 'inventory.products.view', 'inventory.entries.view', 'inventory.locations.view', 'inventory.stock_movements.view', 'hospital_requests.view']}>
+                  <AdminInventarioPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/bienestar" 
+              element={
+                <ProtectedRoute requiredPermissions={['wellness_events.view']}>
+                  <AdminBienestarPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/comfenalco" 
+              element={
+                <ProtectedRoute requiredPermissions={['comfenalco_events.view']}>
+                  <AdminComfenalcoPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/chatbot" 
+              element={
+                <ProtectedRoute requiredPermissions={['chatbot.manage']}>
+                  <AdminChatbotPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/votaciones" 
+              element={
+                <ProtectedRoute requiredPermissions={['votes.statistics.view', 'votes.audit.view']}>
+                  <AdminVotacionesPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/dotacion-epp" 
+              element={
+                <ProtectedRoute requiredPermissions={['dotacion.view']}>
+                  <AdminSstPage />
+                </ProtectedRoute>
+              } 
+            />
 
             {/* 404 Route */}
             <Route path="*" element={<NotFound />} />

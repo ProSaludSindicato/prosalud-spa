@@ -1,20 +1,21 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import api from '@/services/api';
-
-export interface AuthUser {
-  id?: number | string;
-  name?: string;
-  email: string;
-  // Extiende según tu backend
-  [key: string]: any;
-}
+import { authService, AuthUser, LoginCredentials } from '@/services/authService';
+import { logger } from '@/utils/logger';
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  getUser: () => Promise<AuthUser | null>;
+  isAuthenticated: boolean;
+  login: (email: string, password: string, deviceName?: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  // Helpers de permisos
+  can: (permission: string) => boolean;
+  canAny: (permissions: string[]) => boolean;
+  canAll: (permissions: string[]) => boolean;
+  hasRole: (role: string) => boolean;
+  hasAnyRole: (roles: string[]) => boolean;
+  hasAllRoles: (roles: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,54 +24,321 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const getUser = useCallback(async () => {
+  /**
+   * Cargar usuario desde el backend usando el token almacenado
+   */
+  const loadUser = useCallback(async () => {
     try {
-      const { data } = await api.get<AuthUser>('/api/user');
-      setUser(data);
-      return data;
-    } catch {
-      setUser(null);
-      return null;
+      setLoading(true);
+      
+      // Verificar si hay token
+      const token = authService.getToken();
+      if (!token) {
+        logger.info('No token found in localStorage');
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      logger.info('Token found, attempting to load user', {
+        hasToken: !!token,
+        tokenLength: token.length,
+      });
+
+      // Primero, intentar cargar el usuario desde localStorage para UI instantánea
+      const cachedUser = authService.getUser();
+      if (cachedUser) {
+        logger.info('Cached user found, setting immediately for instant UI', { 
+          userId: cachedUser.id,
+          email: cachedUser.email,
+        });
+        setUser(cachedUser);
+        // NO poner loading en false aquí - esperar validación del backend
+      }
+
+      // Luego, validar con el backend
+      try {
+        logger.info('Validating token with backend...');
+        const userData = await authService.me();
+        
+        // Verificar si el usuario está activo
+        if (!userData.is_active) {
+          logger.warn('User account is not active', { userId: userData.id });
+          authService.clearSession();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Actualizar con datos frescos del backend
+        setUser(userData);
+        logger.info('User validated successfully with backend', { 
+          userId: userData.id,
+          email: userData.email,
+        });
+        setLoading(false);
+      } catch (error: any) {
+        const errorStatus = error.response?.status;
+        const errorMessage = error.message || '';
+        const isNetworkError = !errorStatus || errorStatus >= 500 || error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK';
+        
+        logger.warn('Error validating token with backend', {
+          status: errorStatus,
+          message: errorMessage,
+          isNetworkError,
+          url: error.config?.url,
+        });
+        
+        // Si es error de estructura de respuesta, mantener caché si existe
+        if (errorMessage.includes('Invalid response structure')) {
+          logger.error('Invalid response structure from backend', {
+            error: errorMessage,
+            cachedUser: cachedUser ? { id: cachedUser.id, email: cachedUser.email } : null,
+          });
+          // Si hay usuario en caché, mantenerlo
+          if (cachedUser) {
+            logger.info('Keeping cached user despite invalid response structure');
+            setUser(cachedUser);
+            setLoading(false);
+            return;
+          }
+          // Solo limpiar si no hay caché
+          authService.clearSession();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Si es 401 o 403, el token es inválido o la cuenta está desactivada
+        if (errorStatus === 401 || errorStatus === 403) {
+          logger.warn('Token invalid or account disabled, clearing session', {
+            status: errorStatus,
+            message: errorMessage,
+          });
+          authService.clearSession();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Para errores de red o timeout, mantener el usuario en caché si existe
+        if (isNetworkError || !errorStatus) {
+          if (cachedUser) {
+            logger.info('Network error but keeping cached user', {
+              error: errorMessage,
+              cachedUserId: cachedUser.id,
+            });
+            setUser(cachedUser);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Para otros errores (4xx que no sean 401/403), mantener caché si existe
+        if (cachedUser) {
+          logger.warn('Backend validation failed but keeping cached user', {
+            error: errorMessage,
+            status: errorStatus,
+            cachedUserId: cachedUser.id,
+          });
+          setUser(cachedUser);
+          setLoading(false);
+          return;
+        }
+        
+        // Si no hay usuario en caché y hay error, solo limpiar si es 401/403
+        if (errorStatus === 401 || errorStatus === 403) {
+          logger.error('No cached user and authentication failed', {
+            error: errorMessage,
+            status: errorStatus,
+          });
+          authService.clearSession();
+          setUser(null);
+        } else {
+          logger.warn('No cached user but error is not auth-related, keeping token', {
+            error: errorMessage,
+            status: errorStatus,
+          });
+        }
+        setLoading(false);
+      }
+    } catch (error: any) {
+      logger.error('Unexpected error in loadUser', {
+        error: error.message,
+        status: error.response?.status,
+      });
+      // Solo limpiar sesión si es error de autenticación explícito
+      const cachedUser = authService.getUser();
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        authService.clearSession();
+        setUser(null);
+      } else if (cachedUser) {
+        // Mantener usuario en caché para otros errores
+        setUser(cachedUser);
+      } else {
+        authService.clearSession();
+        setUser(null);
+      }
+      setLoading(false);
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    // 1) Asegura la cookie CSRF
-    await api.get('/sanctum/csrf-cookie');
-    // 2) Login
-    await api.post('/api/login', { email, password });
-    // 3) Cargar usuario
-    await getUser();
-  }, [getUser]);
+  /**
+   * Login con credenciales
+   */
+  const login = useCallback(async (email: string, password: string, deviceName?: string) => {
+    try {
+      const credentials: LoginCredentials = {
+        email,
+        password,
+        device_name: deviceName || 'Panel Admin',
+      };
 
+      const response = await authService.login(credentials);
+      
+      // Verificar si el usuario está activo
+      if (!response.user.is_active) {
+        authService.clearSession();
+        throw new Error('Tu cuenta está desactivada. Contacta al administrador.');
+      }
+
+      setUser(response.user);
+      logger.info('Login successful', { userId: response.user.id });
+    } catch (error: any) {
+      logger.error('Login failed', error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Logout
+   */
   const logout = useCallback(async () => {
     try {
-      await api.post('/api/logout');
-    } finally {
+      await authService.logout();
+      setUser(null);
+      logger.info('Logout successful');
+    } catch (error) {
+      logger.error('Logout failed', error);
+      // Limpiar sesión incluso si falla
+      authService.clearSession();
       setUser(null);
     }
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        // Importante: primero obtiene el CSRF cookie para peticiones seguras
-        await api.get('/sanctum/csrf-cookie');
-        if (!isMounted) return;
-        await getUser();
-      } catch {
-        // Ignorar
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [getUser]);
+  /**
+   * Refrescar usuario (útil después de actualizar permisos)
+   * 
+   * A diferencia de loadUser (que intenta usar caché primero),
+   * aquí forzamos una lectura fresca desde el backend para
+   * evitar quedarnos con permisos desactualizados.
+   */
+  const refreshUser = useCallback(async () => {
+    try {
+      logger.info('Refreshing user from backend (refreshUser)');
+      const userData = await authService.me();
 
-  const value = useMemo(() => ({ user, loading, login, getUser, logout }), [user, loading, login, getUser, logout]);
+      if (!userData.is_active) {
+        logger.warn('Refreshed user is not active, clearing session', { userId: userData.id });
+        authService.clearSession();
+        setUser(null);
+        return;
+      }
+
+      setUser(userData);
+      logger.info('User refreshed successfully', {
+        userId: userData.id,
+        email: userData.email,
+        roles: userData.roles,
+        permissionsCount: userData.permissions?.length || 0,
+      });
+    } catch (error: any) {
+      const status = error.response?.status;
+      logger.error('Failed to refresh user', {
+        status,
+        message: error.message,
+      });
+
+      // Si es 401/403 durante refresh explícito, limpiar sesión
+      if (status === 401 || status === 403) {
+        authService.clearSession();
+        setUser(null);
+      }
+    }
+  }, []);
+
+  /**
+   * Helper: Verificar si el usuario tiene un permiso específico
+   */
+  const can = useCallback((permission: string): boolean => {
+    if (!user) return false;
+    return user.permissions?.includes(permission) || false;
+  }, [user]);
+
+  /**
+   * Helper: Verificar si el usuario tiene alguno de los permisos
+   */
+  const canAny = useCallback((permissions: string[]): boolean => {
+    if (!user) return false;
+    return permissions.some(permission => user.permissions?.includes(permission));
+  }, [user]);
+
+  /**
+   * Helper: Verificar si el usuario tiene todos los permisos
+   */
+  const canAll = useCallback((permissions: string[]): boolean => {
+    if (!user) return false;
+    return permissions.every(permission => user.permissions?.includes(permission));
+  }, [user]);
+
+  /**
+   * Helper: Verificar si el usuario tiene un rol específico
+   */
+  const hasRole = useCallback((role: string): boolean => {
+    if (!user) return false;
+    return user.roles?.includes(role) || false;
+  }, [user]);
+
+  /**
+   * Helper: Verificar si el usuario tiene alguno de los roles
+   */
+  const hasAnyRole = useCallback((roles: string[]): boolean => {
+    if (!user) return false;
+    return roles.some(role => user.roles?.includes(role));
+  }, [user]);
+
+  /**
+   * Helper: Verificar si el usuario tiene todos los roles
+   */
+  const hasAllRoles = useCallback((roles: string[]): boolean => {
+    if (!user) return false;
+    return roles.every(role => user.roles?.includes(role));
+  }, [user]);
+
+  /**
+   * Cargar usuario al montar el componente
+   */
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isAuthenticated: !!user,
+      login,
+      logout,
+      refreshUser,
+      can,
+      canAny,
+      canAll,
+      hasRole,
+      hasAnyRole,
+      hasAllRoles,
+    }),
+    [user, loading, login, logout, refreshUser, can, canAny, canAll, hasRole, hasAnyRole, hasAllRoles]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

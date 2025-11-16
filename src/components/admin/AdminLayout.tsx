@@ -1,15 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, GraduationCap, BarChart3, Settings, Heart,
-  Menu, X, LogOut, Home, ChevronRight, ChevronLeft, ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck
+  Menu, X, LogOut, Home, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import UserProfileDropdown from './UserProfileDropdown';
 import { Toaster } from '@/components/ui/toaster';
+import { getVisibleModules, MODULES_CONFIG } from '@/config/permissions';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -58,28 +58,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   }, [location.pathname, DOTACION_ROUTE]);
 
-  const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: BarChart3 },
-    { name: 'Usuarios', href: '/admin/usuarios', icon: Users },
-    { name: 'Roles y Permisos', href: '/admin/roles', icon: Settings },
-    { name: 'Inventario', href: '/admin/inventario', icon: Package },
-    { name: 'Dotación y EPP', href: DOTACION_ROUTE, icon: ShieldCheck },
-    { name: 'Solicitudes', href: '/admin/solicitudes', icon: ClipboardList },
-    { name: 'Solicitudes Bienestar', href: '/admin/solicitudes-bienestar', icon: Heart },
-    { name: 'Galería Bienestar', href: '/admin/bienestar', icon: Images },
-    { name: 'Experiencias Comfenalco', href: '/admin/comfenalco', icon: GraduationCap },
-    { name: 'Chatbot', href: '/admin/chatbot', icon: MessageSquare },
-    { name: 'Votaciones Asamblea', href: '/admin/votaciones', icon: Vote },
-  ];
+  // Filtrar módulos según permisos del usuario
+  const navigation = useMemo(() => {
+    if (!user || !user.permissions) return [];
+    return getVisibleModules(user.permissions);
+  }, [user]);
 
-  const handleLogout = () => {
-    toast({
-      title: "Sesión cerrada",
-      description: "Has cerrado sesión exitosamente.",
-      variant: "default"
-    });
-    navigate('/login');
-  };
 
   const sidebarVariants = {
     closed: { x: '-100%' },
@@ -137,7 +121,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className={`flex-1 space-y-1 ${sidebarCollapsed ? 'px-2 py-3' : 'p-4'}`}>
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
+              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta
+              const isActive = location.pathname === item.href || 
+                              (location.pathname.startsWith(item.href) && item.href !== '/admin');
               return (
                 <Link
                   key={item.name}
@@ -211,7 +197,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4">
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
+              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta
+              const isActive = location.pathname === item.href || 
+                              (location.pathname.startsWith(item.href) && item.href !== '/admin');
               return (
                 <Link
                   key={item.name}
@@ -268,7 +256,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <Home className="h-4 w-4" />
               <ChevronRight className="h-4 w-4" />
               <span className="font-medium text-primary-prosalud">
-                {navigation.find(item => item.href === location.pathname)?.name || 'Dashboard'}
+                {navigation.find(item => 
+                  location.pathname === item.href || 
+                  (location.pathname.startsWith(item.href) && item.href !== '/admin')
+                )?.name || 'Dashboard'}
               </span>
             </div>
 

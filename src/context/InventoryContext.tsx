@@ -17,6 +17,7 @@ import {
 } from '@/types/inventory';
 import { inventoryApiService } from '@/services/inventoryApiService';
 import { logger } from '@/utils/logger';
+import { useAuth } from '@/context/AuthContext';
 
 interface InventoryContextValue {
   // Data
@@ -145,6 +146,9 @@ const fallbackHospitalOptions = [
 ];
 
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Verificar si el usuario está autenticado
+  const { user, loading: authLoading } = useAuth();
+  
   // Data states
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [products, setProducts] = useState<InventoryProduct[]>([]);
@@ -285,8 +289,20 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  // Initial data load
+  // Initial data load - Solo si el usuario está autenticado
   useEffect(() => {
+    // No hacer peticiones si aún se está cargando la autenticación
+    if (authLoading) {
+      return;
+    }
+    
+    // Solo hacer peticiones si el usuario está autenticado
+    if (!user) {
+      logger.debug('User not authenticated, skipping inventory data fetch');
+      return;
+    }
+    
+    logger.debug('User authenticated, fetching inventory data', { userId: user.id });
     refreshCategories();
     refreshProducts();
     refreshHospitalRequests();
@@ -294,7 +310,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshDashboard();
     fetchColors();
     refreshLocations();
-  }, [refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors, refreshLocations]);
+  }, [user, authLoading, refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors, refreshLocations]);
 
   // Category operations
   const addCategory = useCallback<InventoryContextValue['addCategory']>(

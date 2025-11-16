@@ -1,4 +1,5 @@
 import publicApi from './publicApi';
+import { authenticatedApi } from './api';
 import { logger } from '@/utils/logger';
 
 // Tipado laxo para evitar dependencias a tipos no presentes en el repo
@@ -35,12 +36,13 @@ export const chatbotApi = {
 
   /**
    * Lista conversaciones con filtros y paginación
+   * Usa authenticatedApi porque se llama desde el panel admin
    */
   async getConversations(
     filters?: ConversationFilters
   ): Promise<PaginatedResponse<ChatbotConversation>> {
     try {
-      const response = await publicApi.get<PaginatedResponse<ChatbotConversation>>(
+      const response = await authenticatedApi.get<PaginatedResponse<ChatbotConversation>>(
         '/api/chatbot-conversations',
         { params: filters }
       );

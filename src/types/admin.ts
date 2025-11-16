@@ -89,8 +89,10 @@ export interface UpdateUserData {
 export interface Role {
   id: number;
   name: string;
+  description?: string;
   guard_name: string;
   permissions: Permission[];
+  users?: Array<{ id: number; name: string; email: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -98,6 +100,7 @@ export interface Role {
 export interface Permission {
   id: number;
   name: string;
+  description?: string;
   guard_name?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { buildAdminApiUrl } from '@/config/api';
+import { authenticatedApi } from './api';
 import type {
   StatisticsResponse,
   AuditTrailResponse,
@@ -19,8 +18,8 @@ export const votacionesApi = {
     if (filters?.start_date) params.append('start_date', filters.start_date);
     if (filters?.end_date) params.append('end_date', filters.end_date);
     
-    const response = await axios.get<StatisticsResponse>(
-      buildAdminApiUrl('/api/votes/statistics'),
+    const response = await authenticatedApi.get<StatisticsResponse>(
+      '/api/votes/statistics',
       { params }
     );
     
@@ -38,8 +37,8 @@ export const votacionesApi = {
       params.append('hospital', hospital);
     }
     
-    const response = await axios.get<StatisticsResponse>(
-      buildAdminApiUrl('/api/votes/hospital-statistics'),
+    const response = await authenticatedApi.get<StatisticsResponse>(
+      '/api/votes/hospital-statistics',
       { params }
     );
     
@@ -59,8 +58,8 @@ export const votacionesApi = {
     
     // Intentar primero sin parámetros para ver si el backend devuelve todos los registros
     try {
-      const firstResponse = await axios.get<AuditTrailResponse>(
-        buildAdminApiUrl('/api/votes/audit-trail')
+      const firstResponse = await authenticatedApi.get<AuditTrailResponse>(
+        '/api/votes/audit-trail'
       );
       
       const firstData = firstResponse.data;
@@ -96,8 +95,8 @@ export const votacionesApi = {
     // Continuar obteniendo páginas si es necesario
     while (hasMorePages) {
       try {
-        const response = await axios.get<AuditTrailResponse>(
-          buildAdminApiUrl('/api/votes/audit-trail'),
+        const response = await authenticatedApi.get<AuditTrailResponse>(
+          '/api/votes/audit-trail',
           { params: { page: currentPage, per_page: perPage } }
         );
         

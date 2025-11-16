@@ -4,223 +4,75 @@ export { usersApiAdapter as usersApi } from './usersApiAdapter';
 export { inventoryService } from './inventoryService';
 export { solicitudesService } from './solicitudesService';
 
-// Keep existing bienestar and comfenalco APIs as they were
+// Import real APIs
 import { 
+  getWellnessEvents, 
+  createWellnessEvent, 
+  updateWellnessEvent,
+  toggleWellnessEventVisibility 
+} from './wellnessEventsApi';
+import { comfenalcoEventsApi } from './comfenalcoEventsApi';
+import type { 
   BienestarEvent, 
-  ComfenalcoEvent, 
-  AboutUs, 
-  SiteMetrics,
   CreateBienestarEventData,
-  CreateComfenalcoEventData
+  AboutUs,
+  SiteMetrics
 } from '@/types/admin';
-
-// Mock data for events
-const mockBienestarEvents: BienestarEvent[] = [
-  {
-    id: '1',
-    title: 'Jornada de Vacunación COVID-19',
-    date: '2024-06-15',
-    category: 'Salud',
-    description: 'Jornada especial de vacunación para todo el personal de salud',
-    location: 'Sede Principal ProSalud',
-    attendees: 150,
-    gift: 'Kit de bioseguridad',
-    provider: 'ProSalud',
-    images: [
-      { url: '/images/galeria_bienestar/evento1_1.webp', alt: 'Vacunación', isMain: true },
-      { url: '/images/galeria_bienestar/evento1_2.webp', alt: 'Personal médico', isMain: false }
-    ],
-    isVisible: true,
-    createdAt: '2024-06-01'
-  },
-  {
-    id: '2',
-    title: 'Capacitación en Bioseguridad',
-    date: '2024-06-20',
-    category: 'Capacitación',
-    description: 'Capacitación especializada en protocolos de bioseguridad hospitalaria',
-    location: 'Hospital Marco Fidel Suárez',
-    attendees: 80,
-    gift: 'Manual de bioseguridad',
-    provider: 'ProSalud',
-    images: [
-      { url: '/images/galeria_bienestar/evento2_1.webp', alt: 'Capacitación', isMain: true }
-    ],
-    isVisible: true,
-    createdAt: '2024-06-05'
-  },
-  {
-    id: '3',
-    title: 'Jornada de Bienestar Familiar',
-    date: '2024-06-25',
-    category: 'Recreation',
-    description: 'Día de integración familiar para los afiliados y sus familias',
-    location: 'Parque Recreativo',
-    attendees: 200,
-    gift: 'Kit familiar recreativo',
-    provider: 'ProSalud',
-    images: [
-      { url: '/images/galeria_bienestar/evento3_1.webp', alt: 'Familia', isMain: true },
-      { url: '/images/galeria_bienestar/evento3_2.webp', alt: 'Niños jugando', isMain: false }
-    ],
-    isVisible: true,
-    createdAt: '2024-06-10'
-  }
-];
-
-const mockComfenalcoEvents: ComfenalcoEvent[] = [
-  {
-    id: '1',
-    title: 'Curso de Primeros Auxilios',
-    bannerImage: '/images/comfenalco_banners/banner1.webp',
-    description: 'Aprende técnicas básicas de primeros auxilios',
-    publishDate: '2024-06-01',
-    registrationDeadline: '2024-06-20',
-    eventDate: '2024-06-25',
-    registrationLink: 'https://comfenalco.com/registro1',
-    formLink: 'https://forms.comfenalco.com/primeros-auxilios',
-    isNew: true,
-    category: 'curso',
-    displaySize: 'carousel',
-    isVisible: true
-  },
-  {
-    id: '2',
-    title: 'Taller de Liderazgo en Salud',
-    bannerImage: '/images/comfenalco_banners/banner2.webp',
-    description: 'Desarrolla habilidades de liderazgo en el sector salud',
-    publishDate: '2024-06-05',
-    registrationDeadline: '2024-06-25',
-    eventDate: '2024-06-30',
-    registrationLink: 'https://comfenalco.com/registro2',
-    formLink: 'https://forms.comfenalco.com/liderazgo-salud',
-    isNew: true,
-    category: 'taller',
-    displaySize: 'mosaic',
-    isVisible: true
-  },
-  {
-    id: '3',
-    title: 'Diplomado en Gestión Hospitalaria',
-    bannerImage: '/images/comfenalco_banners/banner3.webp',
-    description: 'Especialízate en gestión y administración hospitalaria',
-    publishDate: '2024-06-10',
-    registrationDeadline: '2024-07-01',
-    eventDate: '2024-07-15',
-    registrationLink: 'https://comfenalco.com/registro3',
-    formLink: 'https://forms.comfenalco.com/gestion-hospitalaria',
-    isNew: false,
-    category: 'diplomado',
-    displaySize: 'carousel',
-    isVisible: true
-  }
-];
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Bienestar Events API
+// Create adapter for bienestarApi to match the expected interface
 export const bienestarApi = {
   async getEvents(): Promise<BienestarEvent[]> {
-    await delay(400);
-    return [...mockBienestarEvents];
+    return getWellnessEvents();
   },
 
   async createEvent(data: CreateBienestarEventData): Promise<BienestarEvent> {
-    await delay(1000);
-    const images = data.images.map((file, index) => ({
-      url: URL.createObjectURL(file),
-      alt: `Imagen ${index + 1}`,
-      isMain: index === data.mainImageIndex
-    }));
-
-    const newEvent: BienestarEvent = {
-      id: String(mockBienestarEvents.length + 1),
+    // Convert CreateBienestarEventData to CreateWellnessEventData format
+    const wellnessData = {
       title: data.title,
       date: data.date,
       category: data.category,
+      location: data.location || '', // Required in CreateWellnessEventData
       description: data.description,
-      location: data.location,
       attendees: data.attendees,
       gift: data.gift,
-      provider: data.provider || 'ProSalud',
-      images,
-      isVisible: true,
-      createdAt: new Date().toISOString().split('T')[0]
+      images: data.images,
+      is_visible: true, // Default to visible
     };
     
-    mockBienestarEvents.push(newEvent);
-    return newEvent;
+    return createWellnessEvent(wellnessData);
   },
 
   async updateEvent(id: string, data: Partial<CreateBienestarEventData & { isVisible: boolean }>): Promise<BienestarEvent> {
-    await delay(800);
-    const eventIndex = mockBienestarEvents.findIndex(event => event.id === id);
-    if (eventIndex === -1) throw new Error('Evento no encontrado');
+    // Convert to UpdateWellnessEventData format
+    const updateData: any = {};
     
-    const updatedData: any = { ...data };
-    if (data.images) {
-      updatedData.images = data.images.map((file, index) => ({
-        url: URL.createObjectURL(file),
-        alt: `Imagen ${index + 1}`,
-        isMain: index === data.mainImageIndex
-      }));
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.date !== undefined) updateData.date = data.date;
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.attendees !== undefined) updateData.attendees = data.attendees;
+    if (data.gift !== undefined) updateData.gift = data.gift;
+    if (data.provider !== undefined) updateData.provider = data.provider;
+    if (data.images !== undefined) updateData.images = data.images;
+    
+    // Convert isVisible to is_visible format
+    if ('isVisible' in data) {
+      updateData.is_visible = data.isVisible;
     }
     
-    mockBienestarEvents[eventIndex] = { ...mockBienestarEvents[eventIndex], ...updatedData };
-    return mockBienestarEvents[eventIndex];
+    return updateWellnessEvent(Number(id), updateData);
+  },
+
+  async toggleVisibility(id: string, isVisible: boolean): Promise<BienestarEvent> {
+    return toggleWellnessEventVisibility(Number(id), isVisible);
   }
 };
 
-// Comfenalco Events API
-export const comfenalcoApi = {
-  async getEvents(): Promise<ComfenalcoEvent[]> {
-    await delay(400);
-    return [...mockComfenalcoEvents];
-  },
-
-  async createEvent(data: CreateComfenalcoEventData): Promise<ComfenalcoEvent> {
-    await delay(1000);
-    
-    let bannerImageUrl = '';
-    if (data.bannerImage) {
-      bannerImageUrl = URL.createObjectURL(data.bannerImage);
-    }
-    
-    const newEvent: ComfenalcoEvent = {
-      id: String(mockComfenalcoEvents.length + 1),
-      title: data.title,
-      bannerImage: bannerImageUrl,
-      description: data.description,
-      publishDate: new Date().toISOString().split('T')[0],
-      registrationDeadline: data.registrationDeadline,
-      eventDate: data.eventDate,
-      registrationLink: data.registrationLink,
-      formLink: data.formLink,
-      isNew: true,
-      category: data.category,
-      displaySize: data.displaySize,
-      isVisible: true
-    };
-    
-    mockComfenalcoEvents.push(newEvent);
-    return newEvent;
-  },
-
-  async updateEvent(id: string, data: Partial<CreateComfenalcoEventData & { isVisible: boolean }>): Promise<ComfenalcoEvent> {
-    await delay(800);
-    const eventIndex = mockComfenalcoEvents.findIndex(event => event.id === id);
-    if (eventIndex === -1) throw new Error('Evento no encontrado');
-    
-    const updatedData: any = { ...data };
-    
-    if (data.bannerImage && data.bannerImage instanceof File) {
-      updatedData.bannerImage = URL.createObjectURL(data.bannerImage);
-    }
-    
-    mockComfenalcoEvents[eventIndex] = { ...mockComfenalcoEvents[eventIndex], ...updatedData };
-    return mockComfenalcoEvents[eventIndex];
-  }
-};
+// Export comfenalco API directly (already has compatible interface)
+export { comfenalcoEventsApi as comfenalcoApi };
 
 // Site Configuration API
 export const configApi = {

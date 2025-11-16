@@ -1,17 +1,9 @@
-import axios from "axios";
-import { API_CONFIG } from "../config/api";
+import { authenticatedApi } from "./api";
 import { getErrorMessage } from "@/utils/errorSanitizer";
 import { logger } from "@/utils/logger";
 
-// API client for requests endpoints (no authentication required)
-const requestsApi = axios.create({
-  baseURL: `${API_CONFIG.ADMIN_BASE_URL}/api`,
-  withCredentials: false,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-});
+// Use authenticated API client for requests endpoints
+const requestsApi = authenticatedApi;
 
 // Request and response interfaces based on the API documentation
 export interface ApiRequestResponse {
@@ -110,7 +102,7 @@ export const requestsApiService = {
   // Get all requests
   async getAllRequests(): Promise<ApiRequest[]> {
     try {
-      const response = await requestsApi.get<ApiResponse<ApiRequest[]>>("/requests");
+      const response = await requestsApi.get<ApiResponse<ApiRequest[]>>("/api/requests");
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Error al obtener solicitudes");
@@ -126,7 +118,7 @@ export const requestsApiService = {
   // Get specific request by ID
   async getRequestById(id: number): Promise<ApiRequest> {
     try {
-      const response = await requestsApi.get<ApiResponse<ApiRequest>>(`/requests/${id}`);
+      const response = await requestsApi.get<ApiResponse<ApiRequest>>(`/api/requests/${id}`);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Error al obtener la solicitud");
@@ -145,7 +137,7 @@ export const requestsApiService = {
     status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED",
   ): Promise<ApiRequest> {
     try {
-      const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/requests/${id}/status`, {
+      const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/api/requests/${id}/status`, {
         status,
       });
 
@@ -189,7 +181,7 @@ export const requestsApiService = {
         });
 
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
-          `/requests/${id}/respond`,
+          `/api/requests/${id}/respond`,
           formData,
           {
             headers: {
@@ -217,7 +209,7 @@ export const requestsApiService = {
       } else {
         // Sin archivos, usar JSON
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
-          `/requests/${id}/respond`,
+          `/api/requests/${id}/respond`,
           {
             status: data.status,
             email_subject: data.email_subject,
@@ -267,7 +259,7 @@ export const requestsApiService = {
       }
 
       const response = await requestsApi.get(
-        `/requests/${requestId}/files/${fileKey}`,
+        `/api/requests/${requestId}/files/${fileKey}`,
         {
           responseType: 'blob', // Important: specify blob response type
         }

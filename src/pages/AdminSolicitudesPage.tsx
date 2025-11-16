@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +90,7 @@ const responseFormSchema = z.object({
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
 
 const AdminSolicitudesPage: React.FC = () => {
+  const { can } = usePermissions();
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
@@ -835,7 +837,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
-                                    {(solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                    {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
                                       <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
                                         Dar Respuesta

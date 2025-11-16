@@ -1,17 +1,9 @@
-import axios from 'axios';
-import { API_CONFIG } from '../config/api';
+import { authenticatedApi } from './api';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 import { logger } from '@/utils/logger';
 
-// API client for wellness requests endpoints
-const wellnessRequestsApi = axios.create({
-  baseURL: API_CONFIG.ADMIN_BASE_URL,
-  withCredentials: false,
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-});
+// Use authenticated API instance
+const wellnessRequestsApi = authenticatedApi;
 
 // Request and response interfaces
 export interface WellnessRequestDetail {

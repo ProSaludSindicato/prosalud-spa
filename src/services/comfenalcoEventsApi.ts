@@ -60,6 +60,16 @@ const handleApiError = async (response: Response): Promise<never> => {
   );
 };
 
+// Helper para agregar token Bearer a las peticiones fetch
+const getAuthHeaders = (additionalHeaders?: HeadersInit): HeadersInit => {
+  const token = localStorage.getItem('prosalud_auth_token');
+  return {
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(additionalHeaders ?? {}),
+  };
+};
+
 const createFormData = (data: CreateComfenalcoEventData): FormData => {
   const formData = new FormData();
   
@@ -103,9 +113,7 @@ export const comfenalcoEventsApi = {
     try {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS), {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -148,9 +156,7 @@ export const comfenalcoEventsApi = {
     try {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -195,9 +201,7 @@ export const comfenalcoEventsApi = {
       
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS), {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(), // No incluir Content-Type para FormData, el navegador lo hace automáticamente
         body: formData,
       });
 
@@ -242,10 +246,9 @@ export const comfenalcoEventsApi = {
     try {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
         method: 'PUT',
-        headers: {
+        headers: getAuthHeaders({
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        }),
         body: JSON.stringify(data),
       });
 
@@ -289,10 +292,9 @@ export const comfenalcoEventsApi = {
     try {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}/visibility`, {
         method: 'PATCH',
-        headers: {
+        headers: getAuthHeaders({
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        }),
         body: JSON.stringify({ is_visible: isVisible }),
       });
 
@@ -336,9 +338,7 @@ export const comfenalcoEventsApi = {
     try {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

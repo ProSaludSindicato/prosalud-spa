@@ -14,28 +14,17 @@ import { motion } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/context/AuthContext"
 
-// Enhanced validation schema with stronger security requirements
+// Validation schema
 const formSchema = z.object({
-  emailOrUser: z
+  email: z
     .string()
-    .min(1, { message: "El email o usuario es requerido." })
-    .max(100, { message: "El email o usuario es demasiado largo." })
-    .refine(
-      (val) => {
-        // Basic validation for email format or username
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        const usernameRegex = /^[a-zA-Z0-9_.-]+$/
-        return emailRegex.test(val) || usernameRegex.test(val)
-      },
-      { message: "Formato de email o usuario inválido." },
-    ),
+    .min(1, { message: "El email es requerido." })
+    .email({ message: "Formato de email inválido." })
+    .max(100, { message: "El email es demasiado largo." }),
   password: z
     .string()
-    .min(8, { message: "La contraseña debe tener al menos 8 caracteres." })
-    .max(128, { message: "La contraseña es demasiado larga." })
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-      message: "La contraseña debe contener al menos una mayúscula, una minúscula y un número.",
-    }),
+    .min(1, { message: "La contraseña es requerida." })
+    .max(128, { message: "La contraseña es demasiado larga." }),
 })
 
 type LoginFormValues = z.infer<typeof formSchema>
@@ -44,7 +33,7 @@ const LoginForm: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [loginAttempts, setLoginAttempts] = React.useState(0)
-  const maxLoginAttempts = 3
+  const maxLoginAttempts = 5
   
   const navigate = useNavigate()
   const location = useLocation()
@@ -54,7 +43,7 @@ const LoginForm: React.FC = () => {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      emailOrUser: "",
+      email: "",
       password: "",
     },
   })
@@ -70,7 +59,7 @@ const LoginForm: React.FC = () => {
     setIsSubmitting(true)
 
     try {
-      await login(values.emailOrUser, values.password)
+      await login(values.email, values.password, "Panel Admin")
 
       toast({
         title: "¡Bienvenido!",
@@ -80,9 +69,15 @@ const LoginForm: React.FC = () => {
       const from = (location.state as any)?.from?.pathname || '/admin'
       navigate(from, { replace: true })
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Credenciales inválidas o error de autenticación.'
+      const message = error?.message || 'Credenciales inválidas o error de autenticación.'
       form.setError("root", { message })
       setLoginAttempts((prev) => prev + 1)
+      
+      toast({
+        title: "Error de autenticación",
+        description: message,
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -133,21 +128,19 @@ const LoginForm: React.FC = () => {
       <motion.div variants={itemVariants} className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary-prosalud">Inicia sesión</h1>
         <p className="text-muted-foreground mt-2">Bienvenido, ingresa tus datos para continuar.</p>
-        <p className="text-xs text-slate-500 mt-2">
-          Demo: admin@prosalud.com / ProSalud2024
-        </p>
       </motion.div>
       <Form {...form}>
         <motion.form variants={formVariants} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <motion.div variants={itemVariants}>
             <FormField
               control={form.control}
-              name="emailOrUser"
+              name="email"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input
+                      type="email"
                       placeholder="tu@correo.com"
                       {...field}
                       autoComplete="email"
@@ -201,7 +194,7 @@ const LoginForm: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-sm text-amber-600"
             >
-              Intento {loginAttempts} de {maxLoginAttempts}.{maxLoginAttempts - loginAttempts} intentos restantes.
+              Intento {loginAttempts} de {maxLoginAttempts}. (Quedan {maxLoginAttempts - loginAttempts} intentos restantes).
             </motion.div>
           )}
 

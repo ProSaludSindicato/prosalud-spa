@@ -200,7 +200,6 @@ const LoginPage: React.FC = () => {
               >
                 <motion.div
                   variants={floatingIconVariants}
-                  animate="animate"
                   className={`w-10 h-10 ${feature.bgColor} rounded-lg flex items-center justify-center mb-3 mx-auto`}
                 >
                   {feature.icon}

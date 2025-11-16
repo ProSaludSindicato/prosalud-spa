@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +73,7 @@ interface ActionMenuProps {
   onChangeStatus: (s: WellnessRequest) => void;
   onAddActivityRealized?: (s: WellnessRequest) => void;
   onReviewActivity?: (s: WellnessRequest) => void;
+  can: (permission: string) => boolean;
 }
 
 const ActionMenu: React.FC<ActionMenuProps> = ({ 
@@ -81,6 +83,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   onChangeStatus,
   onAddActivityRealized,
   onReviewActivity,
+  can,
 }) => {
   const canEditSolicitud = (s: WellnessRequest): boolean => {
     return s.estado === 'pending' || s.estado === 'in_progress';
@@ -93,6 +96,19 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   const isActivityProcessed = hasActivityRealized && 
     (solicitud.actividad_realizada.publicado_en_galeria !== null && 
      solicitud.actividad_realizada.publicado_en_galeria !== undefined);
+
+  const canEdit = can('wellness_requests.edit') && canEditSolicitud(solicitud);
+  const canChangeStatus = can('wellness_requests.update_status') && !isApproved;
+  const canAddActivityAction =
+    can('wellness_requests.edit') && canAddActivity && !hasActivityRealized && !!onAddActivityRealized;
+  const canReviewActivityAction =
+    can('wellness_activity.publish') && hasActivityRealized && !isActivityProcessed && !!onReviewActivity;
+
+  const hasAnyAction = canEdit || canChangeStatus || canAddActivityAction || canReviewActivityAction;
+
+  if (!hasAnyAction) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -113,25 +129,25 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
           <Eye className="h-4 w-4 mr-2" />
           Ver Detalles
         </DropdownMenuItem>
-        {canEditSolicitud(solicitud) && (
+        {canEdit && (
           <DropdownMenuItem onClick={() => onEdit(solicitud)}>
             <Pencil className="h-4 w-4 mr-2" />
             Editar
           </DropdownMenuItem>
         )}
-        {!isApproved && (
+        {canChangeStatus && (
           <DropdownMenuItem onClick={() => onChangeStatus(solicitud)}>
             <Send className="h-4 w-4 mr-2" />
             Cambiar Estado
           </DropdownMenuItem>
         )}
-        {canAddActivity && !hasActivityRealized && onAddActivityRealized && (
+        {canAddActivityAction && onAddActivityRealized && (
           <DropdownMenuItem onClick={() => onAddActivityRealized(solicitud)}>
             <Plus className="h-4 w-4 mr-2" />
             Agregar Actividad Realizada
           </DropdownMenuItem>
         )}
-        {hasActivityRealized && !isActivityProcessed && onReviewActivity && (
+        {canReviewActivityAction && onReviewActivity && (
           <DropdownMenuItem onClick={() => onReviewActivity(solicitud)}>
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Revisar y Publicar
@@ -143,6 +159,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 };
 
 const AdminSolicitudBienestarPage: React.FC = () => {
+  const { can } = usePermissions();
   const [selectedSolicitud, setSelectedSolicitud] = useState<WellnessRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [solicitudToRespond, setSolicitudToRespond] = useState<WellnessRequest | null>(null);
@@ -459,13 +476,15 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => setShowCreateForm(true)}
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Solicitud
-                  </Button>
+                  {can('wellness_requests.create') && (
+                    <Button
+                      onClick={() => setShowCreateForm(true)}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva Solicitud
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
             </Card>
@@ -766,6 +785,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                   onChangeStatus={handleOpenStatusDialog}
                                   onAddActivityRealized={handleAddActivityRealized}
                                   onReviewActivity={handleReviewActivity}
+                                  can={can}
                                 />
                               </TableCell>
                             </TableRow>

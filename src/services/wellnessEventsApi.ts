@@ -1,4 +1,4 @@
-import api from './api';
+import { authenticatedApi as api } from './api';
 import { API_CONFIG } from '../config/api';
 import { BienestarEvent } from '@/types/admin';
 import { logger } from '@/utils/logger';

@@ -104,7 +104,7 @@ const ForgotPasswordForm: React.FC = () => {
         </div>
 
         <motion.div variants={itemVariants}>
-          <Link to="/login">
+          <Link to="/auth/login">
             <Button variant="outline" className="w-full">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver al inicio de sesión
@@ -172,7 +172,7 @@ const ForgotPasswordForm: React.FC = () => {
 
           <motion.div variants={itemVariants} className="text-center">
             <Link
-              to="/login"
+              to="/auth/login"
               className="text-sm text-primary-prosalud hover:underline inline-flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />

@@ -69,25 +69,20 @@ class AuthService {
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Si recibimos 401, limpiamos la sesión
+        // Si recibimos 401, NO limpiar sesión aquí
+        // Dejar que AuthContext maneje la limpieza de sesión completamente
         if (error.response?.status === 401) {
-          logger.warn('Unauthorized request', {
-            url: error.config?.url,
-            status: error.response?.status,
-          });
-          
-          // No limpiar sesión ni redirigir si estamos validando el token al cargar
-          // La lógica de limpieza la maneja AuthContext
           const isAuthMeRequest = error.config?.url?.includes('/api/auth/me');
           
-          if (!isAuthMeRequest) {
-            this.clearSession();
-            
-            // Redirigir al login solo si no estamos ya ahí
-            if (!window.location.pathname.includes('/auth/login')) {
-              window.location.href = '/auth/login';
-            }
-          }
+          logger.warn('Unauthorized request in authService', {
+            url: error.config?.url,
+            status: error.response?.status,
+            isAuthMeRequest,
+            currentPath: window.location.pathname,
+          });
+          
+          // NO hacer nada aquí - dejar que AuthContext maneje todo
+          // Esto evita limpiar la sesión prematuramente
         }
 
         // Si recibimos 403 cuenta desactivada
@@ -145,29 +140,76 @@ class AuthService {
       logger.info('Fetching current user from backend');
       const response = await this.api.get('/api/auth/me');
       
+      // Log la respuesta completa para debugging
+      logger.debug('Response from /api/auth/me', {
+        status: response.status,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+      });
+      
       // Manejar diferentes estructuras de respuesta
-      let userData: AuthUser;
+      let userData: AuthUser | null = null;
       
-      // Si la respuesta tiene data.data (respuesta envuelta)
-      if (response.data?.data) {
+      // Opción 1: Respuesta envuelta { data: { user } }
+      if (response.data?.data && typeof response.data.data === 'object') {
         userData = response.data.data;
+        logger.debug('Using response.data.data structure');
       } 
-      // Si la respuesta es directamente el objeto usuario
-      else if (response.data?.id || response.data?.email) {
-        userData = response.data;
+      // Opción 2: Respuesta directa { id, name, email, ... }
+      else if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        // Verificar que tenga al menos un campo de usuario
+        if (response.data.id || response.data.email || response.data.name) {
+          userData = response.data;
+          logger.debug('Using direct response.data structure');
+        }
       }
-      // Si no tiene la estructura esperada
-      else {
-        throw new Error('Invalid response structure from /api/auth/me');
+      // Opción 3: Respuesta con success wrapper { success: true, data: { user } }
+      else if (response.data?.success && response.data?.data) {
+        userData = response.data.data;
+        logger.debug('Using success wrapper structure');
       }
       
-      logger.info('User fetched successfully', { userId: userData.id });
+      // Si no se pudo extraer el usuario, lanzar error con detalles
+      if (!userData) {
+        logger.error('Invalid response structure from /api/auth/me', {
+          responseData: response.data,
+          responseStatus: response.status,
+          responseHeaders: response.headers,
+        });
+        throw new Error(`Invalid response structure from /api/auth/me. Received: ${JSON.stringify(response.data)}`);
+      }
+      
+      // Validar que el usuario tenga los campos mínimos requeridos
+      if (!userData.id && !userData.email) {
+        logger.error('User data missing required fields', { userData });
+        throw new Error('User data missing required fields (id or email)');
+      }
+      
+      // Asegurar que roles y permissions sean arrays
+      if (!Array.isArray(userData.roles)) {
+        userData.roles = [];
+      }
+      if (!Array.isArray(userData.permissions)) {
+        userData.permissions = [];
+      }
+      
+      logger.info('User fetched successfully', { 
+        userId: userData.id,
+        email: userData.email,
+        rolesCount: userData.roles?.length || 0,
+        permissionsCount: userData.permissions?.length || 0,
+      });
+      
       this.setUser(userData);
       return userData;
     } catch (error: any) {
       logger.error('Failed to fetch current user', {
         status: error.response?.status,
-        message: error.response?.data?.message,
+        statusText: error.response?.statusText,
+        message: error.message,
+        responseData: error.response?.data,
         url: error.config?.url,
       });
       throw error;
@@ -197,8 +239,14 @@ class AuthService {
    */
   getToken(): string | null {
     try {
-      return localStorage.getItem(TOKEN_KEY);
-    } catch {
+      const token = localStorage.getItem(TOKEN_KEY);
+      logger.debug('Getting token from localStorage', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+      });
+      return token;
+    } catch (error) {
+      logger.error('Failed to get token from localStorage', error);
       return null;
     }
   }
@@ -206,8 +254,12 @@ class AuthService {
   setToken(token: string): void {
     try {
       localStorage.setItem(TOKEN_KEY, token);
+      logger.info('Token saved to localStorage', {
+        tokenLength: token.length,
+        tokenPreview: token.substring(0, 10) + '...',
+      });
     } catch (error) {
-      logger.error('Failed to save token', error);
+      logger.error('Failed to save token to localStorage', error);
     }
   }
 
@@ -259,7 +311,13 @@ class AuthService {
    * Verificar si hay una sesión activa
    */
   hasActiveSession(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    const hasSession = !!token;
+    logger.debug('Checking active session', {
+      hasSession,
+      tokenLength: token?.length || 0,
+    });
+    return hasSession;
   }
 
   /**

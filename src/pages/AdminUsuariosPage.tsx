@@ -23,8 +23,11 @@ import { usersApi } from '@/services/adminApi';
 import { User } from '@/types/admin';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PermissionGuard } from '@/components/permissions/PermissionGuard';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const AdminUsuariosPage: React.FC = () => {
+  const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
@@ -131,13 +134,15 @@ const AdminUsuariosPage: React.FC = () => {
                     </div>
                   </div>
                   {activeTab === 'users' && (
-                  <Button
-                    onClick={handleCreate}
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Nuevo Usuario
-                  </Button>
+                  <PermissionGuard permissions={['users.create']}>
+                    <Button
+                      onClick={handleCreate}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Nuevo Usuario
+                    </Button>
+                  </PermissionGuard>
                   )}
                 </div>
               </CardHeader>
@@ -266,35 +271,42 @@ const AdminUsuariosPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(user)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleToggleStatus(user)}
-                              className={user.isActive ? "text-red-600" : "text-green-600"}
-                            >
-                              {user.isActive ? (
-                                <>
-                                  <UserX className="h-4 w-4 mr-2" />
-                                  Desactivar
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-4 w-4 mr-2" />
-                                  Activar
-                                </>
+                        {/** Mostrar menú solo si hay al menos una acción permitida */} 
+                        {(can('users.edit') || can('users.change_status')) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {can('users.edit') && (
+                                <DropdownMenuItem onClick={() => handleEdit(user)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
                               )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              {can('users.change_status') && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleToggleStatus(user)}
+                                  className={user.isActive ? "text-red-600" : "text-green-600"}
+                                >
+                                  {user.isActive ? (
+                                    <>
+                                      <UserX className="h-4 w-4 mr-2" />
+                                      Desactivar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="h-4 w-4 mr-2" />
+                                      Activar
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </div>
                   ))}

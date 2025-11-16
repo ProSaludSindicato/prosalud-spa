@@ -1,5 +1,4 @@
-import api from './api';
-import { buildAdminApiUrl } from '@/config/api';
+import { authenticatedApi as api } from './api';
 import { logger } from '@/utils/logger';
 import type {
   InventoryCategory,
@@ -418,11 +417,20 @@ export const inventoryApiService = {
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/dashboard`);
-      logger.debug('Fetching dashboard data', { url });
+      const endpoint = `${BASE_PATH}/dashboard`;
+      logger.debug('Fetching dashboard data', { endpoint });
       
-      const response = await api.get<ApiSingleResponse<DashboardData>>(url);
-      return response.data.data;
+      const response = await api.get<{ success: boolean; data: DashboardData } | ApiSingleResponse<DashboardData>>(endpoint);
+      
+      // Manejar diferentes estructuras de respuesta
+      if (response.data && 'success' in response.data && response.data.success) {
+        return response.data.data;
+      } else if (response.data && 'data' in response.data) {
+        return response.data.data;
+      } else {
+        // Si la respuesta es directamente el objeto DashboardData
+        return response.data as DashboardData;
+      }
     } catch (error) {
       logger.error('Error fetching dashboard data', error);
       throw error;
@@ -433,17 +441,36 @@ export const inventoryApiService = {
   async getCategories(params: GetCategoriesParams = {}): Promise<ApiPaginatedResponse<InventoryCategory>> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching categories', { url, params });
+      const endpoint = `${BASE_PATH}/categories${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching categories', { endpoint, params });
       
-      const response = await api.get<ApiPaginatedResponse<InventoryCategory>>(url);
+      const response = await api.get<{ success: boolean; data: InventoryCategory[]; pagination?: any } | ApiPaginatedResponse<InventoryCategory>>(endpoint);
+      
+      // Manejar diferentes estructuras de respuesta
+      let categoriesData: InventoryCategory[];
+      let paginationData: any = {};
+      
+      if (response.data && 'success' in response.data && response.data.success) {
+        // Estructura { success: true, data: [...], pagination: {...} }
+        categoriesData = Array.isArray(response.data.data) ? response.data.data : [];
+        paginationData = response.data.pagination || {};
+      } else if (response.data && 'data' in response.data && Array.isArray(response.data.data)) {
+        // Estructura ApiPaginatedResponse estándar
+        categoriesData = response.data.data;
+        paginationData = 'pagination' in response.data ? response.data.pagination : {};
+      } else if (Array.isArray(response.data)) {
+        // Si la respuesta es directamente un array
+        categoriesData = response.data;
+      } else {
+        categoriesData = [];
+      }
       
       // Normalize categories
-      const normalizedData = response.data.data.map(normalizeCategory);
+      const normalizedData = categoriesData.map(normalizeCategory);
       
       return {
-        ...response.data,
         data: normalizedData,
+        pagination: paginationData,
       };
     } catch (error) {
       logger.error('Error fetching categories', error);
@@ -453,10 +480,10 @@ export const inventoryApiService = {
 
   async getCategoryById(id: string): Promise<InventoryCategory> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${id}`);
-      logger.debug('Fetching category by ID', { url, id });
+      const endpoint = `${BASE_PATH}/categories/${id}`;
+      logger.debug('Fetching category by ID', { endpoint, id });
       
-      const response = await api.get<ApiSingleResponse<InventoryCategory>>(url);
+      const response = await api.get<ApiSingleResponse<InventoryCategory>>(endpoint);
       return normalizeCategory(response.data.data);
     } catch (error) {
       logger.error('Error fetching category', error);
@@ -466,10 +493,10 @@ export const inventoryApiService = {
 
   async createCategory(payload: CreateCategoryPayload): Promise<InventoryCategory> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories`);
-      logger.debug('Creating category', { url, payload });
+      const endpoint = `${BASE_PATH}/categories`;
+      logger.debug('Creating category', { endpoint, payload });
       
-      const response = await api.post<ApiSingleResponse<InventoryCategory>>(url, payload);
+      const response = await api.post<ApiSingleResponse<InventoryCategory>>(endpoint, payload);
       return normalizeCategory(response.data.data);
     } catch (error) {
       logger.error('Error creating category', error);
@@ -479,10 +506,10 @@ export const inventoryApiService = {
 
   async updateCategory(id: string, payload: UpdateCategoryPayload): Promise<InventoryCategory> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${id}`);
-      logger.debug('Updating category', { url, id, payload });
+      const endpoint = `${BASE_PATH}/categories/${id}`;
+      logger.debug('Updating category', { endpoint, id, payload });
       
-      const response = await api.put<ApiSingleResponse<InventoryCategory>>(url, payload);
+      const response = await api.put<ApiSingleResponse<InventoryCategory>>(endpoint, payload);
       return normalizeCategory(response.data.data);
     } catch (error) {
       logger.error('Error updating category', error);
@@ -492,10 +519,10 @@ export const inventoryApiService = {
 
   async deleteCategory(id: string): Promise<void> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${id}`);
-      logger.debug('Deleting category', { url, id });
+      const endpoint = `${BASE_PATH}/categories/${id}`;
+      logger.debug('Deleting category', { endpoint, id });
       
-      await api.delete(url);
+      await api.delete(endpoint);
     } catch (error) {
       logger.error('Error deleting category', error);
       throw error;
@@ -505,10 +532,10 @@ export const inventoryApiService = {
   // Subcategories
   async createSubcategory(categoryId: string, payload: CreateSubcategoryPayload): Promise<InventoryCategory> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${categoryId}/subcategories`);
-      logger.debug('Creating subcategory', { url, categoryId, payload });
+      const endpoint = `${BASE_PATH}/categories/${categoryId}/subcategories`;
+      logger.debug('Creating subcategory', { endpoint, categoryId, payload });
       
-      const response = await api.post<ApiSingleResponse<InventoryCategory>>(url, payload);
+      const response = await api.post<ApiSingleResponse<InventoryCategory>>(endpoint, payload);
       return normalizeCategory(response.data.data);
     } catch (error) {
       logger.error('Error creating subcategory', error);
@@ -522,10 +549,10 @@ export const inventoryApiService = {
     payload: CreateSubcategoryPayload
   ): Promise<InventoryCategory> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${categoryId}/subcategories/${subcategoryId}`);
-      logger.debug('Updating subcategory', { url, categoryId, subcategoryId, payload });
+      const endpoint = `${BASE_PATH}/categories/${categoryId}/subcategories/${subcategoryId}`;
+      logger.debug('Updating subcategory', { endpoint, categoryId, subcategoryId, payload });
       
-      const response = await api.put<ApiSingleResponse<InventoryCategory>>(url, payload);
+      const response = await api.put<ApiSingleResponse<InventoryCategory>>(endpoint, payload);
       return normalizeCategory(response.data.data);
     } catch (error) {
       logger.error('Error updating subcategory', error);
@@ -535,10 +562,10 @@ export const inventoryApiService = {
 
   async deleteSubcategory(categoryId: string, subcategoryId: string): Promise<void> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/categories/${categoryId}/subcategories/${subcategoryId}`);
-      logger.debug('Deleting subcategory', { url, categoryId, subcategoryId });
+      const endpoint = `${BASE_PATH}/categories/${categoryId}/subcategories/${subcategoryId}`;
+      logger.debug('Deleting subcategory', { endpoint, categoryId, subcategoryId });
       
-      await api.delete(url);
+      await api.delete(endpoint);
     } catch (error) {
       logger.error('Error deleting subcategory', error);
       throw error;
@@ -549,10 +576,10 @@ export const inventoryApiService = {
   async getProducts(params: GetProductsParams = {}): Promise<ApiPaginatedResponse<InventoryProduct>> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/products${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching products', { url, params });
+      const endpoint = `${BASE_PATH}/products${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching products', { endpoint, params });
       
-      const response = await api.get<ApiPaginatedResponse<InventoryProduct>>(url);
+      const response = await api.get<ApiPaginatedResponse<InventoryProduct>>(endpoint);
       
       // Normalize products
       const normalizedData = response.data.data.map(normalizeProduct);
@@ -569,10 +596,10 @@ export const inventoryApiService = {
 
   async getProductById(id: string): Promise<InventoryProduct> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/products/${id}`);
-      logger.debug('Fetching product by ID', { url, id });
+      const endpoint = `${BASE_PATH}/products/${id}`;
+      logger.debug('Fetching product by ID', { endpoint, id });
       
-      const response = await api.get<ApiSingleResponse<InventoryProduct>>(url);
+      const response = await api.get<ApiSingleResponse<InventoryProduct>>(endpoint);
       return normalizeProduct(response.data.data);
     } catch (error) {
       logger.error('Error fetching product', error);
@@ -582,10 +609,10 @@ export const inventoryApiService = {
 
   async createProduct(payload: CreateProductPayload): Promise<InventoryProduct> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/products`);
-      logger.debug('Creating product', { url, payload });
+      const endpoint = `${BASE_PATH}/products`;
+      logger.debug('Creating product', { endpoint, payload });
       
-      const response = await api.post<ApiSingleResponse<InventoryProduct>>(url, payload);
+      const response = await api.post<ApiSingleResponse<InventoryProduct>>(endpoint, payload);
       return normalizeProduct(response.data.data);
     } catch (error) {
       logger.error('Error creating product', error);
@@ -595,10 +622,10 @@ export const inventoryApiService = {
 
   async updateProduct(id: string, payload: UpdateProductPayload): Promise<InventoryProduct> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/products/${id}`);
-      logger.debug('Updating product', { url, id, payload });
+      const endpoint = `${BASE_PATH}/products/${id}`;
+      logger.debug('Updating product', { endpoint, id, payload });
       
-      const response = await api.put<ApiSingleResponse<InventoryProduct>>(url, payload);
+      const response = await api.put<ApiSingleResponse<InventoryProduct>>(endpoint, payload);
       return normalizeProduct(response.data.data);
     } catch (error) {
       logger.error('Error updating product', error);
@@ -608,10 +635,10 @@ export const inventoryApiService = {
 
   async deleteProduct(id: string): Promise<void> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/products/${id}`);
-      logger.debug('Deleting product', { url, id });
+      const endpoint = `${BASE_PATH}/products/${id}`;
+      logger.debug('Deleting product', { endpoint, id });
       
-      await api.delete(url);
+      await api.delete(endpoint);
     } catch (error) {
       logger.error('Error deleting product', error);
       throw error;
@@ -622,10 +649,10 @@ export const inventoryApiService = {
   async getEntries(params: GetEntriesParams = {}): Promise<ApiPaginatedResponse<InventoryEntry>> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/entries${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching inventory entries', { url, params });
+      const endpoint = `${BASE_PATH}/entries${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching inventory entries', { endpoint, params });
 
-      const response = await api.get<ApiPaginatedResponse<any>>(url);
+      const response = await api.get<ApiPaginatedResponse<any>>(endpoint);
       const normalizedData = response.data.data.map(normalizeEntry);
 
       return {
@@ -640,10 +667,10 @@ export const inventoryApiService = {
 
   async getEntryById(id: string): Promise<InventoryEntry> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/entries/${id}`);
-      logger.debug('Fetching inventory entry by ID', { url, id });
+      const endpoint = `${BASE_PATH}/entries/${id}`;
+      logger.debug('Fetching inventory entry by ID', { endpoint, id });
 
-      const response = await api.get<ApiSingleResponse<any>>(url);
+      const response = await api.get<ApiSingleResponse<any>>(endpoint);
       return normalizeEntry(response.data.data);
     } catch (error) {
       logger.error('Error fetching inventory entry', error);
@@ -653,10 +680,10 @@ export const inventoryApiService = {
 
   async createEntry(payload: CreateEntryPayload): Promise<InventoryEntry> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/entries`);
-      logger.debug('Creating inventory entry', { url, payload });
+      const endpoint = `${BASE_PATH}/entries`;
+      logger.debug('Creating inventory entry', { endpoint, payload });
 
-      const response = await api.post<ApiSingleResponse<any>>(url, payload);
+      const response = await api.post<ApiSingleResponse<any>>(endpoint, payload);
       const data = 'data' in response.data ? response.data.data : response.data;
       return normalizeEntry(data);
     } catch (error) {
@@ -668,10 +695,10 @@ export const inventoryApiService = {
   // Colors
   async getColors(): Promise<InventoryColorOption[]> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/colors`);
-      logger.debug('Fetching colors', { url });
+      const endpoint = `${BASE_PATH}/colors`;
+      logger.debug('Fetching colors', { endpoint });
       
-      const response = await api.get<ApiSingleResponse<InventoryColorOption[]>>(url);
+      const response = await api.get<ApiSingleResponse<InventoryColorOption[]>>(endpoint);
       return response.data.data;
     } catch (error) {
       logger.error('Error fetching colors', error);
@@ -685,10 +712,10 @@ export const inventoryApiService = {
   ): Promise<ApiPaginatedResponse<HospitalRequest> | { success: boolean; data: any }> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/hospital-requests${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching hospital requests', { url, params });
+      const endpoint = `${BASE_PATH}/hospital-requests${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching hospital requests', { endpoint, params });
       
-      const response = await api.get<ApiPaginatedResponse<HospitalRequest> | { success: boolean; data: any }>(url);
+      const response = await api.get<ApiPaginatedResponse<HospitalRequest> | { success: boolean; data: any }>(endpoint);
       
       // If summary=true, return as-is
       if (params.summary) {
@@ -711,10 +738,10 @@ export const inventoryApiService = {
 
   async getHospitalRequestById(id: string): Promise<HospitalRequest> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/hospital-requests/${id}`);
-      logger.debug('Fetching hospital request by ID', { url, id });
+      const endpoint = `${BASE_PATH}/hospital-requests/${id}`;
+      logger.debug('Fetching hospital request by ID', { endpoint, id });
       
-      const response = await api.get<ApiSingleResponse<HospitalRequest>>(url);
+      const response = await api.get<ApiSingleResponse<HospitalRequest>>(endpoint);
       return normalizeHospitalRequest(response.data.data);
     } catch (error) {
       logger.error('Error fetching hospital request', error);
@@ -724,10 +751,10 @@ export const inventoryApiService = {
 
   async createHospitalRequest(payload: CreateHospitalRequestPayload): Promise<HospitalRequest> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/hospital-requests`);
-      logger.debug('Creating hospital request', { url, payload });
+      const endpoint = `${BASE_PATH}/hospital-requests`;
+      logger.debug('Creating hospital request', { endpoint, payload });
       
-      const response = await api.post<ApiSingleResponse<HospitalRequest>>(url, payload);
+      const response = await api.post<ApiSingleResponse<HospitalRequest>>(endpoint, payload);
       return normalizeHospitalRequest(response.data.data);
     } catch (error) {
       logger.error('Error creating hospital request', error);
@@ -740,10 +767,10 @@ export const inventoryApiService = {
     payload: UpdateHospitalRequestStatusPayload
   ): Promise<HospitalRequest> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/hospital-requests/${id}/status`);
-      logger.debug('Updating hospital request status', { url, id, payload });
+      const endpoint = `${BASE_PATH}/hospital-requests/${id}/status`;
+      logger.debug('Updating hospital request status', { endpoint, id, payload });
       
-      const response = await api.put<ApiSingleResponse<HospitalRequest>>(url, payload);
+      const response = await api.put<ApiSingleResponse<HospitalRequest>>(endpoint, payload);
       return normalizeHospitalRequest(response.data.data);
     } catch (error) {
       logger.error('Error updating hospital request status', error);
@@ -754,10 +781,10 @@ export const inventoryApiService = {
   async getLocations(params: GetLocationsParams = { summary: true }): Promise<InventoryLocation[]> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/locations${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching inventory locations', { url, params });
+      const endpoint = `${BASE_PATH}/locations${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching inventory locations', { endpoint, params });
 
-      const response = await api.get<ApiSingleResponse<any> | ApiPaginatedResponse<any> | any[]>(url);
+      const response = await api.get<ApiSingleResponse<any> | ApiPaginatedResponse<any> | any[]>(endpoint);
 
       if (Array.isArray(response.data)) {
         return response.data.map((location: any) => normalizeLocation(location));
@@ -782,10 +809,10 @@ export const inventoryApiService = {
 
   async getLocationById(id: string): Promise<InventoryLocationDetail> {
     try {
-      const url = buildAdminApiUrl(`${BASE_PATH}/locations/${id}`);
-      logger.debug('Fetching inventory location by ID', { url, id });
+      const endpoint = `${BASE_PATH}/locations/${id}`;
+      logger.debug('Fetching inventory location by ID', { endpoint, id });
 
-      const response = await api.get<ApiSingleResponse<any>>(url);
+      const response = await api.get<ApiSingleResponse<any>>(endpoint);
       const data = response.data.data;
       const normalizedLocation = normalizeLocation(data);
       const stocks = Array.isArray(data.stocks) ? data.stocks.map(normalizeLocationStockItem) : undefined;
@@ -803,10 +830,10 @@ export const inventoryApiService = {
   async getStockMovements(params: GetStockMovementsParams = {}): Promise<ApiPaginatedResponse<InventoryStockMovement>> {
     try {
       const queryString = buildQueryString(params as Record<string, string | number | boolean | undefined>);
-      const url = buildAdminApiUrl(`${BASE_PATH}/stock-movements${queryString ? `?${queryString}` : ''}`);
-      logger.debug('Fetching inventory stock movements', { url, params });
+      const endpoint = `${BASE_PATH}/stock-movements${queryString ? `?${queryString}` : ''}`;
+      logger.debug('Fetching inventory stock movements', { endpoint, params });
 
-      const response = await api.get<ApiPaginatedResponse<any>>(url);
+      const response = await api.get<ApiPaginatedResponse<any>>(endpoint);
       const normalizedData = response.data.data.map(normalizeStockMovement);
 
       return {

@@ -19,6 +19,7 @@ import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
 import { logger } from "@/utils/logger";
 import { adminExcelFilesService, type AdminExcelFileType } from "@/services/adminExcelFilesService";
+import { usePermissions } from "@/hooks/usePermissions";
 
 type VotacionesUploadType = "activos" | "delegados";
 
@@ -64,6 +65,7 @@ const votacionesUploadConfigs: Record<VotacionesUploadType, VotacionesUploadConf
 };
 
 export default function AdminVotacionesPage() {
+  const { can } = usePermissions();
   const [auditFilters, setAuditFilters] = useState<Omit<AuditFilters, 'page' | 'per_page'>>({});
   const [statisticsFilters, setStatisticsFilters] = useState<StatisticsFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -376,18 +378,23 @@ export default function AdminVotacionesPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="statistics" className="space-y-6">
+        <Tabs defaultValue={can("votes.statistics.view") ? "statistics" : "audit"} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="statistics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Estadísticas
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="gap-2">
-              <Vote className="h-4 w-4" />
-              Auditoría
-            </TabsTrigger>
+            {can("votes.statistics.view") && (
+              <TabsTrigger value="statistics" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Estadísticas
+              </TabsTrigger>
+            )}
+            {can("votes.audit.view") && (
+              <TabsTrigger value="audit" className="gap-2">
+                <Vote className="h-4 w-4" />
+                Auditoría
+              </TabsTrigger>
+            )}
           </TabsList>
 
+          {can("votes.statistics.view") && (
           <TabsContent value="statistics" className="space-y-6 mt-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -467,7 +474,9 @@ export default function AdminVotacionesPage() {
               )
             )}
           </TabsContent>
+          )}
 
+          {can("votes.audit.view") && (
           <TabsContent value="audit" className="space-y-6 mt-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -499,6 +508,7 @@ export default function AdminVotacionesPage() {
               />
             )}
           </TabsContent>
+          )}
         </Tabs>
 
         <Dialog open={showUploadConfirmDialog} onOpenChange={handleUploadDialogChange}>

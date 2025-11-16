@@ -147,9 +147,13 @@ const mapInventoryItem = (item: any): SstInventoryItem => ({
 });
 
 const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T | undefined> => {
+  // Obtener token del localStorage
+  const token = localStorage.getItem('prosalud_auth_token');
+  
   const headers: HeadersInit = {
     Accept: 'application/json',
     ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers ?? {}),
   };
 
@@ -215,25 +219,25 @@ export const sstAdminService = {
   },
 
   async getAffiliateByDocument(documentType: SstDocumentType, documentNumber: string, signal?: AbortSignal): Promise<SstAffiliate | null> {
-    const url = buildAdminApiUrl(`${endpoints.affiliates}/${documentType}/${documentNumber}`);
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      signal,
-    });
+    try {
+      const data = await fetchJson<any>(
+        buildAdminApiUrl(`${endpoints.affiliates}/${documentType}/${documentNumber}`),
+        { method: 'GET', signal }
+      );
 
-    if (response.status === 404) {
-      return null;
+      if (!data) {
+        return null;
+      }
+
+      return mapAffiliate(data);
+    } catch (error: any) {
+      // Si es 404, retornar null (afiliado no encontrado)
+      if (error?.status === 404) {
+        return null;
+      }
+      // Para otros errores, re-lanzar
+      throw error;
     }
-
-    if (!response.ok) {
-      await parseErrorMessage(response);
-    }
-
-    const data = await response.json();
-    return mapAffiliate(data);
   },
 
   async getInventory(signal?: AbortSignal): Promise<SstInventoryItem[]> {
