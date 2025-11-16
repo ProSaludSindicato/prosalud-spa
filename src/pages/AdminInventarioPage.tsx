@@ -28,7 +28,7 @@ import HospitalRequests from '@/components/admin/inventario/HospitalRequests';
 import { InventoryProvider } from '@/context/InventoryContext';
 
 const AdminInventarioPage: React.FC = () => {
-  const { can } = usePermissions();
+  const { can, canDoAction } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -37,17 +37,30 @@ const AdminInventarioPage: React.FC = () => {
 
   // Tabs con permisos requeridos
   const tabs = useMemo(
-    () => [
-    { id: 'overview', label: 'Inicio', icon: BarChart3, permission: 'inventory.view_dashboard' },
-      { id: 'categories', label: 'Categorías', icon: Tag, permission: 'inventory.categories.view' },
-    { id: 'products', label: 'Productos', icon: Package, permission: 'inventory.products.view' },
-      // { id: 'deliveries', label: 'Entregas', icon: Truck },
-      { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList, permission: 'hospital_requests.view' },
-    ].filter(tab => can(tab.permission)), // Filtrar tabs según permisos
+    () =>
+      [
+        { id: 'overview', label: 'Inicio', icon: BarChart3, permission: 'inventory.view_dashboard' },
+        { id: 'categories', label: 'Categorías', icon: Tag, permission: 'inventory.categories.view' },
+        { id: 'products', label: 'Productos', icon: Package, permission: 'inventory.products.view' },
+        // { id: 'deliveries', label: 'Entregas', icon: Truck },
+        { id: 'hospital-requests', label: 'Solicitudes Hospitales', icon: ClipboardList, permission: 'hospital_requests.view' },
+      ].filter((tab) => can(tab.permission)), // Filtrar tabs según permisos
     [can],
   );
 
   const tabIds = useMemo(() => tabs.map((tab) => tab.id), [tabs]);
+
+  // Asegurar que siempre haya un tab activo válido según permisos.
+  // Si solo hay un tab disponible (por ejemplo, solo "Solicitudes Hospitales"),
+  // se selecciona automáticamente sin que el usuario tenga que hacer click.
+  useEffect(() => {
+    if (tabIds.length === 0) return;
+
+    if (!activeTab || !tabIds.includes(activeTab)) {
+      const firstTab = tabIds[0];
+      setActiveTab(firstTab);
+    }
+  }, [tabIds, activeTab]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -92,6 +105,14 @@ const AdminInventarioPage: React.FC = () => {
     }
   };
 
+  // Validar permisos para botones de acciones rápidas
+  const canExportReport = can('inventory.view_dashboard') || can('inventory.entries.view');
+  const canUseQuickActions =
+    canDoAction('inventory', 'productsManage') ||
+    canDoAction('inventory', 'categoriesManage') ||
+    canDoAction('inventory', 'hospitalRequests') ||
+    can('inventory.view_dashboard');
+
   return (
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
@@ -120,20 +141,24 @@ const AdminInventarioPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline"
-                      onClick={() => setExportReportOpen(true)}
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Exportar Reporte
-                    </Button>
-                    <Button 
-                      onClick={() => setQuickActionsOpen(true)}
-                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Acción Rápida
-                    </Button>
+                    {canExportReport && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setExportReportOpen(true)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Exportar Reporte
+                      </Button>
+                    )}
+                    {canUseQuickActions && (
+                      <Button
+                        onClick={() => setQuickActionsOpen(true)}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Acción Rápida
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -198,8 +223,12 @@ const AdminInventarioPage: React.FC = () => {
           </motion.div>
 
           {/* Dialogs */}
-          <QuickActionsDialog open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
-          <ExportReportDialog open={exportReportOpen} onOpenChange={setExportReportOpen} />
+          {canUseQuickActions && (
+            <QuickActionsDialog open={quickActionsOpen} onOpenChange={setQuickActionsOpen} />
+          )}
+          {canExportReport && (
+            <ExportReportDialog open={exportReportOpen} onOpenChange={setExportReportOpen} />
+          )}
           
           {/* Modal de Solicitudes temporalmente deshabilitado */}
           {/* 

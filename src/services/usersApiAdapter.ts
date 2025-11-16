@@ -3,6 +3,9 @@ import { realUsersApi, BackendUser, BackendPaginatedResponse } from './realUsers
 
 // Adapter functions to convert between backend and frontend formats
 function adaptBackendUserToFrontend(backendUser: BackendUser): User {
+  const createdAtRaw = backendUser.created_at;
+  const updatedAtRaw = backendUser.updated_at ?? backendUser.created_at ?? new Date().toISOString();
+
   return {
     id: String(backendUser.id),
     name: backendUser.name,
@@ -10,8 +13,8 @@ function adaptBackendUserToFrontend(backendUser: BackendUser): User {
     isActive: backendUser.is_active,
     role: backendUser.role,
     roles: backendUser.roles,
-    createdAt: backendUser.created_at.split('T')[0], // Convert to YYYY-MM-DD format
-    updatedAt: backendUser.updated_at.split('T')[0], // Convert to YYYY-MM-DD format
+    createdAt: createdAtRaw ? createdAtRaw.split('T')[0] : '',
+    updatedAt: updatedAtRaw ? updatedAtRaw.split('T')[0] : '',
   };
 }
 
@@ -45,10 +48,8 @@ export const usersApiAdapter = {
     const createData = {
       name: userData.name,
       email: userData.email,
-      password: userData.password,
-      password_confirmation: userData.password_confirmation,
       role: userData.role,
-      is_active: userData.isActive,
+      // El backend se encarga de dejar al usuario inactivo y de enviar la invitación
     };
     const backendUser = await realUsersApi.createUser(createData);
     return adaptBackendUserToFrontend(backendUser);

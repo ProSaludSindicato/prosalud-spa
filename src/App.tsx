@@ -15,6 +15,7 @@ import FAQPage from '@/pages/FAQPage';
 import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import DefinePasswordPage from '@/pages/DefinePasswordPage';
 
 // Admin Pages
 import AdminDashboard from '@/pages/AdminDashboard';
@@ -245,6 +246,7 @@ function App() {
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/auth/definir-contraseña" element={<DefinePasswordPage />} />
 
             {/* Service Routes */}
             <Route path="/servicios/certificado-convenio" element={<SolicitudCertificadoConvenioPage />} />

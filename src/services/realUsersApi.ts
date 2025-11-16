@@ -10,7 +10,8 @@ export interface BackendUser {
   role?: string;
   roles?: string[];
   created_at: string;
-  updated_at: string;
+  // Algunos endpoints (como createUser) pueden no devolver updated_at aún
+  updated_at?: string;
 }
 
 export interface BackendPaginatedResponse<T> {
@@ -41,9 +42,10 @@ export interface BackendErrorResponse {
 export interface CreateUserRequest {
   name: string;
   email: string;
-  password: string;
-  password_confirmation: string;
   role: string;
+  // El backend crea la contraseña mediante invitación; se mantienen campos opcionales solo por compatibilidad
+  password?: string;
+  password_confirmation?: string;
   is_active?: boolean;
 }
 

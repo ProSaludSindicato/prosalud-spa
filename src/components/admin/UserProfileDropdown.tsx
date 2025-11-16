@@ -16,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { getInitialsFromEmail } from '@/utils/avatarUtils';
 import { useAuth } from '@/context/AuthContext';
 import ChangePasswordDialog from './ChangePasswordDialog';
-import UpdateProfileDialog from './UpdateProfileDialog';
 
 interface UserProfileDropdownProps {
   userEmail?: string;
@@ -31,7 +30,6 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showUpdateProfile, setShowUpdateProfile] = useState(false);
 
   const { logout, user } = useAuth();
   // Usar el usuario del contexto si está disponible, sino usar los props
@@ -64,11 +62,6 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
     setShowChangePassword(true);
   };
 
-  const handleUpdateProfile = () => {
-    setIsOpen(false);
-    setShowUpdateProfile(true);
-  };
-
   return (
     <>
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
@@ -91,10 +84,6 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleUpdateProfile} className="cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            <span>Actualizar perfil</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleChangePassword} className="cursor-pointer">
             <Key className="mr-2 h-4 w-4" />
             <span>Cambiar contraseña</span>
@@ -113,11 +102,6 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       <ChangePasswordDialog
         open={showChangePassword}
         onOpenChange={setShowChangePassword}
-      />
-
-      <UpdateProfileDialog
-        open={showUpdateProfile}
-        onOpenChange={setShowUpdateProfile}
       />
     </>
   );

@@ -121,9 +121,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className={`flex-1 space-y-1 ${sidebarCollapsed ? 'px-2 py-3' : 'p-4'}`}>
             {navigation.map((item) => {
-              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta
-              const isActive = location.pathname === item.href || 
-                              (location.pathname.startsWith(item.href) && item.href !== '/admin');
+              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta,
+              // pero evitando que rutas como /admin/solicitudes-bienestar activen también /admin/solicitudes
+              const isActive =
+                location.pathname === item.href ||
+                (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
               return (
                 <Link
                   key={item.name}
@@ -197,9 +199,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4">
             {navigation.map((item) => {
-              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta
-              const isActive = location.pathname === item.href || 
-                              (location.pathname.startsWith(item.href) && item.href !== '/admin');
+              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta,
+              // pero evitando que rutas como /admin/solicitudes-bienestar activen también /admin/solicitudes
+              const isActive =
+                location.pathname === item.href ||
+                (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
               return (
                 <Link
                   key={item.name}
@@ -256,9 +260,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <Home className="h-4 w-4" />
               <ChevronRight className="h-4 w-4" />
               <span className="font-medium text-primary-prosalud">
-                {navigation.find(item => 
-                  location.pathname === item.href || 
-                  (location.pathname.startsWith(item.href) && item.href !== '/admin')
+                {navigation.find(item =>
+                  location.pathname === item.href ||
+                  (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin')
                 )?.name || 'Dashboard'}
               </span>
             </div>

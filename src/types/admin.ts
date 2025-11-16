@@ -71,9 +71,13 @@ export interface PaginatedResponse<T> {
 export interface CreateUserData {
   name: string;
   email: string;
-  password: string;
-  password_confirmation: string;
   role: string;
+  /**
+   * El backend crea al usuario como inactivo y sin contraseña.
+   * Estos campos se mantienen opcionales solo para compatibilidad con flujos anteriores.
+   */
+  password?: string;
+  password_confirmation?: string;
   isActive?: boolean;
 }
 

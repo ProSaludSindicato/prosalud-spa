@@ -14,6 +14,7 @@ import LowStockDialog from './LowStockDialog';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '@/context/InventoryContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface QuickActionsDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const navigate = useNavigate();
   const { products, categories } = useInventory();
+  const { canDoAction, can } = usePermissions();
 
   const lowStockItems = useMemo(() => {
     const categoryMap = new Map(categories.map((category) => [category.id, category.name]));
@@ -58,6 +60,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
     textColor: string;
     onSelect?: () => void;
   }> = [
+    // Requiere permiso de gestión de productos de inventario
     {
       id: 'add-product',
       title: 'Agregar Producto',
@@ -66,6 +69,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
       color: 'bg-blue-500',
       textColor: 'text-blue-600',
     },
+    // Requiere permiso para gestionar categorías
     {
       id: 'open-categories',
       title: 'Gestionar Categorías',
@@ -78,6 +82,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
         navigate('/admin/inventario?tab=categories');
       },
     },
+    // Requiere permiso para ver solicitudes de hospitales
     {
       id: 'open-hospital-requests',
       title: 'Solicitudes de Hospitales',
@@ -90,6 +95,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
         navigate('/admin/inventario?tab=hospital-requests');
       },
     },
+    // Requiere permiso de ver productos de inventario
     {
       id: 'view-low-stock',
       title: 'Ver Stock Bajo',
@@ -98,7 +104,20 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
       color: 'bg-orange-500',
       textColor: 'text-orange-600',
     },
-  ];
+  ].filter((action) => {
+    switch (action.id) {
+      case 'add-product':
+        return canDoAction('inventory', 'productsManage');
+      case 'open-categories':
+        return canDoAction('inventory', 'categoriesManage') || canDoAction('inventory', 'categories');
+      case 'open-hospital-requests':
+        return canDoAction('inventory', 'hospitalRequests');
+      case 'view-low-stock':
+        return can('inventory.products.view');
+      default:
+        return false;
+    }
+  });
 
   const handleActionSelect = (actionId: string) => {
     const action = actions.find((item) => item.id === actionId);

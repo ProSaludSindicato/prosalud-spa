@@ -19,18 +19,8 @@ import AdminModal from '@/components/admin/common/AdminModal';
 const formSchema = z.object({
   name: nameValidation,
   email: emailValidation,
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').optional().or(z.literal('')),
-  password_confirmation: z.string().optional().or(z.literal('')),
   role: z.string().min(1, 'El rol es requerido'),
   isActive: z.boolean().optional(),
-}).refine((data) => {
-  if (data.password && data.password.length > 0) {
-    return data.password === data.password_confirmation;
-  }
-  return true;
-}, {
-  message: 'Las contraseñas no coinciden',
-  path: ['password_confirmation'],
 });
 
 interface UserFormModalProps {
@@ -52,8 +42,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     defaultValues: {
       name: '',
       email: '',
-      password: '',
-      password_confirmation: '',
       role: '',
       isActive: true,
     },
@@ -73,8 +61,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       form.reset({
         name: user.name,
         email: user.email,
-        password: '',
-        password_confirmation: '',
         role: user.role || user.roles?.[0] || '',
         isActive: user.isActive,
       });
@@ -82,8 +68,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       form.reset({
         name: '',
         email: '',
-        password: '',
-        password_confirmation: '',
         role: '',
         isActive: true,
       });
@@ -139,13 +123,11 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       };
       updateMutation.mutate({ id: user.id, data: userData });
     } else {
-      // En creación, incluir contraseña
+      // En creación, el backend crea el usuario inactivo sin contraseña
       const userData = {
         name: data.name,
         email: data.email,
         role: data.role,
-        password: data.password,
-        password_confirmation: data.password_confirmation,
       };
       createMutation.mutate(userData);
     }
@@ -165,7 +147,11 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       open={open}
       onOpenChange={handleOpenChange}
       title={user ? "Editar Usuario" : "Crear Usuario"}
-      description={user ? "Modifica la información del usuario" : "Completa el formulario para crear un nuevo usuario"}
+      description={
+        user
+          ? "Modifica la información del usuario."
+          : "Completa el formulario para crear un nuevo usuario. Al guardar, se enviará un correo al usuario para que configure su contraseña."
+      }
       actions={
         <div className="flex justify-end space-x-2">
           <Button
@@ -240,35 +226,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
                 <p className="text-sm text-red-500">{errors.role.message}</p>
               )}
             </div>
-
+            
             {!user && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    {...register('password')}
-                    placeholder="Mínimo 8 caracteres"
-                  />
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password_confirmation">Confirmar Contraseña</Label>
-                  <Input
-                    id="password_confirmation"
-                    type="password"
-                    {...register('password_confirmation')}
-                    placeholder="Repita la contraseña"
-                  />
-                  {errors.password_confirmation && (
-                    <p className="text-sm text-red-500">{errors.password_confirmation.message}</p>
-                  )}
-                </div>
-              </>
+              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md p-3">
+                Al crear el usuario, este quedará inactivo y se enviará automáticamente un correo de invitación
+                para que la persona defina su contraseña y active su cuenta. <br></br> (El administrador no define ni conoce
+                la contraseña del usuario).
+              </p>
             )}
 
             {user && (
