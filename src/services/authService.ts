@@ -152,12 +152,17 @@ class AuthService {
       // Manejar diferentes estructuras de respuesta
       let userData: AuthUser | null = null;
       
-      // Opción 1: Respuesta envuelta { data: { user } }
-      if (response.data?.data && typeof response.data.data === 'object') {
+      // Opción 1: Respuesta con user wrapper { user: { id, name, email, ... } }
+      if (response.data?.user && typeof response.data.user === 'object') {
+        userData = response.data.user;
+        logger.debug('Using response.data.user structure');
+      }
+      // Opción 2: Respuesta envuelta { data: { user } }
+      else if (response.data?.data && typeof response.data.data === 'object') {
         userData = response.data.data;
         logger.debug('Using response.data.data structure');
       } 
-      // Opción 2: Respuesta directa { id, name, email, ... }
+      // Opción 3: Respuesta directa { id, name, email, ... }
       else if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
         // Verificar que tenga al menos un campo de usuario
         if (response.data.id || response.data.email || response.data.name) {
@@ -165,7 +170,7 @@ class AuthService {
           logger.debug('Using direct response.data structure');
         }
       }
-      // Opción 3: Respuesta con success wrapper { success: true, data: { user } }
+      // Opción 4: Respuesta con success wrapper { success: true, data: { user } }
       else if (response.data?.success && response.data?.data) {
         userData = response.data.data;
         logger.debug('Using success wrapper structure');
@@ -196,8 +201,6 @@ class AuthService {
       }
       
       logger.info('User fetched successfully', { 
-        userId: userData.id,
-        email: userData.email,
         rolesCount: userData.roles?.length || 0,
         permissionsCount: userData.permissions?.length || 0,
       });
@@ -242,7 +245,6 @@ class AuthService {
       const token = localStorage.getItem(TOKEN_KEY);
       logger.debug('Getting token from localStorage', {
         hasToken: !!token,
-        tokenLength: token?.length || 0,
       });
       return token;
     } catch (error) {
@@ -254,10 +256,7 @@ class AuthService {
   setToken(token: string): void {
     try {
       localStorage.setItem(TOKEN_KEY, token);
-      logger.info('Token saved to localStorage', {
-        tokenLength: token.length,
-        tokenPreview: token.substring(0, 10) + '...',
-      });
+      logger.debug('Token saved to localStorage');
     } catch (error) {
       logger.error('Failed to save token to localStorage', error);
     }
@@ -315,7 +314,6 @@ class AuthService {
     const hasSession = !!token;
     logger.debug('Checking active session', {
       hasSession,
-      tokenLength: token?.length || 0,
     });
     return hasSession;
   }

@@ -6,21 +6,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileText, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
+import { Download, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { requestsService } from '@/services/requestsServiceApi';
-import { generateRequestsPDFReport } from './utils/requestsPdfGenerator';
 import { generateRequestsExcelReport } from './utils/requestsExcelGenerator';
-import { requestTypeLabels } from '@/data/requestsMock';
 import * as XLSX from 'xlsx';
 import { logger } from '@/utils/logger';
 
 interface ExportRequestsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  existingRequestTypes?: string[];
+  getRequestTypeLabel?: (type: string) => string;
 }
 
-type ReportFormat = 'pdf' | 'excel';
+// Solo Excel está disponible
 
 interface DateRangeFilter {
   includeAll: boolean;
@@ -28,8 +28,12 @@ interface DateRangeFilter {
   end?: Date;
 }
 
-const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpenChange }) => {
-  const [format, setFormat] = useState<ReportFormat>('pdf');
+const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ 
+  open, 
+  onOpenChange,
+  existingRequestTypes = [],
+  getRequestTypeLabel
+}) => {
   const [requestType, setRequestType] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
@@ -95,27 +99,15 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
       logger.debug('Solicitudes filtradas para exportación', { total: filteredRequests.length });
       const today = new Date().toISOString().split('T')[0];
 
-      if (format === 'pdf') {
-        logger.debug('Generando reporte PDF de solicitudes');
-        const doc = generateRequestsPDFReport(filteredRequests, dateRange);
-        doc.save(`Reporte_Solicitudes_ProSalud_${today}.pdf`);
-        
-        toast({
-          title: "Reporte PDF Generado",
-          description: "El reporte de solicitudes en PDF se ha descargado exitosamente",
-          duration: 4000,
-        });
-      } else {
-        logger.debug('Generando reporte Excel de solicitudes');
-        const wb = generateRequestsExcelReport(filteredRequests, dateRange);
-        XLSX.writeFile(wb, `Reporte_Solicitudes_ProSalud_${today}.xlsx`);
-        
-        toast({
-          title: "Reporte Excel Generado",
-          description: "El reporte de solicitudes en Excel se ha descargado exitosamente",
-          duration: 4000,
-        });
-      }
+      logger.debug('Generando reporte Excel de solicitudes');
+      const wb = generateRequestsExcelReport(filteredRequests, dateRange);
+      XLSX.writeFile(wb, `Reporte_Solicitudes_ProSalud_${today}.xlsx`);
+      
+      toast({
+        title: "Reporte Excel Generado",
+        description: "El reporte de solicitudes en Excel se ha descargado exitosamente",
+        duration: 4000,
+      });
 
       logger.debug('Exportación de solicitudes completada');
       onOpenChange(false);
@@ -142,63 +134,11 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
             Exportar Reporte de Solicitudes
           </DialogTitle>
           <DialogDescription>
-            Genera un reporte de todas las solicitudes realizadas por los afiliados
+            Genera un reporte en Excel de todas las solicitudes realizadas por los afiliados
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Format Selector */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Formato del Reporte</h4>
-                  <p className="text-sm text-gray-600">
-                    Selecciona el formato en el que deseas exportar el reporte
-                  </p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFormat('pdf')}
-                  className={`p-3 flex flex-col items-center space-y-3 rounded-lg border-2 transition-all ${
-                    format === 'pdf'
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <FileText 
-                    className={`h-6 w-6 ${
-                      format === 'pdf' ? 'text-red-600' : 'text-gray-400'
-                    }`} 
-                  />
-                  <p className="text-sm font-semibold">PDF</p>
-                  <p className="text-xs text-gray-600">Documento optimizado</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormat('excel')}
-                  className={`p-3 flex flex-col items-center space-y-3 rounded-lg border-2 transition-all ${
-                    format === 'excel'
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <FileSpreadsheet 
-                    className={`h-6 w-6 ${
-                      format === 'excel' ? 'text-green-600' : 'text-gray-400'
-                    }`} 
-                  />
-                  <p className="text-sm font-semibold">Excel</p>
-                  <p className="text-xs text-gray-600">Hoja de cálculo</p>
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Request Type Filter */}
           <Card className="border border-gray-200">
             <CardContent className="p-4 space-y-4">
@@ -220,9 +160,9 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({ open, onOpe
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tipos de solicitudes</SelectItem>
-                    {Object.entries(requestTypeLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
+                    {existingRequestTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {getRequestTypeLabel ? getRequestTypeLabel(type) : type}
                       </SelectItem>
                     ))}
                   </SelectContent>

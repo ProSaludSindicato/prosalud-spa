@@ -30,6 +30,7 @@ import {
   Send,
   Paperclip,
   X,
+  Loader2,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -39,6 +40,7 @@ import DataPagination from "@/components/ui/data-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { logger } from "@/utils/logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -54,6 +56,7 @@ import { Request } from "@/types/requests";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
 import { parentescos } from '@/components/actualizar-datos-personales/formOptions';
+import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
 
 // Schema para el formulario de respuesta
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
@@ -98,6 +101,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
@@ -126,6 +130,9 @@ const AdminSolicitudesPage: React.FC = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // El backend ya filtra las solicitudes según las asignaciones del usuario
+  // No es necesario filtrar en el frontend
+
   // Función para obtener la etiqueta del tipo de solicitud
   const getRequestTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
@@ -136,13 +143,26 @@ const AdminSolicitudesPage: React.FC = () => {
       "actualizar-datos-personales": "Actualizar Datos Personales",
       "solicitud-microcredito": "Solicitud de Microcrédito",
       "solicitud-retiro-sindical": "Solicitud de Retiro Sindical",
+      "retiro-sindical": "Retiro Sindical",
       "permisos-cambio-turnos": "Permisos y Cambio de Turnos",
       "incapacidades-licencias": "Incapacidades y Licencias",
     };
     return labels[type] || type;
   };
 
+  // Obtener tipos únicos que existen en los registros (para el filtro)
+  // El backend ya filtra las solicitudes según las asignaciones, así que usamos todas las que vienen
+  const existingRequestTypes = useMemo(() => {
+    const types = new Set<string>();
+    allSolicitudes.forEach((request) => {
+      types.add(request.request_type);
+    });
+    return Array.from(types).sort(); // Convertir a array ordenado para el select
+  }, [allSolicitudes]);
+
   const filteredSolicitudes = useMemo(() => {
+    // El backend ya filtra las solicitudes según las asignaciones del usuario
+    // Solo aplicamos filtros de búsqueda, estado y tipo
     let filtered = [...allSolicitudes];
 
     if (searchTerm) {
@@ -589,48 +609,55 @@ const AdminSolicitudesPage: React.FC = () => {
               <CardContent className="pt-0">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                   <div className="md:col-span-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        type="text"
-                        placeholder="Buscar por ID, nombre, email o tipo de solicitud..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 h-10"
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="search-input">Buscar</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          id="search-input"
+                          type="text"
+                          placeholder="Buscar por ID, nombre, email o tipo de solicitud..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 h-10"
+                        />
+                      </div>
                     </div>
                   </div>
                   <div>
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Todos los estados" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los estados</SelectItem>
-                        <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="in_progress">En Revisión</SelectItem>
-                        <SelectItem value="resolved">Completado</SelectItem>
-                        <SelectItem value="rejected">Rechazado</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label htmlFor="status-filter">Estado</Label>
+                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                        <SelectTrigger id="status-filter" className="h-10">
+                          <SelectValue placeholder="Todos los estados" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los estados</SelectItem>
+                          <SelectItem value="pending">Pendiente</SelectItem>
+                          <SelectItem value="in_progress">En Revisión</SelectItem>
+                          <SelectItem value="resolved">Completado</SelectItem>
+                          <SelectItem value="rejected">Rechazado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
-                    <Select value={selectedType} onValueChange={setSelectedType}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Todos los tipos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los tipos</SelectItem>
-                        <SelectItem value="certificado-convenio">Certificado de Convenio</SelectItem>
-                        <SelectItem value="compensacion-descanso">Compensación por Descanso</SelectItem>
-                        <SelectItem value="compensacion-anual">Compensación Anual</SelectItem>
-                        <SelectItem value="verificacion-pagos">Verificación de Pagos</SelectItem>
-                        <SelectItem value="actualizar-datos-personales">Actualizar Datos Personales</SelectItem>
-                        <SelectItem value="incapacidad-maternidad">Incapacidades y Licencias</SelectItem>
-                        <SelectItem value="microcredito">Microcrédito</SelectItem>
-                        <SelectItem value="retiro-sindical">Retiro Sindical</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label htmlFor="type-filter">Tipo de Solicitud</Label>
+                      <Select value={selectedType} onValueChange={setSelectedType}>
+                        <SelectTrigger id="type-filter" className="h-10">
+                          <SelectValue placeholder="Todos los tipos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los tipos</SelectItem>
+                          {existingRequestTypes.map((requestType) => (
+                            <SelectItem key={requestType} value={requestType}>
+                              {getRequestTypeLabel(requestType)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
                     <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center gap-2">
@@ -868,7 +895,12 @@ const AdminSolicitudesPage: React.FC = () => {
           </motion.div>
 
           {/* Export Dialog */}
-          <ExportRequestsDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} />
+          <ExportRequestsDialog 
+            open={exportDialogOpen} 
+            onOpenChange={setExportDialogOpen}
+            existingRequestTypes={existingRequestTypes}
+            getRequestTypeLabel={getRequestTypeLabel}
+          />
 
           {/* Request Details Dialog */}
           {selectedSolicitud && (
@@ -933,6 +965,9 @@ const AdminSolicitudesPage: React.FC = () => {
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Teléfono</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
+                              {/* NOTA: En el panel admin NO se debe ofuscar ningún dato.
+                                  Los datos se muestran tal cual vienen del backend.
+                                  Si los datos vienen ofuscados del backend, eso es un problema del backend que debe resolverse allí. */}
                               <p className="text-gray-900">{selectedSolicitud.phone_number || "No especificado"}</p>
                             </div>
                           </div>
@@ -1015,6 +1050,9 @@ const AdminSolicitudesPage: React.FC = () => {
                               };
 
                               // Format value for display
+                              // NOTA: En el panel admin NO se debe ofuscar ningún dato.
+                              // Los datos se muestran tal cual vienen del backend sin aplicar ofuscación.
+                              // Si los datos vienen ofuscados del backend, eso es un problema del backend que debe resolverse allí.
                               const formatValue = (val: any): React.ReactNode => {
                                 if (val === null || val === undefined) {
                                   return "No especificado";
@@ -1349,7 +1387,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
 
                     {/* Acciones */}
-                    {selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
+                    {can('requests.respond') && selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                         <Button
                           onClick={() => handleOpenResponseDialog(selectedSolicitud)}
@@ -1551,25 +1589,28 @@ const AdminSolicitudesPage: React.FC = () => {
                       const files = field.value ? Array.from(field.value as FileList) : [];
                       const hasFiles = files.length > 0;
                       
-                      const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                         if (!e.target.files || e.target.files.length === 0) {
-                          field.onChange(undefined);
+                          e.target.value = ''; // Limpiar el input
                           return;
                         }
 
                         const selectedFiles = Array.from(e.target.files);
+                        const currentFiles = files; // Archivos ya existentes
+                        const totalFilesCount = currentFiles.length + selectedFiles.length;
                         
-                        // Validar cantidad de archivos
-                        if (selectedFiles.length > MAX_FILES) {
+                        // Validar que no exceda el máximo total de archivos
+                        if (totalFilesCount > MAX_FILES) {
+                          const availableSlots = MAX_FILES - currentFiles.length;
                           toast.error("Error al seleccionar archivos", {
-                            description: `Solo puede adjuntar un máximo de ${MAX_FILES} archivos.`,
+                            description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
                             duration: 4000,
                           });
                           e.target.value = '';
                           return;
                         }
 
-                        // Validar tamaño de cada archivo
+                        // Validar tamaño de cada archivo nuevo (antes de optimizar)
                         const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
                         if (oversizedFiles.length > 0) {
                           toast.error("Error al seleccionar archivos", {
@@ -1580,7 +1621,58 @@ const AdminSolicitudesPage: React.FC = () => {
                           return;
                         }
 
-                        field.onChange(e.target.files);
+                        // Verificar si hay imágenes para optimizar
+                        const hasImages = selectedFiles.some(file => isImageFile(file));
+
+                        if (hasImages) {
+                          setIsOptimizing(true);
+                          try {
+                            // Optimizar solo las imágenes de los archivos seleccionados
+                            const optimizedFiles = await optimizeFileList(e.target.files);
+
+                            // Combinar archivos existentes con los nuevos (optimizados)
+                            const dataTransfer = new DataTransfer();
+                            
+                            // Agregar primero los archivos existentes
+                            currentFiles.forEach(file => dataTransfer.items.add(file));
+                            
+                            // Agregar luego los archivos nuevos (optimizados)
+                            optimizedFiles.forEach(file => dataTransfer.items.add(file));
+
+                            field.onChange(dataTransfer.files);
+
+                            // Notificar optimización
+                            const imageCount = selectedFiles.filter(f => isImageFile(f)).length;
+                            if (imageCount > 0) {
+                              toast.success("Imágenes optimizadas", {
+                                description: `${imageCount} imagen(es) optimizada(s) y agregada(s) exitosamente.`,
+                                duration: 2000,
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Error al optimizar imágenes:", error);
+                            toast.error("Error al optimizar imágenes", {
+                              description: "Se subirán las imágenes sin optimizar.",
+                              duration: 3000,
+                            });
+                            // Si falla la optimización, combinar archivos originales con existentes
+                            const dataTransfer = new DataTransfer();
+                            currentFiles.forEach(file => dataTransfer.items.add(file));
+                            selectedFiles.forEach(file => dataTransfer.items.add(file));
+                            field.onChange(dataTransfer.files);
+                          } finally {
+                            setIsOptimizing(false);
+                          }
+                        } else {
+                          // Si no hay imágenes, combinar archivos existentes con los nuevos
+                          const dataTransfer = new DataTransfer();
+                          currentFiles.forEach(file => dataTransfer.items.add(file));
+                          selectedFiles.forEach(file => dataTransfer.items.add(file));
+                          field.onChange(dataTransfer.files);
+                        }
+
+                        // Limpiar el input para permitir seleccionar el mismo archivo nuevamente si es necesario
+                        e.target.value = '';
                       };
 
                       return (
@@ -1592,16 +1684,32 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                           </FormLabel>
                           <FormControl>
-                            <Input
-                              type="file"
-                              multiple
-                              onChange={handleFileChange}
-                              className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark"
-                            />
+                            <div className="relative">
+                              {isOptimizing && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
+                                  <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Optimizando imágenes...</span>
+                                  </div>
+                                </div>
+                              )}
+                              <Input
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                disabled={isOptimizing || files.length >= MAX_FILES}
+                                className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            </div>
                           </FormControl>
                           <FormDescription>
-                            Puede adjuntar máximo {MAX_FILES} archivos. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
+                            Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
                             Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG).
+                            {files.length >= MAX_FILES && (
+                              <span className="block mt-1 text-amber-600 font-medium">
+                                Límite alcanzado. Elimine archivos para agregar más.
+                              </span>
+                            )}
                           </FormDescription>
                           {hasFiles && (
                             <div className="mt-2 space-y-2">

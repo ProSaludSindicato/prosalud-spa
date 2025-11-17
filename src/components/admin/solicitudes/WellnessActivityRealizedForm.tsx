@@ -20,6 +20,7 @@ import {
   UpdateWellnessActivityRealizedData,
 } from '@/services/wellnessRequestsApi';
 import { logger } from '@/utils/logger';
+import { optimizeImages, isImageFile } from '@/utils/imageOptimizer';
 
 const activityRealizedSchema = z.object({
   fecha_realizada: z.string().min(1, 'La fecha realizada es obligatoria'),
@@ -62,6 +63,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
   const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const isEditing = !!actividadRealizada;
   
   // Obtener sedes disponibles de la solicitud
@@ -161,7 +163,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
     }
   }, [actividadRealizada, open, solicitud, form]);
 
-  const handleEvidenciasUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEvidenciasUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
     if (evidencias.length + files.length > 20) {
@@ -188,15 +190,48 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
       }
     }
 
-    setEvidencias(prev => [...prev, ...files]);
+    // Optimizar imágenes antes de agregarlas
+    setIsOptimizing(true);
+    try {
+      const optimizedFiles = await optimizeImages(files);
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setEvidenciaPreviews(prev => [...prev, e.target?.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+      setEvidencias(prev => [...prev, ...optimizedFiles]);
+
+      // Crear previews de las imágenes optimizadas
+      optimizedFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setEvidenciaPreviews(prev => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Notificar optimización
+      const imageCount = files.filter(f => isImageFile(f)).length;
+      if (imageCount > 0) {
+        toast.success('Imágenes optimizadas', {
+          description: `${imageCount} imagen(es) optimizada(s) exitosamente.`,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error('Error al optimizar imágenes:', error);
+      toast.error('Error al optimizar imágenes', {
+        description: 'Se usarán las imágenes sin optimizar.',
+        duration: 3000,
+      });
+      // Si falla la optimización, usar las imágenes originales
+      setEvidencias(prev => [...prev, ...files]);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setEvidenciaPreviews(prev => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
   };
 
   const removeEvidencia = (index: number) => {
@@ -526,7 +561,15 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                 
                 <div className="space-y-4">
                   {evidenciaPreviews.length === 0 && evidencias.length === 0 ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors relative">
+                      {isOptimizing && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                          <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Optimizando imágenes...</span>
+                          </div>
+                        </div>
+                      )}
                       <input
                         type="file"
                         multiple
@@ -534,8 +577,9 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                         onChange={handleEvidenciasUpload}
                         className="hidden"
                         id="evidencias-upload"
+                        disabled={isOptimizing}
                       />
-                      <label htmlFor="evidencias-upload" className="cursor-pointer">
+                      <label htmlFor="evidencias-upload" className={`cursor-pointer ${isOptimizing ? 'pointer-events-none opacity-50' : ''}`}>
                         <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-lg font-medium text-gray-600 mb-1">Seleccionar evidencias</p>
                         <p className="text-sm text-gray-500">JPG, PNG o WebP (máx. 5MB cada una, hasta 20 imágenes)</p>
@@ -581,7 +625,15 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                           </div>
                         ))}
                       </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center relative">
+                        {isOptimizing && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                            <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Optimizando imágenes...</span>
+                            </div>
+                          </div>
+                        )}
                         <input
                           type="file"
                           multiple
@@ -589,8 +641,9 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                           onChange={handleEvidenciasUpload}
                           className="hidden"
                           id="evidencias-upload-more"
+                          disabled={isOptimizing}
                         />
-                        <label htmlFor="evidencias-upload-more" className="cursor-pointer">
+                        <label htmlFor="evidencias-upload-more" className={`cursor-pointer ${isOptimizing ? 'pointer-events-none opacity-50' : ''}`}>
                           <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                           <p className="text-sm text-gray-600">Agregar más evidencias</p>
                         </label>

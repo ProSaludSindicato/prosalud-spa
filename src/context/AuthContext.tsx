@@ -40,30 +40,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      logger.info('Token found, attempting to load user', {
-        hasToken: !!token,
-        tokenLength: token.length,
-      });
+      logger.debug('Token found, attempting to load user');
 
       // Primero, intentar cargar el usuario desde localStorage para UI instantánea
       const cachedUser = authService.getUser();
       if (cachedUser) {
-        logger.info('Cached user found, setting immediately for instant UI', { 
-          userId: cachedUser.id,
-          email: cachedUser.email,
-        });
+        logger.debug('Cached user found, setting immediately for instant UI');
         setUser(cachedUser);
         // NO poner loading en false aquí - esperar validación del backend
       }
 
       // Luego, validar con el backend
       try {
-        logger.info('Validating token with backend...');
+        logger.debug('Validating token with backend...');
         const userData = await authService.me();
         
         // Verificar si el usuario está activo
         if (!userData.is_active) {
-          logger.warn('User account is not active', { userId: userData.id });
+          logger.warn('User account is not active');
           authService.clearSession();
           setUser(null);
           setLoading(false);
@@ -72,10 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Actualizar con datos frescos del backend
         setUser(userData);
-        logger.info('User validated successfully with backend', { 
-          userId: userData.id,
-          email: userData.email,
-        });
+        logger.debug('User validated successfully with backend');
         setLoading(false);
       } catch (error: any) {
         const errorStatus = error.response?.status;
@@ -93,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (errorMessage.includes('Invalid response structure')) {
           logger.error('Invalid response structure from backend', {
             error: errorMessage,
-            cachedUser: cachedUser ? { id: cachedUser.id, email: cachedUser.email } : null,
+            hasCachedUser: !!cachedUser,
           });
           // Si hay usuario en caché, mantenerlo
           if (cachedUser) {

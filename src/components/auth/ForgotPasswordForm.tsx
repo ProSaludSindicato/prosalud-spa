@@ -10,7 +10,7 @@ import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from '@/services/api';
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -38,29 +38,41 @@ const ForgotPasswordForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const response = await api.post('/api/auth/forgot-password', {
+        email: values.email,
       });
 
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        setIsEmailSent(true);
-        toast({
-          title: "¡Correo enviado!",
-          description: "Revisa tu bandeja de entrada para restablecer tu contraseña.",
-          className: "border-green-200 bg-green-50 text-green-800"
-        });
-      }
-    } catch (error) {
+      // Usar el mensaje de la API si está disponible, o el mensaje por defecto
+      const message = response.data?.message || 
+        "Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.";
+
+      setIsEmailSent(true);
       toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado. Intenta de nuevo más tarde.",
-        variant: "destructive"
+        title: "Solicitud procesada",
+        description: message,
+        className: "border-green-200 bg-green-50 text-green-800"
+      });
+    } catch (error: any) {
+      // Manejar errores de validación (422)
+      if (error.response?.status === 422) {
+        const errors = error.response.data?.errors;
+        if (errors?.email) {
+          toast({
+            title: "Error de validación",
+            description: Array.isArray(errors.email) ? errors.email[0] : errors.email,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      // Para cualquier otro error, mostrar el mensaje genérico por seguridad
+      // Esto previene la enumeración de usuarios
+      setIsEmailSent(true);
+      toast({
+        title: "Solicitud procesada",
+        description: "Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.",
+        className: "border-green-200 bg-green-50 text-green-800"
       });
     } finally {
       setIsSubmitting(false);
@@ -94,9 +106,9 @@ const ForgotPasswordForm: React.FC = () => {
         </motion.div>
         
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-primary-prosalud">Correo enviado</h1>
+          <h1 className="text-2xl font-bold text-primary-prosalud">Solicitud procesada</h1>
           <p className="text-muted-foreground">
-            Hemos enviado un enlace de recuperación a tu correo electrónico.
+            Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.
           </p>
           <p className="text-sm text-slate-500">
             Revisa tu bandeja de entrada y sigue las instrucciones para restablecer tu contraseña.

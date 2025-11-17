@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, X, Plus, Star, Image as ImageIcon, MapPin } from "lucide-react";
+import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
 import { logger } from "@/utils/logger";
+import { optimizeImages, isImageFile } from "@/utils/imageOptimizer";
 
 const formSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
@@ -57,6 +58,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [images, setImages] = useState<File[]>([]);
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const queryClient = useQueryClient();
 
   const form = useForm<FormData>({
@@ -199,7 +201,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     },
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
     if (images.length + files.length > 20) {
@@ -241,15 +243,48 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       }
     }
 
-    setImages((prev) => [...prev, ...files]);
+    // Optimizar imágenes antes de agregarlas
+    setIsOptimizing(true);
+    try {
+      const optimizedFiles = await optimizeImages(files);
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreviews((prev) => [...prev, e.target?.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+      setImages((prev) => [...prev, ...optimizedFiles]);
+
+      // Crear previews de las imágenes optimizadas
+      optimizedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreviews((prev) => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Notificar optimización
+      const imageCount = files.filter(f => isImageFile(f)).length;
+      if (imageCount > 0) {
+        toast.success("Imágenes optimizadas", {
+          description: `${imageCount} imagen(es) optimizada(s) exitosamente.`,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error al optimizar imágenes:", error);
+      toast.error("Error al optimizar imágenes", {
+        description: "Se usarán las imágenes sin optimizar.",
+        duration: 3000,
+      });
+      // Si falla la optimización, usar las imágenes originales
+      setImages((prev) => [...prev, ...files]);
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreviews((prev) => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
   };
 
   const removeImage = (index: number) => {
@@ -501,7 +536,15 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                 <CardContent>
                   <div className="space-y-4">
                     {!imagePreviews.length ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors relative">
+                        {isOptimizing && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                            <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Optimizando imágenes...</span>
+                            </div>
+                          </div>
+                        )}
                         <input
                           type="file"
                           multiple
@@ -509,8 +552,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                           onChange={handleImageUpload}
                           className="hidden"
                           id="image-upload"
+                          disabled={isOptimizing}
                         />
-                        <label htmlFor="image-upload" className="cursor-pointer">
+                        <label htmlFor="image-upload" className={`cursor-pointer ${isOptimizing ? 'pointer-events-none opacity-50' : ''}`}>
                           <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                           <p className="text-lg font-medium text-gray-600 mb-1">Seleccionar imágenes</p>
                           <p className="text-sm text-gray-500">JPG, PNG o WebP</p>
@@ -554,7 +598,15 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                             </div>
                           ))}
                         </div>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center relative">
+                          {isOptimizing && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
+                              <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Optimizando imágenes...</span>
+                              </div>
+                            </div>
+                          )}
                           <input
                             type="file"
                             multiple
@@ -562,8 +614,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                             onChange={handleImageUpload}
                             className="hidden"
                             id="image-upload-more"
+                            disabled={isOptimizing}
                           />
-                          <label htmlFor="image-upload-more" className="cursor-pointer">
+                          <label htmlFor="image-upload-more" className={`cursor-pointer ${isOptimizing ? 'pointer-events-none opacity-50' : ''}`}>
                             <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                             <p className="text-sm text-gray-600">Agregar más imágenes</p>
                           </label>

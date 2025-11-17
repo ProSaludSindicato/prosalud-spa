@@ -47,6 +47,7 @@
     "@uiw/react-json-view": "^2.0.0-alpha.36",
     "ai": "^5.0.60",
     "axios": "^1.12.1",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",

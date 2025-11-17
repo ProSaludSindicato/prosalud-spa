@@ -75,13 +75,15 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     key={option.value}
                     variant="secondary"
                     className="mr-1 mb-1"
-                    onClick={(e) => handleRemove(option.value, e)}
                   >
                     {option.label}
-                    <button
-                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    <span
+                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer inline-flex items-center"
+                      role="button"
+                      tabIndex={0}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           handleRemove(option.value, e as any);
                         }
                       }}
@@ -92,7 +94,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                       onClick={(e) => handleRemove(option.value, e)}
                     >
                       <X className="h-3 w-3 text-red-500 hover:text-red-700 transition-colors" />
-                    </button>
+                    </span>
                   </Badge>
                 ))}
                 {remainingCount > 0 && (

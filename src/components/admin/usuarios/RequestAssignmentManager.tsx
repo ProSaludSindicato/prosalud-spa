@@ -1,9 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { 
-  FileText, 
-  Users, 
+import {
+  FileText,
   Save, 
   Info,
   Award as Certificate,
@@ -15,16 +13,16 @@ import {
   CreditCard,
   LogOut,
   AlertTriangle,
-  User as UserIcon,
-  X
+  Layers
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { usersApi } from '@/services/adminApi';
+import { requestAssignmentsService } from '@/services/requestAssignmentsApi';
 import { User } from '@/types/admin';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -32,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import SaveAssignmentsModal from './SaveAssignmentsModal';
+import { getErrorMessage } from '@/utils/errorSanitizer';
 
 // Mapeo de iconos para cada tipo de solicitud
 const REQUEST_TYPE_ICONS: Record<string, React.ElementType> = {
@@ -106,6 +105,27 @@ const RequestAssignmentManager: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Obtener asignaciones desde el API
+  const { 
+    data: assignmentsResponse, 
+    isLoading: isLoadingAssignments, 
+    error: assignmentsError,
+    refetch: refetchAssignments 
+  } = useQuery({
+    queryKey: ['request-assignments'],
+    queryFn: () => requestAssignmentsService.getAssignments(),
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    onError: (error: any) => {
+      const errorMessage = getErrorMessage(error);
+      toast({
+        title: "Error al cargar asignaciones",
+        description: errorMessage || "No se pudieron cargar las asignaciones. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const allUsers = useMemo(() => {
     return usersResponse?.data || [];
   }, [usersResponse]);
@@ -131,15 +151,21 @@ const RequestAssignmentManager: React.FC = () => {
     }));
   }, [activeUsers]);
 
-  // Inicializar estado inicial cuando se cargan los datos
+  // Inicializar estado cuando se cargan las asignaciones desde el API
   useEffect(() => {
-    if (usersResponse?.data && Object.keys(assignments).length === 0 && Object.keys(subtypeAssignments).length === 0) {
-      // Aquí se cargarían las asignaciones iniciales del backend
-      // Por ahora, inicializamos vacío
-      initialAssignmentsRef.current = {};
-      initialSubtypeAssignmentsRef.current = {};
+    if (assignmentsResponse) {
+      const loadedAssignments = assignmentsResponse.assignments || {};
+      const loadedSubtypeAssignments = assignmentsResponse.subtype_assignments || {};
+      
+      // Cargar asignaciones en el estado
+      setAssignments(loadedAssignments);
+      setSubtypeAssignments(loadedSubtypeAssignments);
+      
+      // Guardar como estado inicial para comparar cambios
+      initialAssignmentsRef.current = { ...loadedAssignments };
+      initialSubtypeAssignmentsRef.current = { ...loadedSubtypeAssignments };
     }
-  }, [usersResponse, assignments, subtypeAssignments]);
+  }, [assignmentsResponse]);
 
   // Filtrar tipos de solicitudes por búsqueda
   const filteredRequestTypes = useMemo(() => {
@@ -155,7 +181,13 @@ const RequestAssignmentManager: React.FC = () => {
   // Obtener asignaciones actuales para un tipo/subtipo
   const getCurrentAssignments = (requestType: string, subtype?: string): string[] => {
     if (subtype) {
-      return subtypeAssignments[requestType]?.[subtype] || [];
+      // Si hay asignación específica para el subtipo, retornarla
+      const specificSubtypeAssignment = subtypeAssignments[requestType]?.[subtype];
+      if (specificSubtypeAssignment && specificSubtypeAssignment.length > 0) {
+        return specificSubtypeAssignment;
+      }
+      // Si no hay asignación específica, retornar la asignación general como fallback
+      return assignments[requestType] || [];
     }
     return assignments[requestType] || [];
   };
@@ -308,10 +340,12 @@ const RequestAssignmentManager: React.FC = () => {
       const generalAssignments = assignments[requestType.value] || [];
       
       if (hasSubtypes) {
-        // Si tiene subtipos, verificar que cada subtipo tenga asignación
+        // Si tiene subtipos, verificar que cada subtipo tenga asignación (específica o general)
         hasSubtypes.forEach((subtype) => {
-          const currentSubtypeAssignments = subtypeAssignments[requestType.value]?.[subtype.value] || [];
-          if (currentSubtypeAssignments.length === 0) {
+          const specificSubtypeAssignments = subtypeAssignments[requestType.value]?.[subtype.value] || [];
+          // Un subtipo tiene asignación si tiene asignación específica O asignación general
+          const hasSubtypeAssignment = specificSubtypeAssignments.length > 0 || generalAssignments.length > 0;
+          if (!hasSubtypeAssignment) {
             unassignedSubtypes.push({
               type: requestType.value,
               subtype: subtype.value,
@@ -321,7 +355,7 @@ const RequestAssignmentManager: React.FC = () => {
           }
         });
         
-        // No es obligatorio tener asignación general si todos los subtipos tienen asignación
+        // No es obligatorio tener asignación general si todos los subtipos tienen asignación específica
       } else {
         // Si no tiene subtipos, debe tener asignación general
         if (generalAssignments.length === 0) {
@@ -401,22 +435,36 @@ const RequestAssignmentManager: React.FC = () => {
   const handleConfirmSave = async () => {
     setIsSaving(true);
     try {
-      // TODO: Conectar con el backend cuando esté listo
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulación
+      // Preparar payload para el API
+      const payload = {
+        assignments: { ...assignments },
+        subtype_assignments: { ...subtypeAssignments },
+      };
+
+      // Guardar en el backend
+      const savedData = await requestAssignmentsService.saveAssignments(payload);
       
-      // Actualizar estado inicial
-      initialAssignmentsRef.current = { ...assignments };
-      initialSubtypeAssignmentsRef.current = { ...subtypeAssignments };
+      // Actualizar estado con la respuesta del servidor
+      setAssignments(savedData.assignments || {});
+      setSubtypeAssignments(savedData.subtype_assignments || {});
+      
+      // Actualizar estado inicial para comparar cambios futuros
+      initialAssignmentsRef.current = { ...savedData.assignments };
+      initialSubtypeAssignmentsRef.current = { ...savedData.subtype_assignments };
+      
+      // Invalidar y recargar las asignaciones
+      await refetchAssignments();
       
       toast({
         title: "Asignaciones guardadas",
         description: "Las asignaciones se han guardado correctamente.",
       });
       setShowSaveModal(false);
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = getErrorMessage(error);
       toast({
-        title: "Error",
-        description: "No se pudieron guardar las asignaciones. Inténtalo de nuevo.",
+        title: "Error al guardar",
+        description: errorMessage || "No se pudieron guardar las asignaciones. Inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -446,10 +494,31 @@ const RequestAssignmentManager: React.FC = () => {
     }
   };
 
-  if (isLoadingUsers) {
+  if (isLoadingUsers || isLoadingAssignments) {
     return (
       <div className="flex justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-prosalud"></div>
+      </div>
+    );
+  }
+
+  // Mostrar error si falla la carga de asignaciones
+  if (assignmentsError) {
+    return (
+      <div className="space-y-4">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error al cargar asignaciones</AlertTitle>
+          <AlertDescription>
+            {getErrorMessage(assignmentsError) || "No se pudieron cargar las asignaciones. Por favor, recarga la página."}
+          </AlertDescription>
+        </Alert>
+        <Button 
+          onClick={() => refetchAssignments()} 
+          className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+        >
+          Reintentar
+        </Button>
       </div>
     );
   }
@@ -533,19 +602,39 @@ const RequestAssignmentManager: React.FC = () => {
               const needsAttention = !hasGeneralAssignment && !allSubtypesAssigned || hasInactiveInGeneral || hasInactiveInSubtypes;
 
               return (
-                <AccordionItem key={requestType.value} value={requestType.value} className="border-b">
+                <AccordionItem 
+                  key={requestType.value} 
+                  value={requestType.value} 
+                  className={cn(
+                    "border-b",
+                    hasSubtypes && "border-l-4 border-l-primary-prosalud"
+                  )}
+                >
                   <AccordionTrigger className="px-6 py-4 hover:no-underline">
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3 flex-1">
                         <div className={cn(
-                          "p-2 rounded-lg",
-                          needsAttention ? "bg-amber-100 text-amber-700" : "bg-primary-prosalud/10 text-primary-prosalud"
+                          "p-2 rounded-lg relative",
+                          needsAttention 
+                            ? "bg-amber-100 text-amber-700" 
+                            : "bg-primary-prosalud/10 text-primary-prosalud"
                         )}>
                           <IconComponent className="h-5 w-5" />
+                          {hasSubtypes && (
+                            <div className="absolute -top-1 -right-1 bg-primary-prosalud text-white rounded-full p-0.5">
+                              <Layers className="h-2.5 w-2.5" />
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col items-start">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-lg">{requestType.label}</span>
+                            {hasSubtypes && (
+                              <Badge variant="secondary" className="text-xs bg-primary-prosalud/10 text-primary-prosalud border-primary-prosalud/30">
+                                <Layers className="h-3 w-3 mr-1" />
+                                {hasSubtypes.length} {hasSubtypes.length === 1 ? 'subtipo' : 'subtipos'}
+                              </Badge>
+                            )}
                             {needsAttention && (
                               <Badge variant="destructive" className="text-xs">
                                 <AlertTriangle className="h-3 w-3 mr-1" />

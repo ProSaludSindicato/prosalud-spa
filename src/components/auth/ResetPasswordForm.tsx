@@ -6,13 +6,13 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Key, CheckCircle, X, Check } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, Key, CheckCircle, X, Check, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import api from '@/services/api';
 
-// Validador robusto de contraseñas
+// Validador de contraseñas seguras (mismo que DefinePasswordForm)
 const passwordSchema = z
   .string()
   .min(12, { message: "La contraseña debe tener al menos 12 caracteres." })
@@ -28,22 +28,6 @@ const passwordSchema = z
   })
   .refine((password) => /[!@#$%^&*()\-_=+[\]{};:,.<>/?]/.test(password), {
     message: "Debe incluir al menos un símbolo especial (!@#$%^&*()-_=+[]{};:,.<>/?).",
-  })
-  .refine((password) => {
-    const commonPasswords = [
-      'password', 'admin', 'administrador', 'prosalud', 'usuario',
-      '123456', 'qwerty', 'abcdef', '123456789', 'password123'
-    ];
-    return !commonPasswords.some(common => password.toLowerCase().includes(common));
-  }, {
-    message: "No usar palabras comunes como 'password', 'admin' o secuencias simples.",
-  })
-  .refine((password) => {
-    // Verificar que no sea una secuencia simple
-    const sequences = ['123456', 'abcdef', 'qwerty', '987654', 'fedcba'];
-    return !sequences.some(seq => password.toLowerCase().includes(seq));
-  }, {
-    message: "Evita secuencias simples como '123456' o 'qwerty'.",
   });
 
 const resetPasswordSchema = z.object({
@@ -63,13 +47,9 @@ const PasswordRequirements: React.FC<{ password: string }> = ({ password }) => {
     { test: (p: string) => /[A-Z]/.test(p), text: "Una letra mayúscula" },
     { test: (p: string) => /[a-z]/.test(p), text: "Una letra minúscula" },
     { test: (p: string) => /\d/.test(p), text: "Un número" },
-    { test: (p: string) => /[!@#$%^&*()\-_=+[\]{};:,.<>/?]/.test(p), text: "Un símbolo especial" },
-    { 
-      test: (p: string) => {
-        const commonPasswords = ['password', 'admin', 'administrador', 'prosalud', 'usuario', '123456', 'qwerty', 'abcdef'];
-        return !commonPasswords.some(common => p.toLowerCase().includes(common));
-      }, 
-      text: "Sin palabras comunes" 
+    {
+      test: (p: string) => /[!@#$%^&*()\-_=+[\]{};:,.<>/?]/.test(p),
+      text: "Un símbolo especial",
     },
   ];
 
@@ -81,7 +61,7 @@ const PasswordRequirements: React.FC<{ password: string }> = ({ password }) => {
         return (
           <div key={index} className="flex items-center gap-2 text-xs">
             {isValid ? (
-              <Check className="w-3 h-3 text-green-500" />
+              <CheckCircle className="w-3 h-3 text-green-500" />
             ) : (
               <X className="w-3 h-3 text-gray-400" />
             )}
@@ -103,6 +83,8 @@ const ResetPasswordForm: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -115,53 +97,78 @@ const ResetPasswordForm: React.FC = () => {
   const watchedPassword = form.watch("password");
 
   useEffect(() => {
-    // Verificar si hay parámetros de reseteo en la URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (!accessToken) {
-      toast({
-        title: "Enlace inválido",
-        description: "El enlace de recuperación no es válido o ha expirado.",
-        variant: "destructive"
-      });
-      navigate('/login');
+    // Obtener token de los query params
+    const urlToken = searchParams.get('token');
+    if (!urlToken) {
+      setLinkError(
+        'El enlace de recuperación no es válido o ha expirado. Por favor, solicita un nuevo enlace.'
+      );
+    } else {
+      setToken(urlToken);
     }
-  }, [searchParams, navigate, toast]);
+  }, [searchParams]);
 
   const onSubmit = async (values: ResetPasswordValues) => {
+    if (!token) {
+      setLinkError(
+        'El enlace de recuperación no es válido o ha expirado. Por favor, solicita un nuevo enlace.'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: values.password
+      await api.post('/api/auth/reset-password', {
+        token: token,
+        password: values.password,
+        password_confirmation: values.confirmPassword,
       });
 
-      if (error) {
+      setIsSuccess(true);
+      toast({
+        title: "¡Contraseña actualizada!",
+        description: "Tu contraseña ha sido restablecida exitosamente.",
+        className: "border-green-200 bg-green-50 text-green-800"
+      });
+      
+      // Redirigir al login después de 3 segundos
+      setTimeout(() => {
+        navigate('/auth/login');
+      }, 3000);
+    } catch (error: any) {
+      // Manejar errores de validación (422)
+      if (error.response?.status === 422) {
+        const errors = error.response.data?.errors;
+        let errorMessage = error.response.data?.message || 
+          "Los datos proporcionados no son válidos.";
+
+        // Si hay errores específicos de campos, mostrarlos
+        if (errors) {
+          const errorFields = Object.keys(errors);
+          if (errorFields.length > 0) {
+            const firstError = errors[errorFields[0]];
+            errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+          }
+        }
+
         toast({
-          title: "Error",
-          description: error.message,
+          title: "Error de validación",
+          description: errorMessage,
           variant: "destructive"
         });
       } else {
-        setIsSuccess(true);
-        toast({
-          title: "¡Contraseña actualizada!",
-          description: "Tu contraseña ha sido restablecida exitosamente.",
-          className: "border-green-200 bg-green-50 text-green-800"
-        });
+        // Otros errores (token inválido, expirado, etc.)
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error ||
+                            "Ocurrió un error al restablecer la contraseña. Verifica que el enlace no haya expirado.";
         
-        // Redirigir al login después de 3 segundos
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado. Intenta de nuevo más tarde.",
-        variant: "destructive"
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -175,6 +182,40 @@ const ResetPasswordForm: React.FC = () => {
       transition: { type: "spring", stiffness: 100, damping: 12 },
     },
   };
+
+  if (linkError) {
+    return (
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={itemVariants}
+        className="w-full bg-white text-center space-y-6"
+      >
+        <div className="flex justify-center">
+          <AlertTriangle className="h-16 w-16 text-amber-500" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-primary-prosalud">Enlace inválido</h1>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            {linkError}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Link to="/auth/forgot-password">
+            <Button variant="outline" className="w-full">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Solicitar nuevo enlace
+            </Button>
+          </Link>
+          <Link to="/auth/login">
+            <Button variant="ghost" className="w-full">
+              Volver al inicio de sesión
+            </Button>
+          </Link>
+        </div>
+      </motion.div>
+    );
+  }
 
   if (isSuccess) {
     return (
@@ -216,7 +257,7 @@ const ResetPasswordForm: React.FC = () => {
       <motion.div variants={itemVariants} className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary-prosalud">Restablecer contraseña</h1>
         <p className="text-muted-foreground mt-2">
-          Ingresa tu nueva contraseña. Asegúrate de que sea segura.
+          Crea una contraseña segura para restablecer el acceso a tu cuenta.
         </p>
       </motion.div>
 

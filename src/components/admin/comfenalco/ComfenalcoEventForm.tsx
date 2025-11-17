@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Upload, X, Calendar, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Upload, X, Calendar, Link as LinkIcon, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { comfenalcoApi } from '@/services/adminApi';
 import { ComfenalcoEvent, CreateComfenalcoEventData } from '@/types/admin';
 import { baseNameValidation, baseTextValidation, baseUrlValidation, baseCategoryValidation } from '@/hooks/useFormValidation';
+import { optimizeImage, isImageFile } from '@/utils/imageOptimizer';
 
 const formSchema = z.object({
   title: baseNameValidation.min(5, 'El título debe tener al menos 5 caracteres'),
@@ -37,6 +38,7 @@ interface ComfenalcoEventFormProps {
 const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClose }) => {
   const [bannerImage, setBannerImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -99,7 +101,7 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
     }
   });
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Validar tamaño del archivo
@@ -122,14 +124,52 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
         return;
       }
 
-      setBannerImage(file);
-      
-      // Crear preview local
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Optimizar imagen si es una imagen válida
+      if (isImageFile(file)) {
+        setIsOptimizing(true);
+        try {
+          const optimizedFile = await optimizeImage(file);
+          setBannerImage(optimizedFile);
+          
+          // Crear preview local con la imagen optimizada
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setImagePreview(e.target?.result as string);
+          };
+          reader.readAsDataURL(optimizedFile);
+
+          toast({
+            title: "Imagen optimizada",
+            description: "La imagen ha sido optimizada exitosamente.",
+            duration: 2000,
+          });
+        } catch (error) {
+          console.error('Error al optimizar imagen:', error);
+          toast({
+            title: "Error al optimizar imagen",
+            description: "Se usará la imagen sin optimizar.",
+            variant: "destructive",
+            duration: 3000,
+          });
+          // Si falla la optimización, usar la imagen original
+          setBannerImage(file);
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setImagePreview(e.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        } finally {
+          setIsOptimizing(false);
+        }
+      } else {
+        // Si no es imagen, usar directamente
+        setBannerImage(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -368,15 +408,24 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
               <CardContent>
                 <div className="space-y-4">
                   {!imagePreview ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-gray-400 transition-colors">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-gray-400 transition-colors relative">
+                      {isOptimizing && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-xl z-10">
+                          <div className="flex items-center gap-2 text-sm text-orange-600">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Optimizando imagen...</span>
+                          </div>
+                        </div>
+                      )}
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleImageUpload}
                         className="hidden"
                         id="banner-upload"
+                        disabled={isOptimizing}
                       />
-                      <label htmlFor="banner-upload" className="cursor-pointer">
+                      <label htmlFor="banner-upload" className={`cursor-pointer ${isOptimizing ? 'pointer-events-none opacity-50' : ''}`}>
                         <Upload className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                         <p className="text-xl font-medium text-gray-600 mb-2">Seleccionar imagen banner</p>
                         <p className="text-sm text-gray-500">JPG, PNG o WebP hasta 5MB</p>

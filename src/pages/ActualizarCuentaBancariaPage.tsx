@@ -13,6 +13,7 @@ import { submitRequest } from '@/services/requestsService';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-certificado/utils';
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { isObfuscated } from '@/utils/obfuscate';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
@@ -34,7 +35,27 @@ const formSchemaActualizarCuenta = z.object({
   municipio: z.string().optional(),
   telefonoFijo: z.string().optional(),
   celular: z.string().optional(),
-  correo: z.string().email("El correo electrónico debe ser válido.").optional().or(z.literal('')),
+  correo: z.string()
+    .optional()
+    .or(z.literal(''))
+    .refine(
+      (val) => {
+        // Si está vacío o undefined, es válido (es opcional)
+        if (!val || val.trim() === '') {
+          return true;
+        }
+        // Si el valor está ofuscado (contiene asteriscos), no validar formato de email
+        // porque el usuario no lo ha modificado
+        if (isObfuscated(val)) {
+          return true;
+        }
+        // Si no está ofuscado, validar que sea un email válido
+        return z.string().email().safeParse(val).success;
+      },
+      {
+        message: "El correo electrónico debe ser válido.",
+      }
+    ),
   tallaUniforme: z.string().optional(),
   
   // Nivel educativo (opcional - solo si se quiere actualizar)

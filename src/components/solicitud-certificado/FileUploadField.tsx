@@ -1,11 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Control, ControllerRenderProps, FieldValues } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import { FileCheck, FileX } from 'lucide-react';
+import { FileCheck, FileX, Loader2 } from 'lucide-react';
 import { formatFileSize } from './utils';
+import { optimizeFileList, isImageFile } from '@/utils/imageOptimizer';
+import { toast } from 'sonner';
 
 interface FileUploadFieldProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -35,6 +37,7 @@ const FileUploadField = <TFieldValues extends FieldValues>({
   onFileChange,
 }: FileUploadFieldProps<TFieldValues>) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const handleRemoveFile = (field: ControllerRenderProps<TFieldValues, any>, indexToRemove: number) => {
     if (!multiple) {
@@ -72,13 +75,22 @@ const FileUploadField = <TFieldValues extends FieldValues>({
           <FormItem className={className}>
             <FormLabel>{label}{isRequired && " *"}</FormLabel>
             <FormControl>
-              <div>
+              <div className="relative">
+                {isOptimizing && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
+                    <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Optimizando imágenes...</span>
+                    </div>
+                  </div>
+                )}
                 <Input
                   type="file"
                   accept={accept}
                   multiple={multiple}
                   ref={inputRef}
-                  onChange={(e) => {
+                  disabled={isOptimizing}
+                  onChange={async (e) => {
                     if (!e.target.files || e.target.files.length === 0) {
                       field.onChange(undefined);
                       return;
@@ -90,7 +102,46 @@ const FileUploadField = <TFieldValues extends FieldValues>({
                       return;
                     }
 
-                    field.onChange(e.target.files);
+                    // Verificar si hay imágenes para optimizar
+                    const filesArray = Array.from(e.target.files);
+                    const hasImages = filesArray.some(file => isImageFile(file));
+
+                    if (hasImages) {
+                      setIsOptimizing(true);
+                      try {
+                        // Optimizar solo las imágenes
+                        const optimizedFiles = await optimizeFileList(e.target.files);
+
+                        // Crear un nuevo FileList con los archivos optimizados
+                        const dataTransfer = new DataTransfer();
+                        optimizedFiles.forEach(file => dataTransfer.items.add(file));
+
+                        field.onChange(dataTransfer.files);
+
+                        // Mostrar notificación de optimización
+                        const imageCount = filesArray.filter(f => isImageFile(f)).length;
+                        if (imageCount > 0) {
+                          toast.success('Imágenes optimizadas', {
+                            description: `${imageCount} imagen(es) optimizada(s) exitosamente.`,
+                            duration: 2000,
+                          });
+                        }
+                      } catch (error) {
+                        console.error('Error al optimizar imágenes:', error);
+                        toast.error('Error al optimizar imágenes', {
+                          description: 'Se subirán las imágenes sin optimizar.',
+                          duration: 3000,
+                        });
+                        // Si falla la optimización, usar los archivos originales
+                        field.onChange(e.target.files);
+                      } finally {
+                        setIsOptimizing(false);
+                      }
+                    } else {
+                      // Si no hay imágenes, usar los archivos directamente
+                      field.onChange(e.target.files);
+                    }
+
                     // Limpiar errores cuando se carga un archivo
                     // Si hay un callback, llamarlo para limpiar errores
                     if (onFileChange) {
