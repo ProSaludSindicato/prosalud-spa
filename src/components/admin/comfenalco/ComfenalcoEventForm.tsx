@@ -13,14 +13,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { comfenalcoApi } from '@/services/adminApi';
-import { ComfenalcoEvent, CreateComfenalcoEventData } from '@/types/admin';
+import type { ComfenalcoEvent as AdminComfenalcoEvent } from '@/types/admin';
+import { CreateComfenalcoEventData, UpdateComfenalcoEventData } from '@/types/comfenalco';
 import { baseNameValidation, baseTextValidation, baseUrlValidation, baseCategoryValidation } from '@/hooks/useFormValidation';
 import { optimizeImage, isImageFile } from '@/utils/imageOptimizer';
 
 const formSchema = z.object({
   title: baseNameValidation.min(5, 'El título debe tener al menos 5 caracteres'),
   registrationLink: baseUrlValidation,
-  formLink: baseUrlValidation,
   category: baseCategoryValidation,
   displaySize: z.enum(['carousel', 'mosaic']),
   description: baseTextValidation.optional(),
@@ -31,7 +31,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 interface ComfenalcoEventFormProps {
-  event?: ComfenalcoEvent | null;
+  event?: AdminComfenalcoEvent | null;
   onClose: () => void;
 }
 
@@ -47,7 +47,6 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
     defaultValues: {
       title: event?.title || '',
       registrationLink: event?.registrationLink || '',
-      formLink: event?.formLink || '',
       category: event?.category || '',
       displaySize: event?.displaySize || 'carousel',
       description: event?.description || '',
@@ -82,8 +81,8 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<CreateComfenalcoEventData & { isVisible: boolean }>) => 
-      comfenalcoApi.updateEvent(event!.id, data),
+    mutationFn: (data: UpdateComfenalcoEventData) => 
+      comfenalcoApi.updateEvent(typeof event!.id === 'string' ? Number(event!.id) : event!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comfenalco-events'] });
       toast({
@@ -189,22 +188,47 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
     }
 
     try {
-      const eventData: CreateComfenalcoEventData = {
-        title: data.title.trim(),
-        bannerImage: bannerImage || null, // Enviar el archivo directamente
-        description: data.description?.trim() || undefined,
-        registrationDeadline: data.registrationDeadline || undefined,
-        eventDate: data.eventDate || undefined,
-        registrationLink: data.registrationLink.trim(),
-        formLink: data.formLink.trim(),
-        category: data.category.trim(),
-        displaySize: data.displaySize
-      };
-
       if (event) {
-        updateMutation.mutate(eventData);
+        // Para actualización, usar UpdateComfenalcoEventData (snake_case)
+        const updateData: UpdateComfenalcoEventData & { banner_image?: File } = {
+          title: data.title.trim(),
+          category: data.category.trim(),
+          description: data.description?.trim() || undefined,
+          display_size: data.displaySize,
+          event_date: data.eventDate || undefined,
+          registration_deadline: data.registrationDeadline || undefined,
+          registration_link: data.registrationLink.trim(),
+        };
+        
+        // Si hay una nueva imagen, incluirla
+        if (bannerImage) {
+          updateData.banner_image = bannerImage;
+        }
+        
+        updateMutation.mutate(updateData);
       } else {
-        createMutation.mutate(eventData);
+        // Para creación, usar CreateComfenalcoEventData (snake_case, banner_image requerido)
+        if (!bannerImage) {
+          toast({
+            title: "Imagen requerida",
+            description: "Debes subir una imagen banner para crear el evento.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        const createData: CreateComfenalcoEventData = {
+          title: data.title.trim(),
+          banner_image: bannerImage,
+          category: data.category.trim(),
+          description: data.description?.trim() || undefined,
+          display_size: data.displaySize,
+          event_date: data.eventDate || undefined,
+          registration_deadline: data.registrationDeadline || undefined,
+          registration_link: data.registrationLink.trim(),
+        };
+        
+        createMutation.mutate(createData);
       }
     } catch (error) {
       toast({
@@ -361,37 +385,20 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="registrationLink" className="text-sm font-semibold">
-                      Enlace de Registro *
-                    </Label>
-                    <Input
-                      id="registrationLink"
-                      type="url"
-                      {...form.register('registrationLink')}
-                      placeholder="https://comfenalco.com/registro"
-                      className="h-12"
-                    />
-                    {form.formState.errors.registrationLink && (
-                      <p className="text-destructive text-sm">{form.formState.errors.registrationLink.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="formLink" className="text-sm font-semibold">
-                      Enlace del Formulario *
-                    </Label>
-                    <Input
-                      id="formLink"
-                      type="url"
-                      {...form.register('formLink')}
-                      placeholder="https://forms.comfenalco.com/experiencia"
-                      className="h-12"
-                    />
-                    {form.formState.errors.formLink && (
-                      <p className="text-destructive text-sm">{form.formState.errors.formLink.message}</p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="registrationLink" className="text-sm font-semibold">
+                    Enlace de Registro *
+                  </Label>
+                  <Input
+                    id="registrationLink"
+                    type="url"
+                    {...form.register('registrationLink')}
+                    placeholder="https://comfenalco.com/registro"
+                    className="h-12"
+                  />
+                  {form.formState.errors.registrationLink && (
+                    <p className="text-destructive text-sm">{form.formState.errors.registrationLink.message}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

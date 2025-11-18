@@ -85,7 +85,6 @@ interface InventoryContextValue {
     notes?: string;
     items: Array<{ productId: string; variantId?: string; quantity: number }>;
   }) => Promise<InventoryEntry>;
-  refreshEntries: () => Promise<void>;
   getEntryById: (id: string) => Promise<InventoryEntry>;
   
   // Hospital request operations
@@ -183,10 +182,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await inventoryApiService.getCategories({ page: 1, pageSize: 100 });
       setCategories(response.data);
       logger.debug('Categories loaded', { count: response.data.length });
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar categorías';
       setCategoriesError(message);
-      logger.error('Error loading categories', error);
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error loading categories', error);
+      }
     } finally {
       setCategoriesLoading(false);
     }
@@ -215,10 +220,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await inventoryApiService.getEntries({ page: 1, pageSize: 50 });
       setEntries(response.data);
       logger.debug('Inventory entries loaded', { count: response.data.length });
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar entradas de inventario';
       setEntriesError(message);
-      logger.error('Error loading entries', error);
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error loading entries', error);
+      }
     } finally {
       setEntriesLoading(false);
     }
@@ -232,10 +243,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await inventoryApiService.getProducts({ page: 1, pageSize: 100 });
       setProducts(response.data);
       logger.debug('Products loaded', { count: response.data.length });
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar productos';
       setProductsError(message);
-      logger.error('Error loading products', error);
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error loading products', error);
+      }
     } finally {
       setProductsLoading(false);
     }
@@ -268,10 +285,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const data = await inventoryApiService.getDashboard();
       setDashboardData(data);
       logger.debug('Dashboard data loaded');
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar resumen';
       setDashboardError(message);
-      logger.error('Error loading dashboard', error);
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error loading dashboard', error);
+      }
     } finally {
       setDashboardLoading(false);
     }
@@ -283,8 +306,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const colors = await inventoryApiService.getColors();
       setColorOptions(colors);
       logger.debug('Colors loaded', { count: colors.length });
-    } catch (error) {
-      logger.error('Error loading colors, using fallback', error);
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error loading colors, using fallback', error);
+      }
       // Keep initial color options as fallback
     }
   }, []);

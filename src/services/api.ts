@@ -96,35 +96,43 @@ authenticatedApi.interceptors.response.use(
     return response;
   },
   (error) => {
-    logger.error("Authenticated API request error", {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: error.message,
-      code: error.code,
-    });
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    const currentPath = window.location.pathname;
+    const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+    const isDashboardQuery = url.includes('/dashboard') || url.includes('/stats') || url.includes('/deliveries');
 
-    // Si recibimos 401, NO hacer nada aquí
-    // Dejar que AuthContext maneje completamente la limpieza de sesión
-    // Esto evita limpiar la sesión prematuramente durante la validación inicial
-    if (error.response?.status === 401) {
-      const isAuthValidation = error.config?.url?.includes('/api/auth/me');
+    // Para errores 403 (permisos), no loguear como error - es lógica de negocio
+    if (status === 403) {
+      logger.debug('403 Forbidden - Permission denied (expected behavior)', {
+        url,
+        currentPath,
+        isDashboard,
+        isDashboardQuery,
+      });
+    } else if (status === 401) {
+      // Si recibimos 401, NO hacer nada aquí
+      // Dejar que AuthContext maneje completamente la limpieza de sesión
+      // Esto evita limpiar la sesión prematuramente durante la validación inicial
+      const isAuthValidation = url.includes('/api/auth/me');
       
       logger.warn('Unauthorized request in authenticatedApi', {
-        url: error.config?.url,
-        currentPath: window.location.pathname,
+        url,
+        currentPath,
         isAuthValidation,
       });
       
       // NO limpiar ni redirigir aquí - AuthContext lo manejará
       // Solo loguear para debugging
-    }
-
-    // Si recibimos 403 (cuenta desactivada u otro error de autorización)
-    if (error.response?.status === 403) {
-      logger.warn('Forbidden access', {
-        url: error.config?.url,
+    } else {
+      // Para otros errores, loguear normalmente
+      logger.error("Authenticated API request error", {
+        url,
+        method: error.config?.method,
+        status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        code: error.code,
       });
     }
     

@@ -15,17 +15,29 @@ export const useApiErrorHandler = () => {
         if (error.response?.status === 403) {
           const url = error.config?.url || '';
           const message = error.response?.data?.message || 'No tienes permisos para realizar esta acción.';
+          const currentPath = window.location.pathname;
           
-          logger.warn('403 Forbidden - Permission denied', {
+          // No mostrar toasts de permisos en el dashboard - es lógica de negocio, no un error
+          const isDashboard = currentPath.includes('/admin') && currentPath.endsWith('/admin') || currentPath === '/admin';
+          const isDashboardQuery = url.includes('/dashboard') || url.includes('/stats') || url.includes('/deliveries');
+          
+          // Solo loguear como info/debug, no como error o warning
+          logger.debug('403 Forbidden - Permission denied (expected behavior)', {
             url,
             message,
-            user: error.response?.data?.user,
+            currentPath,
+            isDashboard,
+            isDashboardQuery,
           });
 
-          toast.error('Permiso Denegado', {
-            description: message,
-            duration: 5000,
-          });
+          // Solo mostrar toast si NO es una query del dashboard
+          // Las queries del dashboard con permisos insuficientes son comportamiento esperado
+          if (!isDashboard && !isDashboardQuery) {
+            toast.error('Permiso Denegado', {
+              description: message,
+              duration: 5000,
+            });
+          }
         }
 
         return Promise.reject(error);

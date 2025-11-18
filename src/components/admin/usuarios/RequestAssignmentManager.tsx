@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { usersApi } from '@/services/adminApi';
-import { requestAssignmentsService } from '@/services/requestAssignmentsApi';
+import { requestAssignmentsService, type RequestAssignmentsResponse } from '@/services/requestAssignmentsApi';
 import { User } from '@/types/admin';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -111,20 +111,23 @@ const RequestAssignmentManager: React.FC = () => {
     isLoading: isLoadingAssignments, 
     error: assignmentsError,
     refetch: refetchAssignments 
-  } = useQuery({
+  } = useQuery<RequestAssignmentsResponse>({
     queryKey: ['request-assignments'],
     queryFn: () => requestAssignmentsService.getAssignments(),
     staleTime: 5 * 60 * 1000,
     retry: 2,
-    onError: (error: any) => {
-      const errorMessage = getErrorMessage(error);
+  });
+
+  useEffect(() => {
+    if (assignmentsError) {
+      const errorMessage = getErrorMessage(assignmentsError);
       toast({
         title: "Error al cargar asignaciones",
         description: errorMessage || "No se pudieron cargar las asignaciones. Inténtalo de nuevo.",
         variant: "destructive",
       });
-    },
-  });
+    }
+  }, [assignmentsError, toast]);
 
   const allUsers = useMemo(() => {
     return usersResponse?.data || [];

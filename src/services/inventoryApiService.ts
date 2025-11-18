@@ -420,19 +420,30 @@ export const inventoryApiService = {
       const endpoint = `${BASE_PATH}/dashboard`;
       logger.debug('Fetching dashboard data', { endpoint });
       
-      const response = await api.get<{ success: boolean; data: DashboardData } | ApiSingleResponse<DashboardData>>(endpoint);
+      const response = await api.get<{ success: boolean; data: DashboardData } | ApiSingleResponse<DashboardData> | DashboardData>(endpoint);
       
       // Manejar diferentes estructuras de respuesta
-      if (response.data && 'success' in response.data && response.data.success) {
-        return response.data.data;
-      } else if (response.data && 'data' in response.data) {
-        return response.data.data;
-      } else {
-        // Si la respuesta es directamente el objeto DashboardData
-        return response.data as DashboardData;
+      if (response.data && typeof response.data === 'object') {
+        // Si tiene 'success' y 'data', es una respuesta envuelta (ApiSingleResponse o similar)
+        if ('success' in response.data && 'data' in response.data) {
+          return (response.data as { success: boolean; data: DashboardData }).data;
+        }
+        // Si tiene las propiedades de DashboardData directamente, es el objeto
+        if ('categories' in response.data && 'low_stock_products' in response.data && 'requests_summary' in response.data) {
+          return response.data as DashboardData;
+        }
       }
-    } catch (error) {
-      logger.error('Error fetching dashboard data', error);
+      
+      // Fallback: intentar cast directo
+      return response.data as unknown as DashboardData;
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error fetching dashboard data', error);
+      }
       throw error;
     }
   },
@@ -469,11 +480,18 @@ export const inventoryApiService = {
       const normalizedData = categoriesData.map(normalizeCategory);
       
       return {
+        success: true,
         data: normalizedData,
         pagination: paginationData,
       };
-    } catch (error) {
-      logger.error('Error fetching categories', error);
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error fetching categories', error);
+      }
       throw error;
     }
   },
@@ -588,8 +606,14 @@ export const inventoryApiService = {
         ...response.data,
         data: normalizedData,
       };
-    } catch (error) {
-      logger.error('Error fetching products', error);
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error fetching products', error);
+      }
       throw error;
     }
   },
@@ -659,8 +683,14 @@ export const inventoryApiService = {
         ...response.data,
         data: normalizedData,
       };
-    } catch (error) {
-      logger.error('Error fetching inventory entries', error);
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error fetching inventory entries', error);
+      }
       throw error;
     }
   },
@@ -700,8 +730,14 @@ export const inventoryApiService = {
       
       const response = await api.get<ApiSingleResponse<InventoryColorOption[]>>(endpoint);
       return response.data.data;
-    } catch (error) {
-      logger.error('Error fetching colors', error);
+    } catch (error: any) {
+      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      const status = error?.response?.status || error?.status;
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (status !== 403 || !isDashboard) {
+        logger.error('Error fetching colors', error);
+      }
       throw error;
     }
   },

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShieldCheck,
@@ -132,6 +133,8 @@ const isRecentDelivery = (dateString: string): boolean => {
 
 const AdminSstPage: React.FC = () => {
   const { toast } = useToast();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [affiliates, setAffiliates] = useState<SstAffiliate[]>([]);
   const [totalAffiliates, setTotalAffiliates] = useState(0);
   const [hospitalOptions, setHospitalOptions] = useState<string[]>([]);
@@ -244,6 +247,74 @@ const AdminSstPage: React.FC = () => {
       controller.abort();
     };
   }, [currentPage, itemsPerPage, hospitalFilter, listFilterTerm, showFeedbackBanner]);
+
+  // Read search parameter from URL and set searchTerm, then auto-search
+  useEffect(() => {
+    const searchParam = searchParams.get('search');
+    if (searchParam) {
+      const trimmed = searchParam.trim();
+      // Remove the search parameter from URL immediately to prevent re-triggering
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('search');
+      setSearchParams(newSearchParams, { replace: true });
+      
+      // Set search term
+      setSearchTerm(trimmed);
+      
+      // Parse document type and number from format "TYPE-NUMBER" or just "NUMBER"
+      let documentType: SstDocumentType = 'CC';
+      let documentNumber = trimmed;
+      
+      if (trimmed.includes('-')) {
+        const parts = trimmed.split('-');
+        const possibleType = parts[0].toUpperCase();
+        // Check if first part is a valid document type
+        if (['CC', 'CE', 'TI', 'PA'].includes(possibleType)) {
+          documentType = possibleType as SstDocumentType;
+          documentNumber = parts.slice(1).join('-');
+        }
+      }
+      
+      // Auto-execute search if document number is valid (only digits after parsing)
+      if (documentNumber && /^\d+$/.test(documentNumber)) {
+        const controller = new AbortController();
+        setIsSearchingAffiliate(true);
+        sstAdminService.getAffiliateByDocument(documentType, documentNumber, controller.signal)
+          .then((affiliate) => {
+            if (affiliate) {
+              handleSelectAffiliate(affiliate);
+            } else {
+              showFeedbackBanner(
+                'error',
+                'Afiliado no encontrado',
+                'No se encontró un afiliado con el número de documento proporcionado.',
+              );
+              toast({
+                title: 'Afiliado no encontrado',
+                description: 'No se encontró un afiliado con el número de documento proporcionado.',
+                variant: 'destructive',
+                duration: 5000,
+              });
+              setSelectedAffiliate(null);
+              setShowAffiliateList(true);
+            }
+            setIsSearchingAffiliate(false);
+          })
+          .catch((error) => {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              return;
+            }
+            logger.error('Error al buscar afiliado automáticamente', error instanceof Error ? error.message : error);
+            setIsSearchingAffiliate(false);
+          });
+        
+        return () => {
+          controller.abort();
+        };
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     let isMounted = true;

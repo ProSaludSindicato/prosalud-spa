@@ -241,16 +241,45 @@ export const comfenalcoEventsApi = {
    * Update a Comfenalco event
    * PUT /api/comfenalco-events/{id}
    * PATCH /api/comfenalco-events/{id}
+   * Supports both JSON and FormData (when updating with new image)
    */
-  async updateEvent(id: number, data: UpdateComfenalcoEventData): Promise<ComfenalcoEvent> {
+  async updateEvent(id: number, data: UpdateComfenalcoEventData | (UpdateComfenalcoEventData & { banner_image?: File })): Promise<ComfenalcoEvent> {
     try {
-      const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
-        method: 'PUT',
-        headers: getAuthHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(data),
-      });
+      // Check if we need to send FormData (when banner_image is present)
+      const hasNewImage = 'banner_image' in data && data.banner_image instanceof File;
+      
+      let response: Response;
+      
+      if (hasNewImage) {
+        // Use FormData when updating with new image
+        const formData = new FormData();
+        const updateData = data as UpdateComfenalcoEventData & { banner_image?: File };
+        
+        if (updateData.title) formData.append('title', updateData.title);
+        if (updateData.banner_image) formData.append('banner_image', updateData.banner_image);
+        if (updateData.category) formData.append('category', updateData.category);
+        if (updateData.description) formData.append('description', updateData.description);
+        if (updateData.display_size) formData.append('display_size', updateData.display_size);
+        if (updateData.event_date) formData.append('event_date', updateData.event_date);
+        if (updateData.registration_deadline) formData.append('registration_deadline', updateData.registration_deadline);
+        if (updateData.registration_link) formData.append('registration_link', updateData.registration_link);
+        if (updateData.is_visible !== undefined) formData.append('is_visible', updateData.is_visible.toString());
+        
+        response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(), // No incluir Content-Type para FormData
+          body: formData,
+        });
+      } else {
+        // Use JSON for regular updates
+        response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
+          method: 'PUT',
+          headers: getAuthHeaders({
+            'Content-Type': 'application/json',
+          }),
+          body: JSON.stringify(data),
+        });
+      }
 
       if (!response.ok) {
         await handleApiError(response);

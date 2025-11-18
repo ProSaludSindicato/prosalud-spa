@@ -1,4 +1,4 @@
-import imageCompression from 'browser-image-compression';
+import imageCompression, { type Options } from 'browser-image-compression';
 
 /**
  * Tipos MIME de imágenes soportadas
@@ -67,7 +67,7 @@ function supportsWebP(): boolean {
  */
 export async function optimizeImage(
   file: File,
-  options?: Partial<imageCompression.Options>
+  options?: Partial<Options>
 ): Promise<File> {
   if (!isImageFile(file)) {
     throw new Error('El archivo no es una imagen válida');
@@ -90,7 +90,7 @@ export async function optimizeImage(
   // Calidad media para otros formatos (0.75)
   const quality = shouldConvertToWebP ? 0.85 : 0.75;
 
-  const compressionOptions: imageCompression.Options = {
+  const compressionOptions: Options = {
     maxSizeMB: targetSizeMB,
     maxWidthOrHeight: 1920, // Reducir resolución solo si es necesario (mantiene calidad)
     useWebWorker: true,
@@ -158,7 +158,7 @@ export async function optimizeImage(
  */
 export async function optimizeImages(
   files: File[],
-  options?: Partial<imageCompression.Options>
+  options?: Partial<Options>
 ): Promise<File[]> {
   // Separar imágenes de otros archivos
   const imageFiles = files.filter(isImageFile);
@@ -182,7 +182,7 @@ export async function optimizeImages(
  */
 export async function optimizeFileList(
   fileList: FileList,
-  options?: Partial<imageCompression.Options>
+  options?: Partial<Options>
 ): Promise<File[]> {
   const files = Array.from(fileList);
   return optimizeImages(files, options);

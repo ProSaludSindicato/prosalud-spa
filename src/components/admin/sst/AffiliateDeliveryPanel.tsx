@@ -153,7 +153,7 @@ export function AffiliateDeliveryPanel({
 
       if (colorGroups.size <= 1) {
         const entry = colorGroups.values().next().value as
-          | { label?: string; hex?: string; variants: SstInventoryVariant[] }
+          | { label?: string; colorId?: string; hex?: string; variants: SstInventoryVariant[] }
           | undefined;
         return [
           {
@@ -328,6 +328,7 @@ const renderColorSwatch = (color?: string) => {
     if (carnetSelected) {
       items.push({
         itemId: '__carnet__',
+        variant: undefined,
         quantity: 1,
       });
     }

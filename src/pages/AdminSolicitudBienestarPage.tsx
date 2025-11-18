@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -160,6 +161,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
 const AdminSolicitudBienestarPage: React.FC = () => {
   const { can } = usePermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSolicitud, setSelectedSolicitud] = useState<WellnessRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [solicitudToRespond, setSolicitudToRespond] = useState<WellnessRequest | null>(null);
@@ -223,6 +225,21 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   const bienestarSolicitudes = wellnessRequestsData?.data || [];
   const pagination = wellnessRequestsData?.pagination;
+
+  // Open modal from URL parameter
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && bienestarSolicitudes.length > 0) {
+      const solicitud = bienestarSolicitudes.find(s => s.id.toString() === viewId);
+      if (solicitud) {
+        setSelectedSolicitud(solicitud);
+        // Remove the view parameter from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('view');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+    }
+  }, [searchParams, bienestarSolicitudes, setSearchParams]);
 
   // Ordenamiento local (si el backend no lo hace automáticamente)
   const sortedSolicitudes = React.useMemo(() => {

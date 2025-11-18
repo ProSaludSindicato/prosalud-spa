@@ -62,6 +62,33 @@ export const logger = {
     }
   },
   error: (...args: unknown[]) => {
+    // Filtrar errores 403 del dashboard - son lógica de negocio, no errores reales
+    const firstArg = args[0];
+    if (typeof firstArg === 'string' && firstArg.includes('403')) {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+      if (isDashboard) {
+        // No mostrar errores 403 del dashboard en la consola
+        return;
+      }
+    }
+    
+    // Verificar si el error es un objeto con status 403
+    if (typeof firstArg === 'object' && firstArg !== null) {
+      const errorObj = firstArg as any;
+      const status = errorObj?.response?.status || errorObj?.status;
+      if (status === 403) {
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+        const url = errorObj?.config?.url || errorObj?.url || '';
+        const isDashboardQuery = url.includes('/dashboard') || url.includes('/stats') || url.includes('/deliveries');
+        if (isDashboard || isDashboardQuery) {
+          // No mostrar errores 403 del dashboard en la consola
+          return;
+        }
+      }
+    }
+    
     // Siempre mostrar errores, especialmente en desarrollo
     if (isDebugEnabled || import.meta.env.DEV || import.meta.env.MODE !== 'production') {
       originalConsole.error(...redactSensitive(...args));

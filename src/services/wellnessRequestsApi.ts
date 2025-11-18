@@ -178,11 +178,23 @@ wellnessRequestsApi.interceptors.response.use(
     return response;
   },
   (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
+    const isDashboardQuery = url.includes('/dashboard') || url.includes('/stats') || url.includes('/deliveries');
+    
+    // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+    if (status === 403 && (isDashboard || isDashboardQuery)) {
+      // Silenciar errores 403 del dashboard
+      return Promise.reject(error);
+    }
+    
     logger.error('Wellness Request API response error', {
-      status: error.response?.status,
+      status,
       statusText: error.response?.statusText,
       message: error.message,
-      url: error.config?.url,
+      url,
     });
     return Promise.reject(error);
   },

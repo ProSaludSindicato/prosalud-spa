@@ -1,19 +1,29 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Users, GraduationCap, Heart, BarChart3, Handshake, Settings, Edit, Upload, Download, CheckCircle2 } from 'lucide-react';
+import { 
+  Users, GraduationCap, Heart, BarChart3, Settings, Upload, Download, CheckCircle2,
+  ClipboardList, Package, AlertCircle, ArrowRight, Clock, Loader2, TrendingUp, Activity
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import AdminLayout from '@/components/admin/AdminLayout';
-import MetricsCards from '@/components/admin/MetricsCards';
 import UserFormModal from '@/components/admin/usuarios/UserFormModal';
+import { useNavigate } from 'react-router-dom';
 
-import { configApi } from '@/services/adminApi';
 import { adminExcelFilesService, type AdminExcelFileType } from '@/services/adminExcelFilesService';
+import { usersApi } from '@/services/adminApi';
+import { requestsService } from '@/services/requestsServiceApi';
+import { wellnessRequestsService } from '@/services/wellnessRequestsApi';
+import { getWellnessEvents } from '@/services/wellnessEventsApi';
+import { comfenalcoEventsApi } from '@/services/comfenalcoEventsApi';
+import { inventoryApiService } from '@/services/inventoryApiService';
+import { sstAdminService } from '@/services/sstAdminService';
+import type { SstDeliveryRecord } from '@/types/adminSst';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FILE_PERMISSIONS } from '@/config/permissions';
@@ -75,40 +85,7 @@ const dashboardUploadConfigs: Record<DashboardUploadType, DashboardUploadConfig>
 
 const AdminDashboard: React.FC = () => {
   const { can } = usePermissions();
-  const [stats, setStats] = useState([
-    {
-      title: "Usuarios Activos",
-      value: "1.500",
-      change: "+12%",
-      icon: Users,
-      color: "text-primary-prosalud"
-    },
-    {
-      title: "Convenios Activos",
-      value: "7",
-      change: "+2",
-      icon: Handshake,
-      color: "text-secondary-prosaludgreen"
-    },
-    {
-      title: "Eventos de Bienestar",
-      value: "72",
-      change: "+8",
-      icon: Heart,
-      color: "text-accent-prosaludteal"
-    },
-    {
-      title: "Experiencias Comfenalco",
-      value: "12",
-      change: "+3",
-      icon: GraduationCap,
-      color: "text-orange-600"
-    }
-  ]);
-
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [editChange, setEditChange] = useState("");
+  const navigate = useNavigate();
   const [showUserModal, setShowUserModal] = useState(false);
   const [showUploadConfirmDialog, setShowUploadConfirmDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -118,32 +95,227 @@ const AdminDashboard: React.FC = () => {
   const [uploadingType, setUploadingType] = useState<AdminExcelFileType | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-
-  const { data: metrics, isLoading: loadingMetrics } = useQuery({
-    queryKey: ['site-metrics'],
-    queryFn: configApi.getMetrics
+  // Fetch real data from various modules
+  const { data: usersData, isLoading: loadingUsers } = useQuery({
+    queryKey: ['dashboard-users'],
+    queryFn: () => usersApi.getUsers(1, 1000, '', ''),
+    enabled: can('users.view'),
+    retry: false,
+    retryOnMount: false,
   });
 
-  const handleEditStat = (index: number) => {
-    setEditingIndex(index);
-    setEditValue(stats[index].value);
-    setEditChange(stats[index].change);
-  };
+  const { data: requestsStats, isLoading: loadingRequests } = useQuery({
+    queryKey: ['dashboard-requests-stats'],
+    queryFn: () => requestsService.getRequestStats(),
+    enabled: can('requests.view'),
+    retry: false,
+    retryOnMount: false,
+  });
 
-  const handleSaveStat = () => {
-    if (editingIndex !== null) {
-      const newStats = [...stats];
-      newStats[editingIndex] = {
-        ...newStats[editingIndex],
-        value: editValue,
-        change: editChange
-      };
-      setStats(newStats);
-      setEditingIndex(null);
-      setEditValue("");
-      setEditChange("");
+  const { data: allRequests, isLoading: loadingAllRequests } = useQuery({
+    queryKey: ['dashboard-all-requests'],
+    queryFn: () => requestsService.getRequests(),
+    enabled: can('requests.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  const { data: wellnessRequestsData, isLoading: loadingWellnessRequests } = useQuery({
+    queryKey: ['dashboard-wellness-requests'],
+    queryFn: () => wellnessRequestsService.getAllWellnessRequests({ per_page: 1000 }),
+    enabled: can('wellness_requests.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  const { data: wellnessEvents, isLoading: loadingWellnessEvents } = useQuery({
+    queryKey: ['dashboard-wellness-events'],
+    queryFn: () => getWellnessEvents(),
+    enabled: can('wellness_events.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  const { data: comfenalcoEvents, isLoading: loadingComfenalcoEvents } = useQuery({
+    queryKey: ['dashboard-comfenalco-events'],
+    queryFn: () => comfenalcoEventsApi.getEvents(),
+    enabled: can('comfenalco_events.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  const { data: inventoryDashboard, isLoading: loadingInventory } = useQuery({
+    queryKey: ['dashboard-inventory'],
+    queryFn: () => inventoryApiService.getDashboard(),
+    enabled: can('inventory.view_dashboard') || can('inventory.products.view') || can('hospital_requests.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  const { data: deliveriesData, isLoading: loadingDeliveries } = useQuery({
+    queryKey: ['dashboard-deliveries'],
+    queryFn: async () => {
+      const result = await sstAdminService.getDeliveryHistory({ page: 1, pageSize: 5 });
+      console.log('📦 Deliveries Data from API:', result);
+      console.log('📦 Deliveries Items:', result?.items);
+      if (result?.items && result.items.length > 0) {
+        console.log('📦 First Delivery Item:', result.items[0]);
+        console.log('📦 First Delivery Keys:', Object.keys(result.items[0]));
+      }
+      return result;
+    },
+    enabled: can('dotacion.view'),
+    retry: false,
+    retryOnMount: false,
+  });
+
+  // Calculate metrics based on real data
+  const metrics = useMemo(() => {
+    const activeUsers = usersData?.data.filter(u => u.isActive).length || 0;
+    const totalUsers = usersData?.total || 0;
+    
+    const pendingRequests = requestsStats?.pending || 0;
+    const inProgressRequests = requestsStats?.in_progress || 0;
+    const resolvedRequests = requestsStats?.resolved || 0;
+    const rejectedRequests = requestsStats?.rejected || 0;
+    const totalRequests = requestsStats?.total || 0;
+    const thisMonthRequests = requestsStats?.this_month || 0;
+
+    const pendingWellnessRequests = wellnessRequestsData?.data.filter(r => r.estado === 'pending').length || 0;
+    const inProgressWellnessRequests = wellnessRequestsData?.data.filter(r => r.estado === 'in_progress').length || 0;
+    const resolvedWellnessRequests = wellnessRequestsData?.data.filter(r => r.estado === 'resolved').length || 0;
+    const totalWellnessRequests = wellnessRequestsData?.pagination.total || 0;
+
+    const visibleWellnessEvents = wellnessEvents?.filter(e => e.isVisible).length || 0;
+    const totalWellnessEvents = wellnessEvents?.length || 0;
+
+    const visibleComfenalcoEvents = comfenalcoEvents?.filter(e => e.is_visible).length || 0;
+    const totalComfenalcoEvents = comfenalcoEvents?.length || 0;
+
+    const inventoryRequests = inventoryDashboard?.requests_summary || {
+      pending: 0,
+      approved: 0,
+      preparing: 0,
+      shipped: 0,
+      delivered: 0,
+      rejected: 0,
+    };
+    const lowStockProducts = inventoryDashboard?.low_stock_products.length || 0;
+
+    return {
+      users: { active: activeUsers, total: totalUsers },
+      requests: {
+        pending: pendingRequests,
+        inProgress: inProgressRequests,
+        resolved: resolvedRequests,
+        rejected: rejectedRequests,
+        total: totalRequests,
+        thisMonth: thisMonthRequests,
+        avgResolutionTime: requestsStats?.avg_resolution_time || 0,
+      },
+      wellnessRequests: {
+        pending: pendingWellnessRequests,
+        inProgress: inProgressWellnessRequests,
+        resolved: resolvedWellnessRequests,
+        total: totalWellnessRequests,
+      },
+      wellnessEvents: {
+        visible: visibleWellnessEvents,
+        total: totalWellnessEvents,
+      },
+      comfenalcoEvents: {
+        visible: visibleComfenalcoEvents,
+        total: totalComfenalcoEvents,
+      },
+      inventory: {
+        requests: inventoryRequests,
+        lowStock: lowStockProducts,
+      },
+    };
+  }, [
+    usersData,
+    requestsStats,
+    wellnessRequestsData,
+    wellnessEvents,
+    comfenalcoEvents,
+    inventoryDashboard,
+  ]);
+
+  // Calculate chart data
+  const chartData = useMemo(() => {
+    // Requests status distribution
+    const requestsStatusData = can('requests.view') ? [
+      { name: 'Pendientes', value: metrics.requests.pending, color: '#f59e0b' },
+      { name: 'En Progreso', value: metrics.requests.inProgress, color: '#3b82f6' },
+      { name: 'Resueltas', value: metrics.requests.resolved, color: '#10b981' },
+      { name: 'Rechazadas', value: metrics.requests.rejected, color: '#ef4444' },
+    ].filter(item => item.value > 0) : [];
+
+    // Wellness requests status distribution
+    const wellnessRequestsStatusData = can('wellness_requests.view') ? [
+      { name: 'Pendientes', value: metrics.wellnessRequests.pending, color: '#f59e0b' },
+      { name: 'En Progreso', value: metrics.wellnessRequests.inProgress, color: '#3b82f6' },
+      { name: 'Resueltas', value: metrics.wellnessRequests.resolved, color: '#10b981' },
+    ].filter(item => item.value > 0) : [];
+
+    // Inventory requests status
+    const inventoryStatusData = (can('inventory.view_dashboard') || can('hospital_requests.view')) ? [
+      { name: 'Pendientes', value: metrics.inventory.requests.pending, color: '#f59e0b' },
+      { name: 'Aprobadas', value: metrics.inventory.requests.approved, color: '#3b82f6' },
+      { name: 'Preparando', value: metrics.inventory.requests.preparing, color: '#8b5cf6' },
+      { name: 'Enviadas', value: metrics.inventory.requests.shipped, color: '#06b6d4' },
+      { name: 'Entregadas', value: metrics.inventory.requests.delivered || 0, color: '#10b981' },
+      { name: 'Rechazadas', value: metrics.inventory.requests.rejected || 0, color: '#ef4444' },
+    ].filter(item => item.value > 0) : [];
+
+    // Monthly trends (last 6 months) - Calculate from real data
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: date.toLocaleDateString('es-ES', { month: 'short' }),
+        fullMonth: date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+        year: date.getFullYear(),
+        monthIndex: date.getMonth(),
+      });
     }
-  };
+
+    // Calculate monthly data from actual requests
+    const monthlyRequestsData = months.map((m) => {
+      let solicitudesCount = 0;
+      let bienestarCount = 0;
+
+      // Count requests by month from actual data
+      if (allRequests && can('requests.view')) {
+        solicitudesCount = allRequests.filter((req) => {
+          const reqDate = new Date(req.created_at);
+          return reqDate.getFullYear() === m.year && reqDate.getMonth() === m.monthIndex;
+        }).length;
+      }
+
+      // Count wellness requests by month from actual data
+      if (wellnessRequestsData?.data && can('wellness_requests.view')) {
+        bienestarCount = wellnessRequestsData.data.filter((req) => {
+          const reqDate = new Date(req.created_at);
+          return reqDate.getFullYear() === m.year && reqDate.getMonth() === m.monthIndex;
+        }).length;
+      }
+
+      return {
+        month: m.month,
+        solicitudes: solicitudesCount,
+        bienestar: bienestarCount,
+      };
+    });
+
+    return {
+      requestsStatus: requestsStatusData,
+      wellnessRequestsStatus: wellnessRequestsStatusData,
+      inventoryStatus: inventoryStatusData,
+      monthlyTrends: monthlyRequestsData,
+    };
+  }, [metrics, can, allRequests, wellnessRequestsData]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -352,6 +524,228 @@ const AdminDashboard: React.FC = () => {
             </Card>
           </motion.div>
 
+          {/* Metrics Section - Moved before Quick Actions */}
+          <motion.div variants={itemVariants}>
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Métricas del Sistema</h2>
+              <p className="text-sm text-gray-600">Resumen de actividad y estado de los módulos</p>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              {/* Users Metric */}
+              {can('users.view') && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/usuarios')}
+                >
+                  <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-blue-700 line-clamp-2 flex-1">
+                        Usuarios Activos
+                      </CardTitle>
+                      <Users className="h-4 w-4 text-blue-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-blue-900 mb-1">
+                          {loadingUsers ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.users.active.toLocaleString()
+                          )}
+                        </div>
+                        <p className="text-xs text-blue-600">
+                          {loadingUsers ? 'Cargando...' : `de ${metrics.users.total.toLocaleString()} registrados`}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Requests Metric */}
+              {can('requests.view') && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/solicitudes')}
+                >
+                  <Card className="bg-gradient-to-br from-orange-50 to-red-100 border-orange-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-orange-700 line-clamp-2 flex-1">
+                        Solicitudes Pendientes
+                      </CardTitle>
+                      <ClipboardList className="h-4 w-4 text-orange-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-orange-900 mb-1">
+                          {loadingRequests ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.requests.pending
+                          )}
+                        </div>
+                        <p className="text-xs text-orange-600">
+                          {loadingRequests ? 'Cargando...' : (
+                            <>
+                              {metrics.requests.total} total{metrics.requests.thisMonth > 0 && ` • ${metrics.requests.thisMonth} este mes`}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Wellness Requests Metric */}
+              {can('wellness_requests.view') && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/solicitudes-bienestar')}
+                >
+                  <Card className="bg-gradient-to-br from-pink-50 to-rose-100 border-pink-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-pink-700 line-clamp-2 flex-1">
+                        Solicitudes Bienestar Pendientes
+                      </CardTitle>
+                      <Heart className="h-4 w-4 text-pink-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-pink-900 mb-1">
+                          {loadingWellnessRequests ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.wellnessRequests.pending
+                          )}
+                        </div>
+                        <p className="text-xs text-pink-600">
+                          {loadingWellnessRequests ? 'Cargando...' : (
+                            `${metrics.wellnessRequests.total} total`
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Wellness Events Metric */}
+              {can('wellness_events.view') && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/bienestar')}
+                >
+                  <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-green-700 line-clamp-2 flex-1">
+                        Eventos Bienestar Visibles
+                      </CardTitle>
+                      <Heart className="h-4 w-4 text-green-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-green-900 mb-1">
+                          {loadingWellnessEvents ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.wellnessEvents.visible
+                          )}
+                        </div>
+                        <p className="text-xs text-green-600">
+                          {loadingWellnessEvents ? 'Cargando...' : (
+                            `de ${metrics.wellnessEvents.total} eventos`
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Comfenalco Events Metric */}
+              {can('comfenalco_events.view') && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/comfenalco')}
+                >
+                  <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-purple-700 line-clamp-2 flex-1">
+                        Eventos Comfenalco Visibles
+                      </CardTitle>
+                      <GraduationCap className="h-4 w-4 text-purple-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-purple-900 mb-1">
+                          {loadingComfenalcoEvents ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.comfenalcoEvents.visible
+                          )}
+                        </div>
+                        <p className="text-xs text-purple-600">
+                          {loadingComfenalcoEvents ? 'Cargando...' : (
+                            `de ${metrics.comfenalcoEvents.total} eventos`
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Inventory Metric */}
+              {(can('inventory.view_dashboard') || can('hospital_requests.view')) && (
+                <motion.div
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.02 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate('/admin/inventario')}
+                >
+                  <Card className="bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 hover:shadow-lg transition-shadow h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4 min-h-[60px]">
+                      <CardTitle className="text-xs font-medium text-amber-700 line-clamp-2 flex-1">
+                        Solicitudes Hospitales Pendientes
+                      </CardTitle>
+                      <Package className="h-4 w-4 text-amber-600 flex-shrink-0 ml-2" />
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between px-4 pb-4 min-h-[80px]">
+                      <div className="mt-auto">
+                        <div className="text-2xl font-bold text-amber-900 mb-1">
+                          {loadingInventory ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            metrics.inventory.requests.pending
+                          )}
+                        </div>
+                        <p className="text-xs text-amber-600">
+                          {loadingInventory ? 'Cargando...' : (
+                            <>
+                              {metrics.inventory.lowStock > 0 ? `${metrics.inventory.lowStock} productos con stock bajo` : 'Sin alertas'}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
           {/* Quick Actions */}
           <motion.div variants={itemVariants}>
             <Card className="bg-white border shadow-sm">
@@ -378,18 +772,72 @@ const AdminDashboard: React.FC = () => {
                       <span className="font-medium text-text-dark">Crear Usuario</span>
                     </motion.button>
                   )}
-                  
+
                   {can('wellness_events.create') && (
-                    <motion.a
-                      href="/admin/bienestar?action=create"
+                    <motion.button
+                      type="button"
+                      onClick={() => navigate('/admin/bienestar?action=create')}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
                     >
                       <Heart className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
-                      <span className="font-medium text-text-dark">Nuevo Evento</span>
-                    </motion.a>
+                      <span className="font-medium text-text-dark">Nuevo Evento Bienestar</span>
+                    </motion.button>
                   )}
+
+                  {can('comfenalco_events.create') && (
+                    <motion.button
+                      type="button"
+                      onClick={() => navigate('/admin/comfenalco?action=create')}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <GraduationCap className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Nuevo Evento Comfenalco</span>
+                    </motion.button>
+                  )}
+
+                  {can('requests.view') && (
+                    <motion.button
+                      type="button"
+                      onClick={() => navigate('/admin/solicitudes')}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <ClipboardList className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Ver Solicitudes</span>
+                    </motion.button>
+                  )}
+
+                  {can('wellness_requests.view') && (
+                    <motion.button
+                      type="button"
+                      onClick={() => navigate('/admin/solicitudes-bienestar')}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <Heart className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Solicitudes Bienestar</span>
+                    </motion.button>
+                  )}
+
+                  {can('inventory.view_dashboard') && (
+                    <motion.button
+                      type="button"
+                      onClick={() => navigate('/admin/inventario')}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200"
+                    >
+                      <Package className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
+                      <span className="font-medium text-text-dark">Gestionar Inventario</span>
+                    </motion.button>
+                  )}
+
                   {can(FILE_PERMISSIONS.afiliados) && renderUploadButton('afiliados')}
                   {can(FILE_PERMISSIONS.incapacidades) && renderUploadButton('incapacidades')}
                   {can(FILE_PERMISSIONS.liquidaciones) && renderUploadButton('liquidaciones')}
@@ -405,21 +853,592 @@ const AdminDashboard: React.FC = () => {
             </Card>
           </motion.div>
 
-          {/* Main Metrics Section */}
-          <motion.div variants={itemVariants}>
+          {/* Recent Activity Section - Moved to top */}
+          <motion.div variants={itemVariants} className="space-y-6">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Métricas Principales</h2>
-              <p className="text-gray-600">Estadísticas principales de la organización</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Actividad Reciente</h2>
+              <p className="text-gray-600">Últimas acciones y registros del sistema</p>
             </div>
-            {loadingMetrics ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-40 bg-gray-200 rounded animate-pulse"></div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Requests */}
+              {can('requests.view') && (
+                <motion.div variants={itemVariants}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5 text-primary-prosalud" />
+                        Solicitudes Recientes
+                      </CardTitle>
+                      <CardDescription>
+                        Últimas 5 solicitudes registradas
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingAllRequests ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary-prosalud" />
+                        </div>
+                      ) : allRequests && allRequests.length > 0 ? (
+                        <div className="space-y-3">
+                          {allRequests
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .slice(0, 5)
+                            .map((request) => {
+                              const statusColors = {
+                                pending: 'bg-amber-100 text-amber-800',
+                                in_progress: 'bg-blue-100 text-blue-800',
+                                resolved: 'bg-green-100 text-green-800',
+                                rejected: 'bg-red-100 text-red-800',
+                              };
+                              const statusLabels = {
+                                pending: 'Pendiente',
+                                in_progress: 'En Progreso',
+                                resolved: 'Resuelta',
+                                rejected: 'Rechazada',
+                              };
+                              return (
+                                <div
+                                  key={request.id}
+                                  className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                  onClick={() => navigate(`/admin/solicitudes?view=${request.id}`)}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-medium text-slate-900 truncate">
+                                        {request.name} {request.last_name}
+                                      </span>
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded ${statusColors[request.status]}`}>
+                                        {statusLabels[request.status]}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 truncate">
+                                      {request.request_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      {new Date(request.created_at).toLocaleDateString('es-ES', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
+                                  <ArrowRight className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-slate-500">
+                          <ClipboardList className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+                          <p>No hay solicitudes recientes</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Recent Wellness Requests */}
+              {can('wellness_requests.view') && (
+                <motion.div variants={itemVariants}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Heart className="h-5 w-5 text-pink-600" />
+                        Solicitudes Bienestar Recientes
+                      </CardTitle>
+                      <CardDescription>
+                        Últimas 5 solicitudes de bienestar
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingWellnessRequests ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-pink-600" />
+                        </div>
+                      ) : wellnessRequestsData?.data && wellnessRequestsData.data.length > 0 ? (
+                        <div className="space-y-3">
+                          {wellnessRequestsData.data
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .slice(0, 5)
+                            .map((request) => {
+                              const statusColors = {
+                                pending: 'bg-amber-100 text-amber-800',
+                                in_progress: 'bg-blue-100 text-blue-800',
+                                resolved: 'bg-green-100 text-green-800',
+                                rejected: 'bg-red-100 text-red-800',
+                              };
+                              const statusLabels = {
+                                pending: 'Pendiente',
+                                in_progress: 'En Progreso',
+                                resolved: 'Resuelta',
+                                rejected: 'Rechazada',
+                              };
+                              return (
+                                <div
+                                  key={request.id}
+                                  className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                  onClick={() => navigate(`/admin/solicitudes-bienestar?view=${request.id}`)}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-medium text-slate-900 truncate">
+                                        {request.nombreActividad}
+                                      </span>
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded ${statusColors[request.estado]}`}>
+                                        {statusLabels[request.estado]}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 truncate">
+                                      {request.solicitante?.name || 'Solicitante no disponible'}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      {new Date(request.created_at).toLocaleDateString('es-ES', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
+                                  <ArrowRight className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-slate-500">
+                          <Heart className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+                          <p>No hay solicitudes de bienestar recientes</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Recent Events */}
+              {can('wellness_events.view') && (
+                <motion.div variants={itemVariants}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Heart className="h-5 w-5 text-green-600" />
+                        Eventos Bienestar Recientes
+                      </CardTitle>
+                      <CardDescription>
+                        Últimos 5 eventos de bienestar
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingWellnessEvents ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-green-600" />
+                        </div>
+                      ) : wellnessEvents && wellnessEvents.length > 0 ? (
+                        <div className="space-y-3">
+                          {wellnessEvents
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                            .slice(0, 5)
+                            .map((event) => (
+                              <div
+                                key={event.id}
+                                className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                onClick={() => navigate(`/admin/bienestar?id=${event.id}`)}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-medium text-slate-900 truncate">
+                                      {event.title}
+                                    </span>
+                                    {event.isVisible && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">
+                                        Visible
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-slate-600 truncate">
+                                    {event.category}
+                                  </p>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    {new Date(event.date).toLocaleDateString('es-ES', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </p>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                              </div>
                 ))}
               </div>
             ) : (
-              <MetricsCards metrics={metrics || { yearsExperience: 0, affiliatesCount: 0, conventionsCount: 0 }} />
+                        <div className="text-center py-8 text-slate-500">
+                          <Heart className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+                          <p>No hay eventos de bienestar recientes</p>
+                        </div>
             )}
+                    </CardContent>
+                  </Card>
+          </motion.div>
+              )}
+
+              {/* Recent Deliveries */}
+              {can('dotacion.view') && (
+                <motion.div variants={itemVariants}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-amber-600" />
+                        Últimas Entregas Dotación y EPP
+                      </CardTitle>
+                      <CardDescription>
+                        Últimas 5 entregas realizadas
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingDeliveries ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
+                        </div>
+                      ) : deliveriesData?.items && deliveriesData.items.length > 0 ? (
+                        <div className="space-y-3">
+                          {deliveriesData.items
+                            .sort((a, b) => new Date(b.deliveredAt).getTime() - new Date(a.deliveredAt).getTime())
+                            .slice(0, 5)
+                            .map((delivery) => {
+                              const deliveryTypeLabels = {
+                                first_time: 'Primera vez',
+                                periodic: 'Periódica',
+                              };
+                              
+                              // Extract document number from affiliateId (format: "CC-1143254525") or use signedDocumentNumber
+                              const documentNumber = delivery.signedDocumentNumber || 
+                                (delivery.affiliateId && delivery.affiliateId.includes('-') 
+                                  ? delivery.affiliateId.split('-').slice(1).join('-')
+                                  : delivery.affiliateId);
+                              
+                              // Extract document type from affiliateId or use signedDocumentType
+                              const documentType = delivery.signedDocumentType || 
+                                (delivery.affiliateId && delivery.affiliateId.includes('-')
+                                  ? delivery.affiliateId.split('-')[0]
+                                  : null);
+                              
+                              // Build display text for affiliate
+                              const affiliateDisplay = documentType && documentNumber
+                                ? `${documentType} ${documentNumber}`
+                                : documentNumber || delivery.affiliateId || 'Sin información';
+                              
+                              // Count items delivered
+                              const itemsCount = delivery.items?.length || 0;
+                              const itemsText = itemsCount > 0 
+                                ? `${itemsCount} ${itemsCount === 1 ? 'producto' : 'productos'}`
+                                : 'Sin productos';
+                              
+                              return (
+                                <div
+                                  key={delivery.id}
+                                  className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                                  onClick={() => {
+                                    if (documentNumber) {
+                                      navigate(`/admin/dotacion-epp?search=${documentNumber}`);
+                                    } else {
+                                      navigate('/admin/dotacion-epp');
+                                    }
+                                  }}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-medium text-slate-900 truncate">
+                                        {affiliateDisplay}
+                                      </span>
+                                      {delivery.deliveryType && (
+                                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                                          delivery.deliveryType === 'first_time' 
+                                            ? 'bg-blue-100 text-blue-800' 
+                                            : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                          {deliveryTypeLabels[delivery.deliveryType]}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-slate-600 truncate">
+                                      {itemsText} • Entregado por: {delivery.deliveredByName || delivery.deliveredBy || 'N/A'}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      {new Date(delivery.deliveredAt).toLocaleDateString('es-ES', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
+                                  <ArrowRight className="h-4 w-4 text-slate-400 flex-shrink-0 ml-2" />
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-slate-500">
+                          <Package className="h-12 w-12 mx-auto mb-2 text-slate-300" />
+                          <p>No hay entregas recientes</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+        </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+
+          {/* Charts Section */}
+          <motion.div variants={itemVariants} className="space-y-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Análisis y Tendencias</h2>
+              <p className="text-gray-600">Visualización de datos y patrones del sistema</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Requests Status Distribution */}
+              {can('requests.view') && chartData.requestsStatus.length > 0 && (
+                <motion.div variants={itemVariants}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-primary-prosalud" />
+                        Distribución de Solicitudes
+                      </CardTitle>
+                      <CardDescription>
+                        Estado actual de todas las solicitudes
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer
+                        config={{
+                          value: { label: "Cantidad", color: "#00529B" },
+                        }}
+                        className="h-[250px] sm:h-[300px] w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                          <PieChart>
+                            <Pie
+                              data={chartData.requestsStatus}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius="70%"
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {chartData.requestsStatus.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-slate-600">Total</span>
+                          <span className="font-semibold">{metrics.requests.total}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-slate-600">Este mes</span>
+                          <span className="font-semibold">{metrics.requests.thisMonth}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Wellness Requests Status Distribution */}
+              {can('wellness_requests.view') && chartData.wellnessRequestsStatus.length > 0 && (
+                <motion.div variants={itemVariants}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Heart className="h-5 w-5 text-pink-600" />
+                        Distribución de Solicitudes Bienestar
+                      </CardTitle>
+                      <CardDescription>
+                        Estado de las solicitudes de bienestar
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer
+                        config={{
+                          value: { label: "Cantidad", color: "#ec4899" },
+                        }}
+                        className="h-[250px] sm:h-[300px] w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                          <PieChart>
+                            <Pie
+                              data={chartData.wellnessRequestsStatus}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius="70%"
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {chartData.wellnessRequestsStatus.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-slate-600">Total</span>
+                          <span className="font-semibold">{metrics.wellnessRequests.total}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-slate-600">Pendientes</span>
+                          <span className="font-semibold text-amber-600">{metrics.wellnessRequests.pending}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Inventory Requests Status */}
+              {(can('inventory.view_dashboard') || can('hospital_requests.view')) && chartData.inventoryStatus.length > 0 && (
+                <motion.div variants={itemVariants}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-amber-600" />
+                        Estado de Solicitudes Hospitales
+                      </CardTitle>
+                      <CardDescription>
+                        Distribución de solicitudes de inventario
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer
+                        config={{
+                          value: { label: "Cantidad", color: "#f59e0b" },
+                        }}
+                        className="h-[250px] sm:h-[300px] w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                          <BarChart data={chartData.inventoryStatus} margin={{ top: 5, right: 5, left: 5, bottom: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              dataKey="name" 
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                              tick={{ fontSize: 11 }}
+                              interval={0}
+                            />
+                            <YAxis tick={{ fontSize: 11 }} />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Bar dataKey="value" fill="#f59e0b" radius={[8, 8, 0, 0]}>
+                              {chartData.inventoryStatus.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                      {metrics.inventory.lowStock > 0 && (
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-center gap-2 text-amber-800">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="font-semibold">{metrics.inventory.lowStock} productos requieren atención por stock bajo</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Monthly Trends - Now next to Inventory */}
+              {(can('requests.view') || can('wellness_requests.view')) && (
+                <motion.div variants={itemVariants}>
+                  <Card className="h-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-primary-prosalud" />
+                        Tendencias Mensuales
+                      </CardTitle>
+                      <CardDescription>
+                        Evolución de solicitudes en los últimos 6 meses
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer
+                        config={{
+                          solicitudes: { label: "Solicitudes", color: "#f97316" },
+                          bienestar: { label: "Bienestar", color: "#ec4899" },
+                        }}
+                        className="h-[250px] sm:h-[300px] w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                          <AreaChart data={chartData.monthlyTrends} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <defs>
+                              <linearGradient id="colorSolicitudes" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#f97316" stopOpacity={0.1}/>
+                              </linearGradient>
+                              <linearGradient id="colorBienestar" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#ec4899" stopOpacity={0.1}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 11 }}
+                            />
+                            <YAxis tick={{ fontSize: 11 }} />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <Legend wrapperStyle={{ fontSize: '11px' }} />
+                            {can('requests.view') && (
+                              <Area
+                                type="monotone"
+                                dataKey="solicitudes"
+                                stroke="#f97316"
+                                fill="url(#colorSolicitudes)"
+                                strokeWidth={2}
+                              />
+                            )}
+                            {can('wellness_requests.view') && (
+                              <Area
+                                type="monotone"
+                                dataKey="bienestar"
+                                stroke="#ec4899"
+                                fill="url(#colorBienestar)"
+                                strokeWidth={2}
+                              />
+                            )}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       </div>

@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation, useSearchParams } from "react-router-dom";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -94,6 +95,8 @@ type ResponseFormValues = z.infer<typeof responseFormSchema>;
 
 const AdminSolicitudesPage: React.FC = () => {
   const { can } = usePermissions();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
@@ -129,6 +132,21 @@ const AdminSolicitudesPage: React.FC = () => {
     queryFn: requestsService.getRequests,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Open modal from URL parameter
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && allSolicitudes.length > 0) {
+      const solicitud = allSolicitudes.find(s => s.id === viewId);
+      if (solicitud) {
+        setSelectedSolicitud(solicitud);
+        // Remove the view parameter from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('view');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+    }
+  }, [searchParams, allSolicitudes, setSearchParams]);
 
   // El backend ya filtra las solicitudes según las asignaciones del usuario
   // No es necesario filtrar en el frontend
