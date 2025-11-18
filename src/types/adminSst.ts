@@ -97,4 +97,48 @@ export interface SstDeliveryDraft {
   deliveryType: SstDeliveryType;
 }
 
+export type SstReturnReason = 'retirement' | 'replacement' | 'other';
+
+export interface SstReturnRecord {
+  id: string;
+  affiliateId: string;
+  returnedAt: string;
+  receivedBy: string;
+  receivedByName?: string;
+  affiliateDocumentType?: SstDocumentType;
+  affiliateDocumentNumber?: string;
+  affiliateFirstName?: string;
+  affiliateLastName?: string;
+  affiliateFullName?: string;
+  affiliateHospital?: string;
+  affiliateRole?: string;
+  items: SstDeliveryItemSelection[];
+  signedDocumentUrl?: string | null;
+  signedDocumentType?: SstDocumentType;
+  signedDocumentNumber?: string;
+  reason?: SstReturnReason;
+  notes?: string | null;
+}
+
+export interface SstReturnsResponse {
+  items: SstReturnRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface SstReturnDraft {
+  affiliateId: string;
+  affiliateDocumentType: SstDocumentType;
+  affiliateDocumentNumber: string;
+  receivedBy: string;
+  receivedByName: string;
+  items: SstDeliveryItemSelection[];
+  signatureData: string;
+  signedDocumentType: SstDocumentType;
+  signedDocumentNumber: string;
+  reason?: SstReturnReason;
+  notes?: string;
+}
+
 

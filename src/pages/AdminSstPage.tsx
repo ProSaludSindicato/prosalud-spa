@@ -17,12 +17,15 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  RotateCcw,
+  Package,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -35,7 +38,9 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { AffiliateDeliveryPanel } from '@/components/admin/sst/AffiliateDeliveryPanel';
+import { AffiliateReturnPanel } from '@/components/admin/sst/AffiliateReturnPanel';
 import { DeliveryConfirmationModal } from '@/components/admin/sst/DeliveryConfirmationModal';
+import { ReturnConfirmationModal } from '@/components/admin/sst/ReturnConfirmationModal';
 import { resolveSstColorInfo } from '@/components/admin/sst/color-utils';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -56,6 +61,8 @@ import {
   SstDocumentType,
   SstInventoryItem,
   SstDeliveryType,
+  SstReturnDraft,
+  SstReturnRecord,
 } from '@/types/adminSst';
 import { sstAdminService } from '@/services/sstAdminService';
 import { logger } from '@/utils/logger';
@@ -140,8 +147,10 @@ const AdminSstPage: React.FC = () => {
   const [hospitalOptions, setHospitalOptions] = useState<string[]>([]);
   const [inventory, setInventory] = useState<SstInventoryItem[]>([]);
   const [deliveryHistory, setDeliveryHistory] = useState<SstDeliveryRecord[]>([]);
+  const [returnHistory, setReturnHistory] = useState<SstReturnRecord[]>([]);
 
   const [selectedAffiliate, setSelectedAffiliate] = useState<SstAffiliate | null>(null);
+  const [viewMode, setViewMode] = useState<'delivery' | 'return'>('delivery');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [hospitalFilter, setHospitalFilter] = useState<string>('all');
@@ -160,12 +169,16 @@ const AdminSstPage: React.FC = () => {
   const [isLoadingAffiliates, setIsLoadingAffiliates] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingReturnHistory, setIsLoadingReturnHistory] = useState(false);
   const [isSearchingAffiliate, setIsSearchingAffiliate] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [returnConfirmationModalOpen, setReturnConfirmationModalOpen] = useState(false);
   const [pendingRecord, setPendingRecord] = useState<SstDeliveryDraft | null>(null);
+  const [pendingReturnRecord, setPendingReturnRecord] = useState<SstReturnDraft | null>(null);
   const [lastConfirmedRecordId, setLastConfirmedRecordId] = useState<string | null>(null);
+  const [lastConfirmedReturnId, setLastConfirmedReturnId] = useState<string | null>(null);
   const [feedbackBanner, setFeedbackBanner] = useState<
     | {
         type: 'success' | 'error' | 'info';
@@ -389,21 +402,63 @@ const AdminSstPage: React.FC = () => {
     [showFeedbackBanner],
   );
 
+  const fetchReturnHistory = useCallback(
+    async (
+      affiliateId: string,
+      {
+        signal,
+        showLoading = true,
+      }: { signal?: AbortSignal; showLoading?: boolean } = {},
+    ) => {
+      try {
+        if (showLoading) {
+          setIsLoadingReturnHistory(true);
+        }
+
+        const response = await sstAdminService.getReturnHistory({
+          affiliateId,
+          page: 1,
+          pageSize: 25,
+          signal,
+        });
+
+        if (signal?.aborted) return;
+
+        setReturnHistory(response.items);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        logger.error('Error al obtener historial de devoluciones SST', error instanceof Error ? error.message : error);
+        const message = error instanceof Error ? error.message : 'No fue posible cargar el historial de devoluciones.';
+        showFeedbackBanner('error', 'Error al obtener historial', message);
+      } finally {
+        if (!signal?.aborted && showLoading) {
+          setIsLoadingReturnHistory(false);
+        }
+      }
+    },
+    [showFeedbackBanner],
+  );
+
   useEffect(() => {
     if (!selectedAffiliate) {
       setDeliveryHistory([]);
+      setReturnHistory([]);
       setIsLoadingHistory(false);
+      setIsLoadingReturnHistory(false);
       return;
     }
 
     const controller = new AbortController();
 
     fetchDeliveryHistory(selectedAffiliate.id, { signal: controller.signal });
+    fetchReturnHistory(selectedAffiliate.id, { signal: controller.signal });
 
     return () => {
       controller.abort();
     };
-  }, [selectedAffiliate, fetchDeliveryHistory]);
+  }, [selectedAffiliate, fetchDeliveryHistory, fetchReturnHistory]);
 
   const totalItems = totalAffiliates;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -591,6 +646,45 @@ const AdminSstPage: React.FC = () => {
       showFeedbackBanner('error', 'Error al registrar la entrega', message);
       toast({
         title: 'Error al registrar la entrega',
+        description: message,
+        variant: 'destructive',
+        duration: 5000,
+      });
+      throw error;
+    }
+  };
+
+  const handleOpenReturnConfirmation = (draft: SstReturnDraft) => {
+    setPendingReturnRecord(draft);
+    setReturnConfirmationModalOpen(true);
+    setLastConfirmedReturnId(null);
+  };
+
+  const handleConfirmReturn = async (draft: SstReturnDraft) => {
+    try {
+      const { message, record } = await sstAdminService.registerReturn(draft);
+
+      showFeedbackBanner('success', 'Devolución registrada', message);
+      toast({
+        title: 'Devolución registrada',
+        description: message,
+        variant: 'success',
+        duration: 5000,
+      });
+
+      await fetchReturnHistory(record.affiliateId, { showLoading: false });
+      // Also refresh delivery history to update available quantities
+      await fetchDeliveryHistory(record.affiliateId, { showLoading: false });
+
+      setLastConfirmedReturnId(record.id);
+      setPendingReturnRecord(null);
+      setReturnConfirmationModalOpen(false);
+    } catch (error) {
+      logger.error('Error al registrar devolución SST', error instanceof Error ? error.message : error);
+      const message = error instanceof Error ? error.message : 'No fue posible registrar la devolución. Intenta nuevamente.';
+      showFeedbackBanner('error', 'Error al registrar la devolución', message);
+      toast({
+        title: 'Error al registrar la devolución',
         description: message,
         variant: 'destructive',
         duration: 5000,
@@ -1607,15 +1701,63 @@ const AdminSstPage: React.FC = () => {
 
           {selectedAffiliate && !showAffiliateList && (
             <motion.div variants={itemVariants} ref={deliveryPanelRef}>
-              <Card className="border shadow-sm">
+              <Card className={`border-2 shadow-sm ${
+                viewMode === 'delivery' 
+                  ? 'border-green-200 bg-green-50/30' 
+                  : 'border-orange-200 bg-orange-50/30'
+              }`}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-xl">
-                    Registro de entrega para {selectedAffiliate.firstName} {selectedAffiliate.lastName}
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <CardTitle className="text-xl mb-2">
+                        Registro para {selectedAffiliate.firstName} {selectedAffiliate.lastName}
                   </CardTitle>
                   <CardDescription>
-                    Completa la selección de elementos de protección y captura la firma del afiliado como constancia.
+                        Selecciona el tipo de operación que deseas realizar.
                   </CardDescription>
-                  {deliveryHistory.length > 0 && (() => {
+                    </div>
+                    <Tabs 
+                      value={viewMode} 
+                      onValueChange={(value) => setViewMode(value as 'delivery' | 'return')}
+                      className="w-full"
+                    >
+                      <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1">
+                        <TabsTrigger 
+                          value="delivery" 
+                          className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm"
+                        >
+                          <Package className="h-4 w-4" />
+                          Entrega
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="return"
+                          className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Devolución
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="delivery" className="mt-4">
+                        <Alert className="border-green-200 bg-green-50">
+                          <Package className="h-4 w-4 text-green-600" />
+                          <AlertTitle className="text-green-900">Modo: Registro de Entrega</AlertTitle>
+                          <AlertDescription className="text-green-800">
+                            Completa la selección de elementos de protección y captura la firma del afiliado como constancia.
+                          </AlertDescription>
+                        </Alert>
+                      </TabsContent>
+                      <TabsContent value="return" className="mt-4">
+                        <Alert className="border-orange-200 bg-orange-50">
+                          <RotateCcw className="h-4 w-4 text-orange-600" />
+                          <AlertTitle className="text-orange-900">Modo: Registro de Devolución</AlertTitle>
+                          <AlertDescription className="text-orange-800">
+                            Selecciona los elementos que el afiliado está devolviendo. El sistema comparará con el historial de entregas.
+                          </AlertDescription>
+                        </Alert>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                  {viewMode === 'delivery' && deliveryHistory.length > 0 && (() => {
                     const lastDelivery = deliveryHistory[0]; // Most recent delivery is first
                     const lastDeliveryDate = new Date(lastDelivery.deliveredAt);
                     const timeElapsed = formatTimeElapsed(lastDelivery.deliveredAt);
@@ -1783,7 +1925,7 @@ const AdminSstPage: React.FC = () => {
                     </Alert>
                   )}
 
-                  {!isLoadingInventory && inventory.length > 0 && (
+                  {!isLoadingInventory && inventory.length > 0 && viewMode === 'delivery' && (
                     <AffiliateDeliveryPanel
                       affiliate={selectedAffiliate}
                       inventory={inventory}
@@ -1795,10 +1937,30 @@ const AdminSstPage: React.FC = () => {
                     />
                   )}
 
-                  {isLoadingHistory && (
+                  {!isLoadingInventory && inventory.length > 0 && viewMode === 'return' && (
+                    <AffiliateReturnPanel
+                      affiliate={selectedAffiliate}
+                      inventory={inventory}
+                      deliveryHistory={deliveryHistory}
+                      returnHistory={returnHistory}
+                      onConfirmReturn={handleOpenReturnConfirmation}
+                      confirmedRecordId={lastConfirmedReturnId}
+                      highlightedRecordId={highlightedRecordId}
+                      historyScrollRef={historyScrollRef}
+                    />
+                  )}
+
+                  {isLoadingHistory && viewMode === 'delivery' && (
                     <div className="flex items-center gap-2 text-sm text-slate-500">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Consultando historial de entregas...
+                    </div>
+                  )}
+
+                  {isLoadingReturnHistory && viewMode === 'return' && (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Consultando historial de devoluciones...
                     </div>
                   )}
                 </CardContent>
@@ -1938,6 +2100,21 @@ const AdminSstPage: React.FC = () => {
               : ''
           }
           onConfirm={handleConfirmDelivery}
+        />
+
+        <ReturnConfirmationModal
+          open={returnConfirmationModalOpen}
+          onOpenChange={setReturnConfirmationModalOpen}
+          record={pendingReturnRecord}
+          inventory={inventory}
+          affiliateName={
+            selectedAffiliate
+              ? `${selectedAffiliate.firstName} ${selectedAffiliate.lastName}`
+              : ''
+          }
+          deliveryHistory={deliveryHistory}
+          returnHistory={returnHistory}
+          onConfirm={handleConfirmReturn}
         />
       </div>
     </AdminLayout>

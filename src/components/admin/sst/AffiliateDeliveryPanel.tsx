@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ClipboardCheck, ClipboardList, Eye, Signature, UploadCloud, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import type {
   SstAffiliate,
   SstDeliveryDraft,
@@ -87,8 +88,8 @@ export function AffiliateDeliveryPanel({
   historyScrollRef,
 }: AffiliateDeliveryPanelProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedItems, setSelectedItems] = useState<SelectedItemsMap>({});
-  const [deliveredBy, setDeliveredBy] = useState('');
   const [notes, setNotes] = useState('');
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -338,7 +339,6 @@ const renderColorSwatch = (color?: string) => {
 
   const resetForm = () => {
     setSelectedItems({});
-    setDeliveredBy('');
     setNotes('');
     setSignatureDataUrl(null);
     setFormError(null);
@@ -464,7 +464,7 @@ const renderColorSwatch = (color?: string) => {
 
     setFormError(null);
     const cleanedNotes = notes.trim();
-    const responsible = deliveredBy.trim() || 'Responsable Dotación y EPP';
+    const responsible = user?.name || user?.email || 'Usuario del sistema';
 
     const draft: SstDeliveryDraft = {
       affiliateId: affiliate.id,
@@ -560,7 +560,7 @@ const renderColorSwatch = (color?: string) => {
             </div>
           ) : (
             Object.entries(inventoryByCategory).map(([category, items]) => {
-              const showCarnet = category === 'Dotación' || category === 'EPP';
+              const showCarnet = category === 'Dotación';
               return (
             <div key={category} className="space-y-3">
               <div className="flex items-center justify-between">
@@ -777,19 +777,6 @@ const renderColorSwatch = (color?: string) => {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4">
-              <div className="grid gap-1.5">
-                <Label htmlFor="deliveredBy">Entregado por</Label>
-                <Input
-                  id="deliveredBy"
-                  placeholder="Nombre del responsable"
-                  value={deliveredBy}
-                  onChange={(event) => setDeliveredBy(event.target.value)}
-                />
-                <span className="text-xs text-slate-500">
-                  Si se deja en blanco se registrará como &quot;Encargado SST&quot;.
-                </span>
-              </div>
-
               <div className="grid gap-1.5">
                 <Label>Tipo de entrega</Label>
                 <Select

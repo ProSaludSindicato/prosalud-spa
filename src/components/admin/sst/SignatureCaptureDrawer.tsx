@@ -80,7 +80,7 @@ export function SignatureCaptureDrawer({
         <DrawerHeader>
           <DrawerTitle className="text-2xl font-semibold text-slate-800">Firma de constancia</DrawerTitle>
           <DrawerDescription className="text-sm text-slate-500">
-            Por favor, firme dentro del recuadro con letra legible para confirmar la recepción de los elementos entregados. Si necesitas corregir algo, puedes limpiar la firma y volver a intentarlo antes de guardar.
+            Por favor, firme dentro del recuadro con letra legible para confirmar la operación. Si necesitas corregir algo, puedes limpiar la firma y volver a intentarlo antes de guardar.
           </DrawerDescription>
         </DrawerHeader>
 

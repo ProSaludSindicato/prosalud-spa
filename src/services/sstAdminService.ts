@@ -7,6 +7,9 @@ import type {
   SstDocumentType,
   SstInventoryItem,
   SstInventoryResponse,
+  SstReturnDraft,
+  SstReturnRecord,
+  SstReturnsResponse,
 } from '@/types/adminSst';
 import { buildAdminApiUrl } from '@/config/api';
 import { logger } from '@/utils/logger';
@@ -17,6 +20,7 @@ const endpoints = {
   affiliates: `${BASE_PATH}/affiliates`,
   inventory: `${BASE_PATH}/inventory`,
   deliveries: `${BASE_PATH}/deliveries`,
+  returns: `${BASE_PATH}/returns`,
 } as const;
 
 interface GetAffiliatesParams {
@@ -33,6 +37,19 @@ interface GetAffiliatesParams {
 interface GetDeliveryHistoryParams {
   affiliateId?: string;
   deliveredBy?: string;
+  hospital?: string;
+  startDate?: string;
+  endDate?: string;
+  documentNumber?: string;
+  searchTerm?: string;
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}
+
+interface GetReturnHistoryParams {
+  affiliateId?: string;
+  receivedBy?: string;
   hospital?: string;
   startDate?: string;
   endDate?: string;
@@ -131,6 +148,52 @@ const mapDeliveryRecord = (record: any): SstDeliveryRecord => {
     signedDocumentNumber: record.signedDocumentNumber ?? undefined,
     notes: record.notes ?? null,
     deliveryType: record.deliveryType ?? record.type ?? undefined,
+  };
+};
+
+const mapReturnRecord = (record: any): SstReturnRecord => {
+  const affiliateData = record.affiliate ?? record.affiliateData ?? record.affiliateDetails ?? null;
+  const affiliateDocumentType =
+    record.affiliateDocumentType ?? affiliateData?.documentType ?? record.documentType ?? undefined;
+  const affiliateDocumentNumber =
+    record.affiliateDocumentNumber ?? affiliateData?.documentNumber ?? record.documentNumber ?? undefined;
+  const affiliateFirstName = affiliateData?.firstName ?? record.affiliateFirstName ?? undefined;
+  const affiliateLastName = affiliateData?.lastName ?? record.affiliateLastName ?? undefined;
+  const affiliatePrimaryFullName = record.affiliateFullName ?? '';
+  const affiliateSecondaryFullName = affiliateData?.fullName ?? '';
+  const affiliateFallbackFullName = [affiliateFirstName, affiliateLastName].filter(Boolean).join(' ');
+  const affiliateFullName =
+    affiliatePrimaryFullName ||
+    affiliateSecondaryFullName ||
+    (affiliateFallbackFullName !== '' ? affiliateFallbackFullName : undefined);
+  const affiliateHospital = record.affiliateHospital ?? affiliateData?.hospital ?? undefined;
+  const affiliateRole = record.affiliateRole ?? affiliateData?.role ?? undefined;
+
+  return {
+    id: record.id,
+    affiliateId: record.affiliateId,
+    returnedAt: record.returnedAt ?? record.returned_at ?? record.createdAt ?? record.created_at,
+    receivedBy: record.receivedByName ?? record.receivedBy ?? record.received_by,
+    receivedByName: record.receivedByName ?? record.receivedBy ?? record.received_by,
+    affiliateDocumentType: affiliateDocumentType as SstDocumentType | undefined,
+    affiliateDocumentNumber: affiliateDocumentNumber ?? undefined,
+    affiliateFirstName,
+    affiliateLastName,
+    affiliateFullName,
+    affiliateHospital,
+    affiliateRole,
+    items: Array.isArray(record.items)
+      ? record.items.map((item: any) => ({
+          itemId: item.itemId,
+          variant: item.variant,
+          quantity: item.quantity,
+        }))
+      : [],
+    signedDocumentUrl: record.signedDocumentUrl ?? null,
+    signedDocumentType: record.signedDocumentType as SstDocumentType | undefined,
+    signedDocumentNumber: record.signedDocumentNumber ?? undefined,
+    reason: record.reason ?? undefined,
+    notes: record.notes ?? null,
   };
 };
 
@@ -319,6 +382,78 @@ export const sstAdminService = {
     return {
       message: data.message ?? 'Entrega registrada exitosamente',
       record: mapDeliveryRecord(data.record),
+    };
+  },
+
+  async getReturnHistory({
+    affiliateId,
+    receivedBy,
+    hospital,
+    startDate,
+    endDate,
+    documentNumber,
+    searchTerm,
+    page = 1,
+    pageSize = 25,
+    signal,
+  }: GetReturnHistoryParams = {}): Promise<SstReturnsResponse> {
+    const queryString = buildQueryString({
+      affiliateId,
+      receivedBy,
+      hospital,
+      startDate,
+      endDate,
+      documentNumber,
+      searchTerm,
+      page,
+      pageSize,
+    });
+    const data = await fetchJson<any>(
+      buildAdminApiUrl(`${endpoints.returns}${queryString}`),
+      { method: 'GET', signal }
+    );
+
+    const rawItems = Array.isArray(data?.items) ? (data.items as any[]) : [];
+
+    return {
+      items: rawItems.map(mapReturnRecord),
+      total: data?.total ?? 0,
+      page: data?.page ?? page,
+      pageSize: data?.pageSize ?? pageSize,
+    };
+  },
+
+  async registerReturn(draft: SstReturnDraft): Promise<{ message: string; record: SstReturnRecord }> {
+    const payload = {
+      affiliateId: draft.affiliateId,
+      affiliateDocumentType: draft.affiliateDocumentType,
+      affiliateDocumentNumber: draft.affiliateDocumentNumber,
+      items: draft.items.map((item) => ({
+        itemId: item.itemId,
+        variant: item.variant ? { color: item.variant.color, size: item.variant.size } : undefined,
+        quantity: item.quantity,
+      })),
+      signatureData: draft.signatureData,
+      signedDocumentType: draft.signedDocumentType,
+      signedDocumentNumber: draft.signedDocumentNumber,
+      receivedBy: draft.receivedBy,
+      receivedByName: draft.receivedByName,
+      reason: draft.reason ?? null,
+      notes: draft.notes ?? null,
+    };
+
+    const data = await fetchJson<any>(buildAdminApiUrl(endpoints.returns), {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!data) {
+      throw new Error('El servicio de Dotación y EPP no retornó información de la devolución registrada.');
+    }
+
+    return {
+      message: data.message ?? 'Devolución registrada exitosamente',
+      record: mapReturnRecord(data.record),
     };
   },
 };
