@@ -868,10 +868,10 @@ const AdminDashboard: React.FC = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <ClipboardList className="h-5 w-5 text-primary-prosalud" />
-                        Solicitudes Recientes
+                        Solicitudes Afiliados Recientes
                       </CardTitle>
                       <CardDescription>
-                        Últimas 5 solicitudes registradas
+                        Últimas 5 solicitudes registradas por los afiliados
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -948,7 +948,7 @@ const AdminDashboard: React.FC = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Heart className="h-5 w-5 text-pink-600" />
-                        Solicitudes Bienestar Recientes
+                        Solicitudes de Bienestar Recientes
                       </CardTitle>
                       <CardDescription>
                         Últimas 5 solicitudes de bienestar

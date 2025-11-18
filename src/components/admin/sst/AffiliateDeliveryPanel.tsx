@@ -451,13 +451,6 @@ const renderColorSwatch = (color?: string) => {
     }
 
     if (!signatureDataUrl) {
-      setFormError('Captura la firma del afiliado para poder continuar.');
-      toast({
-        title: 'Firma requerida',
-        description: 'Captura la firma del afiliado para finalizar el registro.',
-        variant: 'destructive',
-        duration: 5000,
-      });
       setIsSignatureDrawerOpen(true);
       return;
     }
@@ -791,7 +784,6 @@ const renderColorSwatch = (color?: string) => {
                     <SelectItem value="periodic">Periódica</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-xs text-slate-500">Campo requerido.</span>
               </div>
 
               <div className="grid gap-1.5">

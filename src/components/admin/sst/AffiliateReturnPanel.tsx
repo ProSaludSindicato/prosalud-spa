@@ -518,15 +518,29 @@ export function AffiliateReturnPanel({
       const delivered = deliveredQuantities.get(itemKey) ?? 0;
       const returned = returnedQuantities.get(itemKey) ?? 0;
       
+      // Build product description for the warning message
+      const productParts: string[] = [item.name];
+      if (item.gender) {
+        productParts.push(item.gender);
+      }
+      if (variant?.color) {
+        const colorInfo = resolveSstColorInfo(variant.color);
+        productParts.push(colorInfo?.label ?? variant.color);
+      }
+      if (variant?.size) {
+        productParts.push(`Talla ${variant.size}`);
+      }
+      const productDescription = productParts.join(' - ');
+      
       if (delivered === 0) {
         warnings.push({
           itemKey,
-          message: `Este elemento no tiene entregas registradas en el historial. Puede ser una devolución de elementos entregados antes de la implementación del sistema.`,
+          message: `Este elemento no tiene entregas registradas en el historial. Puede ser una devolución de elementos entregados antes de la implementación del sistema. (${productDescription})`,
         });
       } else if (quantity > available) {
         warnings.push({
           itemKey,
-          message: `Se está devolviendo ${quantity} unidad(es), pero solo hay ${available} disponible(s) según el historial (${delivered} entregado(s) - ${returned} devuelto(s) previamente).`,
+          message: `Se está devolviendo ${quantity} unidad(es), pero solo hay ${available} disponible(s) según el historial (${delivered} entregado(s) - ${returned} devuelto(s) previamente). (${productDescription})`,
         });
       }
     });
@@ -565,13 +579,6 @@ export function AffiliateReturnPanel({
     }
 
     if (!signatureDataUrl) {
-      setFormError('Captura la firma del afiliado para poder continuar.');
-      toast({
-        title: 'Firma requerida',
-        description: 'Captura la firma del afiliado para finalizar el registro.',
-        variant: 'destructive',
-        duration: 5000,
-      });
       setIsSignatureDrawerOpen(true);
       return;
     }

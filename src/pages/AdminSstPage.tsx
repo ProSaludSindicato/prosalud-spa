@@ -131,6 +131,10 @@ const formatDateSpanish = (date: Date): string => {
 };
 
 const isRecentDelivery = (dateString: string): boolean => {
+  return isRecentReturn(dateString);
+};
+
+const isRecentReturn = (dateString: string): boolean => {
   const now = new Date();
   const past = new Date(dateString);
   const diffMs = now.getTime() - past.getTime();
@@ -190,6 +194,7 @@ const AdminSstPage: React.FC = () => {
   const [showAffiliateList, setShowAffiliateList] = useState(true);
   const [highlightedRecordId, setHighlightedRecordId] = useState<string | null>(null);
   const [showLastDeliveryItems, setShowLastDeliveryItems] = useState(false);
+  const [showLastReturnItems, setShowLastReturnItems] = useState(false);
 
   const deliveryPanelRef = useRef<HTMLDivElement>(null);
   const historyScrollRef = useRef<HTMLDivElement>(null);
@@ -1857,23 +1862,168 @@ const AdminSstPage: React.FC = () => {
                                       const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
                                       const itemName = isCarnet 
                                         ? 'Carnet' 
-                                        : inventoryItem?.name ?? item.itemId;
-                                      const variantInfo = item.variant?.size 
-                                        ? ` - Talla: ${item.variant.size}` 
-                                        : '';
+                                        : (inventoryItem?.name ?? item.itemId);
                                       const colorInfo = item.variant?.color 
-                                        ? ` - Color: ${item.variant.color}` 
-                                        : '';
-                                      
+                                        ? resolveSstColorInfo(item.variant.color) 
+                                        : (inventoryItem?.defaultColor ? resolveSstColorInfo(inventoryItem.defaultColor) : null);
+                                      const colorLabel = colorInfo?.label ?? item.variant?.color ?? inventoryItem?.defaultColor;
+                                      const sizeLabel = item.variant?.size;
+                                      const genderLabel = inventoryItem?.gender;
+
                                       return (
-                                        <div key={idx} className="text-xs flex items-center gap-2 p-1.5 rounded bg-slate-50">
-                                          <span className="text-slate-400">•</span>
-                                          <span className="flex-1 text-slate-700">
-                                            <span className="font-medium text-slate-800">{itemName}</span>
-                                            {variantInfo && <span className="text-slate-500">{variantInfo}</span>}
-                                            {colorInfo && <span className="text-slate-500">{colorInfo}</span>}
-                                            <span className="ml-1 font-semibold text-slate-600">× {item.quantity}</span>
-                                          </span>
+                                        <div key={idx} className="flex items-center justify-between text-xs text-slate-600 py-1 border-b border-slate-100 last:border-0">
+                                          <div className="flex items-center gap-2 flex-1">
+                                            {!isCarnet && colorInfo && (
+                                              <span
+                                                className="inline-flex h-3 w-3 flex-shrink-0 rounded-full border border-slate-200"
+                                                style={{ backgroundColor: colorInfo.hex ?? '#cbd5f5' }}
+                                                aria-label={colorLabel}
+                                                title={colorLabel}
+                                              />
+                                            )}
+                                            <span className="font-medium">{itemName}</span>
+                                            {genderLabel && <span className="text-slate-500">({genderLabel})</span>}
+                                            {colorLabel && !isCarnet && <span className="text-slate-500">- {colorLabel}</span>}
+                                            {sizeLabel && <span className="text-slate-500">- Talla {sizeLabel}</span>}
+                                          </div>
+                                          <span className="font-semibold text-slate-800">× {item.quantity}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {viewMode === 'return' && returnHistory.length > 0 && (() => {
+                    const lastReturn = returnHistory[0]; // Most recent return is first
+                    const lastReturnDate = new Date(lastReturn.returnedAt);
+                    const timeElapsed = formatTimeElapsed(lastReturn.returnedAt);
+                    const formattedDate = formatDateSpanish(lastReturnDate);
+                    const isRecent = isRecentReturn(lastReturn.returnedAt);
+
+                    const handleGoToReturnHistory = () => {
+                      setHighlightedRecordId(lastReturn.id);
+                      setTimeout(() => {
+                        historyScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 100);
+                      setTimeout(() => {
+                        setHighlightedRecordId(null);
+                      }, 3000);
+                    };
+
+                    return (
+                      <div className={`mt-3 rounded-lg border p-3 ${
+                        isRecent 
+                          ? 'border-yellow-300 bg-yellow-50' 
+                          : 'border-orange-200 bg-orange-50'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                            isRecent ? 'text-yellow-700' : 'text-orange-600'
+                          }`} />
+                          <div className="flex-1">
+                            <p className={`text-sm font-medium ${
+                              isRecent ? 'text-yellow-900' : 'text-orange-900'
+                            }`}>
+                              Última devolución registrada
+                            </p>
+                            <p className={`text-xs mt-1 ${
+                              isRecent ? 'text-yellow-800' : 'text-orange-700'
+                            }`}>
+                              {formattedDate} ({timeElapsed})
+                            </p>
+                            {(lastReturn.receivedBy || lastReturn.receivedByName) && (
+                              <p className={`text-xs mt-1 ${
+                                isRecent ? 'text-yellow-700' : 'text-orange-600'
+                              }`}>
+                                Recibido por: <span className="font-medium">{lastReturn.receivedByName || lastReturn.receivedBy}</span>
+                              </p>
+                            )}
+                            {lastReturn.items.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className={`text-xs ${
+                                    isRecent ? 'text-yellow-700' : 'text-orange-600'
+                                  }`}>
+                                    {lastReturn.items.length} elemento{lastReturn.items.length > 1 ? 's' : ''} devuelto{lastReturn.items.length > 1 ? 's' : ''}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowLastReturnItems(!showLastReturnItems)}
+                                      className={`h-6 px-2 text-xs ${
+                                        isRecent
+                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100'
+                                          : 'text-orange-600 hover:text-orange-600 hover:bg-orange-100'
+                                      }`}
+                                    >
+                                      {showLastReturnItems ? (
+                                        <>
+                                          <ChevronUp className="h-3 w-3 mr-1" />
+                                          Ocultar elementos
+                                        </>
+                                      ) : (
+                                        <>
+                                          <ChevronDown className="h-3 w-3 mr-1" />
+                                          Ver elementos
+                                        </>
+                                      )}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleGoToReturnHistory}
+                                      className={`h-6 px-2 text-xs ${
+                                        isRecent 
+                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100' 
+                                          : 'text-orange-600 hover:text-orange-600 hover:bg-orange-100'
+                                      }`}
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      Ir al historial
+                                    </Button>
+                                  </div>
+                                </div>
+                                {showLastReturnItems && (
+                                  <div className="mt-2 rounded border border-slate-200 bg-white p-2 space-y-1.5">
+                                    {lastReturn.items.map((item, idx) => {
+                                      const isCarnet = item.itemId === '__carnet__';
+                                      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
+                                      const itemName = isCarnet 
+                                        ? 'Carnet' 
+                                        : (inventoryItem?.name ?? item.itemId);
+                                      const colorInfo = item.variant?.color 
+                                        ? resolveSstColorInfo(item.variant.color) 
+                                        : (inventoryItem?.defaultColor ? resolveSstColorInfo(inventoryItem.defaultColor) : null);
+                                      const colorLabel = colorInfo?.label ?? item.variant?.color ?? inventoryItem?.defaultColor;
+                                      const sizeLabel = item.variant?.size;
+                                      const genderLabel = inventoryItem?.gender;
+
+                                      return (
+                                        <div key={idx} className="flex items-center justify-between text-xs text-slate-600 py-1 border-b border-slate-100 last:border-0">
+                                          <div className="flex items-center gap-2 flex-1">
+                                            {!isCarnet && colorInfo && (
+                                              <span
+                                                className="inline-flex h-3 w-3 flex-shrink-0 rounded-full border border-slate-200"
+                                                style={{ backgroundColor: colorInfo.hex ?? '#cbd5f5' }}
+                                                aria-label={colorLabel}
+                                                title={colorLabel}
+                                              />
+                                            )}
+                                            <span className="font-medium">{itemName}</span>
+                                            {genderLabel && <span className="text-slate-500">({genderLabel})</span>}
+                                            {colorLabel && !isCarnet && <span className="text-slate-500">- {colorLabel}</span>}
+                                            {sizeLabel && <span className="text-slate-500">- Talla {sizeLabel}</span>}
+                                          </div>
+                                          <span className="font-semibold text-slate-800">× {item.quantity}</span>
                                         </div>
                                       );
                                     })}
