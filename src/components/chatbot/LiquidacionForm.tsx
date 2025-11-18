@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,10 @@ import { Loader2 } from "lucide-react";
 interface LiquidacionFormProps {
   onSubmit: (data: FormData) => void;
   isLoading: boolean;
+  initialData?: {
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+  };
 }
 
 interface FormData {
@@ -40,13 +44,24 @@ const getTodayDate = () => {
   return today.toISOString().split("T")[0];
 };
 
-export default function LiquidacionForm({ onSubmit, isLoading }: LiquidacionFormProps) {
+export default function LiquidacionForm({ onSubmit, isLoading, initialData }: LiquidacionFormProps) {
   const [formData, setFormData] = useState<FormData>({
-    tipoDocumento: "CC",
-    numeroDocumento: "",
+    tipoDocumento: initialData?.tipoDocumento || "CC",
+    numeroDocumento: initialData?.numeroDocumento || "",
     fechaExpedicion: "",
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+
+  // Actualizar el formulario cuando cambien los datos iniciales
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        tipoDocumento: initialData.tipoDocumento || prev.tipoDocumento,
+        numeroDocumento: initialData.numeroDocumento || prev.numeroDocumento,
+      }));
+    }
+  }, [initialData]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};

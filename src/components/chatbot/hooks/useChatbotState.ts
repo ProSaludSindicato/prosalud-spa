@@ -29,10 +29,18 @@ export const useChatbotState = () => {
   const [showIncapacidadForm, setShowIncapacidadForm] = useState(false);
   const [showLiquidacionForm, setShowLiquidacionForm] = useState(false);
   const [isConsultingIncapacidad, setIsConsultingIncapacidad] = useState(false);
+  const [incapacidadFormInitialData, setIncapacidadFormInitialData] = useState<{
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+  } | null>(null);
   
   // Estado para incapacidades múltiples
   const [currentMultipleIncapacidades, setCurrentMultipleIncapacidades] = useState<any[] | null>(null);
   const [isConsultingLiquidacion, setIsConsultingLiquidacion] = useState(false);
+  const [liquidacionFormInitialData, setLiquidacionFormInitialData] = useState<{
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+  } | null>(null);
 
   // Estados de mensajes e input
   const [messages, setMessages] = useState<Message[]>([]);
@@ -112,10 +120,14 @@ export const useChatbotState = () => {
     setShowLiquidacionForm,
     isConsultingIncapacidad,
     setIsConsultingIncapacidad,
+    incapacidadFormInitialData,
+    setIncapacidadFormInitialData,
     currentMultipleIncapacidades,
     setCurrentMultipleIncapacidades,
     isConsultingLiquidacion,
     setIsConsultingLiquidacion,
+    liquidacionFormInitialData,
+    setLiquidacionFormInitialData,
     messages,
     setMessages,
     inputMessage,

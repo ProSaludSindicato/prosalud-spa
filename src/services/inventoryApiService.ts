@@ -437,11 +437,11 @@ export const inventoryApiService = {
       // Fallback: intentar cast directo
       return response.data as unknown as DashboardData;
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error fetching dashboard data', error);
       }
       throw error;
@@ -485,11 +485,12 @@ export const inventoryApiService = {
         pagination: paginationData,
       };
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error fetching categories', error);
       }
       throw error;
@@ -607,11 +608,12 @@ export const inventoryApiService = {
         data: normalizedData,
       };
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error fetching products', error);
       }
       throw error;
@@ -684,11 +686,12 @@ export const inventoryApiService = {
         data: normalizedData,
       };
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error fetching inventory entries', error);
       }
       throw error;
@@ -731,11 +734,12 @@ export const inventoryApiService = {
       const response = await api.get<ApiSingleResponse<InventoryColorOption[]>>(endpoint);
       return response.data.data;
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error fetching colors', error);
       }
       throw error;

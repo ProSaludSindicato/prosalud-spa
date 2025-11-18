@@ -22,6 +22,7 @@ import IncapacidadesHeader from '@/components/incapacidades/IncapacidadesHeader'
 import InformacionImportanteIncapacidadesAlert from '@/components/incapacidades/InformacionImportanteIncapacidadesAlert';
 import TipoIncapacidadSection from '@/components/incapacidades/TipoIncapacidadSection';
 import AnexoIncapacidadSection from '@/components/incapacidades/AnexoIncapacidadSection';
+import ConsultaPagoIncapacidadCard from '@/components/incapacidades/ConsultaPagoIncapacidadCard';
 
 const formSchemaIncapacidades = z.object({
   tipoDocumento: z.string().min(1, "Este campo es requerido."),
@@ -133,6 +134,7 @@ const IncapacidadesLicenciasPageContent: React.FC = () => {
       
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
         <IncapacidadesHeader />
+        <ConsultaPagoIncapacidadCard />
         <InformacionImportanteIncapacidadesAlert />
 
         <Form {...form}>

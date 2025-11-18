@@ -858,7 +858,10 @@ export default function ChatBot() {
   /**
    * Abre el formulario de incapacidad
    */
-  const openIncapacidadForm = useCallback(() => {
+  const openIncapacidadForm = useCallback((initialData?: { tipoDocumento?: string; numeroDocumento?: string }) => {
+    if (initialData) {
+      state.setIncapacidadFormInitialData(initialData);
+    }
     state.setShowIncapacidadForm(true);
   }, [state]);
 
@@ -867,6 +870,8 @@ export default function ChatBot() {
    */
   const closeIncapacidadForm = useCallback(() => {
     state.setShowIncapacidadForm(false);
+    // Limpiar datos iniciales al cerrar
+    state.setIncapacidadFormInitialData(null);
     // Hacer scroll al final después de cerrar el formulario
     setTimeout(() => {
       scrollToBottomWithRetry(state.messagesEndRef);
@@ -876,7 +881,10 @@ export default function ChatBot() {
   /**
    * Abre el formulario de liquidación
    */
-  const openLiquidacionForm = useCallback(() => {
+  const openLiquidacionForm = useCallback((initialData?: { tipoDocumento?: string; numeroDocumento?: string }) => {
+    if (initialData) {
+      state.setLiquidacionFormInitialData(initialData);
+    }
     state.setShowLiquidacionForm(true);
   }, [state]);
 
@@ -885,6 +893,8 @@ export default function ChatBot() {
    */
   const closeLiquidacionForm = useCallback(() => {
     state.setShowLiquidacionForm(false);
+    // Limpiar datos iniciales al cerrar
+    state.setLiquidacionFormInitialData(null);
     // Hacer scroll al final después de cerrar el formulario
     setTimeout(() => {
       scrollToBottomWithRetry(state.messagesEndRef);
@@ -1476,6 +1486,59 @@ export default function ChatBot() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.chatContainerRef, state.setIsOpen]);
 
+  // Efecto para escuchar eventos personalizados para abrir el chatbot
+  useEffect(() => {
+    const handleOpenChatbot = () => {
+      if (!state.isOpen) {
+        toggleChat();
+      }
+    };
+
+    const handleOpenChatbotWithIncapacidad = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const initialData = customEvent.detail || null;
+      
+      if (!state.isOpen) {
+        toggleChat();
+      }
+      // Abrir el formulario de incapacidad después de un pequeño delay para asegurar que el chatbot esté abierto
+      setTimeout(() => {
+        openIncapacidadForm(initialData);
+        // Hacer scroll al final después de abrir el formulario
+        setTimeout(() => {
+          scrollToBottomWithRetry(state.messagesEndRef);
+        }, 100);
+      }, 300);
+    };
+
+    const handleOpenChatbotWithLiquidacion = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const initialData = customEvent.detail || null;
+      
+      if (!state.isOpen) {
+        toggleChat();
+      }
+      // Abrir el formulario de liquidación después de un pequeño delay para asegurar que el chatbot esté abierto
+      setTimeout(() => {
+        openLiquidacionForm(initialData);
+        // Hacer scroll al final después de abrir el formulario
+        setTimeout(() => {
+          scrollToBottomWithRetry(state.messagesEndRef);
+        }, 100);
+      }, 300);
+    };
+
+    window.addEventListener('openChatbot', handleOpenChatbot);
+    window.addEventListener('openChatbotWithIncapacidad', handleOpenChatbotWithIncapacidad);
+    window.addEventListener('openChatbotWithLiquidacion', handleOpenChatbotWithLiquidacion);
+
+    return () => {
+      window.removeEventListener('openChatbot', handleOpenChatbot);
+      window.removeEventListener('openChatbotWithIncapacidad', handleOpenChatbotWithIncapacidad);
+      window.removeEventListener('openChatbotWithLiquidacion', handleOpenChatbotWithLiquidacion);
+    };
+  }, [state.isOpen, toggleChat, openIncapacidadForm, openLiquidacionForm, scrollToBottomWithRetry, state.messagesEndRef]);
+
   // ========== RENDERIZADO ==========
 
   return (
@@ -1522,6 +1585,7 @@ export default function ChatBot() {
                     <IncapacidadForm
                       onSubmit={handleIncapacidadFormSubmit}
                       isLoading={state.isConsultingIncapacidad}
+                      initialData={state.incapacidadFormInitialData || undefined}
                     />
                   </div>
                 </div>
@@ -1543,6 +1607,7 @@ export default function ChatBot() {
                     <LiquidacionForm
                       onSubmit={handleLiquidacionFormSubmit}
                       isLoading={state.isConsultingLiquidacion}
+                      initialData={state.liquidacionFormInitialData || undefined}
                     />
                   </div>
                 </div>

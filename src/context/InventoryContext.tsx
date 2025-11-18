@@ -146,7 +146,46 @@ const fallbackHospitalOptions = [
 
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Verificar si el usuario está autenticado
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, can } = useAuth();
+  
+  // Usar window.location.pathname ya que el provider está fuera del Router
+  // Usamos una función que obtiene la ruta actual cuando se necesita
+  const getCurrentPath = useCallback(() => {
+    return typeof window !== 'undefined' ? window.location.pathname : '';
+  }, []);
+  
+  // Estado para rastrear la ruta actual
+  const [currentPath, setCurrentPath] = useState(getCurrentPath);
+  
+  // Escuchar cambios en la ruta
+  useEffect(() => {
+    const updatePath = () => {
+      const newPath = getCurrentPath();
+      setCurrentPath(prevPath => {
+        // Solo actualizar si cambió
+        if (prevPath !== newPath) {
+          return newPath;
+        }
+        return prevPath;
+      });
+    };
+    
+    // Actualizar cuando cambie la ruta (usando popstate para navegación del navegador)
+    window.addEventListener('popstate', updatePath);
+    
+    // También escuchar cambios programáticos usando un intervalo más largo
+    // (esto es necesario porque React Router no dispara popstate en todas las navegaciones)
+    // Usamos 500ms para reducir la carga, pero aún detectar cambios rápidamente
+    const interval = setInterval(updatePath, 500);
+    
+    // También verificar inmediatamente
+    updatePath();
+    
+    return () => {
+      window.removeEventListener('popstate', updatePath);
+      clearInterval(interval);
+    };
+  }, [getCurrentPath]);
   
   // Data states
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
@@ -185,11 +224,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar categorías';
       setCategoriesError(message);
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error loading categories', error);
       }
     } finally {
@@ -223,11 +263,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar entradas de inventario';
       setEntriesError(message);
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error loading entries', error);
       }
     } finally {
@@ -246,11 +287,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar productos';
       setProductsError(message);
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error loading products', error);
       }
     } finally {
@@ -288,11 +330,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error: any) {
       const message = error instanceof Error ? error.message : 'Error al cargar resumen';
       setDashboardError(message);
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error loading dashboard', error);
       }
     } finally {
@@ -307,18 +350,27 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setColorOptions(colors);
       logger.debug('Colors loaded', { count: colors.length });
     } catch (error: any) {
-      // No loguear errores 403 del dashboard - son lógica de negocio, no errores reales
+      // No loguear errores 403 desde rutas públicas o dashboard - son lógica de negocio, no errores reales
       const status = error?.response?.status || error?.status;
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const isPublicRoute = !currentPath.startsWith('/admin');
       const isDashboard = currentPath.includes('/admin') && (currentPath.endsWith('/admin') || currentPath === '/admin');
-      if (status !== 403 || !isDashboard) {
+      if (status !== 403 || (!isDashboard && !isPublicRoute)) {
         logger.error('Error loading colors, using fallback', error);
       }
       // Keep initial color options as fallback
     }
   }, []);
 
-  // Initial data load - Solo si el usuario está autenticado
+  // Verificar si estamos en una ruta de admin relacionada con inventario
+  const isInventoryAdminRoute = useMemo(() => {
+    const path = currentPath;
+    // Solo hacer llamadas si estamos en rutas de admin de inventario o en el dashboard principal (si tiene permisos)
+    return path.startsWith('/admin/inventario') || 
+           (path === '/admin' && user && (can('inventory.view_dashboard') || can('inventory.products.view') || can('hospital_requests.view')));
+  }, [currentPath, can, user]);
+
+  // Initial data load - Solo si el usuario está autenticado Y está en una ruta de admin de inventario
   useEffect(() => {
     // No hacer peticiones si aún se está cargando la autenticación
     if (authLoading) {
@@ -330,8 +382,20 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       logger.debug('User not authenticated, skipping inventory data fetch');
       return;
     }
+
+    // Solo hacer peticiones si estamos en una ruta de admin de inventario
+    if (!isInventoryAdminRoute) {
+      logger.debug('Not in inventory admin route, skipping inventory data fetch', {
+        path: currentPath,
+      });
+      return;
+    }
     
-    logger.debug('User authenticated, fetching inventory data', { userId: user.id });
+    logger.debug('User authenticated and in inventory admin route, fetching inventory data', { 
+      userId: user.id,
+      path: currentPath,
+      isInventoryAdminRoute,
+    });
     refreshCategories();
     refreshProducts();
     refreshHospitalRequests();
@@ -339,7 +403,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshDashboard();
     fetchColors();
     refreshLocations();
-  }, [user, authLoading, refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors, refreshLocations]);
+  }, [user, authLoading, isInventoryAdminRoute, currentPath, refreshCategories, refreshProducts, refreshHospitalRequests, refreshEntries, refreshDashboard, fetchColors, refreshLocations]);
 
   // Category operations
   const addCategory = useCallback<InventoryContextValue['addCategory']>(

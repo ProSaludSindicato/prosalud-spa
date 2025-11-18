@@ -20,6 +20,7 @@ import DetalleNovedadSection from '@/components/verificacion-pagos/DetalleNoveda
 import ArchivoAnexoSection from '@/components/verificacion-pagos/ArchivoAnexoSection';
 import VerificacionHeader from '@/components/verificacion-pagos/VerificacionHeader';
 import InformacionImportanteConsolidada from '@/components/verificacion-pagos/InformacionImportanteConsolidada';
+import ConsultaTramitesRapidosCard from '@/components/verificacion-pagos/ConsultaTramitesRapidosCard';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
@@ -145,6 +146,7 @@ const VerificacionPagosPageContent: React.FC = () => {
       
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
         <VerificacionHeader />
+        <ConsultaTramitesRapidosCard />
         <InformacionImportanteConsolidada />
 
         <Form {...form}>
