@@ -13,7 +13,11 @@ export const CATEGORY_FILES: Record<string, string[]> = {
   ],
   contacto: ["contacto/informacion-contacto.md"],
   convenios: ["convenios/convenios-alianzas.md"],
-  autenticacion: ["servicios/autenticacion.md"],
+  compensacion_final: [
+    "servicios/solicitud-retiro-sindical.md",
+    "servicios/verificacion-pagos.md",
+    "legal/estatutos-beneficios.md",
+  ],
   servicios: [
     "servicios/overview.md",
     "servicios/actualizar-datos-personales.md",
@@ -23,7 +27,6 @@ export const CATEGORY_FILES: Record<string, string[]> = {
     "servicios/solicitud-retiro-sindical.md",
     "servicios/permisos-cambio-turnos.md",
     "servicios/cuadro-turnos.md",
-    "servicios/autenticacion.md",
   ],
   normatividad: ["legal/estatutos-beneficios.md", "legal/contrato-sindical.md"],
   bienestar: [
@@ -35,7 +38,6 @@ export const CATEGORY_FILES: Record<string, string[]> = {
     "quienes-somos/overview.md",
     "quienes-somos/mision-vision.md",
     "contacto/informacion-contacto.md",
-    "servicios/autenticacion.md",
   ],
 };
 
