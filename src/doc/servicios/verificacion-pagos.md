@@ -34,6 +34,14 @@ Este servicio permite a los afiliados realizar consultas sobre el estado de sus 
 
 - **Su solicitud está relacionada con:** Tipo de consulta o novedad a reportar
   - Seleccione la categoría que mejor describa su consulta
+  - Opciones disponibles incluyen (entre otras):
+    * Incapacidades
+    * Vacaciones
+    * Primas
+    * Compensación anual diferida
+    * Auxilio educativo
+    * Descuentos
+    * Otros pagos o compensaciones
 
 - **Detalle de la novedad:** Descripción detallada de la consulta o problema
   - Mínimo 10 caracteres
@@ -75,9 +83,14 @@ R: Se recomienda realizar una solicitud por cada consulta específica para facil
 **P: ¿Qué tipo de consultas puedo realizar?**
 R: Puede consultar sobre:
 - Estado de pagos de incapacidades
+- Pago de vacaciones
+- Primas (navidad, servicios, etc.)
+- Compensación anual diferida
+- Auxilio educativo
 - Compensaciones pendientes
 - Descuentos no reconocidos
 - Diferencias en montos pagados
+- Compensación final (liquidación)
 - Cualquier novedad relacionada con pagos y compensaciones
 
 **P: ¿Debo especificar fechas exactas?**
