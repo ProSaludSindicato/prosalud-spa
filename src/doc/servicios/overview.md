@@ -12,7 +12,7 @@
 - **Incapacidades y Licencias**: Trámite web exclusivo para reporte y seguimiento de incapacidades médicas
 
 ### Servicios de Afiliación
-- **Actualizar Cuenta Bancaria**: Cambio de datos bancarios para pagos
+- **Actualizar Datos Personales**: Actualización de información personal, contacto, datos bancarios, nivel educativo y datos de salud (EPS y AFP)
 - **Verificación de Pagos**: Consulta y verificación de compensaciones
 
 ### Solicitudes Especiales

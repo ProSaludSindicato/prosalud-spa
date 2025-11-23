@@ -44,7 +44,8 @@ function expandQuery(query: string): string {
     // Servicios y trámites
     'certificado': 'certificado convenio comprobante aportes seguridad social ProSalud',
     'incapacidad': 'incapacidad licencia maternidad paternidad ProSalud',
-    'cuenta bancaria': 'actualizar cuenta bancaria compensaciones pagos ProSalud',
+    'datos personales': 'actualizar datos personales cuenta bancaria contacto correo dirección compensaciones pagos ProSalud',
+    'cuenta bancaria': 'actualizar datos personales cuenta bancaria compensaciones pagos ProSalud',
     'turnos': 'cuadro turnos ProSanet programación ProSalud',
     'descanso': 'descanso compensación solicitud ProSalud',
     'retiro': 'retiro sindical afiliado ProSalud',
