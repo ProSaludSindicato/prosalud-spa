@@ -167,6 +167,7 @@ export const buildReportData = ({
     criticalStockCount,
     pendingHospitalRequests: relevantHospitalRequests.filter((request) => request.status === 'pending').length,
     preparingHospitalRequests: relevantHospitalRequests.filter((request) => request.status === 'preparing').length,
+    shippedHospitalRequests: relevantHospitalRequests.filter((request) => request.status === 'approved').length,
     deliveredHospitalRequests: relevantHospitalRequests.filter((request) => request.status === 'delivered').length,
     rejectedHospitalRequests: relevantHospitalRequests.filter((request) => request.status === 'rejected').length,
     pendingDeliveries: relevantDeliveries.filter((delivery) => delivery.status !== 'completed').length,
