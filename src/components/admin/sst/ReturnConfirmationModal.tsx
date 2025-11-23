@@ -56,7 +56,7 @@ const getItemKey = (itemId: string, variant?: { color?: string; size?: string })
   return `${itemId}::${color}::${size}`;
 };
 
-// Calculate delivered quantities by item key (excluding EPP items)
+// Calculate delivered quantities by item key
 const calculateDeliveredQuantities = (
   deliveryHistory: SstDeliveryRecord[],
   inventory: SstInventoryItem[],
@@ -65,10 +65,8 @@ const calculateDeliveredQuantities = (
   
   deliveryHistory.forEach((record) => {
     record.items.forEach((item) => {
-      // Skip EPP items and carnet
+      // Skip carnet
       if (item.itemId === '__carnet__') return;
-      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-      if (inventoryItem?.category === 'EPP') return;
       
       const key = getItemKey(item.itemId, item.variant);
       const current = quantities.get(key) ?? 0;
@@ -79,7 +77,7 @@ const calculateDeliveredQuantities = (
   return quantities;
 };
 
-// Calculate returned quantities by item key (excluding EPP items)
+// Calculate returned quantities by item key
 const calculateReturnedQuantities = (
   returnHistory: SstReturnRecord[],
   inventory: SstInventoryItem[],
@@ -88,10 +86,8 @@ const calculateReturnedQuantities = (
   
   returnHistory.forEach((record) => {
     record.items.forEach((item) => {
-      // Skip EPP items and carnet
+      // Skip carnet
       if (item.itemId === '__carnet__') return;
-      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-      if (inventoryItem?.category === 'EPP') return;
       
       const key = getItemKey(item.itemId, item.variant);
       const current = quantities.get(key) ?? 0;
@@ -126,22 +122,20 @@ export function ReturnConfirmationModal({
     [returnHistory, inventory],
   );
 
-  // Calculate what's being returned now (excluding EPP items)
+  // Calculate what's being returned now
   const returningQuantities = useMemo(() => {
     if (!record) return new Map<string, number>();
     const quantities = new Map<string, number>();
     record.items.forEach((item) => {
-      // Skip EPP items and carnet
+      // Skip carnet
       if (item.itemId === '__carnet__') return;
-      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-      if (inventoryItem?.category === 'EPP') return;
       
       const key = getItemKey(item.itemId, item.variant);
       const current = quantities.get(key) ?? 0;
       quantities.set(key, current + item.quantity);
     });
     return quantities;
-  }, [record?.items, inventory]);
+  }, [record?.items]);
 
   // Calculate pending items (delivered - already returned - being returned now)
   const pendingQuantities = useMemo(() => {
@@ -306,9 +300,6 @@ export function ReturnConfirmationModal({
                 }
 
                 const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-                // Skip EPP items from display
-                if (inventoryItem?.category === 'EPP') return null;
-                
                 const rawColor = item.variant?.color || inventoryItem?.defaultColor;
                 const colorInfo = resolveSstColorInfo(rawColor);
                 const resolvedColor = colorInfo?.label ?? rawColor;

@@ -88,7 +88,7 @@ const getItemKey = (itemId: string, variant?: SstInventoryVariant): string => {
   return `${itemId}::${color}::${size}`;
 };
 
-// Calculate delivered quantities by item key (excluding EPP items)
+// Calculate delivered quantities by item key
 const calculateDeliveredQuantities = (
   deliveryHistory: SstDeliveryRecord[],
   inventory: SstInventoryItem[],
@@ -97,10 +97,8 @@ const calculateDeliveredQuantities = (
   
   deliveryHistory.forEach((record) => {
     record.items.forEach((item) => {
-      // Skip EPP items and carnet
+      // Skip carnet
       if (item.itemId === '__carnet__') return;
-      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-      if (inventoryItem?.category === 'EPP') return;
       
       const key = getItemKey(item.itemId, item.variant);
       const current = quantities.get(key) ?? 0;
@@ -111,7 +109,7 @@ const calculateDeliveredQuantities = (
   return quantities;
 };
 
-// Calculate returned quantities by item key (excluding EPP items)
+// Calculate returned quantities by item key
 const calculateReturnedQuantities = (
   returnHistory: SstReturnRecord[],
   inventory: SstInventoryItem[],
@@ -120,10 +118,8 @@ const calculateReturnedQuantities = (
   
   returnHistory.forEach((record) => {
     record.items.forEach((item) => {
-      // Skip EPP items and carnet
+      // Skip carnet
       if (item.itemId === '__carnet__') return;
-      const inventoryItem = inventory.find((inv) => inv.id === item.itemId || inv.baseId === item.itemId);
-      if (inventoryItem?.category === 'EPP') return;
       
       const key = getItemKey(item.itemId, item.variant);
       const current = quantities.get(key) ?? 0;
@@ -504,9 +500,6 @@ export function AffiliateReturnPanel({
       const item = expandedInventoryMap.get(itemId);
       if (!item) return;
       
-      // Skip EPP items from validation
-      if (item.category === 'EPP') return;
-      
       const variant =
         item.variants && item.variants.length > 0 ? item.variants[state.variantIndex ?? 0] : undefined;
       const quantity = typeof state.quantity === 'number' ? state.quantity : 0;
@@ -546,7 +539,6 @@ export function AffiliateReturnPanel({
     });
     
     // Note: Carnet is not validated against delivery history as it's not in inventory
-    // Note: EPP items are excluded from validation as they are not returnable
     
     return warnings;
   };
@@ -686,9 +678,7 @@ export function AffiliateReturnPanel({
               No se encontraron artículos con los filtros aplicados.
             </div>
           ) : (
-            Object.entries(inventoryByCategory)
-              .filter(([category]) => category !== 'EPP') // Excluir EPP de devoluciones
-              .map(([category, items]) => {
+            Object.entries(inventoryByCategory).map(([category, items]) => {
               const showCarnet = category === 'Dotación';
               return (
               <div key={category} className="space-y-3">
@@ -798,7 +788,14 @@ export function AffiliateReturnPanel({
                         <TableHead>Artículo</TableHead>
                         <TableHead>Talla</TableHead>
                         <TableHead className="w-32">Cantidad</TableHead>
-                        <TableHead className="w-32">Disponible</TableHead>
+                        <TableHead className="w-48">
+                          <div className="flex flex-col">
+                            <span>Pendiente por devolver</span>
+                            <span className="text-[10px] font-normal text-slate-500 mt-0.5">
+                              Según historial de entregas
+                            </span>
+                          </div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -813,6 +810,7 @@ export function AffiliateReturnPanel({
                         const itemKey = getItemKey(item.baseId ?? item.id, variant);
                         const available = availableQuantities.get(itemKey) ?? 0;
                         const delivered = deliveredQuantities.get(itemKey) ?? 0;
+                        const returned = returnedQuantities.get(itemKey) ?? 0;
 
                         return (
                           <TableRow key={item.id} className={cn(isSelected && 'bg-primary-prosalud/5')}>
@@ -887,14 +885,30 @@ export function AffiliateReturnPanel({
                             </TableCell>
                             <TableCell>
                               {delivered > 0 ? (
-                                <span className={cn(
-                                  "text-sm font-medium",
-                                  available > 0 ? "text-green-700" : "text-slate-500"
-                                )}>
-                                  {available} / {delivered}
-                                </span>
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className={cn(
+                                      "text-sm font-semibold",
+                                      available > 0 ? "text-green-700" : "text-slate-500"
+                                    )}>
+                                      {available}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      pendiente{available !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 leading-tight">
+                                    {delivered} entregado{delivered !== 1 ? 's' : ''}
+                                    {returned > 0 && (
+                                      <> - {returned} devuelto{returned !== 1 ? 's' : ''}</>
+                                    )}
+                                  </div>
+                                </div>
                               ) : (
-                                <span className="text-xs text-slate-400">Sin historial</span>
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-slate-400">Sin entregas</span>
+                                  <span className="text-[10px] text-slate-400">registradas</span>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
