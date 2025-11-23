@@ -35,16 +35,16 @@ Este servicio permite a los afiliados realizar consultas sobre el estado de sus 
 - **Su solicitud está relacionada con:** Tipo de consulta o novedad a reportar
   - Seleccione la categoría que mejor describa su consulta
   - Opciones disponibles:
-    * Compensación Final (Liquidación)
-    * Compensación Anual Diferida y/o Descanso
-    * Compensación por Descanso (vacaciones)
-    * Descuentos Seguridad Social
-    * Duplicado Colillas
-    * Viáticos
-    * Ceiisas
-    * Compensación Mensual
-    * Compensación Semestral
-    * Incapacidades
+    - Compensación Final (Liquidación)
+    - Compensación Anual Diferida y/o Descanso
+    - Compensación por Descanso (vacaciones)
+    - Descuentos Seguridad Social
+    - Duplicado Colillas
+    - Viáticos
+    - Ceiisas
+    - Compensación Mensual
+    - Compensación Semestral
+    - Incapacidades
 
 - **Detalle de la novedad:** Descripción detallada de la consulta o problema
   - Mínimo 10 caracteres
@@ -56,10 +56,12 @@ Este servicio permite a los afiliados realizar consultas sobre el estado de sus 
 Si tiene documentación que ayude a clarificar o soportar su consulta:
 
 **Tipos de archivo permitidos:**
+
 - PDF (.pdf)
 - Word (.doc, .docx)
 
 **Restricciones:**
+
 - Tamaño máximo: 4MB
 - Solo documentos que ayuden a aclarar su consulta
 
@@ -78,13 +80,14 @@ R: No, el archivo anexo es opcional. Solo adjúntelo si considera que ayudará a
 R: Solo se permiten archivos PDF o Word (.doc, .docx) con un tamaño máximo de 4MB.
 
 **P: ¿Cómo evito que los correos lleguen a SPAM?**
-R: Agregue `portal@prosalud.org.co` a su lista de contactos confiables en su correo electrónico.
+R: Agregue `comunicaciones@sindicatoprosalud.com` a su lista de contactos confiables en su correo electrónico.
 
 **P: ¿Puedo hacer varias consultas en una sola solicitud?**
 R: Se recomienda realizar una solicitud por cada consulta específica para facilitar el seguimiento y respuesta.
 
 **P: ¿Qué tipo de consultas puedo realizar?**
 R: Puede consultar sobre:
+
 - **Compensación Final (Liquidación)**: Estado de su compensación final al retirarse
 - **Compensación Anual Diferida y/o Descanso**: Consultas sobre compensación anual diferida
 - **Compensación por Descanso**: Pago de vacaciones (término oficial: compensación por descanso)

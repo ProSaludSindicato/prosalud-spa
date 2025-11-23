@@ -5,6 +5,7 @@
 ProSalud utiliza un sistema de autenticación seguro basado en Código de Verificación (OTP) para proteger el acceso de los afiliados a sus servicios y trámites.
 
 **Enlaces del sistema de autenticación:**
+
 - Iniciar sesión: [`/login`](/login)
 - Recuperar contraseña: Disponible desde la página de login
 - Definir contraseña: Proceso automatizado al primer acceso
@@ -33,11 +34,13 @@ ProSalud utiliza un sistema de autenticación seguro basado en Código de Verifi
 Una vez ha definido su contraseña, podrá ingresar de dos formas:
 
 **Opción 1: Con Contraseña (Recomendado)**
+
 - Número de identificación
 - Contraseña
 
 **Opción 2: Con Código de Verificación**
-- Número de identificación  
+
+- Número de identificación
 - Fecha de expedición
 - Código OTP enviado a su correo
 
@@ -54,10 +57,11 @@ Si olvidó su contraseña:
 ## Preguntas Frecuentes sobre Autenticación
 
 **P: ¿Qué hago si no recibo el código de verificación?**
-R: 
+R:
+
 - Verifique su carpeta de correo no deseado (SPAM)
 - Asegúrese de que su correo electrónico esté actualizado en el sistema
-- Agregue `portal@prosalud.org.co` a su lista de contactos confiables
+- Agregue `comunicaciones@sindicatoprosalud.com` a su lista de contactos confiables
 - Si el problema persiste, puede solicitar un nuevo código o contactar al sindicato
 
 **P: ¿Cuánto tiempo dura el código de verificación?**
@@ -71,6 +75,7 @@ R: Sí, puede recuperar o cambiar su contraseña en cualquier momento usando la 
 
 **P: ¿Qué datos necesito para autenticarme por primera vez?**
 R: Para su primer acceso necesita:
+
 - Su número de identificación
 - La fecha de expedición de su documento de identidad
 - Acceso al correo electrónico registrado en ProSalud (para recibir el código)

@@ -2,14 +2,14 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // @ts-ignore
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 // @ts-ignore
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // @ts-ignore
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Variable de entorno para habilitar/deshabilitar rate limiting (por defecto: habilitado)
 // @ts-ignore
@@ -24,9 +24,9 @@ const RATE_LIMITS = {
 };
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Content-Type": "application/json",
 };
 
 // Función para verificar rate limit
@@ -37,19 +37,19 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
 
   // Buscar registro existente
   const { data: rateLimit, error } = await supabase
-    .from('chatbot_rate_limits')
-    .select('*')
-    .eq('user_ip', userIp)
+    .from("chatbot_rate_limits")
+    .select("*")
+    .eq("user_ip", userIp)
     .maybeSingle();
 
   if (error) {
-    console.error('⚠️ Error verificando rate limit:', error);
+    console.error("⚠️ Error verificando rate limit:", error);
     return { allowed: true }; // En caso de error, permitir (fail-open)
   }
 
   // Si no existe registro, crear uno nuevo
   if (!rateLimit) {
-    const { error: insertError } = await supabase.from('chatbot_rate_limits').insert({
+    const { error: insertError } = await supabase.from("chatbot_rate_limits").insert({
       user_ip: userIp,
       user_agent: userAgent,
       message_count_hour: 1,
@@ -57,11 +57,11 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
       consecutive_messages: 1,
       last_message_at: now.toISOString(),
     });
-    
+
     if (insertError) {
-      console.error('⚠️ Error creando rate limit:', insertError);
+      console.error("⚠️ Error creando rate limit:", insertError);
     }
-    
+
     return { allowed: true, usageInfo: { messagesHour: 1, messagesDay: 1 } };
   }
 
@@ -70,9 +70,9 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
     const remainingSeconds = Math.ceil((new Date(rateLimit.cooldown_until).getTime() - now.getTime()) / 1000);
     return {
       allowed: false,
-      reason: 'cooldown',
+      reason: "cooldown",
       remainingSeconds,
-      message: `Has enviado muchos mensajes seguidos. Por favor espera ${remainingSeconds} segundos antes de continuar.`
+      message: `Has enviado muchos mensajes seguidos. Por favor espera ${remainingSeconds} segundos antes de continuar.`,
     };
   }
 
@@ -99,19 +99,19 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
   if (messageCountDay >= RATE_LIMITS.messagesPerDay) {
     return {
       allowed: false,
-      reason: 'daily_limit',
+      reason: "daily_limit",
       message: `Has alcanzado el límite diario de ${RATE_LIMITS.messagesPerDay} mensajes. Podrás continuar mañana. Gracias por tu comprensión.`,
-      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay }
+      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay },
     };
   }
 
   if (messageCountHour >= RATE_LIMITS.messagesPerHour) {
-    const minutesLeft = Math.ceil((60 - (now.getTime() - new Date(rateLimit.last_message_at).getTime()) / (1000 * 60)));
+    const minutesLeft = Math.ceil(60 - (now.getTime() - new Date(rateLimit.last_message_at).getTime()) / (1000 * 60));
     return {
       allowed: false,
-      reason: 'hourly_limit',
+      reason: "hourly_limit",
       message: `Has alcanzado el límite de ${RATE_LIMITS.messagesPerHour} mensajes por hora. Intenta de nuevo en aproximadamente ${minutesLeft} minutos.`,
-      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay }
+      usageInfo: { messagesHour: messageCountHour, messagesDay: messageCountDay },
     };
   }
 
@@ -123,15 +123,15 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
     newCooldown = new Date(now.getTime() + RATE_LIMITS.cooldownMinutes * 60 * 1000).toISOString();
     return {
       allowed: false,
-      reason: 'too_fast',
+      reason: "too_fast",
       message: `Has enviado ${RATE_LIMITS.maxConsecutive} mensajes muy rápido. Toma un descanso de ${RATE_LIMITS.cooldownMinutes} minutos para continuar.`,
-      usageInfo: { messagesHour: messageCountHour + 1, messagesDay: messageCountDay + 1 }
+      usageInfo: { messagesHour: messageCountHour + 1, messagesDay: messageCountDay + 1 },
     };
   }
 
   // Actualizar contadores
   const { error: updateError } = await supabase
-    .from('chatbot_rate_limits')
+    .from("chatbot_rate_limits")
     .update({
       message_count_hour: messageCountHour + 1,
       message_count_day: messageCountDay + 1,
@@ -140,77 +140,78 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
       cooldown_until: newCooldown,
       updated_at: now.toISOString(),
     })
-    .eq('user_ip', userIp);
+    .eq("user_ip", userIp);
 
   if (updateError) {
-    console.error('⚠️ Error actualizando rate limit:', updateError);
+    console.error("⚠️ Error actualizando rate limit:", updateError);
   }
 
-  return { 
-    allowed: true, 
-    usageInfo: { 
-      messagesHour: messageCountHour + 1, 
-      messagesDay: messageCountDay + 1 
-    } 
+  return {
+    allowed: true,
+    usageInfo: {
+      messagesHour: messageCountHour + 1,
+      messagesDay: messageCountDay + 1,
+    },
   };
 }
 
 serve(async (req) => {
   // CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
   }
 
   try {
     // Obtener IP y user agent para rate limiting
-    const userIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
-                   req.headers.get('x-real-ip') || 
-                   'unknown';
-    const userAgent = req.headers.get('user-agent') || 'unknown';
+    const userIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+    const userAgent = req.headers.get("user-agent") || "unknown";
 
     // Verificar rate limit si está habilitado
     let usageInfo = null;
     if (ENABLE_RATE_LIMITING) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const rateLimitCheck = await checkRateLimit(supabase, userIp, userAgent);
-      
+
       if (!rateLimitCheck.allowed) {
         console.warn(`⚠️ Rate limit excedido para IP ${userIp}: ${rateLimitCheck.reason}`);
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: rateLimitCheck.message,
             rateLimitExceeded: true,
             reason: rateLimitCheck.reason,
             remainingSeconds: rateLimitCheck.remainingSeconds,
-            usageInfo: rateLimitCheck.usageInfo
+            usageInfo: rateLimitCheck.usageInfo,
           }),
-          { status: 429, headers: corsHeaders }
+          { status: 429, headers: corsHeaders },
         );
       }
-      
+
       usageInfo = rateLimitCheck.usageInfo;
       if (usageInfo) {
-        console.log(`✅ Rate limit OK para IP ${userIp}. Uso: ${usageInfo.messagesDay}/${RATE_LIMITS.messagesPerDay} diario, ${usageInfo.messagesHour}/${RATE_LIMITS.messagesPerHour} por hora`);
+        console.log(
+          `✅ Rate limit OK para IP ${userIp}. Uso: ${usageInfo.messagesDay}/${RATE_LIMITS.messagesPerDay} diario, ${usageInfo.messagesHour}/${RATE_LIMITS.messagesPerHour} por hora`,
+        );
       }
     } else {
-      console.log('ℹ️ Rate limiting deshabilitado (modo desarrollo)');
+      console.log("ℹ️ Rate limiting deshabilitado (modo desarrollo)");
     }
 
     const body = await req.json();
     let messages = body.messages;
 
     if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'Se requiere un array de mensajes' }), {
+      return new Response(JSON.stringify({ error: "Se requiere un array de mensajes" }), {
         status: 400,
         headers: corsHeaders,
       });
     }
 
-    console.log('📨 Recibiendo mensajes:', messages.length);
+    console.log("📨 Recibiendo mensajes:", messages.length);
 
     // Mejorar las instrucciones del sistema con información sobre servicios y rutas
     messages = messages.map((msg: any) => {
-      if (msg.role === 'system') {
+      if (msg.role === "system") {
         return {
           ...msg,
           content: `${msg.content}
@@ -299,7 +300,7 @@ INSTRUCCIONES IMPORTANTES PARA RESPONDER:
    - Especificar el mes y año relacionado con tu consulta
    - Adjuntar documentación de soporte si la tienes
    
-   El tiempo estimado de respuesta es de hasta 15 días hábiles. Recuerda agregar 'portal@prosalud.org.co' a tu lista de contactos para evitar que los correos lleguen a SPAM."
+   El tiempo estimado de respuesta es de hasta 15 días hábiles. Recuerda agregar 'comunicaciones@sindicatoprosalud.com' a tu lista de contactos para evitar que los correos lleguen a SPAM."
    
    **EDUCACIÓN SOBRE TERMINOLOGÍA (cuando aplique):**
    Si el usuario pregunta por "vacaciones", después de dar la respuesta completa, agrega:
@@ -448,21 +449,21 @@ IMPORTANTE - FORMATO DE RESPUESTA:
   * "En ProSalud..."
   * "Según lo que conozco..."
 
-RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud. SIEMPRE proporciona enlaces cuando sea relevante. NUNCA uses terminología relacionada con trabajo o empleo.`
+RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud. SIEMPRE proporciona enlaces cuando sea relevante. NUNCA uses terminología relacionada con trabajo o empleo.`,
         };
       }
       return msg;
     });
 
     // Llamar a Lovable AI Gateway
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: "google/gemini-2.5-flash",
         messages: messages,
         max_tokens: 1000,
         temperature: 0.7,
@@ -471,46 +472,49 @@ RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud.
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Error de Lovable AI:', response.status, errorText);
-      
+      console.error("❌ Error de Lovable AI:", response.status, errorText);
+
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Límite de solicitudes excedido. Por favor, intenta de nuevo en un momento.' }),
-          { status: 429, headers: corsHeaders }
+          JSON.stringify({ error: "Límite de solicitudes excedido. Por favor, intenta de nuevo en un momento." }),
+          { status: 429, headers: corsHeaders },
         );
       }
-      
+
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Créditos agotados. Por favor, contacta al administrador.' }),
-          { status: 402, headers: corsHeaders }
-        );
+        return new Response(JSON.stringify({ error: "Créditos agotados. Por favor, contacta al administrador." }), {
+          status: 402,
+          headers: corsHeaders,
+        });
       }
 
       throw new Error(`Error de Lovable AI: ${response.status}`);
     }
 
     const data = await response.json();
-    const generatedText = data.choices?.[0]?.message?.content || '';
+    const generatedText = data.choices?.[0]?.message?.content || "";
 
-    console.log('✅ Respuesta generada exitosamente');
+    console.log("✅ Respuesta generada exitosamente");
 
-    return new Response(JSON.stringify({ 
-      generatedText,
-      usageInfo: ENABLE_RATE_LIMITING ? usageInfo : null
-    }), {
-      headers: corsHeaders,
-    });
-  } catch (error) {
-    console.error('❌ Error en prosalud-chat:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Error inesperado en el servidor'
+      JSON.stringify({
+        generatedText,
+        usageInfo: ENABLE_RATE_LIMITING ? usageInfo : null,
+      }),
+      {
+        headers: corsHeaders,
+      },
+    );
+  } catch (error) {
+    console.error("❌ Error en prosalud-chat:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Error inesperado en el servidor",
       }),
       {
         status: 500,
         headers: corsHeaders,
-      }
+      },
     );
   }
 });

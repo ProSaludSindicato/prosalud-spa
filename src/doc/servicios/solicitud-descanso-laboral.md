@@ -37,10 +37,10 @@ Para solicitar la Compensación Anual por Descanso, el afiliado debe cumplir con
 
 ### Información del Descanso (Todo Obligatorio)
 
-- **Proceso:** Selección del área o cargo. Opciones incluyen: 
+- **Proceso:** Selección del área o cargo. Opciones incluyen:
   - Auditor, Auxiliar de enfermería, Auxiliar de farmacia, Bacteriólogo, Conductor, Instrumentador, Jefe de Enfermería, Médico y/o Especialista, Odontólogo, Regente, Secretario, Técnico RX, Terapeuta, Otro administrativo, Otro asistencial
 
-- **Donde realiza el proceso:** Selección de la ubicación. Opciones incluyen: 
+- **Donde realiza el proceso:** Selección de la ubicación. Opciones incluyen:
   - Abejorral, Bello, Caldas, C. Bolívar, Carisma, Cisneros, La María, Rionegro, Sabaneta
 
 - **Coordinador que da el V°B°:** Nombre completo del coordinador que aprueba (mínimo 2 caracteres)
@@ -81,7 +81,7 @@ R: Las solicitudes deben enviarse antes del día 24 del mes para ser incluidas e
 
 ## Confirmación de Correo
 
-Es importante que tenga agregado `portal@prosalud.org.co` en su lista de contactos para asegurar la recepción de correos relacionados con su solicitud.
+Es importante que tenga agregado `comunicaciones@sindicatoprosalud.com` en su lista de contactos para asegurar la recepción de correos relacionados con su solicitud.
 
 ## Autorización de Tratamiento de Datos
 

@@ -39,24 +39,31 @@ Al pertenecer al sindicato como **AFILIADO PARTÍCIPE INDEPENDIENTE AGREMIADO C�
 ## Proceso de Solicitud Paso a Paso
 
 ### 1. Autenticación
+
 Inicie sesión en el portal de afiliados
 
 ### 2. Descargar Formato
+
 Descargue el formato oficial de retiro y compensación final desde el formulario
 
 ### 3. Diligenciar Formato
+
 Complete toda la información solicitada en el formato
 
 ### 4. Firmar
+
 Firme el documento según las indicaciones
 
 ### 5. Completar Formulario Web
+
 Proporcione la información adicional sobre su proceso actual
 
 ### 6. Adjuntar Formato
+
 Suba el formato debidamente diligenciado y firmado
 
 ### 7. Confirmar y Enviar
+
 Revise la información y envíe la solicitud
 
 ## Validaciones del Sistema
@@ -101,7 +108,7 @@ R: Para consultas sobre cancelación o modificación de una solicitud ya enviada
 - Asegúrese de diligenciar completamente el formato antes de adjuntarlo
 - Verifique que el archivo sea legible antes de enviarlo
 - Mantenga una copia del formato diligenciado para sus registros
-- Agregue `portal@prosalud.org.co` a su lista de contactos para recibir notificaciones
+- Agregue `comunicaciones@sindicatoprosalud.com` a su lista de contactos para recibir notificaciones
 
 ## Autorización de Tratamiento de Datos
 
