@@ -52,7 +52,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import {
   SstAffiliate,
@@ -67,6 +66,7 @@ import {
 import { sstAdminService } from '@/services/sstAdminService';
 import { logger } from '@/utils/logger';
 import { Link } from 'react-router-dom';
+import { buildAdminApiUrl } from '@/config/api';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -704,6 +704,7 @@ const AdminSstPage: React.FC = () => {
 
     setExportError(null);
 
+    // Validación de fechas
     if (exportStartDate && exportEndDate && new Date(exportStartDate) > new Date(exportEndDate)) {
       setExportError('La fecha inicial debe ser anterior o igual a la fecha final.');
       return;
@@ -712,586 +713,97 @@ const AdminSstPage: React.FC = () => {
     setIsExporting(true);
 
     try {
-      const startDateParam = exportStartDate || undefined;
-      const endDateParam = exportEndDate || undefined;
-      const startDateObj = startDateParam ? new Date(startDateParam) : undefined;
-      const endDateObj = endDateParam ? new Date(endDateParam) : undefined;
+      // Construir parámetros de consulta
+      const params = new URLSearchParams();
+      
+      if (exportHospital) {
+        params.append('hospital', exportHospital);
+      }
+      if (exportStartDate) {
+        params.append('startDate', exportStartDate);
+      }
+      if (exportEndDate) {
+        params.append('endDate', exportEndDate);
+      }
+      if (exportDocumentNumber.trim()) {
+        params.append('documentNumber', exportDocumentNumber.trim());
+      }
+      if (exportDeliveredBy.trim()) {
+        params.append('deliveredBy', exportDeliveredBy.trim());
+      }
+      
+      // Opciones de firmas (valores por defecto según la documentación)
+      params.append('includeSignatures', 'true');
+      params.append('signatureWidth', '100');
+      params.append('signatureHeight', '50');
 
-      const filters = {
-        hospital: exportHospital !== 'all' ? exportHospital : undefined,
-        startDate: startDateParam,
-        endDate: endDateParam,
-        documentNumber: exportDocumentNumber.trim() || undefined,
-        deliveredBy: exportDeliveredBy.trim() || undefined,
+      // Obtener token del localStorage
+      const token = localStorage.getItem('prosalud_auth_token');
+      
+      // Construir URL del endpoint
+      const endpoint = `/api/dotacion-epp/reports/deliveries/excel${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = buildAdminApiUrl(endpoint);
+
+      // Construir headers
+      const headers: HeadersInit = {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       };
-
-      const deliveries: SstDeliveryRecord[] = [];
-      const PAGE_SIZE = 200;
-      let page = 1;
-      let total = 0;
-
-      do {
-        const response = await sstAdminService.getDeliveryHistory({
-          ...filters,
-          page,
-          pageSize: PAGE_SIZE,
-        });
-        deliveries.push(...response.items);
-        total = response.total ?? deliveries.length;
-        if (deliveries.length >= total || response.items.length === 0) {
-          break;
-        }
-        page += 1;
-      } while (page < 500);
-
-      if (deliveries.length === 0) {
-        const emptyMessage = 'No se encontraron entregas con los filtros seleccionados.';
-        setExportError(emptyMessage);
-        showFeedbackBanner('info', 'Sin entregas para exportar', emptyMessage);
-        toast({
-          title: 'Sin datos para exportar',
-          description: emptyMessage,
-        });
-        return;
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const uniqueAffiliateIds = Array.from(
-        new Set(deliveries.map((record) => record.affiliateId).filter(Boolean)),
-      );
-
-      const affiliateMap = new Map<string, SstAffiliate>();
-      affiliates.forEach((affiliate) => {
-        affiliateMap.set(affiliate.id, affiliate);
-      });
-      if (uniqueAffiliateIds.length > 0) {
-        const AFFILIATES_PAGE_SIZE = 200;
-        let pageCounter = 1;
-        let totalAffiliates = Infinity;
-
-        while (affiliateMap.size < uniqueAffiliateIds.length && (pageCounter - 1) * AFFILIATES_PAGE_SIZE < totalAffiliates) {
-          const response = await sstAdminService.getAffiliates({
-            page: pageCounter,
-            pageSize: AFFILIATES_PAGE_SIZE,
-            hospital: exportHospital !== 'all' ? exportHospital : undefined,
-            status: 'all',
-          });
-
-          response.items.forEach((affiliate) => {
-            affiliateMap.set(affiliate.id, affiliate);
-          });
-
-          totalAffiliates = response.total ?? response.items.length;
-          if (response.items.length === 0) {
-            break;
-          }
-
-          pageCounter += 1;
-        }
-      }
-
-      const affiliateCacheByDocument = new Map<string, SstAffiliate | null>();
-      const affiliateFetchPromises: Promise<void>[] = [];
-
-      deliveries.forEach((record) => {
-        if (affiliateMap.has(record.affiliateId)) {
-          return;
-        }
-
-        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
-        const fallbackDocType = affiliateIdParts.length > 1 ? (affiliateIdParts[0] as SstDocumentType) : undefined;
-        const fallbackDocNumber =
-          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
-
-        const docType = (record.affiliateDocumentType ?? fallbackDocType) as SstDocumentType | undefined;
-        const docNumber = record.affiliateDocumentNumber ?? fallbackDocNumber ?? '';
-
-        if (!docType || !docNumber) {
-          return;
-        }
-
-        const cacheKey = `${docType}-${docNumber}`;
-        if (affiliateCacheByDocument.has(cacheKey)) {
-          const cached = affiliateCacheByDocument.get(cacheKey);
-          if (cached) {
-            affiliateMap.set(cached.id, cached);
-          }
-          return;
-        }
-
-        affiliateCacheByDocument.set(cacheKey, null);
-        affiliateFetchPromises.push(
-          sstAdminService
-            .getAffiliateByDocument(docType, docNumber)
-            .then((result) => {
-              if (result) {
-                affiliateCacheByDocument.set(cacheKey, result);
-                affiliateMap.set(result.id, result);
-              }
-            })
-            .catch(() => {
-              affiliateCacheByDocument.set(cacheKey, null);
-            }),
-        );
+      // Realizar petición al backend
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
       });
 
-      if (affiliateFetchPromises.length > 0) {
-        await Promise.all(affiliateFetchPromises);
-      }
-
-      const inventoryMap = new Map(inventory.map((item) => [item.id, item]));
-
-      const normalizeText = (value: string | null | undefined) =>
-        value ? value.toString().trim().toLowerCase() : '';
-      const hospitalFilterValue = filters.hospital ? normalizeText(filters.hospital) : '';
-      const deliveredByFilterValue = filters.deliveredBy ? normalizeText(filters.deliveredBy) : '';
-      const documentFilterValue = filters.documentNumber?.trim() ?? '';
-      const startTimestamp = startDateObj
-        ? new Date(
-            startDateObj.getFullYear(),
-            startDateObj.getMonth(),
-            startDateObj.getDate(),
-          ).getTime()
-        : undefined;
-      const endTimestamp = endDateObj
-        ? new Date(
-            endDateObj.getFullYear(),
-            endDateObj.getMonth(),
-            endDateObj.getDate(),
-            23,
-            59,
-            59,
-            999,
-          ).getTime()
-        : undefined;
-
-      const filteredDeliveries = deliveries.filter((record) => {
-        const affiliate = affiliateMap.get(record.affiliateId);
-        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
-        const fallbackDocNumber =
-          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
-
-        const docNumberCandidate =
-          record.affiliateDocumentNumber ??
-          affiliate?.documentNumber ??
-          fallbackDocNumber ??
-          '';
-
-        if (documentFilterValue && docNumberCandidate !== documentFilterValue) {
-          return false;
-        }
-
-        if (hospitalFilterValue) {
-          const recordHospitalRaw =
-            record.affiliateHospital ??
-            affiliate?.hospital ??
-            '';
-          if (normalizeText(recordHospitalRaw) !== hospitalFilterValue) {
-            return false;
-          }
-        }
-
-        if (deliveredByFilterValue) {
-          const deliveredByRaw = record.deliveredByName ?? record.deliveredBy ?? '';
-          if (!normalizeText(deliveredByRaw).includes(deliveredByFilterValue)) {
-            return false;
-          }
-        }
-
-        if (startTimestamp !== undefined || endTimestamp !== undefined) {
-          const deliveredAtTime = new Date(record.deliveredAt).getTime();
-          if (Number.isNaN(deliveredAtTime)) {
-            return false;
-          }
-          if (startTimestamp !== undefined && deliveredAtTime < startTimestamp) {
-            return false;
-          }
-          if (endTimestamp !== undefined && deliveredAtTime > endTimestamp) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      if (filteredDeliveries.length === 0) {
-        const emptyMessage = 'No se encontraron entregas con los filtros seleccionados.';
-        setExportError(emptyMessage);
-        showFeedbackBanner('info', 'Sin entregas para exportar', emptyMessage);
-        toast({
-          title: 'Sin datos para exportar',
-          description: emptyMessage,
-        });
-        return;
-      }
-
-      const deliveriesHeader: string[] = [
-        'ID de entrega',
-        'Fecha de entrega',
-        'Hospital',
-        'Afiliado tipo documento',
-        'Afiliado número documento',
-        'Afiliado nombre completo',
-        'Proceso del afiliado',
-        'Responsable de entrega',
-        'Observaciones',
-        'Tipo de entrega',
-        'Artículo',
-        'Categoría artículo',
-        'Color',
-        'Talla',
-        'Cantidad',
-        'Firma URL',
-        'Firma imagen',
-      ];
-      const firmaImageColumnIndex = deliveriesHeader.indexOf('Firma imagen');
-
-      const deliveriesRows: (string | number)[][] = [[...deliveriesHeader]];
-      const signaturePlacements: { row: number; col: number; url: string }[] = [];
-      const blankRowTemplate = Array(deliveriesHeader.length).fill('');
-      let exportedDetailRows = 0;
-      let firstTimeDeliveriesCount = 0;
-      let periodicDeliveriesCount = 0;
-
-      const deliveriesByHospital = new Map<string, { deliveries: number; units: number }>();
-      const itemsByCategory = new Map<string, number>();
-      const itemsByArticle = new Map<string, number>();
-      const articleCategoryMap = new Map<string, string>();
-      let totalUnitsDelivered = 0;
-      let deliveriesWithNotes = 0;
-
-      const imageDataCache = new Map<string, { data: string; extension: string }>();
-      const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.subarray(i, i + chunkSize);
-          binary += String.fromCharCode(...chunk);
-        }
-        return btoa(binary);
-      };
-
-      const loadSignatureImage = async (url: string): Promise<{ data: string; extension: string }> => {
-        const cached = imageDataCache.get(url);
-        if (cached) {
-          return cached;
-        }
-
-        if (url.startsWith('data:')) {
-          const [meta, base64Data] = url.split(',', 2);
-          if (!base64Data) {
-            throw new Error('Formato de data URL inválido para la firma');
-          }
-          const mimeMatch = meta.match(/data:(.*?);/);
-          const mime = mimeMatch?.[1] ?? 'image/png';
-          const extension = mime.split('/')[1] ?? 'png';
-          const result = { data: base64Data, extension };
-          imageDataCache.set(url, result);
-          return result;
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        const extension = (blob.type || 'image/png').split('/')[1] ?? 'png';
-        const result = {
-          data: arrayBufferToBase64(arrayBuffer),
-          extension,
-        };
-        imageDataCache.set(url, result);
-        return result;
-      };
-
-      const addRow = (row: (string | number)[]): number => {
-        deliveriesRows.push(row);
-        return deliveriesRows.length - 1;
-      };
-
-      const appendSeparatorRow = () => {
-        deliveriesRows.push([...blankRowTemplate]);
-      };
-
-      filteredDeliveries.forEach((record) => {
-        const affiliate = affiliateMap.get(record.affiliateId);
-        const affiliateIdParts = record.affiliateId?.split('-') ?? [];
-        const fallbackDocType = affiliateIdParts.length > 1 ? (affiliateIdParts[0] as SstDocumentType) : undefined;
-        const fallbackDocNumber =
-          affiliateIdParts.length > 1 ? affiliateIdParts.slice(1).join('-') : record.affiliateId;
-
-        const docType =
-          record.affiliateDocumentType ?? affiliate?.documentType ?? fallbackDocType ?? '';
-        const docNumber =
-          record.affiliateDocumentNumber ?? affiliate?.documentNumber ?? fallbackDocNumber ?? '';
-
-        const affiliatePrimaryName = (record.affiliateFullName ?? '').trim();
-        const affiliateSecondaryName = affiliate ? `${affiliate.firstName} ${affiliate.lastName}`.trim() : '';
-        const affiliateFallbackName = [record.affiliateFirstName, record.affiliateLastName].filter(Boolean).join(' ');
-        const affiliateName = (affiliatePrimaryName || affiliateSecondaryName || affiliateFallbackName || '').trim();
-
-        const rawHospital =
-          record.affiliateHospital ??
-          affiliate?.hospital ??
-          (exportHospital !== 'all' ? exportHospital : '') ??
-          '';
-        const hospital = rawHospital && rawHospital.trim().length > 0 ? rawHospital : 'No especificado';
-
-        const rawRole =
-          record.affiliateRole ??
-          affiliate?.role ??
-          '';
-        const role = rawRole && rawRole.trim().length > 0 ? rawRole : 'No especificado';
-
-        const recordUnits = record.items.reduce((acc, item) => acc + item.quantity, 0);
-        totalUnitsDelivered += recordUnits;
-        if (record.notes && record.notes.trim().length > 0) {
-          deliveriesWithNotes += 1;
-        }
-
-        const hospitalStats = deliveriesByHospital.get(hospital) ?? { deliveries: 0, units: 0 };
-        hospitalStats.deliveries += 1;
-        hospitalStats.units += recordUnits;
-        deliveriesByHospital.set(hospital, hospitalStats);
-
-        const deliveryTypeLabel = getDeliveryTypeLabel(record.deliveryType as SstDeliveryType | undefined);
-        if (record.deliveryType === 'first_time') {
-          firstTimeDeliveriesCount += 1;
-        } else if (record.deliveryType === 'periodic') {
-          periodicDeliveriesCount += 1;
-        }
-
-        const baseRowData: (string | number)[] = [
-          record.id,
-          format(new Date(record.deliveredAt), 'yyyy-MM-dd HH:mm'),
-          hospital,
-          docType,
-          docNumber,
-          affiliateName || 'Sin información',
-          role,
-          record.deliveredByName ?? record.deliveredBy,
-          record.notes ?? '',
-          deliveryTypeLabel,
-        ];
-        const signatureUrl = record.signedDocumentUrl ?? '';
-
-        if (!record.items.length) {
-          const row = [
-            ...baseRowData,
-            'Sin artículos registrados',
-            '',
-            '',
-            '',
-            0,
-            signatureUrl,
-            '',
-          ];
-          const rowIndex = addRow(row);
-          exportedDetailRows += 1;
-          if (signatureUrl && firmaImageColumnIndex !== -1) {
-            signaturePlacements.push({ row: rowIndex, col: firmaImageColumnIndex, url: signatureUrl });
-          }
-          appendSeparatorRow();
-          return;
-        }
-
-        record.items.forEach((item, index) => {
-          const inventoryItem = inventoryMap.get(item.itemId);
-          const category = inventoryItem?.category ?? 'Sin categoría';
-          const baseArticleName = inventoryItem?.name ?? item.itemId;
-          const articleName =
-            inventoryItem?.gender && inventoryItem.gender.trim().length > 0
-              ? `${baseArticleName} (${inventoryItem.gender})`
-              : baseArticleName;
-          const rawColor = item.variant?.color ?? inventoryItem?.defaultColor ?? '';
-          const colorInfo = resolveSstColorInfo(rawColor);
-          const colorLabel = colorInfo?.label ?? rawColor;
-          const articleAggregationKey = colorLabel ? `${articleName} - ${colorLabel}` : articleName;
-          const quantity = item.quantity ?? 0;
-
-          itemsByCategory.set(category, (itemsByCategory.get(category) ?? 0) + quantity);
-          itemsByArticle.set(articleAggregationKey, (itemsByArticle.get(articleAggregationKey) ?? 0) + quantity);
-          if (!articleCategoryMap.has(articleAggregationKey)) {
-            articleCategoryMap.set(articleAggregationKey, category);
-          }
-
-          const row = [
-            ...baseRowData,
-            articleName,
-            category,
-            colorLabel,
-            item.variant?.size ?? '',
-            quantity,
-            signatureUrl,
-            '',
-          ];
-          const rowIndex = addRow(row);
-          exportedDetailRows += 1;
-
-          if (signatureUrl && firmaImageColumnIndex !== -1 && index === 0) {
-            signaturePlacements.push({ row: rowIndex, col: firmaImageColumnIndex, url: signatureUrl });
-          }
-        });
-
-        appendSeparatorRow();
-      });
-
-      if (deliveriesRows.length > 1) {
-        const lastRow = deliveriesRows[deliveriesRows.length - 1];
-        if (lastRow.every((cell) => cell === '')) {
-          deliveriesRows.pop();
-        }
-      }
-
-      const workbook = XLSX.utils.book_new();
-      const deliveriesSheet = XLSX.utils.aoa_to_sheet(deliveriesRows);
-
-      if (signaturePlacements.length > 0 && firmaImageColumnIndex !== -1) {
-        for (const placement of signaturePlacements) {
+      // Manejar errores
+      if (!response.ok) {
+        let errorMessage = 'Error al generar el reporte';
+        
+        // Intentar parsear el error como JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
           try {
-            const targetRow = deliveriesRows[placement.row];
-            if (!targetRow) continue;
-
-            const targetCell = targetRow[placement.col];
-            if (typeof targetCell === 'object' && targetCell && 'f' in targetCell) continue;
-
-            const { data, extension } = await loadSignatureImage(placement.url);
-            targetRow[placement.col] = {
-              f: `=IMAGE("data:image/${extension};base64,${data}", 4, 48, 48)`,
-            } as unknown as string;
-          } catch (error) {
-            logger.warn(
-              'No fue posible adjuntar la firma en el reporte',
-              error instanceof Error ? error.message : error,
-            );
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            // Si no se puede parsear, usar el mensaje por defecto
           }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Obtener el blob del archivo
+      const blob = await response.blob();
+
+      // Obtener nombre del archivo del header Content-Disposition si está disponible
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `reporte-dotacion-epp-${format(new Date(), 'yyyyMMdd-HHmmss')}.xlsx`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
         }
       }
 
-      XLSX.utils.book_append_sheet(workbook, deliveriesSheet, 'Entregas');
-      if (deliveriesRows.length > 1 && deliveriesSheet['!ref']) {
-        deliveriesSheet['!cols'] = [
-          { wch: 18 },
-          { wch: 20 },
-          { wch: 26 },
-          { wch: 12 },
-          { wch: 18 },
-          { wch: 30 },
-          { wch: 24 },
-          { wch: 24 },
-          { wch: 36 },
-          { wch: 18 },
-          { wch: 28 },
-          { wch: 20 },
-          { wch: 18 },
-          { wch: 12 },
-          { wch: 14 },
-          { wch: 36 },
-          { wch: 18 },
-        ];
-        const filterRange = XLSX.utils.encode_range({
-          s: { r: 0, c: 0 },
-          e: { r: deliveriesRows.length - 1, c: deliveriesHeader.length - 1 },
-        });
-        deliveriesSheet['!autofilter'] = { ref: filterRange };
-      }
-
-      const summarySheetData: (string | number)[][] = [
-        ['Filtros aplicados', '', ''],
-        ['Hospital', exportHospital === 'all' ? 'Todos' : exportHospital, ''],
-        ['Fecha desde', startDateObj ? format(startDateObj, 'yyyy-MM-dd') : 'Sin definir', ''],
-        ['Fecha hasta', endDateObj ? format(endDateObj, 'yyyy-MM-dd') : 'Sin definir', ''],
-        ['Número de documento', exportDocumentNumber.trim() || 'Sin definir', ''],
-        ['Responsable (registrado por)', exportDeliveredBy.trim() || 'Sin definir', ''],
-        [''],
-        ['Indicadores generales', '', ''],
-        ['Total entregas registradas', filteredDeliveries.length, ''],
-        ['Total unidades entregadas', totalUnitsDelivered, ''],
-        ['Entregas con observaciones', deliveriesWithNotes, ''],
-        ['Entregas primera vez', firstTimeDeliveriesCount, ''],
-        ['Entregas periódicas', periodicDeliveriesCount, ''],
-        ['Afiliados únicos incluidos', new Set(filteredDeliveries.map((record) => record.affiliateId)).size, ''],
-        ['Artículos diferentes entregados', itemsByArticle.size, ''],
-        [''],
-        ['Entregas por hospital', 'Entregas', 'Unidades entregadas'],
-      ];
-
-      if (deliveriesByHospital.size === 0) {
-        summarySheetData.push(['Sin datos', 0, 0]);
-      } else {
-        Array.from(deliveriesByHospital.entries())
-          .sort((a, b) => b[1].deliveries - a[1].deliveries)
-          .forEach(([hospitalName, stats]) => {
-            summarySheetData.push([hospitalName, stats.deliveries, stats.units]);
-          });
-      }
-
-      summarySheetData.push(['']);
-      summarySheetData.push(['Top artículos entregados', 'Unidades', '']);
-      const topArticles = Array.from(itemsByArticle.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-      if (topArticles.length === 0) {
-        summarySheetData.push(['Sin artículos registrados', 0, '']);
-      } else {
-        topArticles.forEach(([articleName, quantity]) => {
-          summarySheetData.push([articleName, quantity, '']);
-        });
-      }
-
-      summarySheetData.push(['']);
-      summarySheetData.push(['Artículos por categoría', 'Unidades', '']);
-      if (itemsByCategory.size === 0) {
-        summarySheetData.push(['Sin categoría', 0, '']);
-      } else {
-        Array.from(itemsByCategory.entries())
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([category, quantity]) => {
-            summarySheetData.push([category, quantity, '']);
-          });
-      }
-
-      summarySheetData.push(['']);
-      summarySheetData.push(['Generado el', format(new Date(), 'yyyy-MM-dd HH:mm'), '']);
-
-      const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData);
-      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
-      if (summarySheet['!ref']) {
-        summarySheet['!cols'] = [{ wch: 36 }, { wch: 28 }, { wch: 24 }];
-      }
-
-      const articleTotalsSheetData = [
-        ['Artículo', 'Categoría', 'Total unidades', 'Entregas registradas'],
-        ...Array.from(itemsByArticle.entries())
-          .sort((a, b) => b[1] - a[1])
-          .map(([articleName, quantity]) => {
-            const matchingRecords = filteredDeliveries.filter((record) =>
-              record.items.some((item) => {
-                const inventoryItem = inventoryMap.get(item.itemId);
-                const currentName = inventoryItem?.name ?? item.itemId;
-                return currentName === articleName;
-              }),
-            );
-            const deliveriesCount = matchingRecords.length;
-            const categoryFromMatch = articleCategoryMap.get(articleName) ?? 'Sin categoría';
-            return [articleName, categoryFromMatch, quantity, deliveriesCount];
-          }),
-      ];
-      const articlesSheet = XLSX.utils.aoa_to_sheet(articleTotalsSheetData);
-      XLSX.utils.book_append_sheet(workbook, articlesSheet, 'Totales por artículo');
-      if (articlesSheet['!ref']) {
-        const articleRange = XLSX.utils.decode_range(articlesSheet['!ref']);
-        articlesSheet['!autofilter'] = { ref: XLSX.utils.encode_range(articleRange) };
-        articlesSheet['!cols'] = [{ wch: 34 }, { wch: 22 }, { wch: 18 }, { wch: 20 }];
-      }
-
-      const filename = `reporte-dotacion-epp-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`;
-      XLSX.writeFile(workbook, filename);
+      // Crear URL temporal y descargar
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
 
       toast({
         title: 'Reporte exportado',
-        description: `Se generaron ${exportedDetailRows} filas detalladas en el reporte.`,
+        description: 'El reporte se ha descargado exitosamente.',
       });
       handleCloseExportDialog();
     } catch (error) {
