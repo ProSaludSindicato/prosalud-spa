@@ -34,14 +34,17 @@ Este servicio permite a los afiliados realizar consultas sobre el estado de sus 
 
 - **Su solicitud está relacionada con:** Tipo de consulta o novedad a reportar
   - Seleccione la categoría que mejor describa su consulta
-  - Opciones disponibles incluyen (entre otras):
+  - Opciones disponibles:
+    * Compensación Final (Liquidación)
+    * Compensación Anual Diferida y/o Descanso
+    * Compensación por Descanso (vacaciones)
+    * Descuentos Seguridad Social
+    * Duplicado Colillas
+    * Viáticos
+    * Ceiisas
+    * Compensación Mensual
+    * Compensación Semestral
     * Incapacidades
-    * Vacaciones
-    * Primas
-    * Compensación anual diferida
-    * Auxilio educativo
-    * Descuentos
-    * Otros pagos o compensaciones
 
 - **Detalle de la novedad:** Descripción detallada de la consulta o problema
   - Mínimo 10 caracteres
@@ -82,16 +85,17 @@ R: Se recomienda realizar una solicitud por cada consulta específica para facil
 
 **P: ¿Qué tipo de consultas puedo realizar?**
 R: Puede consultar sobre:
-- Estado de pagos de incapacidades
-- Pago de vacaciones
-- Primas (navidad, servicios, etc.)
-- Compensación anual diferida
-- Auxilio educativo
-- Compensaciones pendientes
-- Descuentos no reconocidos
-- Diferencias en montos pagados
-- Compensación final (liquidación)
-- Cualquier novedad relacionada con pagos y compensaciones
+- **Compensación Final (Liquidación)**: Estado de su compensación final al retirarse
+- **Compensación Anual Diferida y/o Descanso**: Consultas sobre compensación anual diferida
+- **Compensación por Descanso**: Pago de vacaciones (término oficial: compensación por descanso)
+- **Descuentos Seguridad Social**: Descuentos no reconocidos o diferencias
+- **Duplicado Colillas**: Solicitud de duplicados de comprobantes de pago
+- **Viáticos**: Consultas sobre viáticos
+- **Ceiisas**: Consultas relacionadas con Ceiisas
+- **Compensación Mensual**: Diferencias en montos de compensación mensual
+- **Compensación Semestral**: Primas (navidad, servicios, etc.)
+- **Incapacidades**: Estado de pagos de incapacidades
+- Cualquier otra novedad relacionada con pagos y compensaciones
 
 **P: ¿Debo especificar fechas exactas?**
 R: Sí, es importante que especifique el mes y año al que se refiere su consulta para una revisión más precisa.

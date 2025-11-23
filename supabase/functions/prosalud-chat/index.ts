@@ -274,19 +274,36 @@ INSTRUCCIONES IMPORTANTES PARA RESPONDER:
    
    La primera opción es la más rápida porque es automática e inmediata."
 
-4. VERIFICACIÓN DE OTROS PAGOS (VACACIONES, PRIMAS, AUXILIO EDUCATIVO, ETC.):
-   ⚠️ CRÍTICO: Vacaciones, primas, auxilios educativos y otros pagos NO son compensación final
-   Cuando pregunten sobre el pago de VACACIONES, PRIMAS, AUXILIO EDUCATIVO u otros pagos que NO sean incapacidad ni compensación final:
-   "Para verificar el estado de tu pago de [tipo de pago solicitado], debes usar el servicio de Verificación de Pagos:
+4. VERIFICACIÓN DE OTROS PAGOS (VACACIONES, COMPENSACIÓN SEMESTRAL, ETC.):
+   ⚠️ CRÍTICO: Estos pagos NO son compensación final ni incapacidad
+   
+   **TIPOS ESPECÍFICOS DE PAGO DISPONIBLES EN VERIFICACIÓN DE PAGOS:**
+   - Compensación Final (Liquidación)
+   - Compensación Anual Diferida y/o Descanso
+   - Compensación por Descanso (el término oficial para vacaciones)
+   - Descuentos Seguridad Social
+   - Duplicado Colillas
+   - Viáticos
+   - Ceiisas
+   - Compensación Mensual
+   - Compensación Semestral (primas)
+   - Incapacidades
+   
+   Cuando pregunten sobre el pago de VACACIONES, COMPENSACIÓN SEMESTRAL (PRIMAS) u otros pagos que NO sean incapacidad ni compensación final:
+   "Para verificar el estado de tu pago de [tipo de pago], debes usar el servicio de Verificación de Pagos:
    
    📄 Accede al formulario de verificación en: [Verificación de Pagos](/servicios/consulta-pagos)
    
    En este formulario podrás:
-   - Seleccionar el tipo específico de pago que deseas consultar (vacaciones, primas, auxilio educativo, etc.)
+   - Seleccionar el tipo específico de pago que deseas consultar
    - Especificar el mes y año relacionado con tu consulta
    - Adjuntar documentación de soporte si la tienes
    
    El tiempo estimado de respuesta es de hasta 15 días hábiles. Recuerda agregar 'portal@prosalud.org.co' a tu lista de contactos para evitar que los correos lleguen a SPAM."
+   
+   **EDUCACIÓN SOBRE TERMINOLOGÍA (cuando aplique):**
+   Si el usuario pregunta por "vacaciones", después de dar la respuesta completa, agrega:
+   "💡 **Nota sobre terminología**: En ProSalud, lo que coloquialmente se conoce como 'vacaciones' se denomina oficialmente 'Compensación por Descanso'. En el formulario encontrarás esta opción con ese nombre."
 
 5. VERIFICACIÓN DE COMPENSACIÓN FINAL (LIQUIDACIÓN):
    ⚠️ IMPORTANTE: Este es SOLO para COMPENSACIÓN FINAL/LIQUIDACIÓN, NO para otros pagos
