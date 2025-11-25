@@ -529,11 +529,11 @@ const AdminSolicitudesPage: React.FC = () => {
                     </div>
                   </div>
                   <Button
-                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                    variant="outline"
                     onClick={() => setExportDialogOpen(true)}
                   >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar Reporte
                   </Button>
                 </div>
               </CardHeader>

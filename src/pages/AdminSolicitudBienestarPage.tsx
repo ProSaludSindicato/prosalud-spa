@@ -55,6 +55,7 @@ import { TableLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import WellnessRequestForm from '@/components/admin/solicitudes/WellnessRequestForm';
 import WellnessActivityRealizedForm from '@/components/admin/solicitudes/WellnessActivityRealizedForm';
 import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
+import ExportWellnessReportDialog from '@/components/admin/solicitudes/ExportWellnessReportDialog';
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -179,6 +180,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [solicitudForActivity, setSolicitudForActivity] = useState<WellnessRequest | null>(null);
   const [showActivityReviewDialog, setShowActivityReviewDialog] = useState(false);
   const [solicitudForReview, setSolicitudForReview] = useState<WellnessRequest | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const queryClient = useQueryClient();
 
   const statusChangeForm = useForm<StatusChangeFormValues>({
@@ -493,15 +495,26 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  {can('wellness_requests.create') && (
-                    <Button
-                      onClick={() => setShowCreateForm(true)}
-                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nueva Solicitud
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {can('wellness_requests.view') && (
+                      <Button
+                        onClick={() => setShowExportDialog(true)}
+                        variant="outline"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Exportar Reporte
+                      </Button>
+                    )}
+                    {can('wellness_requests.create') && (
+                      <Button
+                        onClick={() => setShowCreateForm(true)}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nueva Solicitud
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
             </Card>
@@ -1388,6 +1401,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             }}
           />
         )}
+
+        {/* Diálogo de Exportación de Reporte */}
+        <ExportWellnessReportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+        />
       </div>
     </AdminLayout>
   );

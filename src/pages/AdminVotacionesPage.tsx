@@ -13,7 +13,7 @@ import { generateVotacionesExcelReport } from "@/components/admin/votaciones/uti
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Vote, BarChart3, FileDown, Upload, Download, CheckCircle2 } from "lucide-react";
+import { Vote, BarChart3, Upload, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
@@ -190,10 +190,10 @@ export default function AdminVotacionesPage() {
       const fileName = `Reporte_Votaciones_Asamblea_ProSalud_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
-      toast.success("Reporte Excel generado exitosamente");
+      toast.success("Reporte exportado exitosamente");
     } catch (error) {
       logger.error("Error al exportar reporte de votaciones", error instanceof Error ? error.message : error);
-      toast.error("Error al generar el reporte Excel");
+      toast.error("Error al exportar reporte");
     }
   };
 
@@ -218,10 +218,10 @@ export default function AdminVotacionesPage() {
       const fileName = `Reporte_Auditoria_Votaciones_ProSalud_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
-      toast.success("Reporte Excel generado exitosamente");
+      toast.success("Reporte exportado exitosamente");
     } catch (error) {
       logger.error("Error al exportar reporte de auditoría de votaciones", error instanceof Error ? error.message : error);
-      toast.error("Error al generar el reporte Excel");
+      toast.error("Error al exportar reporte");
     }
   };
 
@@ -415,8 +415,8 @@ export default function AdminVotacionesPage() {
                     className="gap-2"
                     variant="default"
                   >
-                    <FileDown className="h-4 w-4" />
-                    Exportar a Excel
+                    <Download className="h-4 w-4" />
+                    Exportar Reporte
                   </Button>
                 </div>
               </div>
@@ -487,8 +487,8 @@ export default function AdminVotacionesPage() {
                   className="gap-2"
                   variant="default"
                 >
-                  <FileDown className="h-4 w-4" />
-                  Exportar a Excel
+                  <Download className="h-4 w-4" />
+                  Exportar Reporte
                 </Button>
               </div>
               <AuditFiltersComponent 

@@ -16,6 +16,7 @@ import {
   Bot,
   Filter,
   Download,
+  FileText,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -243,11 +244,11 @@ const AdminChatbotPage: React.FC = () => {
               <div>
                 <Button 
                   onClick={handleExportExcel}
-                  variant="default"
+                  variant="outline"
                   className="gap-2"
                 >
-                  <Download className="h-4 w-4" />
-                  Exportar Excel
+                  <FileText className="h-4 w-4" />
+                  Exportar Reporte
                 </Button>
               </div>
             </div>

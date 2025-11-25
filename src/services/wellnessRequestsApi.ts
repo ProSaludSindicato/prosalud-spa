@@ -580,5 +580,101 @@ export const wellnessRequestsService = {
       throw sanitizedError;
     }
   },
+
+  /**
+   * Export wellness requests to Excel
+   */
+  async exportToExcel(filters: {
+    cost_center?: string;
+    requester_id?: number;
+    status?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    include_images?: boolean;
+  }): Promise<{ blob: Blob; filename: string }> {
+    try {
+      const response = await wellnessRequestsApi.post(
+        '/api/wellness-requests/export/excel',
+        filters,
+        {
+          responseType: 'blob', // Important: specify blob response type for Excel file
+          headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        }
+      );
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'Reporte_Bienestar_ProSalud.xlsx';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      return {
+        blob: response.data,
+        filename,
+      };
+    } catch (error: any) {
+      // Handle validation errors (400)
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        
+        // Try to parse error message from blob if it's JSON
+        if (errorData instanceof Blob) {
+          try {
+            const text = await errorData.text();
+            const jsonError = JSON.parse(text);
+            if (jsonError.message) {
+              throw new Error(jsonError.message);
+            }
+            if (jsonError.errors) {
+              const errorMessages = Object.entries(jsonError.errors)
+                .flatMap(([field, messages]) => 
+                  Array.isArray(messages) 
+                    ? messages.map((msg: string) => `${field}: ${msg}`)
+                    : [`${field}: ${messages}`]
+                )
+                .join('\n');
+              throw new Error(`Errores de validación:\n${errorMessages}`);
+            }
+          } catch (parseError) {
+            // If parsing fails, use default error
+          }
+        } else if (errorData?.message) {
+          throw new Error(errorData.message);
+        } else if (errorData?.errors) {
+          const errorMessages = Object.entries(errorData.errors)
+            .flatMap(([field, messages]) => 
+              Array.isArray(messages) 
+                ? messages.map((msg: string) => `${field}: ${msg}`)
+                : [`${field}: ${messages}`]
+            )
+            .join('\n');
+          throw new Error(`Errores de validación:\n${errorMessages}`);
+        }
+      }
+
+      // Handle other errors
+      if (error.response?.status === 401) {
+        throw new Error('No autorizado. Por favor, inicie sesión nuevamente.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('No tiene permisos para exportar solicitudes de bienestar.');
+      }
+
+      if (error.response?.status === 500) {
+        throw new Error('Error al generar el reporte. Por favor, intente nuevamente.');
+      }
+
+      handleApiError(error);
+      throw error;
+    }
+  },
 };
 

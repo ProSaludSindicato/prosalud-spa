@@ -106,7 +106,7 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
               ) : (
                 <>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar a Excel
+                  Exportar Reporte
                 </>
               )}
             </Button>

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Users,
   Download,
+  FileText,
   Info,
   ClipboardList,
   ChevronDown,
@@ -939,8 +940,8 @@ const AdminSstPage: React.FC = () => {
                       className="gap-2"
                       onClick={handleOpenExportDialog}
                     >
-                      <Download className="h-4 w-4" />
-                      Exportar reporte
+                      <FileText className="h-4 w-4" />
+                      Exportar Reporte
                     </Button>
                   </div>
                 </div>
@@ -1803,7 +1804,7 @@ const AdminSstPage: React.FC = () => {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark" disabled={isExporting}>
+                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark text-white" disabled={isExporting}>
                   {isExporting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1812,7 +1813,7 @@ const AdminSstPage: React.FC = () => {
                   ) : (
                     <>
                       <Download className="h-4 w-4" />
-                      Exportar Excel
+                      Exportar Reporte
                     </>
                   )}
                 </Button>

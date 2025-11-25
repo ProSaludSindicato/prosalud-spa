@@ -110,7 +110,7 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({
     } catch (error) {
       logger.error('Error al exportar solicitudes', error instanceof Error ? error.message : error);
       toast({
-        title: "Error al Generar Reporte",
+        title: "Error al Exportar Reporte",
         description: error instanceof Error ? error.message : "No se pudo conectar con el servidor. Verifique su conexión.",
         variant: "destructive",
         duration: 4000,
