@@ -223,7 +223,8 @@ const AdminChatbotPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 space-y-6">
+      <div className="min-h-screen bg-slate-50">
+        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <Card>
           <CardHeader>
@@ -536,6 +537,7 @@ const AdminChatbotPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {/* Detail Modal */}

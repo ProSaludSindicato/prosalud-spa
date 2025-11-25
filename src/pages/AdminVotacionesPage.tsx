@@ -370,7 +370,8 @@ export default function AdminVotacionesPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 p-6">
+      <div className="min-h-screen bg-slate-50">
+        <div className="space-y-6 p-4 sm:p-6 max-w-7xl mx-auto">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Votaciones Asamblea</h1>
           <p className="text-muted-foreground">
@@ -564,6 +565,7 @@ export default function AdminVotacionesPage() {
             )}
           </DialogContent>
         </Dialog>
+        </div>
       </div>
     </AdminLayout>
   );

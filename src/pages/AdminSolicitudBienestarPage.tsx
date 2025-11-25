@@ -470,7 +470,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="p-6 space-y-6"
+          className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto"
         >
           {/* Header */}
           <motion.div variants={itemVariants}>

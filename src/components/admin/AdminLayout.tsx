@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Menu, X, LogOut, Home, ChevronRight, ChevronLeft
+  Menu, X, Home, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import UserProfileDropdown from './UserProfileDropdown';
 import { Toaster } from '@/components/ui/toaster';
-import { getVisibleModules, MODULES_CONFIG } from '@/config/permissions';
+import { getVisibleModules } from '@/config/permissions';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -26,37 +25,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return false;
   });
   const location = useLocation();
-  const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
-  const hasAutoCollapsedForDotacion = useRef(false);
-  const isForcingCollapse = useRef(false);
-  const DOTACION_ROUTE = '/admin/dotacion-epp';
 
   useEffect(() => {
-    if (!isForcingCollapse.current) {
-      localStorage.setItem('adminSidebarCollapsed', JSON.stringify(sidebarCollapsed));
-    }
+    localStorage.setItem('adminSidebarCollapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    if (location.pathname.startsWith(DOTACION_ROUTE)) {
-      if (!hasAutoCollapsedForDotacion.current) {
-        isForcingCollapse.current = true;
-        setSidebarCollapsed(true);
-        hasAutoCollapsedForDotacion.current = true;
-        requestAnimationFrame(() => {
-          isForcingCollapse.current = false;
-        });
-      }
-    } else {
-      hasAutoCollapsedForDotacion.current = false;
-      const storedPreference = localStorage.getItem('adminSidebarCollapsed');
-      if (storedPreference !== null) {
-        setSidebarCollapsed(storedPreference === 'true');
-      }
-    }
-  }, [location.pathname, DOTACION_ROUTE]);
 
   // Filtrar módulos según permisos del usuario
   const navigation = useMemo(() => {
