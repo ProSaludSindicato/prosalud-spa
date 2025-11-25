@@ -5,13 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ReportType, DateRangeFilter } from './types/reportTypes';
-import { buildReportData, getFilteredData } from './utils/reportData';
-import { generateExcelReport } from './utils/excelReportGenerator';
 import ReportTypeSelector from './components/ReportTypeSelector';
 import ReportInfoCard from './components/ReportInfoCard';
 import DateRangeSelector from './components/DateRangeSelector';
-import * as XLSX from 'xlsx';
-import { useInventory } from '@/context/InventoryContext';
+import { API_CONFIG } from '@/config/api';
 
 interface ExportReportDialogProps {
   open: boolean;
@@ -25,26 +22,108 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
-  const { categories, products, hospitalRequests, deliveries } = useInventory();
+
+  /**
+   * Obtiene el token de autenticación desde localStorage
+   */
+  const getAuthToken = (): string | null => {
+    try {
+      return localStorage.getItem('prosalud_auth_token');
+    } catch (error) {
+      console.error('Error al obtener token:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Descarga un blob como archivo
+   */
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
 
   const handleExport = async () => {
     setIsGenerating(true);
     
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.');
+      }
 
-      const baseData = buildReportData({
-        categories,
-        products,
-        hospitalRequests,
-        deliveries,
-        dateRange,
+      // Construir el body de la petición
+      const body: {
+        reportType: string;
+        dateRange?: {
+          start: string;
+          end: string;
+        };
+      } = {
+        reportType,
+      };
+
+      // Agregar rango de fechas si está especificado
+      if (!dateRange.includeAll && dateRange.start && dateRange.end) {
+        body.dateRange = {
+          start: dateRange.start.toISOString(),
+          end: dateRange.end.toISOString(),
+        };
+      }
+
+      // Realizar la petición al backend
+      const response = await fetch(`${API_CONFIG.BASE_URL}/api/inventory/reports/excel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       });
 
-      const filteredData = getFilteredData(reportType, baseData);
-      const workbook = generateExcelReport(filteredData, reportType);
+      // Manejar errores de respuesta
+      if (!response.ok) {
+        let errorMessage = 'Error al generar el reporte';
+        
+        if (response.status === 401) {
+          errorMessage = 'No autorizado. Por favor, inicia sesión nuevamente.';
+        } else if (response.status === 403) {
+          errorMessage = 'Acceso denegado. No tienes permisos para generar reportes.';
+        } else if (response.status === 400) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            errorMessage = 'Parámetros inválidos para el reporte.';
+          }
+        } else if (response.status === 500) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || 'Error interno del servidor al generar el reporte.';
+          } catch {
+            errorMessage = 'Error interno del servidor al generar el reporte.';
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      // Obtener el blob del archivo Excel
+      const blob = await response.blob();
+
+      // Generar nombre de archivo
       const timestamp = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `Reporte_${reportType.toUpperCase()}_${timestamp}.xlsx`);
+      const reportTypeUpper = reportType.toUpperCase();
+      const filename = `Reporte_${reportTypeUpper}_${timestamp}.xlsx`;
+
+      // Descargar el archivo
+      downloadBlob(blob, filename);
 
       const reportLabel =
         reportType === 'strategic'
@@ -53,19 +132,21 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
             ? 'operacional'
             : 'de stock crítico';
         
-        toast({
+      toast({
         title: 'Reporte Excel Generado',
         description: `Se descargó el reporte ${reportLabel} del inventario en formato Excel.`,
-          duration: 4000,
-        });
+        duration: 4000,
+      });
 
       onOpenChange(false);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Hubo un problema al generar el reporte. Inténtalo de nuevo.';
+      
       toast({
         title: 'Error al Generar Reporte',
-        description: 'Hubo un problema al generar el reporte. Inténtalo de nuevo.',
+        description: errorMessage,
         variant: 'destructive',
-        duration: 4000,
+        duration: 5000,
       });
     } finally {
       setIsGenerating(false);
