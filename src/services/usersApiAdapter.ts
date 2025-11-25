@@ -6,13 +6,16 @@ function adaptBackendUserToFrontend(backendUser: BackendUser): User {
   const createdAtRaw = backendUser.created_at;
   const updatedAtRaw = backendUser.updated_at ?? backendUser.created_at ?? new Date().toISOString();
 
+  // Priorizar role sobre roles (el backend ahora siempre envía role)
+  const role = backendUser.role || backendUser.roles?.[0] || undefined;
+
   return {
     id: String(backendUser.id),
     name: backendUser.name,
     email: backendUser.email,
     isActive: backendUser.is_active,
-    role: backendUser.role,
-    roles: backendUser.roles,
+    role: role,
+    roles: backendUser.roles, // Mantener por compatibilidad, pero role es el campo principal
     createdAt: createdAtRaw ? createdAtRaw.split('T')[0] : '',
     updatedAt: updatedAtRaw ? updatedAtRaw.split('T')[0] : '',
   };

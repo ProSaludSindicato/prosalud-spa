@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { getInitialsFromEmail } from '@/utils/avatarUtils';
+import { getInitialsFromEmail, getInitialsFromName } from '@/utils/avatarUtils';
 import { useAuth } from '@/context/AuthContext';
 import ChangePasswordDialog from './ChangePasswordDialog';
 
@@ -35,7 +35,8 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   // Usar el usuario del contexto si está disponible, sino usar los props
   const displayEmail = userEmail || user?.email || '';
   const displayName = userName || user?.name || '';
-  const initials = getInitialsFromEmail(displayEmail);
+  // Priorizar el nombre para las iniciales, si no está disponible usar el email
+  const initials = displayName ? getInitialsFromName(displayName) : getInitialsFromEmail(displayEmail);
 
   const handleLogout = async () => {
     setIsOpen(false);

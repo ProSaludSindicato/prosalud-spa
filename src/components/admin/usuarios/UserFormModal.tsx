@@ -61,7 +61,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       form.reset({
         name: user.name,
         email: user.email,
-        role: user.role || user.roles?.[0] || '',
+        role: user.role || '', // Priorizar role (el backend ahora siempre envía role)
         isActive: user.isActive,
       });
     } else {

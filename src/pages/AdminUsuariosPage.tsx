@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getInitialsFromName } from '@/utils/avatarUtils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -247,7 +248,7 @@ const AdminUsuariosPage: React.FC = () => {
                       <div className="flex items-center gap-3 flex-1">
                         <Avatar>
                           <AvatarFallback className="bg-muted/30 text-foreground">
-                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {getInitialsFromName(user.name)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
@@ -258,9 +259,9 @@ const AdminUsuariosPage: React.FC = () => {
                             <Badge variant={user.isActive ? "secondary" : "destructive"}>
                               {user.isActive ? "Activo" : "Inactivo"}
                             </Badge>
-                            {(user.role || user.roles?.[0]) && (
+                            {user.role && (
                               <Badge variant="outline" className="bg-primary-prosalud/10 text-primary-prosalud border-primary-prosalud/20">
-                                {(user.role || user.roles?.[0] || '').charAt(0).toUpperCase() + (user.role || user.roles?.[0] || '').slice(1)}
+                                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                               </Badge>
                             )}
                           </div>
