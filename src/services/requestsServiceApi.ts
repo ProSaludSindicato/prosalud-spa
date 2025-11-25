@@ -188,4 +188,53 @@ export const requestsService = {
   async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
     return requestsApiService.downloadFile(requestId, fileKey);
   },
+
+  // Map frontend request type to backend request type
+  mapRequestTypeToBackend(requestType: string): string {
+    const typeMap: Record<string, string> = {
+      'retiro-sindical': 'solicitud-retiro-sindical',
+      'microcredito': 'solicitud-microcredito',
+      'incapacidad-licencia': 'incapacidades-licencias',
+      'descanso-laboral': 'compensacion-descanso',
+      // Note: 'permisos-turnos' and 'solicitud-bienestar' are not in backend API
+      // They will be sent as-is and backend should handle them or return an error
+    };
+    
+    return typeMap[requestType] || requestType;
+  },
+
+  // Export requests to Excel
+  async exportToExcel(filters: {
+    request_type?: string;
+    date_range?: {
+      includeAll: boolean;
+      start?: Date;
+      end?: Date;
+    };
+  }): Promise<{ blob: Blob; filename: string }> {
+    // Map request type to backend format
+    const backendRequestType = filters.request_type && filters.request_type !== 'all'
+      ? this.mapRequestTypeToBackend(filters.request_type)
+      : 'all';
+
+    // Format dates to YYYY-MM-DD
+    const formatDate = (date: Date): string => {
+      return date.toISOString().split('T')[0];
+    };
+
+    const dateRange = filters.date_range
+      ? {
+          include_all: filters.date_range.includeAll,
+          start_date: filters.date_range.start ? formatDate(filters.date_range.start) : undefined,
+          end_date: filters.date_range.end ? formatDate(filters.date_range.end) : undefined,
+        }
+      : {
+          include_all: true,
+        };
+
+    return requestsApiService.exportToExcel({
+      request_type: backendRequestType,
+      date_range: dateRange,
+    });
+  },
 };

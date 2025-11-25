@@ -166,9 +166,11 @@ const AdminSstPage: React.FC = () => {
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
   const [exportDocumentNumber, setExportDocumentNumber] = useState('');
-  const [exportDeliveredBy, setExportDeliveredBy] = useState('');
+  const [exportDeliveredBy, setExportDeliveredBy] = useState<string>('__all__');
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [deliveredByUsers, setDeliveredByUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [isLoadingDeliveredByUsers, setIsLoadingDeliveredByUsers] = useState(false);
 
   const [isLoadingAffiliates, setIsLoadingAffiliates] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
@@ -592,10 +594,68 @@ const AdminSstPage: React.FC = () => {
     setExportStartDate('');
     setExportEndDate('');
     setExportDocumentNumber('');
-    setExportDeliveredBy('');
+    setExportDeliveredBy('__all__');
     setExportError(null);
     setIsExportDialogOpen(true);
   };
+
+  // Cargar usuarios únicos que han entregado cuando se abre el modal
+  useEffect(() => {
+    if (!isExportDialogOpen) return;
+
+    const controller = new AbortController();
+    setIsLoadingDeliveredByUsers(true);
+
+    const fetchDeliveredByUsers = async () => {
+      try {
+        // Obtener todas las entregas (con un pageSize grande para obtener la mayoría)
+        const response = await sstAdminService.getDeliveryHistory({
+          page: 1,
+          pageSize: 1000,
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) return;
+
+        // Extraer usuarios únicos de las entregas
+        const usersMap = new Map<string, string>();
+        
+        response.items.forEach((delivery) => {
+          const deliveredBy = delivery.deliveredBy;
+          const deliveredByName = delivery.deliveredByName || deliveredBy;
+          
+          // Usar deliveredBy como ID único, y displayedName como nombre a mostrar
+          if (deliveredBy && !usersMap.has(deliveredBy)) {
+            usersMap.set(deliveredBy, deliveredByName);
+          }
+        });
+
+        // Convertir el Map a un array de objetos y ordenar alfabéticamente
+        const usersList = Array.from(usersMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+
+        setDeliveredByUsers(usersList);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return;
+        }
+        logger.error('Error al cargar usuarios que han entregado', error instanceof Error ? error.message : error);
+        // No mostrar error al usuario, simplemente dejar la lista vacía
+        setDeliveredByUsers([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingDeliveredByUsers(false);
+        }
+      }
+    };
+
+    fetchDeliveredByUsers();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isExportDialogOpen]);
 
   const handleCloseExportDialog = () => {
     setIsExportDialogOpen(false);
@@ -728,7 +788,7 @@ const AdminSstPage: React.FC = () => {
       if (exportDocumentNumber.trim()) {
         params.append('documentNumber', exportDocumentNumber.trim());
       }
-      if (exportDeliveredBy.trim()) {
+      if (exportDeliveredBy && exportDeliveredBy.trim() && exportDeliveredBy !== '__all__') {
         params.append('deliveredBy', exportDeliveredBy.trim());
       }
       
@@ -1670,19 +1730,29 @@ const AdminSstPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="export-delivered-by">Responsable que registró (opcional)</Label>
-                  <Input
-                    id="export-delivered-by"
-                    placeholder="Nombre o identificador del responsable"
+                  <Select
                     value={exportDeliveredBy}
-                    onChange={(event) => setExportDeliveredBy(event.target.value)}
-                    disabled={isExporting}
-                  />
+                    onValueChange={(value) => setExportDeliveredBy(value)}
+                    disabled={isExporting || isLoadingDeliveredByUsers}
+                  >
+                    <SelectTrigger id="export-delivered-by">
+                      <SelectValue placeholder={isLoadingDeliveredByUsers ? "Cargando usuarios..." : "Selecciona un responsable"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos los responsables</SelectItem>
+                      {deliveredByUsers.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="export-start-date">Fecha desde</Label>
+                  <Label htmlFor="export-start-date">Fecha desde (opcional)</Label>
                   <Input
                     id="export-start-date"
                     type="date"
@@ -1693,7 +1763,7 @@ const AdminSstPage: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="export-end-date">Fecha hasta</Label>
+                  <Label htmlFor="export-end-date">Fecha hasta (opcional)</Label>
                   <Input
                     id="export-end-date"
                     type="date"

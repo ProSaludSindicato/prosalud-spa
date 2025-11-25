@@ -6,11 +6,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileSpreadsheet, Calendar, Filter } from 'lucide-react';
+import { Download, Calendar, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { requestsService } from '@/services/requestsServiceApi';
-import { generateRequestsExcelReport } from './utils/requestsExcelGenerator';
-import * as XLSX from 'xlsx';
 import { logger } from '@/utils/logger';
 
 interface ExportRequestsDialogProps {
@@ -75,33 +73,31 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({
     setIsGenerating(true);
     
     try {
-      logger.debug('Iniciando exportación de solicitudes');
+      logger.debug('Iniciando exportación de solicitudes desde backend');
       
-      // Fetch real data from API
-      const allRequests = await requestsService.getRequests();
-      logger.debug('Solicitudes obtenidas para exportación', { total: allRequests.length });
+      // Call backend API to generate Excel report
+      const { blob, filename } = await requestsService.exportToExcel({
+        request_type: requestType !== 'all' ? requestType : undefined,
+        date_range: {
+          includeAll: dateRange.includeAll,
+          start: dateRange.start,
+          end: dateRange.end,
+        },
+      });
 
-      let filteredRequests = allRequests;
+      logger.debug('Reporte Excel recibido del backend', { filename, size: blob.size });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
       
-      // Filter by request type if specified
-      if (requestType !== 'all') {
-        filteredRequests = filteredRequests.filter(request => request.request_type === requestType);
-      }
-      
-      // Filter by date range if specified
-      if (!dateRange.includeAll && dateRange.start && dateRange.end) {
-        filteredRequests = filteredRequests.filter(request => {
-          const requestDate = new Date(request.created_at);
-          return requestDate >= dateRange.start! && requestDate <= dateRange.end!;
-        });
-      }
-
-      logger.debug('Solicitudes filtradas para exportación', { total: filteredRequests.length });
-      const today = new Date().toISOString().split('T')[0];
-
-      logger.debug('Generando reporte Excel de solicitudes');
-      const wb = generateRequestsExcelReport(filteredRequests, dateRange);
-      XLSX.writeFile(wb, `Reporte_Solicitudes_ProSalud_${today}.xlsx`);
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
       
       toast({
         title: "Reporte Excel Generado",
