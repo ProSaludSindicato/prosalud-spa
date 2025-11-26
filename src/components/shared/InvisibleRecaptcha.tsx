@@ -1,6 +1,19 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 
+// Declaración de tipos para grecaptcha en window
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (callback: () => void) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      render: (container: string | HTMLElement, options: any) => number;
+      reset: (widgetId?: number) => void;
+      getResponse: (widgetId?: number) => string;
+    };
+  }
+}
+
 export interface InvisibleRecaptchaRef {
   execute: () => Promise<string | null>;
   reset: () => void;
@@ -91,9 +104,9 @@ const InvisibleRecaptcha = forwardRef<InvisibleRecaptchaRef, InvisibleRecaptchaP
         onExpired={() => {
           onExpire?.();
         }}
-        onErrored={(error) => {
+        onErrored={() => {
           // Solo loguear errores, no bloquear al usuario
-          console.warn('Error en reCAPTCHA:', error);
+          console.warn('Error en reCAPTCHA');
           setHasError(true);
           
           // Si ya estaba inicializado y hay un error, notificar pero no bloquear
