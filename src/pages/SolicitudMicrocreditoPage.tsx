@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +24,8 @@ import { toast } from "@/components/ui/sonner";
 import { submitRequest } from "@/services/requestsService";
 import RequireAfiliadoAuth from "@/components/auth/RequireAfiliadoAuth";
 import { useAfiliadoAuth } from "@/context/AfiliadoAuthContext";
+import InvisibleRecaptcha, { InvisibleRecaptchaRef } from "@/components/shared/InvisibleRecaptcha";
+import { RECAPTCHA_CONFIG } from "@/config/api";
 
 import DatosPersonalesReadOnly from "@/components/shared/DatosPersonalesReadOnly";
 import ConfirmacionCorreoSection from "@/components/solicitud-certificado/ConfirmacionCorreoSection";
@@ -63,6 +65,7 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
   const form = useForm<MicrocreditoFormValues>({
     resolver: zodResolver(microcreditoFormSchema),
     defaultValues: {
@@ -77,6 +80,15 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
+      let recaptchaToken: string | null = null;
+      try {
+        recaptchaToken = await recaptchaRef.current?.execute() ?? null;
+      } catch (error) {
+        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        // No bloquear al usuario - permitir continuar
+      }
+
       const requestData = {
         request_type: "microcredito",
         id_type: afiliado.tipo_documento || '',
@@ -90,9 +102,13 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
           montoSolicitado: data.montoSolicitado,
           numeroCuotas: data.numeroCuotas,
         },
+        ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
       await submitRequest(requestData);
+      
+      // Reset reCAPTCHA after successful submission
+      recaptchaRef.current?.reset();
 
       form.reset();
 
@@ -239,6 +255,16 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
 
               <ConfirmacionCorreoSection />
               <AutorizacionDatosSection />
+
+              <InvisibleRecaptcha
+                ref={recaptchaRef}
+                siteKey={RECAPTCHA_CONFIG.SITE_KEY}
+                onVerify={() => {}}
+                onError={() => {
+                  // Solo loguear, no bloquear al usuario
+                  console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+                }}
+              />
 
               <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-10">
                 <Button

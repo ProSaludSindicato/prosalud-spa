@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +13,8 @@ import { submitRequest } from '@/services/requestsService';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-certificado/utils';
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
+import { RECAPTCHA_CONFIG } from '@/config/api';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 
@@ -49,6 +51,7 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
 
   const activeConvenio = getActiveConvenio();
   
@@ -65,6 +68,15 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
+      let recaptchaToken: string | null = null;
+      try {
+        recaptchaToken = await recaptchaRef.current?.execute() ?? null;
+      } catch (error) {
+        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        // No bloquear al usuario - permitir continuar
+      }
+
       const files: Record<string, File> = {};
       if (data.formatoRetiroAnexo) {
         files.formatoRetiroAnexo = data.formatoRetiroAnexo;
@@ -82,10 +94,14 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
           proceso: activeConvenio?.proceso || '',
           dondeRealizaProceso: activeConvenio?.cliente || ''
         },
-        files
+        files,
+        ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
       await submitRequest(requestData);
+      
+      // Reset reCAPTCHA after successful submission
+      recaptchaRef.current?.reset();
 
       form.reset();
       
@@ -156,6 +172,16 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
             <ConfirmacionCorreoSection />
             <AutorizacionDatosSection />
             <MensajeDespedidaRetiroSection />
+            
+            <InvisibleRecaptcha
+              ref={recaptchaRef}
+              siteKey={RECAPTCHA_CONFIG.SITE_KEY}
+              onVerify={() => {}}
+              onError={() => {
+                // Solo loguear, no bloquear al usuario
+                console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+              }}
+            />
             
             <div className="flex justify-center mt-10">
               <Button 

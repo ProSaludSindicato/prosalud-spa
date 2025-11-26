@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +14,8 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-ce
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
+import { RECAPTCHA_CONFIG } from '@/config/api';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import DetalleNovedadSection from '@/components/verificacion-pagos/DetalleNovedadSection';
@@ -48,6 +50,7 @@ const VerificacionPagosPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
 
   const activeConvenio = getActiveConvenio();
   
@@ -67,6 +70,15 @@ const VerificacionPagosPageContent: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
+      let recaptchaToken: string | null = null;
+      try {
+        recaptchaToken = await recaptchaRef.current?.execute() ?? null;
+      } catch (error) {
+        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        // No bloquear al usuario - permitir continuar
+      }
+
       const files: Record<string, File> = {};
       if (data.archivoAnexo) {
         files.archivoAnexo = data.archivoAnexo;
@@ -87,10 +99,14 @@ const VerificacionPagosPageContent: React.FC = () => {
           solicitudRelacionadaCon: data.solicitudRelacionadaCon,
           detalleNovedad: data.detalleNovedad
         },
-        files
+        files,
+        ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
       await submitRequest(requestData);
+      
+      // Reset reCAPTCHA after successful submission
+      recaptchaRef.current?.reset();
 
       form.reset();
       
@@ -207,6 +223,16 @@ const VerificacionPagosPageContent: React.FC = () => {
             <ArchivoAnexoSection control={form.control} />
             <ConfirmacionCorreoSection />
             <AutorizacionDatosSection />
+            
+            <InvisibleRecaptcha
+              ref={recaptchaRef}
+              siteKey={RECAPTCHA_CONFIG.SITE_KEY}
+              onVerify={() => {}}
+              onError={() => {
+                // Solo loguear, no bloquear al usuario
+                console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+              }}
+            />
             
             <div className="flex justify-center mt-10">
               <Button 

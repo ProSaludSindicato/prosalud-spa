@@ -35,6 +35,11 @@ export const buildApiUrl = (endpoint: string): string => {
   return `${API_CONFIG.BASE_URL}${endpoint}`;
 };
 
+// reCAPTCHA configuration (Enterprise)
+export const RECAPTCHA_CONFIG = {
+  SITE_KEY: import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LfTGhksAAAAANaQkiOUEGeJkHjoaFyzLNSv5xiP',
+} as const;
+
 // Environment configuration
 export const ENV_CONFIG = {
   isDevelopment: import.meta.env.DEV,

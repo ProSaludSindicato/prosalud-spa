@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +13,8 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { submitRequest } from '@/services/requestsService';
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
+import { RECAPTCHA_CONFIG } from '@/config/api';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import InformacionCertificadoSection from '@/components/solicitud-certificado/InformacionCertificadoSection';
@@ -21,8 +23,6 @@ import SolicitudHeader from '@/components/solicitud-certificado/SolicitudHeader'
 import InformacionImportanteAlert from '@/components/solicitud-certificado/InformacionImportanteAlert';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
-
-const RECAPTCHA_SITE_KEY = "6LclSkArAAAAABXa8SIwimuDgPd8tjQbNzoBSlOZ";
 
 const formSchema = z.object({
   infoCertificado: z.object({
@@ -94,6 +94,7 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -120,6 +121,15 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
+      let recaptchaToken: string | null = null;
+      try {
+        recaptchaToken = await recaptchaRef.current?.execute() ?? null;
+      } catch (error) {
+        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        // No bloquear al usuario - permitir continuar
+      }
+
       const files: Record<string, File> = {};
       if (data.actividadesPdf) {
         files.actividadesPdf = data.actividadesPdf;
@@ -141,10 +151,14 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
           dirigidoAQuien: data.dirigidoAQuien,
           otrosDescripcion: data.otrosDescripcion
         },
-        files
+        files,
+        ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
       await submitRequest(requestData);
+      
+      // Reset reCAPTCHA after successful submission
+      recaptchaRef.current?.reset();
 
       form.reset();
       
@@ -215,29 +229,15 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
             <ConfirmacionCorreoSection /> {/* Removido el prop 'control' */}
             <AutorizacionDatosSection />
             
-            {/* Campo ReCAPTCHA Comentado Temporalmente */}
-            {/*
-            <FormField
-              control={form.control}
-              name="recaptchaToken"
-              render={({ field }) => (
-                <FormItem className="flex flex-col items-center">
-                  <FormControl>
-                    <ReCAPTCHA
-                      sitekey={RECAPTCHA_SITE_KEY}
-                      onChange={(token) => field.onChange(token)}
-                      onExpired={() => field.onChange('')}
-                      onErrored={() => {
-                        field.onChange(''); 
-                        toast.error("Error con reCAPTCHA. Inténtalo de nuevo.");
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <InvisibleRecaptcha
+              ref={recaptchaRef}
+              siteKey={RECAPTCHA_CONFIG.SITE_KEY}
+              onVerify={() => {}}
+              onError={() => {
+                // Solo loguear, no bloquear al usuario
+                console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+              }}
             />
-            */}
             
             <div className="flex justify-center mt-10">
               <Button 

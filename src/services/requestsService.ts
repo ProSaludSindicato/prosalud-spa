@@ -11,6 +11,7 @@ export interface RequestData {
   phone_number: string;
   payload: Record<string, any>;
   files?: Record<string, File | FileList>;
+  recaptcha_token?: string;
 }
 
 export interface ValidationError {
@@ -57,6 +58,11 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
     formData.append('last_name', requestData.last_name);
     formData.append('email', requestData.email);
     formData.append('phone_number', requestData.phone_number);
+    
+    // Add reCAPTCHA token if provided
+    if (requestData.recaptcha_token) {
+      formData.append('recaptcha_token', requestData.recaptcha_token);
+    }
     
     // Add payload fields - only include non-empty values for optional fields
     Object.entries(requestData.payload).forEach(([key, value]) => {
