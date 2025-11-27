@@ -46,6 +46,11 @@ authenticatedApi.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      
+      // Si el body es FormData, eliminar Content-Type para que axios lo establezca automáticamente con boundary
+      if (config.data instanceof FormData) {
+        delete config.headers['Content-Type'];
+      }
     } catch (error) {
       logger.error('Failed to get token from localStorage', error);
     }
