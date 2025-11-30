@@ -37,7 +37,7 @@ const fileValidation = z.any().refine(files => {
   if (!files || files.length === 0) return true;
   const file = files[0];
   return ALLOWED_FILE_TYPES_ALL.includes(file.type);
-}, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).');
+}, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, WEBP).');
 
 const formSchemaAnualDiferida = z.object({
   motivoSolicitud: z.string().min(1, "Este campo es requerido."),

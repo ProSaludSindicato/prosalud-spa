@@ -21,6 +21,7 @@ import InformacionCertificadoSection from '@/components/solicitud-certificado/In
 import ArchivoAdicionalSection from '@/components/solicitud-certificado/ArchivoAdicionalSection';
 import SolicitudHeader from '@/components/solicitud-certificado/SolicitudHeader';
 import InformacionImportanteAlert from '@/components/solicitud-certificado/InformacionImportanteAlert';
+import CertificadoSimpleAlert from '@/components/solicitud-certificado/CertificadoSimpleAlert';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
@@ -58,7 +59,7 @@ const formSchema = z.object({
     if (!files || files.length === 0) return true;
     const file = files[0];
     return ALLOWED_FILE_TYPES_ALL.includes(file.type);
-  }, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+  }, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, WEBP).'),
   
   // confirmacionCorreo: z.boolean().default(false), // Eliminado
   // recaptchaToken: z.string().min(1, "Por favor, completa el reCAPTCHA."),
@@ -90,11 +91,55 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Función helper para determinar si un certificado es simple
+const isCertificadoSimple = (data: FormValues): boolean => {
+  const { infoCertificado, dirigidoAQuien, actividadesPdf, adjuntarArchivoAdicional, otrosDescripcion } = data;
+  
+  // Un certificado es simple cuando:
+  // 1. Tiene fecha de ingreso/retiro (siempre true)
+  // 2. NO tiene otras opciones que requieran revisión manual
+  // 3. Puede tener "Dirigido a una entidad particular" (opcional), pero si lo tiene, debe tener el nombre de la entidad
+  // 4. Si solo tiene fecha de ingreso/retiro, ya es simple
+  // 5. Si tiene fecha de ingreso/retiro + dirigido a entidad (con nombre), también es simple
+  
+  // Verificar que no tenga opciones que requieran revisión manual
+  const hasComplexOptions = 
+    infoCertificado.valorCompensaciones ||
+    infoCertificado.paraSubsidioDesempleo ||
+    infoCertificado.paraSubsidioVivienda ||
+    infoCertificado.dirigidoFondoPensiones ||
+    infoCertificado.adicionarActividades ||
+    infoCertificado.dirigidoBancolombia ||
+    infoCertificado.otros ||
+    actividadesPdf ||
+    adjuntarArchivoAdicional ||
+    otrosDescripcion?.trim();
+  
+  // Si tiene opciones complejas, no es simple
+  if (hasComplexOptions) return false;
+  
+  // Si tiene fecha de ingreso/retiro y no tiene opciones complejas, es simple
+  // Si además tiene "dirigido a entidad", debe tener el nombre de la entidad
+  if (infoCertificado.fechaIngresoRetiro) {
+    // Si tiene "dirigido a entidad" marcado, debe tener el nombre
+    if (infoCertificado.dirigidoAEntidad) {
+      return !!dirigidoAQuien?.trim();
+    }
+    // Si solo tiene fecha de ingreso/retiro, es simple
+    return true;
+  }
+  
+  return false;
+};
+
 const SolicitudCertificadoConvenioPageContent: React.FC = () => {
   const navigate = useNavigate();
-  const { afiliado } = useAfiliadoAuth();
+  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
+  
+  const activeConvenio = getActiveConvenio();
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -115,6 +160,10 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
       adjuntarArchivoAdicional: undefined,
     },
   });
+
+  // Observar los valores del formulario para determinar si es simple
+  const watchedValues = form.watch();
+  const isSimple = React.useMemo(() => isCertificadoSimple(watchedValues), [watchedValues]);
 
   const onSubmit = async (data: FormValues) => {
     if (!afiliado) return;
@@ -147,6 +196,8 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
+          proceso: activeConvenio?.proceso || '',
+          dondeRealizaProceso: activeConvenio?.cliente || '',
           infoCertificado: data.infoCertificado,
           dirigidoAQuien: data.dirigidoAQuien,
           otrosDescripcion: data.otrosDescripcion
@@ -160,14 +211,27 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
       // Reset reCAPTCHA after successful submission
       recaptchaRef.current?.reset();
 
+      // Determinar si el certificado es simple para mostrar el mensaje correcto
+      const certificadoEsSimple = isCertificadoSimple(data);
+
       form.reset();
       
       toast.success('Solicitud enviada con éxito', {
         description: (
           <>
-            Recibirá el certificado en su correo en los próximos días hábiles.
-            <br />
-            <strong className="mt-2 block font-semibold">Tenga presente:</strong> Solamente en caso de presentarse alguna inconsistencia nos comunicaremos con usted.
+            {certificadoEsSimple ? (
+              <>
+                Recibirá el certificado en su correo electrónico en los próximos minutos.
+                <br />
+                <strong className="mt-2 block font-semibold">Importante:</strong> Asegúrese de que su correo electrónico esté actualizado en el sistema.
+              </>
+            ) : (
+              <>
+                Recibirá el certificado en su correo en los próximos días hábiles.
+                <br />
+                <strong className="mt-2 block font-semibold">Tenga presente:</strong> Solamente en caso de presentarse alguna inconsistencia nos comunicaremos con usted.
+              </>
+            )}
           </>
         ),
         duration: 8000,
@@ -225,7 +289,9 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
             <InformacionCertificadoSection control={form.control} watch={form.watch} />
-            <ArchivoAdicionalSection control={form.control} />
+            {watchedValues.infoCertificado?.otros && (
+              <ArchivoAdicionalSection control={form.control} />
+            )}
             <ConfirmacionCorreoSection /> {/* Removido el prop 'control' */}
             <AutorizacionDatosSection />
             
@@ -238,6 +304,8 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
                 console.warn('Error en reCAPTCHA, pero permitiendo continuar');
               }}
             />
+            
+            <CertificadoSimpleAlert isSimple={isSimple} />
             
             <div className="flex justify-center mt-10">
               <Button 

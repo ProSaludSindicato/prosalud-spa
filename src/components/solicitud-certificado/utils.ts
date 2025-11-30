@@ -12,7 +12,7 @@ export const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 
 // Tipos de archivos permitidos - Actualizados para incluir Word, PDF e imágenes
 export const ALLOWED_FILE_TYPES_PDF = ['application/pdf'];
-export const ALLOWED_FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png'];
+export const ALLOWED_FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 export const ALLOWED_FILE_TYPES_WORD = ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 export const ALLOWED_FILE_TYPES_PDF_WORD = [...ALLOWED_FILE_TYPES_PDF, ...ALLOWED_FILE_TYPES_WORD];
 export const ALLOWED_FILE_TYPES_PDF_IMAGES = [...ALLOWED_FILE_TYPES_PDF, ...ALLOWED_FILE_TYPES_IMAGES];

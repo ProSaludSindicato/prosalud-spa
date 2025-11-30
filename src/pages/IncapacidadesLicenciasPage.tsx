@@ -36,7 +36,7 @@ const formSchemaIncapacidades = z.object({
   certificadoIncapacidad: z.any()
     .refine(files => files && files.length > 0, "El certificado de incapacidad es requerido.")
     .refine(files => files && files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => files && ALLOWED_FILE_TYPES_ALL.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+    .refine(files => files && ALLOWED_FILE_TYPES_ALL.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, WEBP).'),
 });
 
 type FormValuesIncapacidades = z.infer<typeof formSchemaIncapacidades>;

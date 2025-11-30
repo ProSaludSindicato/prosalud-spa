@@ -39,7 +39,7 @@ const formSchema = z.object({
     if (!files || files.length === 0) return true;
     const file = files[0];
     return ALLOWED_FILE_TYPES_ALL.includes(file.type);
-  }, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, GIF, WEBP).'),
+  }, 'Se permiten archivos PDF, Word o imágenes (JPG, PNG, WEBP).'),
   
   confirmacionEnvio: z.boolean().default(false),
 });

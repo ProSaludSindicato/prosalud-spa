@@ -25,6 +25,30 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       setValue("infoCertificado.fechaIngresoRetiro" as any, true, { shouldValidate: false });
   }, [setValue]);
 
+  // Limpiar campos dependientes cuando se desmarcan los checkboxes
+  useEffect(() => {
+    if (!watchInfoCertificado?.dirigidoAEntidad) {
+      // @ts-ignore
+      setValue("dirigidoAQuien" as any, '', { shouldValidate: false });
+    }
+  }, [watchInfoCertificado?.dirigidoAEntidad, setValue]);
+
+  useEffect(() => {
+    if (!watchInfoCertificado?.adicionarActividades) {
+      // @ts-ignore
+      setValue("actividadesPdf" as any, undefined, { shouldValidate: false });
+    }
+  }, [watchInfoCertificado?.adicionarActividades, setValue]);
+
+  useEffect(() => {
+    if (!watchInfoCertificado?.otros) {
+      // @ts-ignore
+      setValue("otrosDescripcion" as any, '', { shouldValidate: false });
+      // @ts-ignore
+      setValue("adjuntarArchivoAdicional" as any, undefined, { shouldValidate: false });
+    }
+  }, [watchInfoCertificado?.otros, setValue]);
+
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
       <h2 className="text-xl font-semibold mb-2 text-primary-prosalud-dark flex items-center">
