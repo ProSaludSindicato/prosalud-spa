@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import ExportRequestsDialog from "@/components/admin/solicitudes/ExportRequestsDialog";
+import VerificarCertificadoModal from "@/components/admin/solicitudes/VerificarCertificadoModal";
 import {
   FileText,
   Download,
@@ -101,6 +102,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [solicitudToRespond, setSolicitudToRespond] = useState<Request | null>(null);
+  const [verificarCertificadoOpen, setVerificarCertificadoOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -528,13 +530,24 @@ const AdminSolicitudesPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setExportDialogOpen(true)}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Exportar Reporte
-                  </Button>
+                  <div className="flex flex-col gap-2 items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setExportDialogOpen(true)}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Exportar Reporte
+                    </Button>
+                    {can('requests.view') && (
+                      <button
+                        type="button"
+                        onClick={() => setVerificarCertificadoOpen(true)}
+                        className="text-sm text-primary-prosalud hover:text-primary-prosalud-dark underline underline-offset-2 font-medium cursor-pointer"
+                      >
+                        Verificar certificado de convenio
+                      </button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
             </Card>
@@ -1821,6 +1834,14 @@ const AdminSolicitudesPage: React.FC = () => {
               </Form>
             </DialogContent>
           </Dialog>
+
+          {/* Modal de Verificación de Certificado */}
+          {can('requests.view') && (
+            <VerificarCertificadoModal
+              open={verificarCertificadoOpen}
+              onOpenChange={setVerificarCertificadoOpen}
+            />
+          )}
         </motion.div>
       </div>
     </AdminLayout>
