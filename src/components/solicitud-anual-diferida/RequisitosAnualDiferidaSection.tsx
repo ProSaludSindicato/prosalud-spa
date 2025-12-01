@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button';
 import { DownloadCloud } from 'lucide-react';
 
 const RequisitosAnualDiferidaSection: React.FC = () => {
-  const formatoRequisitoUrl = 'http://orgs.ddns.net:8091/DocPublicos/Modelo%20de%20Plantillas/Solicitud%20compensacion%20Anual%20%20Diferida/Procedimiento%20Compensaci%C3%B3n%20Anual%20Diferida.pdf';
-  const formatoSolicitudUrl = 'http://orgs.ddns.net:8091/DocPublicos/Modelo%20de%20Plantillas/Solicitud%20compensacion%20Anual%20%20Diferida/Solicitud%20compensacion%20Anual%20%20Diferida.pdf';
+  // Archivos almacenados localmente en public/files/
+  const formatoRequisitoUrl = '/files/Procedimiento_Compensación_Anual_Diferida.pdf';
+  const formatoSolicitudUrl = '/files/Solicitud_compensacion_Anual _Diferida.pdf';
 
   const handleDownload = (url: string) => (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); // Prevenir el envío del formulario
-    window.open(url, '_blank');
+    // Codificar la URL para manejar espacios y caracteres especiales correctamente
+    const encodedUrl = encodeURI(url);
+    window.open(encodedUrl, '_blank');
   };
 
   return (
@@ -21,21 +24,22 @@ const RequisitosAnualDiferidaSection: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Button
           type="button"
-          onClick={handleDownload(formatoRequisitoUrl)}
-          size="lg"
-          className="bg-primary-prosalud hover:bg-primary-prosalud/90 text-white"
-        >
-          <DownloadCloud className="mr-2 h-5 w-5" />
-          Requisitos - PDF
-        </Button>
-        <Button
-          type="button"
           onClick={handleDownload(formatoSolicitudUrl)}
           size="lg"
           className="bg-primary-prosalud hover:bg-primary-prosalud/90 text-white"
         >
           <DownloadCloud className="mr-2 h-5 w-5" />
           Formato Solicitud - PDF
+        </Button>
+        <Button
+          type="button"
+          onClick={handleDownload(formatoRequisitoUrl)}
+          size="lg"
+          variant="outline"
+          className="border-primary-prosalud text-primary-prosalud hover:bg-primary-prosalud/10"
+        >
+          <DownloadCloud className="mr-2 h-5 w-5" />
+          Requisitos - PDF
         </Button>
       </div>
     </div>

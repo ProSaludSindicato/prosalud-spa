@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,15 @@ const formSchema = z.object({
   name: nameValidation,
   email: emailValidation,
   role: z.string().min(1, 'El rol es requerido'),
-  isActive: z.boolean().optional(),
+  isActive: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return true;
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      return Boolean(val);
+    },
+    z.boolean().optional()
+  ),
 });
 
 interface UserFormModalProps {
@@ -47,7 +54,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     },
   });
 
-  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = form;
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch, control } = form;
 
   // Fetch available roles
   const { data: roles = [] } = useQuery({
@@ -62,7 +69,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         name: user.name,
         email: user.email,
         role: user.role || '', // Priorizar role (el backend ahora siempre envía role)
-        isActive: user.isActive,
+        isActive: Boolean(user.isActive), // Asegurar que sea booleano
       });
     } else {
       form.reset({
@@ -113,14 +120,16 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    console.log('onSubmit called with data:', data);
     if (user) {
       // En edición, solo actualizar nombre, email, rol y estado activo
       const userData = {
         name: data.name,
         email: data.email,
         role: data.role,
-        isActive: data.isActive,
+        isActive: Boolean(data.isActive), // Asegurar que sea booleano
       };
+      console.log('Updating user with data:', userData);
       updateMutation.mutate({ id: user.id, data: userData });
     } else {
       // En creación, el backend crea el usuario inactivo sin contraseña
@@ -129,9 +138,27 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         email: data.email,
         role: data.role,
       };
+      console.log('Creating user with data:', userData);
       createMutation.mutate(userData);
     }
   };
+
+  const handleFormSubmit = handleSubmit(
+    onSubmit,
+    (errors) => {
+      console.log('Validation errors:', errors);
+      // Mostrar errores de validación
+      const firstError = Object.values(errors)[0];
+      if (firstError) {
+        const errorMessage = firstError?.message || "Por favor completa todos los campos requeridos.";
+        toast({
+          title: "Error de validación",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    }
+  );
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
@@ -152,34 +179,11 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           ? "Modifica la información del usuario."
           : "Completa el formulario para crear un nuevo usuario. Al guardar, se enviará un correo al usuario para que configure su contraseña."
       }
-      actions={
-        <div className="flex justify-end space-x-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isLoading}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="user-form"
-            disabled={isLoading}
-            className="min-w-[120px]"
-          >
-            {isLoading ? "Procesando..." : user ? "Actualizar Usuario" : "Crear Usuario"}
-          </Button>
-        </div>
-      }
     >
-      <motion.form
+      <form
         id="user-form"
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={handleFormSubmit}
         className="space-y-6"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
       >
         <div className="grid gap-6">
           <div className="space-y-4">
@@ -210,18 +214,24 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
 
             <div className="space-y-2">
               <Label htmlFor="role">Rol</Label>
-              <Select value={watch('role')} onValueChange={(value) => setValue('role', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione un rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.name}>
-                      {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                name="role"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.name}>
+                          {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
               {errors.role && (
                 <p className="text-sm text-red-500">{errors.role.message}</p>
               )}
@@ -237,17 +247,41 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
 
             {user && (
               <div className="flex items-center space-x-2">
-                <Switch
-                  id="isActive"
-                  checked={watch('isActive')}
-                  onCheckedChange={(checked) => setValue('isActive', checked)}
+                <Controller
+                  name="isActive"
+                  control={control}
+                  render={({ field }) => (
+                    <Switch
+                      id="isActive"
+                      checked={Boolean(field.value)}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                    />
+                  )}
                 />
                 <Label htmlFor="isActive">Usuario activo</Label>
               </div>
             )}
           </div>
         </div>
-      </motion.form>
+        
+        <div className="flex justify-end space-x-2 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="min-w-[120px]"
+          >
+            {isLoading ? "Procesando..." : user ? "Actualizar Usuario" : "Crear Usuario"}
+          </Button>
+        </div>
+      </form>
     </AdminModal>
   );
 };

@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const SolicitudPermisosCambioTurnosPage: React.FC = () => {
-  const formatoPermisosUrl = "http://orgs.ddns.net:8091/DocPublicos/Modelo%20de%20Plantillas/Formato%20Solicitud%20Permisos/Formato%20Solicitud%20Permisos.pdf";
-  const formatoCambioTurnosUrl = "http://orgs.ddns.net:8091/DocPublicos/Modelo%20de%20Plantillas/Formato%20cambio%20de%20turnos/Formato%20cambio%20de%20turnos%20ProSalud.pdf";
+  // Archivos almacenados localmente en public/files/
+  const formatoPermisosUrl = "/files/Formato_Solicitud_Permisos.pdf";
+  const formatoCambioTurnosUrl = "/files/Formato_cambio_de_turnos_ProSalud.pdf";
 
   const handleDownload = (url: string) => (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    window.open(url, '_blank');
+    // Codificar la URL para manejar espacios y caracteres especiales correctamente
+    const encodedUrl = encodeURI(url);
+    window.open(encodedUrl, '_blank');
   };
 
   return (
@@ -77,8 +80,11 @@ const SolicitudPermisosCambioTurnosPage: React.FC = () => {
           <section className="mb-8">
             <Alert className="border-amber-400 bg-amber-50 text-amber-700">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              <AlertTitle className="font-semibold text-amber-800">Notas Importantes</AlertTitle>
+              <AlertTitle className="font-semibold text-amber-800">Información Importante</AlertTitle>
               <AlertDescription className="text-amber-700">
+                <p className="font-semibold mb-3">
+                  Este tipo de solicitudes se deben informar con tiempo y realizar de manera presencial a través de su coordinador del área, haciendo uso de los formatos correspondientes debido a la importancia de actualización en temas de cuadros de turnos y gestiones operacionales.
+                </p>
                 <ul className="list-disc list-inside space-y-1.5 mt-2 pl-2">
                   <li>Tener presente los requisitos de su solicitud.</li>
                   <li>Es muy importante que la solicitud cuente con el V°B° del Coordinador o la persona encargada en la Sede de la programación de turnos. <strong>Requerido.</strong></li>

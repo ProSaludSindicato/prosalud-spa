@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText } from 'lucide-react';
 import FileUploadField from './FileUploadField'; // Assuming FormValues type is defined elsewhere or passed
+import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 
 interface InformacionCertificadoSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -18,6 +19,12 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
 }: InformacionCertificadoSectionProps<TFieldValues>) => {
   const watchInfoCertificado = watch("infoCertificado" as any); // Use 'as any' if type inference is tricky
   const { setValue } = useFormContext<TFieldValues>();
+  const { afiliado } = useAfiliadoAuth();
+  
+  // Determinar el estado del afiliado (normalizado a minúsculas para comparación)
+  const estadoAfiliado = afiliado?.estado?.toLowerCase() || null;
+  const isActivo = estadoAfiliado === 'activo';
+  const isRetirado = estadoAfiliado === 'retirado';
 
   // Asegurar que fechaIngresoRetiro siempre sea true
   useEffect(() => {
@@ -48,6 +55,22 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       setValue("adjuntarArchivoAdicional" as any, undefined, { shouldValidate: false });
     }
   }, [watchInfoCertificado?.otros, setValue]);
+
+  // Limpiar "Para subsidio de desempleo" si el afiliado está activo
+  useEffect(() => {
+    if (isActivo && watchInfoCertificado?.paraSubsidioDesempleo) {
+      // @ts-ignore
+      setValue("infoCertificado.paraSubsidioDesempleo" as any, false, { shouldValidate: false });
+    }
+  }, [isActivo, watchInfoCertificado?.paraSubsidioDesempleo, setValue]);
+
+  // Limpiar "Para subsidio de vivienda" si el afiliado está retirado
+  useEffect(() => {
+    if (isRetirado && watchInfoCertificado?.paraSubsidioVivienda) {
+      // @ts-ignore
+      setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
+    }
+  }, [isRetirado, watchInfoCertificado?.paraSubsidioVivienda, setValue]);
 
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
@@ -85,18 +108,24 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                 </FormItem>
             )}/>
         )}
-        <FormField control={control} name={"infoCertificado.paraSubsidioDesempleo" as any} render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                <FormLabel className="font-normal">Para subsidio de desempleo</FormLabel>
-            </FormItem>
-        )}/>
-        <FormField control={control} name={"infoCertificado.paraSubsidioVivienda" as any} render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                <FormLabel className="font-normal">Para subsidio de vivienda</FormLabel>
-            </FormItem>
-        )}/>
+        {/* Ocultar "Para subsidio de desempleo" si el afiliado está activo */}
+        {!isActivo && (
+          <FormField control={control} name={"infoCertificado.paraSubsidioDesempleo" as any} render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  <FormLabel className="font-normal">Para subsidio de desempleo</FormLabel>
+              </FormItem>
+          )}/>
+        )}
+        {/* Ocultar "Para subsidio de vivienda" si el afiliado está retirado */}
+        {!isRetirado && (
+          <FormField control={control} name={"infoCertificado.paraSubsidioVivienda" as any} render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  <FormLabel className="font-normal">Para subsidio de vivienda</FormLabel>
+              </FormItem>
+          )}/>
+        )}
         <FormField control={control} name={"infoCertificado.dirigidoFondoPensiones" as any} render={({ field }) => (
             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                 <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
