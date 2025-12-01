@@ -3,6 +3,109 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Estilos para reCAPTCHA badge - mover a esquina inferior izquierda y colapsar por defecto */
+.grecaptcha-badge {
+  bottom: 20px !important;
+  left: 20px !important;
+  right: auto !important;
+  z-index: 40 !important; /* Debajo del chatbot (z-50) pero visible */
+  width: 70px !important; /* Ancho suficiente para mostrar el logo completo */
+  overflow: hidden !important;
+  transition: width 0.3s ease !important;
+  cursor: pointer !important;
+  visibility: visible !important;
+  -webkit-tap-highlight-color: transparent !important; /* Eliminar highlight en móviles */
+}
+
+/* Contenedor interno del badge - colapsado por defecto */
+.grecaptcha-badge > div {
+  width: 70px !important;
+  overflow: hidden !important;
+  transition: width 0.3s ease !important;
+  position: relative !important;
+}
+
+/* Ocultar solo la parte azul del texto (el span con el texto) */
+.grecaptcha-badge span {
+  opacity: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  transition: opacity 0.3s ease, width 0.3s ease !important;
+  white-space: nowrap !important;
+  display: inline-block !important;
+}
+
+/* Mantener visible el iframe (logo) */
+.grecaptcha-badge iframe {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Al hacer hover, expandir para mostrar el texto completo */
+.grecaptcha-badge:hover {
+  width: 256px !important; /* Ancho completo para mostrar el texto */
+}
+
+.grecaptcha-badge:hover > div {
+  width: 256px !important;
+}
+
+.grecaptcha-badge:hover span {
+  opacity: 1 !important;
+  width: auto !important;
+}
+
+/* Estado expandido cuando se hace click (usando clase toggle) */
+.grecaptcha-badge.expanded {
+  width: 256px !important;
+}
+
+.grecaptcha-badge.expanded > div {
+  width: 256px !important;
+}
+
+.grecaptcha-badge.expanded span {
+  opacity: 1 !important;
+  width: auto !important;
+}
+
+/* Asegurar que el badge no interfiera con el chatbot */
+@media (max-width: 768px) {
+  .grecaptcha-badge {
+    bottom: 10px !important;
+    left: 10px !important;
+  }
+  
+  /* En móviles, deshabilitar hover y usar solo click */
+  .grecaptcha-badge:hover {
+    width: 70px !important; /* Mantener colapsado en hover en móviles */
+  }
+  
+  .grecaptcha-badge:hover > div {
+    width: 70px !important;
+  }
+  
+  .grecaptcha-badge:hover span {
+    opacity: 0 !important;
+    width: 0 !important;
+  }
+  
+  /* Solo expandir con la clase expanded en móviles */
+  .grecaptcha-badge.expanded {
+    width: 256px !important;
+  }
+  
+  .grecaptcha-badge.expanded > div {
+    width: 256px !important;
+  }
+  
+  .grecaptcha-badge.expanded span {
+    opacity: 1 !important;
+
+    width: auto !important;
+  }
+}
+
 /* Eliminar overflow-x hidden global que puede causar problemas de rendimiento */
 
 @layer base {
@@ -166,3 +269,4 @@
     scroll-behavior: auto !important;
   }
 }
+

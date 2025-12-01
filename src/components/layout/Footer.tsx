@@ -102,9 +102,31 @@ const Footer: React.FC = () => {
           <p className="text-sm text-slate-500">
             &copy; {new Date().getFullYear()} ProSalud. Todos los derechos reservados.
           </p>
-          {/*<p className="text-xs text-slate-500 mt-2">
-            Algunas imágenes diseñadas por <a href="http://www.freepik.es/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">Freepik</a>.
+          {/* Aviso de privacidad de reCAPTCHA (requerido por Google si se oculta el badge)
+          <p className="text-xs text-slate-600 mt-2">
+            Este sitio está protegido por reCAPTCHA y se aplican la{' '}
+            <a 
+              href="https://policies.google.com/privacy" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="underline hover:text-slate-300"
+            >
+              Política de Privacidad
+            </a>
+            {' '}y los{' '}
+            <a 
+              href="https://policies.google.com/terms" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="underline hover:text-slate-300"
+            >
+              Términos de Servicio
+            </a>
+            {' '}de Google.
           </p>*/}
+          <p className="text-xs text-slate-500 mt-2">
+            Algunas imágenes diseñadas por <a href="http://www.freepik.es/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">Freepik</a>.
+          </p>
         </div>
       </div>
     </footer>

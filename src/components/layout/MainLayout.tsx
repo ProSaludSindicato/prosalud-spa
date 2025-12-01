@@ -67,6 +67,79 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   }, []);
 
+  // Manejar el badge de reCAPTCHA para expandir/colapsar al hacer click/touch
+  useEffect(() => {
+    let badgeElement: HTMLElement | null = null;
+    let clickHandler: ((e: Event) => void) | null = null;
+    let touchHandler: ((e: TouchEvent) => void) | null = null;
+
+    const setupRecaptchaBadge = () => {
+      const badge = document.querySelector('.grecaptcha-badge') as HTMLElement;
+      if (badge && badge !== badgeElement) {
+        // Limpiar listeners anteriores si existen
+        if (badgeElement && clickHandler) {
+          badgeElement.removeEventListener('click', clickHandler);
+          if (touchHandler) {
+            badgeElement.removeEventListener('touchend', touchHandler);
+          }
+        }
+
+        badgeElement = badge;
+        badge.style.cursor = 'pointer';
+        badge.style.touchAction = 'manipulation'; // Mejorar respuesta táctil en móviles
+
+        // Handler para click (desktop) y touch (móvil)
+        const handleInteraction = (e: Event) => {
+          e.preventDefault();
+          e.stopPropagation();
+          badge.classList.toggle('expanded');
+        };
+
+        clickHandler = handleInteraction;
+        touchHandler = (e: TouchEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          badge.classList.toggle('expanded');
+        };
+
+        // Agregar listeners para desktop y móvil
+        badge.addEventListener('click', clickHandler);
+        badge.addEventListener('touchend', touchHandler, { passive: false });
+      }
+    };
+
+    // Intentar configurar inmediatamente
+    setupRecaptchaBadge();
+
+    // También intentar después de delays (por si reCAPTCHA se carga después)
+    const timeoutIds = [
+      setTimeout(() => setupRecaptchaBadge(), 1000),
+      setTimeout(() => setupRecaptchaBadge(), 2000),
+      setTimeout(() => setupRecaptchaBadge(), 3000),
+    ];
+
+    // Observar cambios en el DOM para detectar cuando se carga el badge
+    const observer = new MutationObserver(() => {
+      setupRecaptchaBadge();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      timeoutIds.forEach(id => clearTimeout(id));
+      observer.disconnect();
+      if (badgeElement && clickHandler) {
+        badgeElement.removeEventListener('click', clickHandler);
+        if (touchHandler) {
+          badgeElement.removeEventListener('touchend', touchHandler);
+        }
+      }
+    };
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light">
       <Header />
