@@ -41,11 +41,12 @@
 
 ### Presencial
 - Atención en sede principal
-- Horario: Lunes a viernes 7:00 AM - 5:00 PM
+- Horario: Lunes a viernes 8:00 AM - 4:00 PM
 
 ### Telefónico
-- Línea principal: (604) 444-5555
-- Horario: Lunes a viernes 7:00 AM - 6:00 PM
+- Línea PBX: 604 448 9232
+- Horario: Lunes a viernes 7:00 AM - 5:00 PM
+- **Importante:** Para recepción de solicitudes, si se hace después de las 4:00 PM se cuenta como al siguiente día hábil
 
 ### Correo Electrónico
 - General: comunicaciones@sindicatoprosalud.com

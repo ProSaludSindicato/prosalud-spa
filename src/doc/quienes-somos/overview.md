@@ -32,7 +32,9 @@ Trabajamos bajo la modalidad de Contrato Sindical, que permite a nuestros afilia
 
 ## Contacto y Ubicación
 
-**Sede Principal**: Medellín, Antioquia
-**Teléfono**: (604) 444-5555
+**Sede Principal**: Caldas (Ant.)
+**Dirección**: Carrera 50 N° 127 Sur 61 Int. 802
+**Teléfono PBX**: 604 448 9232
 **Sitio Web**: www.sindicatoprosalud.com
 **Correo**: comunicaciones@sindicatoprosalud.com
+**Horario**: Lunes a viernes 7:00 AM - 5:00 PM

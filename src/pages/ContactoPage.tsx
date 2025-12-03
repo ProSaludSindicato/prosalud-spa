@@ -83,9 +83,18 @@ const ContactoPage: React.FC = () => {
               <div className="flex items-start gap-3">
                 <Phone className="h-5 w-5 text-gray-500 mt-1" />
                 <div>
-                  <p className="font-semibold">Teléfono Principal</p>
-                  <p className="text-gray-600">(604) 444-5555</p>
+                  <p className="font-semibold">Teléfono PBX</p>
+                  <p className="text-gray-600">604 448 9232</p>
                   <p className="text-sm text-gray-500">Línea directa de atención</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <MessageCircle className="h-5 w-5 text-gray-500 mt-1" />
+                <div>
+                  <p className="font-semibold">WhatsApp Talento Humano</p>
+                  <p className="text-gray-600">3216529892</p>
+                  <p className="text-sm text-gray-500">Consultas sobre talento humano</p>
                 </div>
               </div>
 
@@ -103,9 +112,8 @@ const ContactoPage: React.FC = () => {
                 <div>
                   <p className="font-semibold">Dirección</p>
                   <p className="text-gray-600">
-                    Carrera 50 #45-30, Piso 8<br />
-                    Medellín, Antioquia<br />
-                    Colombia
+                    Carrera 50 N° 127 Sur 61 Int. 802<br />
+                    Caldas (Ant.) Colombia
                   </p>
                 </div>
               </div>
@@ -126,26 +134,27 @@ const ContactoPage: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="border-l-4 border-primary-prosalud pl-4">
                 <p className="font-semibold">Atención Presencial</p>
-                <p className="text-gray-600">Lunes a Viernes: 7:00 AM - 5:00 PM</p>
-                <p className="text-sm text-gray-500">Sede principal</p>
+                <p className="text-gray-600">Lunes a Viernes: 8:00 AM - 4:00 PM</p>
+                <p className="text-sm text-gray-500">Sede principal - Caldas (Ant.)</p>
               </div>
 
               <div className="border-l-4 border-secondary-prosaludgreen pl-4">
                 <p className="font-semibold">Atención Telefónica</p>
-                <p className="text-gray-600">Lunes a Viernes: 7:00 AM - 6:00 PM</p>
-                <p className="text-sm text-gray-500">Línea directa</p>
+                <p className="text-gray-600">Lunes a Viernes: 7:00 AM - 5:00 PM</p>
+                <p className="text-sm text-gray-500">Línea PBX: 604 448 9232</p>
               </div>
 
               <div className="border-l-4 border-blue-500 pl-4">
                 <p className="font-semibold">Servicios Digitales</p>
                 <p className="text-gray-600">24/7 disponibles</p>
                 <p className="text-sm text-gray-500">Portal web y formularios en línea</p>
+                <p className="text-sm text-amber-600 mt-1">⚠️ Solicitudes después de 4:00 PM se cuentan como siguiente día hábil</p>
               </div>
 
               <div className="border-l-4 border-orange-500 pl-4">
                 <p className="font-semibold">Chatbot</p>
                 <p className="text-gray-600">24/7 disponible</p>
-                <p className="text-sm text-gray-500">Consultas rápidas e incapacidades</p>
+                <p className="text-sm text-gray-500">Consultas rápidas</p>
               </div>
             </CardContent>
           </Card>

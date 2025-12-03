@@ -4,14 +4,14 @@ import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
 const Footer: React.FC = () => {
   const logoUrl = "/images/logo_prosalud_fondo.png";
-  const minsaludLogoUrl = "/images/minsalud.webp";
+  const minsaludLogoUrl = "/images/minsalud.png";
 
   return (
     <footer className="bg-slate-900 text-slate-300 py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 mb-10">
           {/* Column 1: Logos and About */}
-          <div className="space-y-4 lg:col-span-4">
+          <div className="space-y-4 sm:col-span-2 lg:col-span-5">
             <div className="flex items-center space-x-4">
               {" "}
               {/* Container for both logos */}
@@ -28,7 +28,7 @@ const Footer: React.FC = () => {
           </div>
 
           {/* Column 2: Enlaces Útiles */}
-          <div className="lg:col-span-3">
+          <div className="sm:col-span-1 lg:col-span-2">
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Enlaces Útiles</h3>
             <ul className="space-y-2">
               <li>
@@ -68,7 +68,7 @@ const Footer: React.FC = () => {
           </div>
 
           {/* Column 3: Servicios Destacados (Example) */}
-          <div className="lg:col-span-3">
+          <div className="sm:col-span-1 lg:col-span-2">
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Servicios Clave</h3>
             <ul className="space-y-2">
               <li>
@@ -92,11 +92,27 @@ const Footer: React.FC = () => {
                   Seguridad y Salud
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/servicios/actualizar-datos-personales"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                >
+                  Actualizar Datos Personales
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/servicios/incapacidad-maternidad"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                >
+                  Incapacidades y Licencias
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Column 4: Síguenos */}
-          <div className="lg:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-3">
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Síguenos</h3>
             <p className="text-xs text-slate-500 mt-4">Mantente al día con nuestras novedades y actividades.</p>
           </div>

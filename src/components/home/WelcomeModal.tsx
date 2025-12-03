@@ -43,7 +43,7 @@ const WelcomeModal: React.FC = () => {
     {
       icon: Settings,
       title: 'Procesos de Autogestión Mejorados',
-      description: 'Formularios más intuitivos y procesos simplificados para tus trámites.'
+      description: 'Formularios más intuitivos, certificados de convenio automáticos y procesos simplificados para tus trámites.'
     },
     {
       icon: MessageSquare,
@@ -53,7 +53,7 @@ const WelcomeModal: React.FC = () => {
     {
       icon: Sparkles,
       title: 'Diseño Renovado',
-      description: 'Interfaz moderna y adaptativa para una mejor experiencia de usuario.'
+      description: 'Interfaz moderna y adaptativa para una mejor experiencia de usuario. Instala ProSalud como app y accede más rápido desde tu celular.'
     }
   ];
 

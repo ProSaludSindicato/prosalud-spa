@@ -94,7 +94,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
       <div className="min-h-screen bg-background-light">
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-primary-prosalud to-primary-prosalud-dark text-white relative overflow-hidden">
-          <div className="container mx-auto px-4 pt-12 md:pt-16 lg:pt-20 pb-0">
+          <div className="container mx-auto px-4 md:px-6 lg:px-8 pt-12 md:pt-16 lg:pt-20 pb-0">
             <Link 
               to="/" 
               className="inline-flex items-center text-white/90 hover:text-white mb-4 md:mb-5 transition-colors relative z-10"
@@ -135,7 +135,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
         </div>
 
         {/* Benefits Section */}
-        <div className="container mx-auto px-4 py-8 md:py-12">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             {benefits.map((benefit, index) => (
               <Card key={index} className="text-center hover:shadow-lg transition-shadow">
@@ -155,7 +155,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
           </div>
 
           {/* Instructions Section with Tabs */}
-          <div className="container mx-auto px-4">
+          <div className="px-4 md:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Main Instructions - Takes 2 columns on desktop */}
               <div className="lg:col-span-2">

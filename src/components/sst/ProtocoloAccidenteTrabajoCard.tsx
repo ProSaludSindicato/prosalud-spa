@@ -22,9 +22,11 @@ const ProtocoloAccidenteTrabajoCard: React.FC<ProtocoloAccidenteTrabajoCardProps
           <div className="md:w-2/3 space-y-3">
             <p className="text-lg font-semibold text-muted-foreground">El afiliado debe:</p>
             <ol className="list-decimal list-inside space-y-3 text-muted-foreground">
-              <li>Informar a su jefe inmediato y comunicarse a la <strong className="text-primary">Línea Efectiva de Colmena Seguros al 018000919667</strong>.</li>
-              <li>Dirigirse al centro asistencial notificado por la ARL en el menor tiempo posible.</li>
+              <li>Notificar a su jefe inmediato y notificar al área de SST de ProSalud.</li>
+              <li>Reportar a la <strong className="text-primary">Línea Efectiva Colmena ARL: 018000919667</strong> Desde tu celular al <strong className="text-primary">#833</strong>.</li>
+              <li>Dirigirse al punto de atención asignado por la ARL en el menor tiempo posible.</li>
               <li>Comunicarse con el área de SST a fin de realizar la pertinente legalización del accidente de trabajo <strong className="text-primary">antes de las 48 horas</strong>.</li>
+              <li>En caso de incapacidad, enviar soporte a través de la página del trámite en el sitio web.</li>
               <li>El área de SST remitirá el informe individual del AT y reconocimiento económico según el caso.</li>
             </ol>
           </div>
@@ -47,11 +49,20 @@ const ProtocoloAccidenteTrabajoCard: React.FC<ProtocoloAccidenteTrabajoCardProps
         </div>
          <Alert variant="default" className="bg-primary-prosalud/5 border-primary-prosalud mt-6">
           <Info className="h-5 w-5 text-primary-prosalud" />
-          <AlertTitle className="font-semibold text-primary-prosalud">Contacto ProSalud</AlertTitle>
-          <AlertDescription className="text-sm">
-            <p>PBX: (57)(4) 448 9232</p>
-            <p>RUT: 900.444.737-1</p>
-            <p>Dirección: Carrera 50 N° 127 Sur 61 Int. 802 / Caldas (Ant.)</p>
+          <AlertTitle className="font-semibold text-primary-prosalud">Contacto ProSalud - SST</AlertTitle>
+          <AlertDescription className="text-sm pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div className="space-y-2">
+                <p className="font-semibold mb-1">Personal encargado SST:</p>
+                <p>• Juan Yepes: 3117738124</p>
+                <p>• Eucaris Hernandez: 3206735264</p>
+              </div>
+              <div className="space-y-2">
+                <p><strong>Tel PBX:</strong> 604 448 9232</p>
+                <p><strong>RUT:</strong> 900.444.737-1</p>
+                <p><strong>Dirección:</strong> Carrera 50 N° 127 Sur 61 Int. 802 / Caldas (Ant.)</p>
+              </div>
+            </div>
           </AlertDescription>
         </Alert>
       </CardContent>

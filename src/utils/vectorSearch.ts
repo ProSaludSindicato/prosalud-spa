@@ -71,10 +71,11 @@ function expandQuery(query: string): string {
     
     // Contacto y ubicación
     'contacto': 'contacto teléfono correo dirección ProSalud',
-    'teléfono': 'teléfono contacto comunicación ProSalud',
+    'telefono': 'teléfono contacto comunicación ProSalud',
     'correo': 'correo electrónico contacto ProSalud',
-    'dirección': 'dirección ubicación sede ProSalud',
-    'medellín': 'Medellín Antioquia sede ProSalud',
+    'direccion': 'dirección ubicación sede ProSalud',
+    'medellin': 'Caldas Antioquia sede ProSalud',
+    'caldas': 'Caldas Antioquia sede ProSalud',
     
     // Seguridad y salud en el trabajo
     'sst': 'SST seguridad salud trabajo ProSalud',

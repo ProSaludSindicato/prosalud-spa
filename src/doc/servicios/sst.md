@@ -6,6 +6,26 @@ Esta sección proporciona información esencial para que los afiliados de ProSal
 
 **Enlace a la sección en el sitio web:** [`/servicios/sst`](/servicios/sst)
 
+## Números de Contacto para Reportar Accidentes de Trabajo
+
+**Para reportar un accidente de trabajo en ProSalud, debes contactar:**
+
+1. **Notificar a tu jefe inmediato y al área de SST de ProSalud**
+
+2. **Reportar a la Línea Efectiva Colmena ARL**:
+   - **Número**: 018000919667
+   - **Desde tu celular marca**: #833
+   - Este es el número oficial de ProSalud para reportar accidentes a la ARL Colmena Seguros
+
+3. **Contactar al Área de SST de ProSalud**:
+   - **Juan Yepes**: 3117738124
+   - **Eucaris Hernandez**: 3206735264
+   - Estos son los números de teléfono del personal encargado de SST en ProSalud
+
+4. **En caso de incapacidad**: Enviar soporte a través de la página del trámite en el sitio web de ProSalud
+
+**Importante**: La legalización del accidente con ProSalud debe realizarse antes de las 48 horas.
+
 ## Contenido Detallado de la Página
 
 ### 1. Encabezado
@@ -37,15 +57,40 @@ Esta sección proporciona información esencial para que los afiliados de ProSal
 - **Incidente**: Es un acontecimiento no deseado, que bajo circunstancias diferentes, podría haber resultado en lesiones a las personas, daño a la propiedad o pérdida en el proceso. Es decir UN CASI ACCIDENTE.
 
 ### 5. Protocolo en caso de Accidente de Trabajo
-- **Pasos a seguir**:
-    1.  **Reportar Inmediatamente**: Informar al jefe inmediato o al encargado de SST.
-    2.  **Primeros Auxilios**: Brindar o buscar atención médica básica inicial.
-    3.  **Traslado**: Si es necesario, trasladar al accidentado al centro médico indicado por la ARL.
-    4.  **Seguimiento**: Realizar seguimiento al estado de salud del trabajador y al proceso con la ARL.
-- **Información Importante**:
-    - Reportar el accidente a la ARL correspondiente.
-    - Informar al COPASST (Comité Paritario de Seguridad y Salud en el Trabajo) o Vigía de SST.
-- **Imagen disponible en la página**: "Referencia visual del protocolo" (diagrama de flujo).
+
+**Pasos a seguir para reportar un accidente de trabajo en ProSalud:**
+
+1. **Notificar Inmediatamente**: 
+   - Informar a su jefe inmediato
+   - Notificar al área de SST de ProSalud
+
+2. **Reportar a la ARL (Colmena Seguros)**:
+   - **Línea Efectiva Colmena ARL**: 018000919667
+   - Desde tu celular marca: **#833**
+   - Este es el número oficial de ProSalud para reportar accidentes a la ARL
+
+3. **Contactar al Área de SST de ProSalud**:
+   Para consultas, reportes o temas relacionados con Seguridad y Salud en el Trabajo (SST), puedes contactar directamente a:
+   - **Juan Yepes**: 3117738124
+   - **Eucaris Hernandez**: 3206735264
+
+4. **Primeros Auxilios y Traslado**: 
+   - Brindar o buscar atención médica básica inicial si es necesario
+   - Dirigirse al centro asistencial notificado por la ARL en el menor tiempo posible
+
+5. **Legalización del Accidente**:
+   - Comunicarse con el área de SST de ProSalud a fin de realizar la pertinente legalización del accidente de trabajo **antes de las 48 horas**
+
+6. **En caso de Incapacidad**:
+   - Enviar soporte a través de la página del trámite en el sitio web de ProSalud
+   - El área de SST remitirá el informe individual del AT y reconocimiento económico según el caso
+
+**Información Importante**:
+- El reporte a la ARL debe hacerse de forma inmediata usando el número 018000919667 desde tu celular al #833
+- La legalización del accidente con ProSalud debe realizarse antes de las 48 horas
+- ProSalud tiene personal específico asignado para temas de SST que debes contactar
+
+**Imagen disponible en la página**: "Referencia visual del protocolo" (diagrama de flujo).
 
 ### 6. Preparación para Emergencias
 - **Plan de Emergencia**: Documento que establece los procedimientos y acciones para responder de manera efectiva ante una emergencia.
@@ -109,7 +154,10 @@ Sección con enlaces a documentos PDF relevantes:
 ## Preguntas Frecuentes (FAQ) Específicas de la Página SST
 
 **P: ¿Qué debo hacer si sufro un accidente de trabajo?**
-R: Debe reportarlo inmediatamente a su jefe o al encargado de SST, buscar primeros auxilios si es necesario, y seguir el protocolo de reporte a la ARL. La página detalla los pasos en la sección "Protocolo en caso de Accidente de Trabajo".
+R: Debe seguir el protocolo de ProSalud: 1) Notificar a su jefe inmediato y al área de SST de ProSalud, 2) Reportar a la Línea Efectiva Colmena ARL: 018000919667 desde tu celular al #833, 3) Contactar al área de SST de ProSalud (Juan Yepes: 3117738124 o Eucaris Hernandez: 3206735264), 4) Dirigirse al centro asistencial indicado por la ARL, 5) Legalizar el accidente con ProSalud antes de las 48 horas, 6) Si hay incapacidad, enviar soporte a través de la página del trámite en el sitio web. La página detalla los pasos completos en la sección "Protocolo en caso de Accidente de Trabajo".
+
+**P: ¿Cuáles son los números para reportar un accidente laboral?**
+R: Para reportar un accidente laboral en ProSalud debes: 1) Notificar a tu jefe inmediato y al área de SST de ProSalud, 2) Reportar a la Línea Efectiva Colmena ARL: 018000919667 desde tu celular al #833, 3) Contactar al área de SST de ProSalud - Juan Yepes: 3117738124 o Eucaris Hernandez: 3206735264. En caso de incapacidad, debes enviar soporte a través de la página del trámite en el sitio web de ProSalud.
 
 **P: ¿Cómo debo actuar en caso de un sismo en el lugar de trabajo?**
 R: La página indica que debe mantener la calma, apagar equipos si es posible, y dirigirse a zonas seguras según las indicaciones del plan de emergencia. Si está en la vía pública, busque áreas abiertas. Consulte la sección "Tipos de Emergencias y Cómo Actuar" para más detalles.
