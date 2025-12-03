@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Info, FileText, Users, Gift, Settings, ExternalLink, ArrowRight, HelpCircle, Sparkles } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Info, FileText, Users, Gift, Settings, ExternalLink, ArrowRight, HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -66,67 +66,53 @@ const FAQPage: React.FC = () => {
   }, [filteredFAQs, selectedCategory]);
 
   const handleChatbotClick = () => {
-    // Trigger the chatbot FAB click event
-    const chatbotFab = document.querySelector('[aria-label="Abrir chat"]') as HTMLButtonElement;
-    if (chatbotFab) {
-      chatbotFab.click();
-    }
+    // Disparar evento personalizado para abrir el chatbot
+    window.dispatchEvent(new CustomEvent('openChatbot'));
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Enhanced Header */}
-      <div className="relative bg-gradient-to-r from-primary-prosalud to-blue-700 text-white overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSI0Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
-        
-        <div className="container mx-auto px-4 py-12 relative">
+    <div className="min-h-screen bg-background-light">
+      {/* Hero Section */}
+      <div className="relative bg-gradient-to-br from-primary-prosalud to-primary-prosalud-dark text-white overflow-hidden">
+        <div className="container mx-auto px-4 py-12 md:py-16">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Icon and title */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="bg-white/20 p-4 rounded-full mr-4 backdrop-blur-sm">
-                <HelpCircle className="h-8 w-8 text-white" />
+            <div className="flex justify-center items-center gap-3 mb-6">
+              <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                <HelpCircle className="h-8 w-8" />
               </div>
-              <div className="text-left">
-                <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                  Preguntas Frecuentes
-                </h1>
-                <div className="flex items-center text-yellow-500">
-                  <Sparkles className="h-4 w-4 mr-2 text-yellow-500" />
-                  <span className="text-lg text-yellow-500">Centro de Ayuda ProSalud</span>
-                </div>
-              </div>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">
+                Preguntas Frecuentes
+              </h1>
             </div>
-
-            <p className="text-xl text-blue-100 mb-8 leading-relaxed max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-white/90 leading-relaxed max-w-3xl mx-auto">
               Encuentra respuestas rápidas y precisas a las consultas más comunes sobre ProSalud, 
               nuestros servicios y trámites disponibles
             </p>
 
-            {/* Enhanced Search Bar */}
-            <div className="relative mb-8 max-w-2xl mx-auto">
+            {/* Search Bar */}
+            <div className="relative mt-8 mb-6 max-w-2xl mx-auto">
               <div className="relative group">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={22} />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
                 <Input
                   type="text"
                   placeholder="¿Qué necesitas saber? Busca aquí..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 pr-6 py-4 text-gray-500 text-lg rounded-2xl border-0 shadow-xl bg-white/95 backdrop-blur-sm focus:ring-2 focus:ring-white/50 transition-all"
+                  className="pl-12 pr-6 py-3 text-base rounded-lg border border-gray-300 shadow-md bg-white text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-primary-prosalud transition-all"
                 />
               </div>
             </div>
 
-            {/* Enhanced Category Filters */}
-            <div className="flex flex-wrap gap-3 justify-center">
+            {/* Category Filters */}
+            <div className="flex flex-wrap gap-2 justify-center mt-6">
               <Button
                 variant="outline"
                 onClick={() => setSelectedCategory('all')}
                 className={`${
                   selectedCategory === 'all' 
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg' 
-                    : 'bg-white border-white text-blue-500 hover:bg-gray-100 hover:text-blue-700'
-                } rounded-full px-6 py-2 transition-all font-medium cursor-pointer`}
+                    ? 'bg-white border-white text-primary-prosalud shadow-md' 
+                    : 'bg-white/10 border-white/30 text-white hover:bg-accent-prosaludteal hover:border-accent-prosaludteal'
+                } rounded-lg px-4 py-2 transition-all font-medium`}
                 size="sm"
               >
                 Todas las categorías
@@ -140,9 +126,9 @@ const FAQPage: React.FC = () => {
                     onClick={() => setSelectedCategory(category.id)}
                     className={`${
                       selectedCategory === category.id 
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg' 
-                        : 'bg-white border-white text-blue-500 hover:bg-gray-100 hover:text-blue-700'
-                    } rounded-full px-4 py-2 transition-all font-medium cursor-pointer`}
+                        ? 'bg-white border-white text-primary-prosalud shadow-md' 
+                        : 'bg-white/10 border-white/30 text-white hover:bg-accent-prosaludteal hover:border-accent-prosaludteal'
+                    } rounded-lg px-4 py-2 transition-all font-medium`}
                     size="sm"
                   >
                     <IconComponent className="h-4 w-4 mr-2" />
@@ -156,7 +142,7 @@ const FAQPage: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto">
           {/* Results summary */}
           {searchQuery && (
@@ -236,16 +222,17 @@ const FAQPage: React.FC = () => {
                           {/* Redirect button for service-related questions */}
                           {faq.redirectUrl && (
                             <div className="mt-6 pt-4 border-t border-gray-100">
-                              <Link to={faq.redirectUrl}>
-                                <Button 
-                                  className="bg-primary-prosalud hover:bg-primary-prosalud/90 text-white rounded-lg font-medium transition-all hover:scale-105"
-                                  size="sm"
-                                >
+                              <Button 
+                                asChild
+                                className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white font-medium"
+                                size="sm"
+                              >
+                                <Link to={faq.redirectUrl}>
                                   <ArrowRight className="h-4 w-4 mr-2" />
                                   {faq.redirectText}
                                   <ExternalLink className="h-3 w-3 ml-2" />
-                                </Button>
-                              </Link>
+                                </Link>
+                              </Button>
                             </div>
                           )}
                           
@@ -267,47 +254,46 @@ const FAQPage: React.FC = () => {
             })
           )}
 
-          {/* Enhanced Contact Section */}
-          <Card className="mt-16 bg-gradient-to-r from-primary-prosalud via-blue-600 to-primary-prosalud text-white shadow-2xl overflow-hidden relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSI0Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
-            <CardHeader className="relative">
-              <div className="flex items-center mb-2">
-                <div className="bg-white/20 p-3 rounded-full mr-4">
+          {/* Contact Section */}
+          <Card className="mt-12 bg-gradient-to-r from-primary-prosalud to-primary-prosalud-dark text-white shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
                   <HelpCircle className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <CardTitle className="text-white text-2xl font-bold">¿No encontraste lo que buscabas?</CardTitle>
-                  <CardDescription className="text-blue-100 text-lg">
+                  <CardDescription className="text-white/90 text-base mt-2">
                     Si tienes una consulta específica que no está en nuestras preguntas frecuentes, no dudes en contactarnos.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="relative">
-              <div className="space-y-6">
-                <p className="text-blue-100 text-lg leading-relaxed">
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-white/90 text-base leading-relaxed">
                   Puedes utilizar nuestro chatbot disponible en el sitio web o acceder a los formularios de contacto específicos para cada servicio.
                 </p>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3">
                   <Button 
                     onClick={handleChatbotClick}
                     variant="secondary" 
-                    size="lg"
-                    className="bg-white text-primary-prosalud hover:bg-gray-100 font-semibold rounded-lg transition-all hover:scale-105"
+                    size="default"
+                    className="bg-white text-primary-prosalud hover:bg-gray-100 font-semibold"
                   >
-                    <Settings className="h-5 w-5 mr-2" />
+                    <Settings className="h-4 w-4 mr-2" />
                     Usar Chatbot
                   </Button>
-                  <Link to="/#servicios">
-                    <Button 
-                      variant="outline" 
-                      size="lg"
-                      className="text-white border-white/50 bg-primary-prosalud font-semibold rounded-lg transition-all"
-                    >
-                      <FileText className="h-5 w-5 mr-2" />
-                      Ver Servicios
-                    </Button>
-                  </Link>
+                  <Button 
+                    asChild
+                    size="default"
+                    className="bg-accent-prosaludteal text-white hover:bg-accent-prosaludteal/90 font-semibold border-0"
+                  >
+                    <Link to="/contacto">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Contacto
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </CardContent>
