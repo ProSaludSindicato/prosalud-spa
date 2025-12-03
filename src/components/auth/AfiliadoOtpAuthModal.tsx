@@ -90,11 +90,35 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
         toast.error('La fecha de expedición es obligatoria');
         return;
       }
+      
+      // Validar que la fecha de expedición no sea futura
+      const fechaSeleccionada = new Date(formData.fechaExpedicion);
+      const hoy = new Date();
+      hoy.setHours(23, 59, 59, 999); // Establecer al final del día para comparar correctamente
+      
+      if (fechaSeleccionada > hoy) {
+        toast.error('Fecha inválida', {
+          description: 'La fecha de expedición no puede ser futura.',
+        });
+        return;
+      }
     } else {
       // Si no está autenticado, necesita todos los campos
     if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
       toast.error('Todos los campos son obligatorios');
       return;
+      }
+      
+      // Validar que la fecha de expedición no sea futura
+      const fechaSeleccionada = new Date(formData.fechaExpedicion);
+      const hoy = new Date();
+      hoy.setHours(23, 59, 59, 999); // Establecer al final del día para comparar correctamente
+      
+      if (fechaSeleccionada > hoy) {
+        toast.error('Fecha inválida', {
+          description: 'La fecha de expedición no puede ser futura.',
+        });
+        return;
       }
     }
 
@@ -314,6 +338,7 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
                       onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
                       disabled={requestingOtp}
                       className="w-full bg-indigo-50 border-indigo-200"
+                      max={new Date().toISOString().split('T')[0]}
                       required
                     />
                   </div>
@@ -377,6 +402,7 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
                   onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
                   disabled={requestingOtp}
                   className="w-full bg-indigo-50 border-indigo-200"
+                  max={new Date().toISOString().split('T')[0]}
                 />
               </div>
                 </>

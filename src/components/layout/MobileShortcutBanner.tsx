@@ -7,35 +7,45 @@ import { Button } from '@/components/ui/button';
 const ALWAYS_SHOW_BANNER = true;
 
 const MobileShortcutBanner: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
   const location = useLocation();
+  
+  // Inicializar visibilidad inmediatamente basado en la lógica
+  const [isVisible, setIsVisible] = useState(() => {
+    // No mostrar el banner en la página de ayuda/acceso-directo-movil
+    if (typeof window !== 'undefined' && location.pathname === '/ayuda/acceso-directo-movil') {
+      return false;
+    }
+
+    // Si ALWAYS_SHOW_BANNER es true, siempre mostrar el banner (ignorar localStorage)
+    if (ALWAYS_SHOW_BANNER) {
+      return true;
+    }
+
+    // Si ALWAYS_SHOW_BANNER es false, usar la lógica original con localStorage
+    if (typeof window !== 'undefined') {
+      const hasDismissed = localStorage.getItem('prosalud-mobile-shortcut-banner-dismissed');
+      return !hasDismissed;
+    }
+
+    return false;
+  });
 
   useEffect(() => {
-    // No mostrar el banner en la página de ayuda/acceso-directo-movil
+    // Actualizar visibilidad cuando cambia la ruta
     if (location.pathname === '/ayuda/acceso-directo-movil') {
       setIsVisible(false);
       return;
     }
 
-    // Si ALWAYS_SHOW_BANNER es true, siempre mostrar el banner (ignorar localStorage)
+    // Si ALWAYS_SHOW_BANNER es true, siempre mostrar el banner
     if (ALWAYS_SHOW_BANNER) {
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 2000);
-      return () => clearTimeout(timer);
+      setIsVisible(true);
+      return;
     }
 
-    // Si ALWAYS_SHOW_BANNER es false, usar la lógica original con localStorage
+    // Si ALWAYS_SHOW_BANNER es false, verificar localStorage
     const hasDismissed = localStorage.getItem('prosalud-mobile-shortcut-banner-dismissed');
-    
-    if (!hasDismissed) {
-      // Show banner after a small delay
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
+    setIsVisible(!hasDismissed);
   }, [location.pathname]);
 
   const handleDismiss = () => {

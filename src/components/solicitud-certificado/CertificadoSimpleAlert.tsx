@@ -4,9 +4,10 @@ import { CheckCircle2 } from 'lucide-react';
 
 interface CertificadoSimpleAlertProps {
   isSimple: boolean;
+  tieneValorCompensaciones?: boolean;
 }
 
-const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimple }) => {
+const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimple, tieneValorCompensaciones }) => {
   if (!isSimple) return null;
 
   return (
@@ -18,8 +19,13 @@ const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimpl
       <AlertDescription className="text-emerald-800">
         <p className="mb-2">
           Su solicitud cumple con las condiciones para ser procesada automáticamente. 
-          <strong className="font-semibold"> Recibirá el certificado en su correo electrónico en los próximos minutos</strong> después de enviar la solicitud.
+          <strong className="font-semibold"> Recibirá el certificado en su correo electrónico casi de inmediato</strong> después de enviar la solicitud.
         </p>
+        {tieneValorCompensaciones && (
+          <p className="mb-2 mt-2 text-sm italic">
+            <strong>Nota:</strong> Los certificados de convenio con valor de compensaciones para afiliados activos, en su mayoría (si no son casos particulares) también podrán ser enviados de manera automática.
+          </p>
+        )}
         <p className="font-semibold mt-2">
           ⚠️ Importante: Asegúrese de que su correo electrónico esté actualizado en el sistema, 
           ya que el certificado se enviará automáticamente a la dirección registrada.

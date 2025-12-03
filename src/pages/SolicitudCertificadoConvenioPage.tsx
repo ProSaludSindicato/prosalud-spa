@@ -92,7 +92,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 // Función helper para determinar si un certificado es simple
-const isCertificadoSimple = (data: FormValues): boolean => {
+const isCertificadoSimple = (data: FormValues, estadoAfiliado?: string | null): boolean => {
   const { infoCertificado, dirigidoAQuien, actividadesPdf, adjuntarArchivoAdicional, otrosDescripcion } = data;
   
   // Un certificado es simple cuando:
@@ -101,10 +101,15 @@ const isCertificadoSimple = (data: FormValues): boolean => {
   // 3. Puede tener "Dirigido a una entidad particular" (opcional), pero si lo tiene, debe tener el nombre de la entidad
   // 4. Si solo tiene fecha de ingreso/retiro, ya es simple
   // 5. Si tiene fecha de ingreso/retiro + dirigido a entidad (con nombre), también es simple
+  // 6. Si tiene fecha de ingreso/retiro + valor de compensaciones Y el estado del afiliado es "Activo", también es simple (en su mayoría, excepto casos particulares)
+  
+  // Verificar si el afiliado está activo
+  const isActivo = estadoAfiliado?.toLowerCase() === 'activo';
   
   // Verificar que no tenga opciones que requieran revisión manual
+  // NOTA: valorCompensaciones puede ser simple si el estado es Activo, así que lo excluimos de hasComplexOptions
   const hasComplexOptions = 
-    infoCertificado.valorCompensaciones ||
+    (!isActivo && infoCertificado.valorCompensaciones) || // Solo es complejo si NO está activo
     infoCertificado.paraSubsidioDesempleo ||
     infoCertificado.paraSubsidioVivienda ||
     infoCertificado.dirigidoFondoPensiones ||
@@ -124,6 +129,11 @@ const isCertificadoSimple = (data: FormValues): boolean => {
     // Si tiene "dirigido a entidad" marcado, debe tener el nombre
     if (infoCertificado.dirigidoAEntidad) {
       return !!dirigidoAQuien?.trim();
+    }
+    // Si solo tiene fecha de ingreso/retiro, es simple
+    // Si tiene fecha de ingreso/retiro + valor de compensaciones Y está activo, también es simple
+    if (infoCertificado.valorCompensaciones && isActivo) {
+      return true;
     }
     // Si solo tiene fecha de ingreso/retiro, es simple
     return true;
@@ -163,7 +173,14 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
 
   // Observar los valores del formulario para determinar si es simple
   const watchedValues = form.watch();
-  const isSimple = React.useMemo(() => isCertificadoSimple(watchedValues), [watchedValues]);
+  const isSimple = React.useMemo(() => isCertificadoSimple(watchedValues, afiliado?.estado), [watchedValues, afiliado?.estado]);
+  
+  // Determinar si tiene valor de compensaciones y está activo (para mostrar aclaración)
+  const tieneValorCompensacionesYActivo = React.useMemo(() => {
+    return watchedValues.infoCertificado?.valorCompensaciones && 
+           afiliado?.estado?.toLowerCase() === 'activo' &&
+           isSimple;
+  }, [watchedValues.infoCertificado?.valorCompensaciones, afiliado?.estado, isSimple]);
 
   const onSubmit = async (data: FormValues) => {
     if (!afiliado) return;
@@ -212,7 +229,7 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
       recaptchaRef.current?.reset();
 
       // Determinar si el certificado es simple para mostrar el mensaje correcto
-      const certificadoEsSimple = isCertificadoSimple(data);
+      const certificadoEsSimple = isCertificadoSimple(data, afiliado?.estado);
 
       form.reset();
       
@@ -305,7 +322,10 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
               }}
             />
             
-            <CertificadoSimpleAlert isSimple={isSimple} />
+            <CertificadoSimpleAlert 
+              isSimple={isSimple} 
+              tieneValorCompensaciones={tieneValorCompensacionesYActivo}
+            />
             
             <div className="flex justify-center mt-10">
               <Button 

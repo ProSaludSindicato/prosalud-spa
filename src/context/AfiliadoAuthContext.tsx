@@ -3,6 +3,7 @@ import api from '@/services/api';
 import { API_CONFIG } from '@/config/api';
 import { toast } from 'sonner';
 import { verifyOtp, VerifyOtpResponse } from '@/services/afiliadosOtpService';
+import { authenticateForDataUpdate, AuthenticateForDataUpdateResponse } from '@/services/afiliadosDataUpdateService';
 
 export interface Convenio {
   cliente: string | null;
@@ -52,8 +53,11 @@ interface AfiliadoAuthContextType {
   afiliado: AfiliadoData | null;
   isAuthenticated: boolean;
   isOtpAuthenticated: boolean;
+  isDataUpdateAuthenticated: boolean;
+  fechaExpedicion: string | null;
   authenticate: (tipoDoc: string, numDoc: string, fechaExp: string) => Promise<AfiliadoData>;
   authenticateWithOtp: (tipoDoc: string, numDoc: string, fechaExp: string, sessionId: string, otp: string) => Promise<AfiliadoData>;
+  authenticateForDataUpdate: (tipoDoc: string, numDoc: string, fechaExp: string) => Promise<AfiliadoData>;
   logout: () => void;
   getActiveConvenio: () => Convenio | null;
 }
@@ -68,6 +72,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [afiliado, setAfiliado] = useState<AfiliadoData | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [isOtpAuthenticated, setIsOtpAuthenticated] = useState<boolean>(false);
+  const [isDataUpdateAuthenticated, setIsDataUpdateAuthenticated] = useState<boolean>(false);
+  const [fechaExpedicion, setFechaExpedicion] = useState<string | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const expirationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownExpirationToastRef = useRef<boolean>(false);
@@ -88,6 +94,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setAfiliado(null);
       setExpiresAt(null);
       setIsOtpAuthenticated(false);
+      setIsDataUpdateAuthenticated(false);
+      setFechaExpedicion(null);
       localStorage.removeItem(STORAGE_KEY);
       
       // Mostrar toast y redirigir
@@ -108,11 +116,13 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        const { afiliado: storedAfiliado, expiresAt: storedExpiry, isOtpAuthenticated: storedOtpAuth } = JSON.parse(stored);
+        const { afiliado: storedAfiliado, expiresAt: storedExpiry, isOtpAuthenticated: storedOtpAuth, isDataUpdateAuthenticated: storedDataUpdateAuth, fechaExpedicion: storedFechaExp } = JSON.parse(stored);
         if (storedExpiry && Date.now() < storedExpiry) {
           setAfiliado(storedAfiliado);
           setExpiresAt(storedExpiry);
           setIsOtpAuthenticated(storedOtpAuth || false);
+          setIsDataUpdateAuthenticated(storedDataUpdateAuth || false);
+          setFechaExpedicion(storedFechaExp || null);
           lastActivityRef.current = Date.now();
           hasShownExpirationToastRef.current = false;
         } else {
@@ -150,9 +160,15 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           try {
             const data = JSON.parse(stored);
             data.expiresAt = newExpiresAt;
-        // Preservar isOtpAuthenticated al extender sesión
+        // Preservar flags de autenticación y fecha de expedición al extender sesión
         if (data.isOtpAuthenticated === undefined) {
           data.isOtpAuthenticated = isOtpAuthenticated;
+        }
+        if (data.isDataUpdateAuthenticated === undefined) {
+          data.isDataUpdateAuthenticated = isDataUpdateAuthenticated;
+        }
+        if (data.fechaExpedicion === undefined) {
+          data.fechaExpedicion = fechaExpedicion;
         }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           } catch {
@@ -219,6 +235,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setAfiliado(data.afiliado);
       setExpiresAt(newExpiresAt);
       setIsOtpAuthenticated(false); // Autenticación básica, no OTP
+      setIsDataUpdateAuthenticated(false);
+      setFechaExpedicion(fechaExp); // Guardar fecha de expedición
       lastActivityRef.current = Date.now();
       hasShownExpirationToastRef.current = false;
 
@@ -227,6 +245,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         afiliado: data.afiliado,
         expiresAt: newExpiresAt,
         isOtpAuthenticated: false,
+        isDataUpdateAuthenticated: false,
+        fechaExpedicion: fechaExp,
       }));
 
       return data.afiliado;
@@ -267,6 +287,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setAfiliado(null);
     setExpiresAt(null);
     setIsOtpAuthenticated(false);
+    setIsDataUpdateAuthenticated(false);
+    setFechaExpedicion(null);
     lastActivityRef.current = Date.now();
     hasShownExpirationToastRef.current = false;
     localStorage.removeItem(STORAGE_KEY);
@@ -373,6 +395,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setAfiliado(afiliadoData);
       setExpiresAt(newExpiresAt);
       setIsOtpAuthenticated(true); // Autenticación con OTP
+      setIsDataUpdateAuthenticated(false);
+      setFechaExpedicion(fechaExp); // Guardar fecha de expedición
       lastActivityRef.current = Date.now();
       hasShownExpirationToastRef.current = false;
 
@@ -381,6 +405,118 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         afiliado: afiliadoData,
         expiresAt: newExpiresAt,
         isOtpAuthenticated: true,
+        isDataUpdateAuthenticated: false,
+        fechaExpedicion: fechaExp,
+      }));
+
+      return afiliadoData;
+    } catch (error: any) {
+      // El servicio ya maneja los errores y los convierte en mensajes de error descriptivos
+      throw error;
+    }
+  }, []);
+
+  const authenticateForDataUpdateMethod = useCallback(async (
+    tipoDoc: string,
+    numDoc: string,
+    fechaExp: string
+  ): Promise<AfiliadoData> => {
+    try {
+      const response: AuthenticateForDataUpdateResponse = await authenticateForDataUpdate({
+        tipo_documento: tipoDoc,
+        documento: numDoc,
+        fecha_expedicion: fechaExp,
+      });
+
+      if (!response.success || !response.data?.afiliado) {
+        throw new Error('Respuesta inválida del servidor');
+      }
+
+      // Transformar los datos de la API al formato esperado por el contexto
+      const afiliadoData: AfiliadoData = {
+        tipo_documento: response.data.afiliado.tipo_documento || null,
+        documento: response.data.afiliado.documento || null,
+        nombres: response.data.afiliado.nombres || null,
+        apellidos: response.data.afiliado.apellidos || null,
+        estado: response.data.afiliado.estado || null,
+        celular: response.data.afiliado.celular || null,
+        correo_personal: response.data.afiliado.correo_personal || null,
+        convenios: response.data.convenios.map((c) => ({
+          cliente: c.cliente || null,
+          proceso: c.proceso || null,
+          estado: c.estado || null,
+          fecha_fin: c.fecha_fin || null,
+        })),
+        beneficiarios: response.data.beneficiarios?.map((b) => {
+          // El API parece intercambiar parentesco y sexo en algunos casos
+          // parentesco puede venir como "M" (sexo) y sexo como "HIJO" (parentesco)
+          const parentescoValue = b.parentesco || '';
+          const sexoValue = b.sexo || '';
+          
+          // Determinar cuál es cuál basándose en los valores posibles
+          const parentescosValidos = ['MADRE', 'PADRE', 'HIJA', 'HIJO', 'CONYUGUE'];
+          const sexosValidos = ['M', 'F', 'MASCULINO', 'FEMENINO'];
+          
+          let parentescoFinal = parentescoValue;
+          let sexoFinal = sexoValue;
+          
+          // Si parentesco tiene un valor de sexo, intercambiar
+          if (sexosValidos.includes(parentescoValue.toUpperCase()) && parentescosValidos.includes(sexoValue.toUpperCase())) {
+            parentescoFinal = sexoValue;
+            sexoFinal = parentescoValue;
+          } else if (sexosValidos.includes(parentescoValue.toUpperCase())) {
+            // Solo parentesco es sexo
+            sexoFinal = parentescoValue;
+            parentescoFinal = sexoValue || '';
+          } else if (parentescosValidos.includes(sexoValue.toUpperCase())) {
+            // Solo sexo es parentesco
+            parentescoFinal = sexoValue;
+            sexoFinal = parentescoValue || '';
+          }
+          
+          return {
+            documento_afiliado: b.documento_afiliado || '',
+            tipo_documento: b.tipo_documento || '',
+            documento: b.documento || '',
+            nombres: b.nombres || '',
+            apellidos: b.apellidos || '',
+            fecha_nacimiento: '', // No viene en la respuesta por seguridad
+            parentesco: parentescoFinal,
+            sexo: sexoFinal,
+            estado: b.estado || null,
+          };
+        }) || [],
+        // Campos adicionales
+        estado_civil: response.data.afiliado.estado_civil || null,
+        direccion: response.data.afiliado.direccion || null,
+        municipio: response.data.afiliado.municipio || null,
+        telefono: response.data.afiliado.telefono || null,
+        talla_uniforme: response.data.afiliado.talla_uniforme || null,
+        talla_calzado: response.data.afiliado.talla_calzado || null,
+        nivel_educacion: response.data.afiliado.nivel_educacion || null,
+        numero_cuenta: response.data.afiliado.numero_cuenta || null,
+        tipo_cuenta: response.data.afiliado.tipo_cuenta || null,
+        banco: response.data.afiliado.banco || null,
+        eps: response.data.afiliado.eps || null,
+        afp: response.data.afiliado.afp || null,
+      };
+
+      const newExpiresAt = Date.now() + SESSION_DURATION;
+      setAfiliado(afiliadoData);
+      setExpiresAt(newExpiresAt);
+      setIsOtpAuthenticated(false); // No es autenticación OTP
+      setIsDataUpdateAuthenticated(true); // Autenticación para actualización de datos
+      setFechaExpedicion(fechaExp); // Guardar fecha de expedición
+      lastActivityRef.current = Date.now();
+      hasShownExpirationToastRef.current = false;
+
+      // Guardar en localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        afiliado: afiliadoData,
+        expiresAt: newExpiresAt,
+        isOtpAuthenticated: false,
+        isDataUpdateAuthenticated: true,
+        fechaExpedicion: fechaExp,
       }));
 
       return afiliadoData;
@@ -411,11 +547,14 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     afiliado,
     isAuthenticated: !!afiliado,
     isOtpAuthenticated,
+    isDataUpdateAuthenticated,
+    fechaExpedicion,
     authenticate,
     authenticateWithOtp,
+    authenticateForDataUpdate: authenticateForDataUpdateMethod,
     logout,
     getActiveConvenio,
-  }), [afiliado, isOtpAuthenticated, authenticate, authenticateWithOtp, logout, getActiveConvenio]);
+  }), [afiliado, isOtpAuthenticated, isDataUpdateAuthenticated, fechaExpedicion, authenticate, authenticateWithOtp, authenticateForDataUpdateMethod, logout, getActiveConvenio]);
 
   return (
     <AfiliadoAuthContext.Provider value={value}>

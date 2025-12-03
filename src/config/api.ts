@@ -18,6 +18,7 @@ export const API_CONFIG = {
     AFILIADOS_AUTHENTICATE: '/api/afiliados/authenticate',
     AFILIADOS_REQUEST_OTP: '/api/afiliados/request-otp',
     AFILIADOS_VERIFY_OTP: '/api/afiliados/verify-otp',
+    AFILIADOS_AUTHENTICATE_FOR_DATA_UPDATE: '/api/afiliados/authenticate-for-data-update',
   },
 } as const;
 

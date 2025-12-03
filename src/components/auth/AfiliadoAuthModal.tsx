@@ -31,6 +31,18 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
       return;
     }
 
+    // Validar que la fecha de expedición no sea futura
+    const fechaSeleccionada = new Date(formData.fechaExpedicion);
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999); // Establecer al final del día para comparar correctamente
+    
+    if (fechaSeleccionada > hoy) {
+      toast.error('Fecha inválida', {
+        description: 'La fecha de expedición no puede ser futura.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await authenticate(formData.tipoDocumento, formData.numeroDocumento, formData.fechaExpedicion);
@@ -130,6 +142,7 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
                 onChange={(e) => setFormData({ ...formData, fechaExpedicion: e.target.value })}
                 disabled={loading}
                 className="w-full bg-indigo-50 border-indigo-200"
+                max={new Date().toISOString().split('T')[0]}
               />
             </div>
           </div>

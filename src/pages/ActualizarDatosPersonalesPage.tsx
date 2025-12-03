@@ -12,7 +12,7 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { submitRequest } from '@/services/requestsService';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-certificado/utils';
-import RequireAfiliadoOtpAuth from '@/components/auth/RequireAfiliadoOtpAuth';
+import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoDataUpdateAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
@@ -837,9 +837,9 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
 
 const ActualizarDatosPersonalesPage: React.FC = () => {
   return (
-    <RequireAfiliadoOtpAuth>
+    <RequireAfiliadoDataUpdateAuth>
       <ActualizarDatosPersonalesPageContent />
-    </RequireAfiliadoOtpAuth>
+    </RequireAfiliadoDataUpdateAuth>
   );
 };
 
