@@ -42,6 +42,11 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/ayuda/acceso-directo-movil" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                  Instalar como App
+                </Link>
+              </li>
+              <li>
                 <Link to="/terminos" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
                   Términos y Condiciones
                 </Link>

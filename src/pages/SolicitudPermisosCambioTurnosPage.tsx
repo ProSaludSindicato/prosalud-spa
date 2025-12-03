@@ -6,8 +6,9 @@ import { Link } from 'react-router-dom';
 import { Home, DownloadCloud, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 
-const SolicitudPermisosCambioTurnosPage: React.FC = () => {
+const SolicitudPermisosCambioTurnosPageContent: React.FC = () => {
   // Archivos almacenados localmente en public/files/
   const formatoPermisosUrl = "/files/Formato_Solicitud_Permisos.pdf";
   const formatoCambioTurnosUrl = "/files/Formato_cambio_de_turnos_ProSalud.pdf";
@@ -105,6 +106,14 @@ const SolicitudPermisosCambioTurnosPage: React.FC = () => {
         </div>
       </div>
     </MainLayout>
+  );
+};
+
+const SolicitudPermisosCambioTurnosPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <SolicitudPermisosCambioTurnosPageContent />
+    </RequireAfiliadoAuth>
   );
 };
 

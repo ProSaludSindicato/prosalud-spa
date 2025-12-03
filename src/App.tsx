@@ -53,6 +53,7 @@ import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
 import ContratoSindicalPage from '@/pages/ContratoSindicalPage';
 import EpsSuraPage from '@/pages/EpsSuraPage';
+import AccesoDirectoMovilPage from '@/pages/AccesoDirectoMovilPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
 import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
@@ -81,6 +82,7 @@ const AppRoutes = () => {
             <Route path="/nosotros/contrato-sindical" element={<ContratoSindicalPage />} />
             <Route path="/contacto" element={<ContactoPage />} />
             <Route path="/faq" element={<FAQPage />} />
+            <Route path="/ayuda/acceso-directo-movil" element={<AccesoDirectoMovilPage />} />
 
             {/* Auth Routes */}
             <Route path="/auth/login" element={<LoginPage />} />

@@ -192,5 +192,13 @@ export const searchData: SearchItem[] = [
     category: 'Información',
     keywords: ['eps', 'sura', 'traslado', 'ips', 'beneficiarios', 'upc', 'certificados', 'incapacidades', 'afiliación', 'retiro'],
     path: '/servicios/eps-sura'
+  },
+  {
+    id: 'acceso-directo-movil',
+    title: 'Instalar ProSalud como App',
+    description: 'Aprende cómo crear un acceso directo a ProSalud en tu dispositivo móvil para acceder más rápido, ágil y seguro. Instrucciones paso a paso para Android e iOS.',
+    category: 'Ayuda',
+    keywords: ['app', 'móvil', 'acceso directo', 'instalar', 'android', 'iphone', 'ios', 'pantalla inicio', 'aplicación', 'celular', 'dispositivo móvil', 'instalar app', 'acceso rápido'],
+    path: '/ayuda/acceso-directo-movil'
   }
 ];

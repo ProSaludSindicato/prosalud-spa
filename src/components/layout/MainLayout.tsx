@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import Bot from '@/components/chatbot/ChatBot';
+import MobileShortcutBanner from './MobileShortcutBanner';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -143,6 +144,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="flex flex-col min-h-screen bg-background-light">
       <Header />
+      <MobileShortcutBanner />
       <main className="flex-grow animate-fade-in">
         {children}
       </main>

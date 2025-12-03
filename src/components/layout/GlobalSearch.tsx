@@ -94,8 +94,19 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ className = '' }) => {
 
       {/* Search Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center pt-[8vh] px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-auto max-h-[75vh] overflow-hidden border border-gray-200 relative">
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center pt-[8vh] px-4"
+          onClick={(e) => {
+            // Cerrar al hacer click fuera del contenido del modal
+            if (e.target === e.currentTarget) {
+              handleClose();
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-auto max-h-[75vh] overflow-hidden border border-gray-200 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Close button in top right corner */}
             <Button
               variant="ghost"
@@ -140,16 +151,16 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ className = '' }) => {
                         <CommandItem
                           key={item.id}
                           onSelect={() => handleSelect(item)}
-                          className="cursor-pointer rounded-lg p-3 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-all duration-200 mb-2"
+                          className="cursor-pointer rounded-lg p-3 hover:bg-primary-prosalud border border-transparent hover:border-primary-prosalud transition-all duration-200 mb-2 group"
                         >
                           <div className="flex flex-col w-full">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="font-semibold text-gray-900 text-base">{item.title}</span>
-                              <span className="text-xs font-medium text-white bg-primary-prosalud px-2 py-1 rounded-full">
+                              <span className="font-semibold text-gray-900 group-hover:text-white text-base transition-colors">{item.title}</span>
+                              <span className="text-xs font-medium text-white bg-primary-prosalud group-hover:bg-white group-hover:text-primary-prosalud px-2 py-1 rounded-full transition-colors">
                                 {item.category}
                               </span>
                             </div>
-                            <span className="text-sm text-gray-600 leading-relaxed">
+                            <span className="text-sm text-gray-600 group-hover:text-white leading-relaxed transition-colors">
                               {item.description}
                             </span>
                           </div>

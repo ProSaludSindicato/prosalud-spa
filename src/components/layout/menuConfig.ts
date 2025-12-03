@@ -67,14 +67,14 @@ export const menuItems: MenuItemType[] = [
     name: 'Documentos y formatos',
     icon: FileText,
     submenu: [
-      {
+      /*{
         name: 'Documentos públicos',
         submenu: [
           { name: 'Formatos de dotación', path: '/documentos-formatos/documentos-publicos/formatos-dotacion' },
           { name: 'Listados de asistencia', path: '/documentos-formatos/documentos-publicos/listados-asistencia' },
           { name: 'Retefuente: documentos Requeridos', path: '/documentos-formatos/documentos-publicos/retefuente-documentos-requeridos' },
         ]
-      },
+      },*/
       {
         name: 'Solicitudes de afiliados',
         submenu: [
@@ -99,6 +99,7 @@ export const menuItems: MenuItemType[] = [
       { name: 'Video ProSanet (YouTube)', external: true, url: 'https://www.youtube.com/watch?v=GnaElswl7SI&feature=youtu.be' },
       { name: 'Acceso a ProSanet', external: true, url: 'https://www.prosanet.com/#/shifts-employees/index' },
       { name: 'Bienestar', path: '/servicios/galeria-bienestar' },
+      { name: 'Instalar como App', path: '/ayuda/acceso-directo-movil' },
     ]
   },
 ];

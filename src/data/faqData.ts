@@ -190,4 +190,14 @@ export const faqData: FAQItem[] = [
     category: "tecnico",
     keywords: ["respuesta", "correo", "spam", "contacto"],
   },
+  {
+    id: "acceso-directo-movil",
+    question: "¿Cómo puedo instalar ProSalud como app en mi móvil?",
+    answer:
+      "Puedes crear un acceso directo a ProSalud en tu dispositivo móvil para acceder más rápido y de forma más segura. En Android: abre el navegador, toca el menú (tres puntos) y selecciona 'Agregar a pantalla de inicio'. En iPhone: abre Safari, toca el botón de compartir y selecciona 'Agregar a pantalla de inicio'. Visita nuestra página de ayuda para ver el video instructivo completo con todos los pasos detallados.",
+    category: "tecnico",
+    keywords: ["app", "móvil", "acceso directo", "instalar", "android", "iphone", "ios", "pantalla inicio"],
+    redirectUrl: "/ayuda/acceso-directo-movil",
+    redirectText: "Ver instrucciones completas",
+  },
 ];
