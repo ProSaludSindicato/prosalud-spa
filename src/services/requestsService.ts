@@ -87,8 +87,18 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
             formData.append(`payload[${key}]`, JSON.stringify(value));
           }
         } else if (typeof value === 'object') {
-          // Handle nested objects by converting to JSON
-          formData.append(`payload[${key}]`, JSON.stringify(value));
+          // Special handling for infoCertificado - send as nested object fields for Laravel
+          if (key === 'infoCertificado') {
+            Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+              if (nestedValue !== null && nestedValue !== undefined) {
+                // Convert boolean to string for Laravel
+                formData.append(`payload[${key}][${nestedKey}]`, String(nestedValue));
+              }
+            });
+          } else {
+            // Handle other nested objects by converting to JSON
+            formData.append(`payload[${key}]`, JSON.stringify(value));
+          }
         } else {
           formData.append(`payload[${key}]`, String(value));
         }
