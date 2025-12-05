@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Control, UseFormWatch, FieldValues, useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,9 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
   const estadoAfiliado = afiliado?.estado?.toLowerCase() || null;
   const isActivo = estadoAfiliado === 'activo';
   const isRetirado = estadoAfiliado === 'retirado';
+
+  // Rastrear si "Valor de compensaciones" fue marcado manualmente por el usuario
+  const valorCompensacionesMarcadoManualmente = useRef(false);
 
   // Asegurar que fechaIngresoRetiro siempre sea true
   useEffect(() => {
@@ -71,6 +74,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
     }
   }, [isRetirado, watchInfoCertificado?.paraSubsidioVivienda, setValue]);
+
+  // Limpiar "Dirigido a Bancolombia" si el afiliado está retirado
+  useEffect(() => {
+    if (isRetirado && watchInfoCertificado?.dirigidoBancolombia) {
+      // @ts-ignore
+      setValue("infoCertificado.dirigidoBancolombia" as any, false, { shouldValidate: false });
+    }
+  }, [isRetirado, watchInfoCertificado?.dirigidoBancolombia, setValue]);
 
   // Grupo de opciones mutuamente excluyentes:
   // - valorCompensaciones
@@ -262,10 +273,20 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
     }
 
+    const tieneSubsidio = infoCert.paraSubsidioVivienda || infoCert.paraSubsidioDesempleo;
+
     // Marcar "Valor de compensaciones" como obligatorio si se selecciona algún subsidio
-    if ((infoCert.paraSubsidioVivienda || infoCert.paraSubsidioDesempleo) && !infoCert.valorCompensaciones) {
+    if (tieneSubsidio && !infoCert.valorCompensaciones) {
+      // Marcar automáticamente (no manualmente)
+      valorCompensacionesMarcadoManualmente.current = false;
       // @ts-ignore
       setValue("infoCertificado.valorCompensaciones" as any, true, { shouldValidate: false });
+    }
+
+    // Si se desmarca el subsidio y "Valor de compensaciones" fue marcado automáticamente, desmarcarlo
+    if (!tieneSubsidio && infoCert.valorCompensaciones && !valorCompensacionesMarcadoManualmente.current) {
+      // @ts-ignore
+      setValue("infoCertificado.valorCompensaciones" as any, false, { shouldValidate: false });
     }
   }, [
     watchInfoCertificado?.paraSubsidioVivienda,
@@ -344,7 +365,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                 <FormControl>
                   <Checkbox 
                     checked={field.value} 
-                    onCheckedChange={field.onChange}
+                    onCheckedChange={(checked) => {
+                      // Si el usuario marca manualmente (y no está deshabilitado por subsidio), rastrear que fue manual
+                      if (!esObligatorioPorSubsidio) {
+                        valorCompensacionesMarcadoManualmente.current = checked === true;
+                      }
+                      field.onChange(checked);
+                    }}
                     disabled={isDisabled}
                   />
                 </FormControl>
@@ -479,35 +506,38 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
             </FormItem>
           );
         }}/>
-        <FormField control={control} name={"infoCertificado.dirigidoBancolombia" as any} render={({ field }) => {
-          // Deshabilitar si otra opción del grupo excluyente está seleccionada O si "Adicionar actividades" está seleccionado
-          // O si "Dirigido a una entidad en particular" está seleccionado
-          const otraOpcionSeleccionada = 
-            watchInfoCertificado?.valorCompensaciones ||
-            watchInfoCertificado?.paraSubsidioVivienda ||
-            watchInfoCertificado?.paraSubsidioDesempleo ||
-            watchInfoCertificado?.dirigidoFondoPensiones ||
-            watchInfoCertificado?.otros ||
-            watchInfoCertificado?.adicionarActividades ||
-            watchInfoCertificado?.dirigidoAEntidad;
-          
-          const isDisabled = !!otraOpcionSeleccionada && !field.value;
-          
-          return (
-            <FormItem className={`flex flex-row items-start space-x-3 space-y-0 ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                <FormControl>
-                  <Checkbox 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange}
-                    disabled={isDisabled}
-                  />
-                </FormControl>
-                <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud
-                </FormLabel>
-            </FormItem>
-          );
-        }}/>
+        {/* Ocultar "Dirigido a Bancolombia" si el afiliado está retirado */}
+        {!isRetirado && (
+          <FormField control={control} name={"infoCertificado.dirigidoBancolombia" as any} render={({ field }) => {
+            // Deshabilitar si otra opción del grupo excluyente está seleccionada O si "Adicionar actividades" está seleccionado
+            // O si "Dirigido a una entidad en particular" está seleccionado
+            const otraOpcionSeleccionada = 
+              watchInfoCertificado?.valorCompensaciones ||
+              watchInfoCertificado?.paraSubsidioVivienda ||
+              watchInfoCertificado?.paraSubsidioDesempleo ||
+              watchInfoCertificado?.dirigidoFondoPensiones ||
+              watchInfoCertificado?.otros ||
+              watchInfoCertificado?.adicionarActividades ||
+              watchInfoCertificado?.dirigidoAEntidad;
+            
+            const isDisabled = !!otraOpcionSeleccionada && !field.value;
+            
+            return (
+              <FormItem className={`flex flex-row items-start space-x-3 space-y-0 ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                  <FormControl>
+                    <Checkbox 
+                      checked={field.value} 
+                      onCheckedChange={field.onChange}
+                      disabled={isDisabled}
+                    />
+                  </FormControl>
+                  <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud
+                  </FormLabel>
+              </FormItem>
+            );
+          }}/>
+        )}
         <FormField control={control} name={"infoCertificado.adicionarActividades" as any} render={({ field }) => {
           // Deshabilitar si una opción excluyente está seleccionada (excepto valorCompensaciones y otros)
           const opcionExcluyenteSeleccionada = 

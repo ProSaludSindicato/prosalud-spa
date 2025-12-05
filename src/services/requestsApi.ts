@@ -262,6 +262,122 @@ export const requestsApiService = {
     }
   },
 
+  // Respond to request with manual compensaciones (for certificado-convenio)
+  async respondWithCompensaciones(
+    id: string,
+    data: {
+      status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED";
+      email_subject: string;
+      email_body: string;
+      t_basicos: number;
+      t_auxilios: number;
+      attachments?: FileList;
+    }
+  ): Promise<ApiRequest> {
+    try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
+      // Validar que t_basicos y t_auxilios son números enteros no negativos
+      if (typeof data.t_basicos !== 'number' || data.t_basicos < 0 || !Number.isInteger(data.t_basicos)) {
+        throw new Error('t_basicos debe ser un número entero no negativo');
+      }
+      if (typeof data.t_auxilios !== 'number' || data.t_auxilios < 0 || !Number.isInteger(data.t_auxilios)) {
+        throw new Error('t_auxilios debe ser un número entero no negativo');
+      }
+
+      // Si hay archivos adjuntos, usar FormData
+      if (data.attachments && data.attachments.length > 0) {
+        const formData = new FormData();
+        formData.append('status', data.status);
+        formData.append('email_subject', data.email_subject);
+        formData.append('email_body', data.email_body);
+        formData.append('t_basicos', data.t_basicos.toString());
+        formData.append('t_auxilios', data.t_auxilios.toString());
+        
+        // Agregar archivos como attachments[0], attachments[1], etc.
+        Array.from(data.attachments).forEach((file, index) => {
+          formData.append(`attachments[${index}]`, file);
+        });
+
+        const response = await requestsApi.post<ApiResponse<ApiRequest>>(
+          `/api/requests/${id}/respond-with-compensaciones`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 60000, // 60 segundos - proceso largo que genera certificado y envía email
+          }
+        );
+
+        if (!response.data.success) {
+          // Si hay errores de validación, construir mensaje detallado
+          if (response.data.errors) {
+            const errorMessages = Object.entries(response.data.errors)
+              .flatMap(([field, messages]) => 
+                Array.isArray(messages) 
+                  ? messages.map(msg => `${field}: ${msg}`)
+                  : [`${field}: ${messages}`]
+              )
+              .join('\n');
+            throw new Error(`Errores de validación:\n${errorMessages}`);
+          }
+          throw new Error(response.data.message || "Error al enviar la respuesta con compensaciones");
+        }
+
+        return response.data.data;
+      } else {
+        // Sin archivos, usar JSON
+        const response = await requestsApi.post<ApiResponse<ApiRequest>>(
+          `/api/requests/${id}/respond-with-compensaciones`,
+          {
+            status: data.status,
+            email_subject: data.email_subject,
+            email_body: data.email_body,
+            t_basicos: data.t_basicos,
+            t_auxilios: data.t_auxilios,
+          },
+          {
+            timeout: 60000, // 60 segundos - proceso largo que genera certificado y envía email
+          }
+        );
+
+        if (!response.data.success) {
+          // Si hay errores de validación, construir mensaje detallado
+          if (response.data.errors) {
+            const errorMessages = Object.entries(response.data.errors)
+              .flatMap(([field, messages]) => 
+                Array.isArray(messages) 
+                  ? messages.map(msg => `${field}: ${msg}`)
+                  : [`${field}: ${messages}`]
+              )
+              .join('\n');
+            throw new Error(`Errores de validación:\n${errorMessages}`);
+          }
+          throw new Error(response.data.message || "Error al enviar la respuesta con compensaciones");
+        }
+
+        return response.data.data;
+      }
+    } catch (error: any) {
+      // Sanitizar el error para evitar exponer información técnica al usuario
+      const sanitizedMessage = getErrorMessage(error);
+      
+      // Crear un nuevo error con el mensaje sanitizado
+      const sanitizedError = new Error(sanitizedMessage);
+      // Preservar información del error original para logging en consola (solo para desarrollo)
+      if (error.response) {
+        (sanitizedError as any).originalStatus = error.response.status;
+        (sanitizedError as any).originalData = error.response.data;
+      }
+      
+      throw sanitizedError;
+    }
+  },
+
   // Download a specific file from a request
   async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
     try {

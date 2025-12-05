@@ -204,6 +204,24 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         files.adjuntarArchivoAdicional = data.adjuntarArchivoAdicional;
       }
 
+      const procesoValue = activeConvenio?.proceso ?? '';
+      const dondeRealizaProcesoValue = activeConvenio?.cliente ?? '';
+      
+      const payload: Record<string, any> = {
+        // SIEMPRE incluir proceso y dondeRealizaProceso (incluso si están vacíos)
+        proceso: procesoValue,
+        dondeRealizaProceso: dondeRealizaProcesoValue,
+        infoCertificado: data.infoCertificado,
+      };
+
+      // Incluir campos opcionales solo si tienen valor
+      if (data.dirigidoAQuien && data.dirigidoAQuien.trim() !== '') {
+        payload.dirigidoAQuien = data.dirigidoAQuien;
+      }
+      if (data.otrosDescripcion && data.otrosDescripcion.trim() !== '') {
+        payload.otrosDescripcion = data.otrosDescripcion;
+      }
+
       const requestData = {
         request_type: 'certificado-convenio',
         id_type: afiliado.tipo_documento || '',
@@ -212,13 +230,7 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         last_name: afiliado.apellidos || '',
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
-        payload: {
-          proceso: activeConvenio?.proceso || '',
-          dondeRealizaProceso: activeConvenio?.cliente || '',
-          infoCertificado: data.infoCertificado,
-          dirigidoAQuien: data.dirigidoAQuien,
-          otrosDescripcion: data.otrosDescripcion
-        },
+        payload,
         files,
         ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };

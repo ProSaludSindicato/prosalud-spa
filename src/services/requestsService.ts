@@ -65,10 +65,24 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
     }
     
     // Add payload fields - only include non-empty values for optional fields
+    // Exception: campos de proceso siempre se envían incluso si están vacíos
+    const procesoFields = ['proceso', 'dondeRealizaProceso', 'sedeProceso'];
+    // Campos que deben enviarse como string JSON
+    const jsonStringFields = ['infoCertificado'];
+    
     Object.entries(requestData.payload).forEach(([key, value]) => {
-      // Only append if value is not null, undefined, or empty string
-      // For required fields, they should always have a value
-      if (value !== null && value !== undefined && value !== '') {
+      // Campos de proceso siempre se envían incluso si están vacíos
+      const isProcesoField = procesoFields.includes(key);
+      // Campos que deben enviarse como JSON string
+      const isJsonStringField = jsonStringFields.includes(key);
+      
+      // Campos de proceso: siempre enviar (incluso si están vacíos, null o undefined)
+      // Otros campos: solo enviar si tienen valor
+      const shouldSend = isProcesoField 
+        ? true // Siempre enviar campos de proceso
+        : (value !== null && value !== undefined && value !== '');
+      
+      if (shouldSend) {
         // Handle arrays (like beneficiariosNuevos) - Laravel expects array notation with indices
         if (Array.isArray(value)) {
           // For beneficiariosNuevos, send each item as nested array fields for Laravel
@@ -86,21 +100,34 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
             // For other arrays, convert to JSON string
             formData.append(`payload[${key}]`, JSON.stringify(value));
           }
-        } else if (typeof value === 'object') {
-          // Special handling for infoCertificado - send as nested object fields for Laravel
-          if (key === 'infoCertificado') {
+        } else if (typeof value === 'object' && value !== null) {
+          // Handle nested objects
+          if (isJsonStringField) {
+            // Para infoCertificado y otros campos JSON, enviar como string JSON
+            const jsonString = JSON.stringify(value);
+            formData.append(`payload[${key}]`, jsonString);
+          } else {
+            // Para otros objetos anidados, enviar como campos separados para Laravel
             Object.entries(value).forEach(([nestedKey, nestedValue]) => {
               if (nestedValue !== null && nestedValue !== undefined) {
-                // Convert boolean to string for Laravel
-                formData.append(`payload[${key}][${nestedKey}]`, String(nestedValue));
+                // Convert boolean, number, etc. to string for FormData
+                const stringValue = typeof nestedValue === 'boolean' 
+                  ? (nestedValue ? '1' : '0')
+                  : String(nestedValue);
+                formData.append(`payload[${key}][${nestedKey}]`, stringValue);
               }
             });
-          } else {
-            // Handle other nested objects by converting to JSON
-            formData.append(`payload[${key}]`, JSON.stringify(value));
           }
         } else {
-          formData.append(`payload[${key}]`, String(value));
+          // Para todos los campos primitivos (strings, numbers, booleans)
+          let stringValue: string;
+          if (isProcesoField) {
+            // Campos de proceso: enviar como string, incluso si está vacío, null o undefined
+            stringValue = value === null || value === undefined ? '' : String(value);
+          } else {
+            stringValue = String(value);
+          }
+          formData.append(`payload[${key}]`, stringValue);
         }
       }
     });

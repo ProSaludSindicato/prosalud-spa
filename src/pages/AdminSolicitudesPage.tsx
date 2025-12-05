@@ -94,6 +94,90 @@ const responseFormSchema = z.object({
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
 
+// Schema para el formulario de respuesta con compensaciones manuales
+const responseWithCompensacionesFormSchema = z.object({
+  newStatus: z.enum(["in_progress", "resolved", "rejected"], {
+    required_error: "Debe seleccionar un nuevo estado",
+  }),
+  emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
+  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
+  t_basicos: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number({
+      required_error: "El valor de Total Basicos es obligatorio",
+      invalid_type_error: "El valor de Total Basicos debe ser un número entero",
+    }).int("El valor de Total Basicos debe ser un número entero").min(0, "El valor de Total Basicos debe ser mayor o igual a 0")
+  ),
+  t_auxilios: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number({
+      required_error: "El valor de Total Auxilios es obligatorio",
+      invalid_type_error: "El valor de Total Auxilios debe ser un número entero",
+    }).int("El valor de Total Auxilios debe ser un número entero").min(0, "El valor de Total Auxilios debe ser mayor o igual a 0")
+  ),
+  attachments: z.any().optional().refine((files) => {
+    if (!files || files.length === 0) return true;
+    
+    // Validar cantidad de archivos
+    if (files.length > MAX_FILES) {
+      return false;
+    }
+    
+    // Validar tamaño de cada archivo
+    return Array.from(files as FileList).every(file => file.size <= MAX_FILE_SIZE);
+  }, {
+    message: `Puede adjuntar máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
+  }),
+});
+
+type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
+
+// Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
+const requiresManualCompensaciones = (solicitud: Request): boolean => {
+  // Solo para certificados de convenio
+  if (solicitud.request_type !== 'certificado-convenio') {
+    return false;
+  }
+
+  // Solo para solicitudes pendientes o en revisión
+  if (solicitud.status !== 'pending' && solicitud.status !== 'in_progress') {
+    return false;
+  }
+
+  const payload = solicitud.payload || {};
+  let infoCertificado = payload.infoCertificado || {};
+
+  // Si infoCertificado es un string JSON, parsearlo
+  if (typeof infoCertificado === 'string') {
+    try {
+      infoCertificado = JSON.parse(infoCertificado);
+    } catch (e) {
+      console.warn('Error al parsear infoCertificado:', e);
+      infoCertificado = {};
+    }
+  }
+
+  // Verificar múltiples formatos posibles (boolean, string, número)
+  const checkValue = (value: any): boolean => {
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0 || value === null || value === undefined) return false;
+    const strValue = String(value).toLowerCase().trim();
+    return strValue === 'true' || strValue === '1' || strValue === 'yes' || strValue === 'si';
+  };
+
+  // Caso 1: Certificado simple con valor de compensaciones
+  const tieneValorCompensaciones = checkValue(infoCertificado.valorCompensaciones);
+  
+  // Caso 2: Certificado para subsidio de vivienda (no se encuentra registro de compensaciones)
+  const paraSubsidioVivienda = checkValue(infoCertificado.paraSubsidioVivienda);
+  
+  // Caso 3: Certificado para subsidio de desempleo (solo para afiliados retirados)
+  const paraSubsidioDesempleo = checkValue(infoCertificado.paraSubsidioDesempleo);
+
+  // Si tiene valor de compensaciones, subsidio de vivienda o subsidio de desempleo, requiere compensaciones manuales
+  return tieneValorCompensaciones || paraSubsidioVivienda || paraSubsidioDesempleo;
+};
+
 const AdminSolicitudesPage: React.FC = () => {
   const { can } = usePermissions();
   const location = useLocation();
@@ -111,15 +195,29 @@ const AdminSolicitudesPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
+  const [useCompensacionesForm, setUseCompensacionesForm] = useState(false);
 
 
-  // Form para la respuesta
+  // Form para la respuesta normal
   const responseForm = useForm<ResponseFormValues>({
     resolver: zodResolver(responseFormSchema),
     defaultValues: {
       newStatus: "in_progress",
       emailSubject: "",
       emailBody: "",
+      attachments: undefined,
+    },
+  });
+
+  // Form para la respuesta con compensaciones manuales
+  const responseWithCompensacionesForm = useForm<ResponseWithCompensacionesFormValues>({
+    resolver: zodResolver(responseWithCompensacionesFormSchema),
+    defaultValues: {
+      newStatus: "in_progress",
+      emailSubject: "",
+      emailBody: "",
+      t_basicos: undefined,
+      t_auxilios: undefined,
       attachments: undefined,
     },
   });
@@ -304,6 +402,11 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleOpenResponseDialog = (solicitud: Request) => {
     setIsSubmittingResponse(false); // Asegurar que el estado esté reseteado al abrir
     setSolicitudToRespond(solicitud);
+    
+    // Determinar si necesita formulario de compensaciones manuales
+    const needsCompensaciones = requiresManualCompensaciones(solicitud);
+    setUseCompensacionesForm(needsCompensaciones);
+    
     // Pre-llenar el formulario con valores por defecto basados en el estado actual
     // Convertir "pending" a "in_progress" ya que "pending" no está disponible en el formulario
     let defaultStatus: "in_progress" | "resolved" | "rejected" = "in_progress";
@@ -316,12 +419,65 @@ const AdminSolicitudesPage: React.FC = () => {
       defaultStatus = "in_progress";
     }
     const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
-    responseForm.reset({
-      newStatus: defaultStatus,
-      emailSubject: `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`,
-      emailBody: "",
-      attachments: undefined,
-    });
+    
+    if (needsCompensaciones) {
+      // Generar sugerencias de texto según el tipo de certificado
+      const payload = solicitud.payload || {};
+      let infoCertificado = payload.infoCertificado || {};
+      if (typeof infoCertificado === 'string') {
+        try {
+          infoCertificado = JSON.parse(infoCertificado);
+        } catch (e) {
+          infoCertificado = {};
+        }
+      }
+
+      const paraSubsidioDesempleo = infoCertificado.paraSubsidioDesempleo === true || 
+        infoCertificado.paraSubsidioDesempleo === 'true' ||
+        String(infoCertificado.paraSubsidioDesempleo).toLowerCase() === 'true';
+      
+      const paraSubsidioVivienda = infoCertificado.paraSubsidioVivienda === true || 
+        infoCertificado.paraSubsidioVivienda === 'true' ||
+        String(infoCertificado.paraSubsidioVivienda).toLowerCase() === 'true';
+
+      // Generar asunto y cuerpo según el tipo
+      let emailSubject = `Certificado de Convenio - Solicitud #${solicitud.id}`;
+      let emailBody = "Adjunto encontrará su certificado de convenio en formato PDF.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+
+      if (paraSubsidioDesempleo) {
+        emailSubject = `Certificado de Convenio - Subsidio de Desempleo - Solicitud #${solicitud.id}`;
+        emailBody = "Adjunto encontrará su certificado de convenio para subsidio de desempleo.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+      } else if (paraSubsidioVivienda) {
+        emailSubject = `Certificado de Convenio - Subsidio de Vivienda - Solicitud #${solicitud.id}`;
+        emailBody = "Adjunto encontrará su certificado de convenio para subsidio de vivienda con los valores de compensación.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+      }
+
+      // Agregar fecha de generación
+      const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
+
+      // Usar formulario de compensaciones
+      responseWithCompensacionesForm.reset({
+        newStatus: defaultStatus,
+        emailSubject,
+        emailBody,
+        t_basicos: undefined,
+        t_auxilios: undefined,
+        attachments: undefined,
+      });
+    } else {
+      // Usar formulario normal
+      responseForm.reset({
+        newStatus: defaultStatus,
+        emailSubject: `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`,
+        emailBody: "",
+        attachments: undefined,
+      });
+    }
     setResponseDialogOpen(true);
   };
 
@@ -329,7 +485,9 @@ const AdminSolicitudesPage: React.FC = () => {
     setIsSubmittingResponse(false); // Resetear estado de envío al cerrar
     setResponseDialogOpen(false);
     setSolicitudToRespond(null);
+    setUseCompensacionesForm(false);
     responseForm.reset();
+    responseWithCompensacionesForm.reset();
   };
 
   const handleSubmitResponse = async (data: ResponseFormValues) => {
@@ -405,6 +563,84 @@ const AdminSolicitudesPage: React.FC = () => {
       
       // Mostrar toast de error SIN cerrar el modal para que el usuario pueda ver el error
       toast.error("Error al enviar respuesta", {
+        description: errorMessage,
+        duration: 6000,
+      });
+    }
+  };
+
+  const handleSubmitResponseWithCompensaciones = async (data: ResponseWithCompensacionesFormValues) => {
+    if (!solicitudToRespond) return;
+
+    setIsSubmittingResponse(true);
+    const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
+    try {
+      // Enviar respuesta con compensaciones usando la API del backend
+      const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudId, {
+        newStatus: data.newStatus,
+        emailSubject: data.emailSubject,
+        emailBody: data.emailBody,
+        t_basicos: data.t_basicos,
+        t_auxilios: data.t_auxilios,
+        attachments: data.attachments,
+      });
+
+      // Resetear estado
+      setIsSubmittingResponse(false);
+
+      // Calcular Total Ingresos para el mensaje
+      const t_ingresos = data.t_basicos + data.t_auxilios;
+
+      // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
+      toast.success("Certificado generado y respuesta enviada exitosamente", {
+        description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
+        duration: 5000,
+      });
+
+      // Cerrar el modal después de un pequeño delay para que el usuario vea el toast
+      setTimeout(() => {
+        handleCloseResponseDialog();
+      }, 500);
+      
+      // Refetch para actualizar la lista primero
+      const refetchResult = await refetch();
+      
+      // Actualizar la solicitud seleccionada con los datos más recientes del servidor
+      if (selectedSolicitud?.id === solicitudId) {
+        const refetchedData = refetchResult.data || [];
+        const updatedFromList = refetchedData.find(req => req.id === solicitudId);
+        
+        if (updatedFromList) {
+          setSelectedSolicitud(updatedFromList);
+          setExpandedFields({});
+        } else {
+          try {
+            const refreshedRequest = await requestsService.getRequestById(solicitudId);
+            if (refreshedRequest) {
+              setSelectedSolicitud(refreshedRequest);
+              setExpandedFields({});
+            } else {
+              setSelectedSolicitud(updatedRequest);
+              setExpandedFields({});
+            }
+          } catch (error) {
+            logger.error("Error al actualizar la solicitud seleccionada", error instanceof Error ? error.message : error);
+            setSelectedSolicitud(updatedRequest);
+            setExpandedFields({});
+          }
+        }
+      }
+    } catch (error) {
+      logger.error("Error al enviar respuesta con compensaciones", error instanceof Error ? error.message : error);
+      
+      // Siempre resetear el estado primero
+      setIsSubmittingResponse(false);
+      
+      // Obtener mensaje sanitizado y amigable para el usuario
+      const errorMessage = getErrorMessage(error);
+      
+      // Mostrar toast de error SIN cerrar el modal para que el usuario pueda ver el error
+      toast.error("Error al generar certificado con compensaciones", {
         description: errorMessage,
         duration: 6000,
       });
@@ -1071,6 +1307,29 @@ const AdminSolicitudesPage: React.FC = () => {
                             (() => {
                               // Format field name: remove underscores/hyphens and capitalize each word
                               const formatFieldName = (str: string) => {
+                                // Mapeo especial para nombres de campos comunes
+                                const fieldNameMap: Record<string, string> = {
+                                  'proceso': 'Proceso',
+                                  'dondeRealizaProceso': 'Hospital / Cliente',
+                                  'sedeProceso': 'Sede del Proceso',
+                                  'infoCertificado': 'Información del Certificado',
+                                  'dirigidoAQuien': 'Dirigido A Quien',
+                                  'otrosDescripcion': 'Descripción de Otros',
+                                  'fechaIngresoRetiro': 'Fecha Ingreso Retiro',
+                                  'valorCompensaciones': 'Valor Compensaciones',
+                                  'dirigidoAEntidad': 'Dirigido A Entidad',
+                                  'paraSubsidioDesempleo': 'Para Subsidio Desempleo',
+                                  'paraSubsidioVivienda': 'Para Subsidio Vivienda',
+                                  'dirigidoFondoPensiones': 'Dirigido Fondo Pensiones',
+                                  'adicionarActividades': 'Adicionar Actividades',
+                                  'dirigidoBancolombia': 'Dirigido Bancolombia',
+                                  'otros': 'Otros',
+                                };
+                                
+                                if (fieldNameMap[str]) {
+                                  return fieldNameMap[str];
+                                }
+                                
                                 return str
                                   .replace(/([A-Z])/g, ' $1') // Add space before capital letters
                                   .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
@@ -1085,8 +1344,22 @@ const AdminSolicitudesPage: React.FC = () => {
                               // Los datos se muestran tal cual vienen del backend sin aplicar ofuscación.
                               // Si los datos vienen ofuscados del backend, eso es un problema del backend que debe resolverse allí.
                               const formatValue = (val: any): React.ReactNode => {
+                                // Handle empty strings - mostrar como "No especificado" pero permitir strings vacíos para campos de proceso
                                 if (val === null || val === undefined) {
                                   return "No especificado";
+                                }
+                                
+                                // Handle empty strings - para campos de proceso, mostrar "No especificado" si está vacío
+                                if (typeof val === 'string' && val.trim() === '') {
+                                  return <span className="text-gray-400 italic">No especificado</span>;
+                                }
+                                
+                                // Handle boolean values and numeric booleans (1/0)
+                                if (val === true || val === 1 || val === '1' || val === 'true') {
+                                  return <span className="text-green-600 font-medium">✓ Sí</span>;
+                                }
+                                if (val === false || val === 0 || val === '0' || val === 'false') {
+                                  return <span className="text-red-600 font-medium">✗ No</span>;
                                 }
                                 
                                 // Handle string that might be JSON (from FormData serialization)
@@ -1181,24 +1454,28 @@ const AdminSolicitudesPage: React.FC = () => {
                                   if (typeof parsedVal === "object" && !Array.isArray(parsedVal)) {
                                     return (
                                       <div className="space-y-2">
-                                        {Object.entries(parsedVal).map(([nestedKey, nestedValue]) => (
-                                          <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
-                                            <span className="text-xs font-medium text-gray-600">
-                                              {formatFieldName(nestedKey)}:
-                                            </span>
-                                            <span className={`text-xs ml-2 font-medium ${
-                                              nestedValue === true || nestedValue === "true" 
-                                                ? "text-green-600" 
-                                                : nestedValue === false || nestedValue === "false" 
-                                                  ? "text-red-600" 
-                                                  : "text-gray-900"
-                                            }`}>
-                                              {nestedValue === true || nestedValue === "true" ? "✓ Sí" : 
-                                               nestedValue === false || nestedValue === "false" ? "✗ No" : 
-                                               String(nestedValue)}
-                                            </span>
-                                          </div>
-                                        ))}
+                                        {Object.entries(parsedVal).map(([nestedKey, nestedValue]) => {
+                                          // Format nested value (handle booleans and numeric booleans)
+                                          let displayValue: React.ReactNode;
+                                          if (nestedValue === true || nestedValue === 1 || nestedValue === '1' || nestedValue === 'true') {
+                                            displayValue = <span className="text-green-600 font-medium">✓ Sí</span>;
+                                          } else if (nestedValue === false || nestedValue === 0 || nestedValue === '0' || nestedValue === 'false') {
+                                            displayValue = <span className="text-red-600 font-medium">✗ No</span>;
+                                          } else {
+                                            displayValue = String(nestedValue);
+                                          }
+                                          
+                                          return (
+                                            <div key={nestedKey} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-b-0">
+                                              <span className="text-xs font-medium text-gray-600">
+                                                {formatFieldName(nestedKey)}:
+                                              </span>
+                                              <span className="text-xs ml-2 font-medium text-gray-900">
+                                                {displayValue}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     );
                                   }
@@ -1212,8 +1489,10 @@ const AdminSolicitudesPage: React.FC = () => {
                               const procesoFields = ['proceso', 'dondeRealizaProceso', 'sedeProceso'];
                               const isActualizarDatosPersonales = selectedSolicitud.request_type === 'actualizar-datos-personales';
                               
-                              const payloadEntries = Object.entries(selectedSolicitud.payload);
+                              const payloadEntries = Object.entries(selectedSolicitud.payload || {});
+                              // Filtrar campos de proceso - mostrar incluso si están vacíos (para que se vea que existen)
                               const procesoEntries = payloadEntries.filter(([key]) => procesoFields.includes(key));
+                              // Filtrar datos específicos excluyendo campos de proceso
                               const datosEspecificosEntries = payloadEntries.filter(([key]) => !procesoFields.includes(key));
 
                               const renderField = (key: string, value: any) => (
@@ -1420,13 +1699,32 @@ const AdminSolicitudesPage: React.FC = () => {
                     {/* Acciones */}
                     {can('requests.respond') && selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
                       <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                        <Button
-                          onClick={() => handleOpenResponseDialog(selectedSolicitud)}
-                          className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          Dar Respuesta
-                        </Button>
+                        {requiresManualCompensaciones(selectedSolicitud) ? (
+                          <div className="flex flex-col items-end gap-2">
+                            <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle className="text-sm font-semibold">Requiere Compensaciones Manuales</AlertTitle>
+                              <AlertDescription className="text-xs">
+                                Esta solicitud requiere ingresar valores de compensaciones manualmente.
+                              </AlertDescription>
+                            </Alert>
+                            <Button
+                              onClick={() => handleOpenResponseDialog(selectedSolicitud)}
+                              className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                            >
+                              <Send className="h-4 w-4 mr-2" />
+                              Responder con Compensaciones
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => handleOpenResponseDialog(selectedSolicitud)}
+                            className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                          >
+                            <Send className="h-4 w-4 mr-2" />
+                            Dar Respuesta
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1447,48 +1745,133 @@ const AdminSolicitudesPage: React.FC = () => {
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold text-gray-900">
-                  Dar Respuesta a Solicitud #{solicitudToRespond?.id}
+                  {useCompensacionesForm 
+                    ? `Responder con Compensaciones Manuales - Solicitud #${solicitudToRespond?.id}`
+                    : `Dar Respuesta a Solicitud #${solicitudToRespond?.id}`
+                  }
                 </DialogTitle>
                 <DialogDescription>
-                  Complete el formulario para responder a la solicitud. El correo se enviará automáticamente al afiliado.
+                  {useCompensacionesForm 
+                    ? "Complete el formulario con los valores de compensaciones. El certificado se generará automáticamente y se enviará por correo al afiliado."
+                    : "Complete el formulario para responder a la solicitud. El correo se enviará automáticamente al afiliado."
+                  }
                 </DialogDescription>
               </DialogHeader>
 
-              <Form {...responseForm}>
-                <form onSubmit={responseForm.handleSubmit(handleSubmitResponse)} className="space-y-6">
-                  {/* Información de la solicitud */}
-                  {solicitudToRespond && (
-                    <Card className="border border-gray-200 bg-gray-50">
-                      <CardContent className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-600 font-medium">Solicitante:</p>
-                            <p className="text-gray-900">
-                              {solicitudToRespond.name} {solicitudToRespond.last_name}
-                            </p>
+              {useCompensacionesForm ? (
+                <Form {...responseWithCompensacionesForm}>
+                  <form onSubmit={responseWithCompensacionesForm.handleSubmit(handleSubmitResponseWithCompensaciones)} className="space-y-6">
+                    {/* Información de la solicitud */}
+                    {solicitudToRespond && (
+                      <Card className="border border-gray-200 bg-gray-50">
+                        <CardContent className="p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-600 font-medium">Solicitante:</p>
+                              <p className="text-gray-900">
+                                {solicitudToRespond.name} {solicitudToRespond.last_name}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 font-medium">Correo:</p>
+                              <p className="text-gray-900">{solicitudToRespond.email}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
+                              <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 font-medium">Estado Actual:</p>
+                              <Badge className={getStatusColor(solicitudToRespond.status)}>
+                                {getStatusLabel(solicitudToRespond.status)}
+                              </Badge>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Correo:</p>
-                            <p className="text-gray-900">{solicitudToRespond.email}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
-                            <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Estado Actual:</p>
-                            <Badge className={getStatusColor(solicitudToRespond.status)}>
-                              {getStatusLabel(solicitudToRespond.status)}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Nuevo Estado */}
-                  <FormField
-                    control={responseForm.control}
+                    {/* Campos de compensaciones */}
+                    <div className="border-t border-gray-200 pt-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Total Basicos */}
+                        <FormField
+                          control={responseWithCompensacionesForm.control}
+                          name="t_basicos"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Basicos *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Ingrese el valor"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const value = e.target.value === '' ? undefined : (e.target.value === '-' ? undefined : parseInt(e.target.value, 10));
+                                    field.onChange(value === undefined || isNaN(value) ? undefined : value);
+                                  }}
+                                  value={field.value === undefined || field.value === null ? '' : field.value}
+                                  min={0}
+                                  step={1}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Valor de compensación básica (número entero).
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Total Auxilios */}
+                        <FormField
+                          control={responseWithCompensacionesForm.control}
+                          name="t_auxilios"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Auxilios *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Ingrese el valor"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const value = e.target.value === '' ? undefined : (e.target.value === '-' ? undefined : parseInt(e.target.value, 10));
+                                    field.onChange(value === undefined || isNaN(value) ? undefined : value);
+                                  }}
+                                  value={field.value === undefined || field.value === null ? '' : field.value}
+                                  min={0}
+                                  step={1}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Valor de auxilios (número entero).
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Mostrar Total Ingresos calculado */}
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Total Ingresos (calculado automáticamente):</span>
+                          <span className="text-lg font-bold text-primary-prosalud">
+                            ${((responseWithCompensacionesForm.watch('t_basicos') ?? 0) + (responseWithCompensacionesForm.watch('t_auxilios') ?? 0)).toLocaleString('es-CO')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Total Ingresos = Total Basicos + Total Auxilios
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Nuevo Estado */}
+                    <FormField
+                      control={responseWithCompensacionesForm.control}
                     name="newStatus"
                     render={({ field }) => (
                       <FormItem>
@@ -1543,9 +1926,9 @@ const AdminSolicitudesPage: React.FC = () => {
                     )}
                   />
 
-                  {/* Asunto del correo */}
-                  <FormField
-                    control={responseForm.control}
+                    {/* Asunto del correo */}
+                    <FormField
+                      control={responseWithCompensacionesForm.control}
                     name="emailSubject"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
@@ -1558,7 +1941,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           <FormLabel>Asunto del Correo *</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="Ej: Respuesta a su solicitud #123" 
+                              placeholder={useCompensacionesForm ? "Ej: Certificado de Convenio - Consecutivo 202412150001" : "Ej: Respuesta a su solicitud #123"} 
                               {...field}
                               maxLength={maxLength}
                             />
@@ -1577,9 +1960,9 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
-                  {/* Cuerpo del correo */}
-                  <FormField
-                    control={responseForm.control}
+                    {/* Cuerpo del correo */}
+                    <FormField
+                      control={responseWithCompensacionesForm.control}
                     name="emailBody"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
@@ -1592,7 +1975,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           <FormLabel>Cuerpo del Correo *</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Escriba aquí el contenido de la respuesta al afiliado..."
+                              placeholder={useCompensacionesForm ? "Ej: Adjunto encontrará su certificado de convenio con los valores de compensación solicitados..." : "Escriba aquí el contenido de la respuesta al afiliado..."}
                               className="min-h-[200px]"
                               {...field}
                               maxLength={maxLength}
@@ -1612,9 +1995,9 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
-                  {/* Adjuntar archivos */}
-                  <FormField
-                    control={responseForm.control}
+                    {/* Adjuntar archivos */}
+                    <FormField
+                      control={responseWithCompensacionesForm.control}
                     name="attachments"
                     render={({ field }) => {
                       const files = field.value ? Array.from(field.value as FileList) : [];
@@ -1802,36 +2185,400 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
-                  {/* Botones de acción */}
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCloseResponseDialog}
-                      disabled={isSubmittingResponse}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmittingResponse}
-                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-                    >
-                      {isSubmittingResponse ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4 mr-2" />
-                          Enviar Respuesta
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
+                    {/* Botones de acción */}
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCloseResponseDialog}
+                        disabled={isSubmittingResponse}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={isSubmittingResponse}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                      >
+                        {isSubmittingResponse ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Generando certificado...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Generar Certificado y Enviar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              ) : (
+                <Form {...responseForm}>
+                  <form onSubmit={responseForm.handleSubmit(handleSubmitResponse)} className="space-y-6">
+                    {/* Información de la solicitud */}
+                    {solicitudToRespond && (
+                      <Card className="border border-gray-200 bg-gray-50">
+                      <CardContent className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600 font-medium">Solicitante:</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.name} {solicitudToRespond.last_name}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Correo:</p>
+                            <p className="text-gray-900">{solicitudToRespond.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
+                            <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Estado Actual:</p>
+                            <Badge className={getStatusColor(solicitudToRespond.status)}>
+                              {getStatusLabel(solicitudToRespond.status)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                    {/* Nuevo Estado */}
+                    <FormField
+                      control={responseForm.control}
+                    name="newStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nuevo Estado *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              {field.value ? (
+                                <div className="flex items-center gap-2">
+                                  <div className={`h-3 w-3 rounded-full ${
+                                    field.value === "in_progress" ? "bg-blue-500" :
+                                    field.value === "resolved" ? "bg-green-500" :
+                                    "bg-red-500"
+                                  }`}></div>
+                                  <span>{
+                                    field.value === "in_progress" ? "En Revisión" :
+                                    field.value === "resolved" ? "Completado" :
+                                    "Rechazado"
+                                  }</span>
+                                </div>
+                              ) : (
+                                <SelectValue placeholder="Seleccione el nuevo estado" />
+                              )}
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="in_progress">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                                <span>En Revisión</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="resolved">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                <span>Completado</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="rejected">
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                                <span>Rechazado</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Seleccione el estado que tendrá la solicitud después de enviar la respuesta.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                    {/* Asunto del correo */}
+                    <FormField
+                      control={responseForm.control}
+                      name="emailSubject"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 100;
+                      const isNearLimit = currentLength > maxLength * 0.8;
+                      const isOverLimit = currentLength > maxLength;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Asunto del Correo *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Ej: Respuesta a su solicitud #123" 
+                              {...field}
+                              maxLength={maxLength}
+                            />
+                          </FormControl>
+                          <div className="flex items-center justify-between">
+                            <FormDescription>
+                              El asunto del correo que se enviará al afiliado.
+                            </FormDescription>
+                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {currentLength}/{maxLength}
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                    {/* Cuerpo del correo */}
+                    <FormField
+                      control={responseForm.control}
+                      name="emailBody"
+                    render={({ field }) => {
+                      const currentLength = field.value?.length || 0;
+                      const maxLength = 1500;
+                      const isNearLimit = currentLength > maxLength * 0.8;
+                      const isOverLimit = currentLength > maxLength;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Cuerpo del Correo *</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Escriba aquí el contenido de la respuesta al afiliado..."
+                              className="min-h-[200px]"
+                              {...field}
+                              maxLength={maxLength}
+                            />
+                          </FormControl>
+                          <div className="flex items-center justify-between">
+                            <FormDescription>
+                              El contenido del correo que se enviará al afiliado.
+                            </FormDescription>
+                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {currentLength}/{maxLength}
+                            </span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                    {/* Adjuntar archivos */}
+                    <FormField
+                      control={responseForm.control}
+                      name="attachments"
+                    render={({ field }) => {
+                      const files = field.value ? Array.from(field.value as FileList) : [];
+                      const hasFiles = files.length > 0;
+                      
+                      const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                        if (!e.target.files || e.target.files.length === 0) {
+                          e.target.value = '';
+                          return;
+                        }
+
+                        const selectedFiles = Array.from(e.target.files);
+                        const currentFiles = files;
+                        const totalFilesCount = currentFiles.length + selectedFiles.length;
+                        
+                        if (totalFilesCount > MAX_FILES) {
+                          const availableSlots = MAX_FILES - currentFiles.length;
+                          toast.error("Error al seleccionar archivos", {
+                            description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
+                            duration: 4000,
+                          });
+                          e.target.value = '';
+                          return;
+                        }
+
+                        const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+                        if (oversizedFiles.length > 0) {
+                          toast.error("Error al seleccionar archivos", {
+                            description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                            duration: 5000,
+                          });
+                          e.target.value = '';
+                          return;
+                        }
+
+                        const hasImages = selectedFiles.some(file => isImageFile(file));
+
+                        if (hasImages) {
+                          setIsOptimizing(true);
+                          try {
+                            const optimizedFiles = await optimizeFileList(e.target.files);
+                            const dataTransfer = new DataTransfer();
+                            currentFiles.forEach(file => dataTransfer.items.add(file));
+                            optimizedFiles.forEach(file => dataTransfer.items.add(file));
+                            field.onChange(dataTransfer.files);
+                            const imageCount = selectedFiles.filter(f => isImageFile(f)).length;
+                            if (imageCount > 0) {
+                              toast.success("Imágenes optimizadas", {
+                                description: `${imageCount} imagen(es) optimizada(s) y agregada(s) exitosamente.`,
+                                duration: 2000,
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Error al optimizar imágenes:", error);
+                            toast.error("Error al optimizar imágenes", {
+                              description: "Se subirán las imágenes sin optimizar.",
+                              duration: 3000,
+                            });
+                            const dataTransfer = new DataTransfer();
+                            currentFiles.forEach(file => dataTransfer.items.add(file));
+                            selectedFiles.forEach(file => dataTransfer.items.add(file));
+                            field.onChange(dataTransfer.files);
+                          } finally {
+                            setIsOptimizing(false);
+                          }
+                        } else {
+                          const dataTransfer = new DataTransfer();
+                          currentFiles.forEach(file => dataTransfer.items.add(file));
+                          selectedFiles.forEach(file => dataTransfer.items.add(file));
+                          field.onChange(dataTransfer.files);
+                        }
+
+                        e.target.value = '';
+                      };
+
+                      return (
+                        <FormItem>
+                          <FormLabel>
+                            <div className="flex items-center gap-2">
+                              <Paperclip className="h-4 w-4" />
+                              Adjuntar Archivos (Opcional)
+                            </div>
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              {isOptimizing && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
+                                  <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Optimizando imágenes...</span>
+                                  </div>
+                                </div>
+                              )}
+                              <Input
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                disabled={isOptimizing || files.length >= MAX_FILES}
+                                className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>
+                            Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
+                            Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG).
+                            {files.length >= MAX_FILES && (
+                              <span className="block mt-1 text-amber-600 font-medium">
+                                Límite alcanzado. Elimine archivos para agregar más.
+                              </span>
+                            )}
+                          </FormDescription>
+                          {hasFiles && (
+                            <div className="mt-2 space-y-2">
+                              {files.map((file, index) => {
+                                const fileSizeMB = file.size / (1024 * 1024);
+                                const isOversized = file.size > MAX_FILE_SIZE;
+                                
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`p-2 border rounded-md flex items-center justify-between text-sm ${
+                                      isOversized ? 'bg-red-50 border-red-200' : 'bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <FileText className={`h-4 w-4 shrink-0 ${isOversized ? 'text-red-600' : 'text-gray-600'}`} />
+                                      <span className={`truncate ${isOversized ? 'text-red-700 font-medium' : 'text-gray-700'}`}>
+                                        {file.name}
+                                      </span>
+                                      <span className={`text-xs shrink-0 ${isOversized ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                                        ({fileSizeMB.toFixed(2)} MB)
+                                        {isOversized && ' - EXCEDE LÍMITE'}
+                                      </span>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-100"
+                                      onClick={() => {
+                                        const dataTransfer = new DataTransfer();
+                                        files.forEach((f, i) => {
+                                          if (i !== index) {
+                                            dataTransfer.items.add(f);
+                                          }
+                                        });
+                                        field.onChange(dataTransfer.files.length > 0 ? dataTransfer.files : undefined);
+                                        if (dataTransfer.files.length === 0) {
+                                          const input = document.querySelector('input[type="file"][multiple]') as HTMLInputElement;
+                                          if (input) input.value = '';
+                                        }
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                              {files.length >= MAX_FILES && (
+                                <p className="text-xs text-orange-600 font-medium">
+                                  Ha alcanzado el límite de {MAX_FILES} archivos.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                    {/* Botones de acción */}
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCloseResponseDialog}
+                        disabled={isSubmittingResponse}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={isSubmittingResponse}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                      >
+                        {isSubmittingResponse ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Enviar Respuesta
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              )}
             </DialogContent>
           </Dialog>
 

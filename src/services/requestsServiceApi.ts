@@ -145,6 +145,35 @@ export const requestsService = {
     return mapApiRequestToFrontendRequest(updatedApiRequest);
   },
 
+  async sendResponseWithCompensaciones(
+    id: string,
+    data: {
+      newStatus: Request['status'];
+      emailSubject: string;
+      emailBody: string;
+      t_basicos: number;
+      t_auxilios: number;
+      attachments?: FileList;
+    }
+  ): Promise<Request> {
+    // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
+    if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+      throw new Error('ID inválido - debe ser un string de 10 dígitos');
+    }
+
+    const apiStatus = mapFrontendStatusToApiStatus(data.newStatus);
+    const updatedApiRequest = await requestsApiService.respondWithCompensaciones(id, {
+      status: apiStatus,
+      email_subject: data.emailSubject,
+      email_body: data.emailBody,
+      t_basicos: data.t_basicos,
+      t_auxilios: data.t_auxilios,
+      attachments: data.attachments,
+    });
+    
+    return mapApiRequestToFrontendRequest(updatedApiRequest);
+  },
+
   async getRequestStats(): Promise<RequestStats> {
     const requests = await this.getRequests();
     
