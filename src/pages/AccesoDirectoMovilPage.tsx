@@ -454,7 +454,6 @@ const AccesoDirectoMovilPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Video Dialog */}
       <Dialog open={showVideoDialog} onOpenChange={setShowVideoDialog}>
         <DialogContent className="max-w-md w-[95vw] p-0">
           <DialogHeader className="px-6 pt-6">
