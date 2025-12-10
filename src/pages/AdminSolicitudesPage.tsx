@@ -77,6 +77,8 @@ const responseFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
+  afp: z.string().trim().max(100, "El nombre del fondo no puede exceder 100 caracteres").optional(),
+  actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
     
@@ -132,6 +134,43 @@ const responseWithCompensacionesFormSchema = z.object({
 
 type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
 
+// Helper para parsear infoCertificado en múltiples formatos
+const parseInfoCertificado = (solicitud: Request): Record<string, any> => {
+  const payload = solicitud.payload || {};
+  let infoCertificado = payload.infoCertificado || {};
+
+  if (typeof infoCertificado === 'string') {
+    try {
+      infoCertificado = JSON.parse(infoCertificado);
+    } catch (e) {
+      console.warn('Error al parsear infoCertificado:', e);
+      infoCertificado = {};
+    }
+  }
+
+  return infoCertificado;
+};
+
+const checkFlag = (value: any): boolean => {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0 || value === null || value === undefined) return false;
+  const strValue = String(value).toLowerCase().trim();
+  return strValue === 'true' || strValue === '1' || strValue === 'yes' || strValue === 'si';
+};
+
+const isDirigidoFondoPensiones = (solicitud: Request): boolean => {
+  if (solicitud.request_type !== 'certificado-convenio') return false;
+  const infoCertificado = parseInfoCertificado(solicitud);
+  return checkFlag(infoCertificado.dirigidoFondoPensiones);
+};
+
+const requiresAdicionarActividades = (solicitud: Request): boolean => {
+  if (solicitud.request_type !== 'certificado-convenio') return false;
+  if (solicitud.status !== 'pending' && solicitud.status !== 'in_progress') return false;
+  const infoCertificado = parseInfoCertificado(solicitud);
+  return checkFlag(infoCertificado.adicionarActividades);
+};
+
 // Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
 const requiresManualCompensaciones = (solicitud: Request): boolean => {
   // Solo para certificados de convenio
@@ -144,35 +183,24 @@ const requiresManualCompensaciones = (solicitud: Request): boolean => {
     return false;
   }
 
-  const payload = solicitud.payload || {};
-  let infoCertificado = payload.infoCertificado || {};
-
-  // Si infoCertificado es un string JSON, parsearlo
-  if (typeof infoCertificado === 'string') {
-    try {
-      infoCertificado = JSON.parse(infoCertificado);
-    } catch (e) {
-      console.warn('Error al parsear infoCertificado:', e);
-      infoCertificado = {};
-    }
-  }
-
-  // Verificar múltiples formatos posibles (boolean, string, número)
-  const checkValue = (value: any): boolean => {
-    if (value === true || value === 1) return true;
-    if (value === false || value === 0 || value === null || value === undefined) return false;
-    const strValue = String(value).toLowerCase().trim();
-    return strValue === 'true' || strValue === '1' || strValue === 'yes' || strValue === 'si';
-  };
+  const infoCertificado = parseInfoCertificado(solicitud);
 
   // Caso 1: Certificado simple con valor de compensaciones
-  const tieneValorCompensaciones = checkValue(infoCertificado.valorCompensaciones);
+  const tieneValorCompensaciones = checkFlag(infoCertificado.valorCompensaciones);
   
   // Caso 2: Certificado para subsidio de vivienda (no se encuentra registro de compensaciones)
-  const paraSubsidioVivienda = checkValue(infoCertificado.paraSubsidioVivienda);
+  const paraSubsidioVivienda = checkFlag(infoCertificado.paraSubsidioVivienda);
   
   // Caso 3: Certificado para subsidio de desempleo (solo para afiliados retirados)
-  const paraSubsidioDesempleo = checkValue(infoCertificado.paraSubsidioDesempleo);
+  const paraSubsidioDesempleo = checkFlag(infoCertificado.paraSubsidioDesempleo);
+
+  // Certificados dirigidos a fondo de pensiones NO deben manejar compensaciones
+  const dirigidoFondoPensiones = checkFlag(infoCertificado.dirigidoFondoPensiones);
+  if (dirigidoFondoPensiones) return false;
+
+  // Certificados con adicionar actividades NO deben manejar compensaciones
+  const adicionarActividades = checkFlag(infoCertificado.adicionarActividades);
+  if (adicionarActividades) return false;
 
   // Si tiene valor de compensaciones, subsidio de vivienda o subsidio de desempleo, requiere compensaciones manuales
   return tieneValorCompensaciones || paraSubsidioVivienda || paraSubsidioDesempleo;
@@ -196,6 +224,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
   const [useCompensacionesForm, setUseCompensacionesForm] = useState(false);
+  const [requiresFondoPensionesAnnex, setRequiresFondoPensionesAnnex] = useState(false);
+  const [requiresActividadesForm, setRequiresActividadesForm] = useState(false);
 
 
   // Form para la respuesta normal
@@ -205,6 +235,8 @@ const AdminSolicitudesPage: React.FC = () => {
       newStatus: "in_progress",
       emailSubject: "",
       emailBody: "",
+      afp: "",
+      actividades: [],
       attachments: undefined,
     },
   });
@@ -405,18 +437,38 @@ const AdminSolicitudesPage: React.FC = () => {
     
     // Determinar si necesita formulario de compensaciones manuales
     const needsCompensaciones = requiresManualCompensaciones(solicitud);
-    setUseCompensacionesForm(needsCompensaciones);
+    const isFondoPensiones = isDirigidoFondoPensiones(solicitud);
+    const needsActividades = requiresAdicionarActividades(solicitud);
+    setRequiresFondoPensionesAnnex(isFondoPensiones);
+    setRequiresActividadesForm(needsActividades);
+    setUseCompensacionesForm(isFondoPensiones || needsActividades ? false : needsCompensaciones);
     
     // Pre-llenar el formulario con valores por defecto basados en el estado actual
-    // Convertir "pending" a "in_progress" ya que "pending" no está disponible en el formulario
+    // Para certificados de convenio, solo permitir "resolved" o "rejected"
+    const isCertificadoConvenio = solicitud.request_type === 'certificado-convenio';
     let defaultStatus: "in_progress" | "resolved" | "rejected" = "in_progress";
-    if (solicitud.status === "resolved") {
-      defaultStatus = "resolved";
-    } else if (solicitud.status === "rejected") {
-      defaultStatus = "rejected";
+    
+    if (isCertificadoConvenio) {
+      // Para certificados de convenio, solo permitir "resolved" o "rejected"
+      // Si ya está resuelto o rechazado, mantener ese estado, sino usar "resolved" por defecto
+      if (solicitud.status === "resolved") {
+        defaultStatus = "resolved";
+      } else if (solicitud.status === "rejected") {
+        defaultStatus = "rejected";
+      } else {
+        // Para "pending" o "in_progress", usar "resolved" por defecto
+        defaultStatus = "resolved";
+      }
     } else {
-      // Para "pending" o "in_progress", usar "in_progress"
-      defaultStatus = "in_progress";
+      // Para otros tipos de solicitud, permitir "in_progress"
+      if (solicitud.status === "resolved") {
+        defaultStatus = "resolved";
+      } else if (solicitud.status === "rejected") {
+        defaultStatus = "rejected";
+      } else {
+        // Para "pending" o "in_progress", usar "in_progress"
+        defaultStatus = "in_progress";
+      }
     }
     const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
     
@@ -469,14 +521,61 @@ const AdminSolicitudesPage: React.FC = () => {
         t_auxilios: undefined,
         attachments: undefined,
       });
+      // Asegurar que el valor del estado se establezca correctamente después del reset
+      responseWithCompensacionesForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
     } else {
       // Usar formulario normal
+      let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`;
+      let emailBody = "";
+      
+      // Si es dirigido a fondo de pensiones, prediligenciar mensaje
+      if (isFondoPensiones) {
+        emailSubject = `Certificado de Convenio - Fondo de Pensiones - Solicitud #${solicitud.id}`;
+        
+        // Obtener AFP si está disponible en el payload
+        const payload = solicitud.payload || {};
+        const afpValue = payload.afp || "";
+        
+        emailBody = "Adjunto encontrará su certificado de convenio dirigido al fondo de pensiones en formato PDF.\n\n";
+        emailBody += "Este certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio para corrección de historia.";
+        
+        if (afpValue && afpValue.trim() !== "") {
+          emailBody += `\n\nFondo de Pensiones: ${afpValue}`;
+        }
+        
+        // Agregar fecha de generación
+        const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
+      } else if (needsActividades) {
+        // Si requiere adicionar actividades, prediligenciar mensaje
+        emailSubject = `Certificado de Convenio - Con Actividades - Solicitud #${solicitud.id}`;
+        
+        emailBody = "Adjunto encontrará su certificado de convenio en formato PDF con las actividades realizadas.\n\n";
+        emailBody += "Este certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio, incluyendo las actividades que ha realizado.";
+        
+        // Agregar fecha de generación
+        const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
+      }
+      
       responseForm.reset({
         newStatus: defaultStatus,
-        emailSubject: `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`,
-        emailBody: "",
+        emailSubject,
+        emailBody,
+        afp: "",
+        actividades: needsActividades ? [] : undefined,
         attachments: undefined,
       });
+      // Asegurar que el valor del estado se establezca correctamente después del reset
+      responseForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
     }
     setResponseDialogOpen(true);
   };
@@ -486,6 +585,8 @@ const AdminSolicitudesPage: React.FC = () => {
     setResponseDialogOpen(false);
     setSolicitudToRespond(null);
     setUseCompensacionesForm(false);
+    setRequiresFondoPensionesAnnex(false);
+    setRequiresActividadesForm(false);
     responseForm.reset();
     responseWithCompensacionesForm.reset();
   };
@@ -493,15 +594,60 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleSubmitResponse = async (data: ResponseFormValues) => {
     if (!solicitudToRespond) return;
 
+    if (requiresFondoPensionesAnnex) {
+      const hasFiles = data.attachments && (data.attachments as FileList).length > 0;
+      if (!hasFiles) {
+        responseForm.setError('attachments', { type: 'custom', message: 'Debe adjuntar al menos un documento (planillas de pagos de seguridad social).' });
+        toast.error("Adjunto requerido", {
+          description: "Debe adjuntar al menos un documento. (Planillas de pagos de seguridad social)",
+          duration: 5000,
+        });
+        return;
+      }
+    }
+
+    if (requiresActividadesForm) {
+      const actividadesValidas = data.actividades?.filter(a => a.trim() !== '') || [];
+      if (actividadesValidas.length === 0) {
+        responseForm.setError('actividades', { type: 'custom', message: 'Debe agregar al menos una actividad.' });
+        toast.error("Actividades requeridas", {
+          description: "Debe agregar al menos una actividad para incluir en el certificado.",
+          duration: 5000,
+        });
+        return;
+      }
+    }
+
     setIsSubmittingResponse(true);
     const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
+    
+    // Para certificados de convenio, asegurar que el estado sea "resolved" o "rejected", nunca "in_progress"
+    const isCertificadoConvenio = solicitudToRespond.request_type === 'certificado-convenio';
+    let finalStatus = data.newStatus;
+    if (isCertificadoConvenio && finalStatus === 'in_progress') {
+      // Si por alguna razón el estado es "in_progress" para un certificado de convenio, cambiarlo a "resolved"
+      finalStatus = 'resolved';
+    }
+    
     try {
+      // Incluir AFP en el cuerpo si se proporcionó
+      const trimmedAfp = data.afp?.trim();
+      let finalEmailBody = data.emailBody;
+      
+      if (trimmedAfp) {
+        finalEmailBody = `${finalEmailBody}\n\nAFP: ${trimmedAfp}`;
+      }
+
       // Enviar respuesta usando la API del backend
+      // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
+      // El AFP también se envía en FormData si está presente
       const updatedRequest = await requestsService.sendResponse(solicitudId, {
-        newStatus: data.newStatus,
+        newStatus: finalStatus,
         emailSubject: data.emailSubject,
-        emailBody: data.emailBody,
+        emailBody: finalEmailBody,
         attachments: data.attachments,
+        actividades: requiresActividadesForm ? (data.actividades || []) : undefined,
+        afp: data.afp && data.afp.trim() !== '' ? data.afp.trim() : undefined,
       });
 
       // Resetear estado
@@ -558,14 +704,76 @@ const AdminSolicitudesPage: React.FC = () => {
       // Siempre resetear el estado primero
       setIsSubmittingResponse(false);
       
-      // Obtener mensaje sanitizado y amigable para el usuario
-      const errorMessage = getErrorMessage(error);
+      // Extraer errores específicos de campos del error original
+      let errorMessage = getErrorMessage(error);
+      let hasFieldErrors = false;
+      
+      // Intentar extraer errores de validación del error original
+      if (error && typeof error === 'object' && 'originalData' in error) {
+        const originalData = (error as any).originalData;
+        if (originalData?.errors) {
+          const fieldErrors = originalData.errors;
+          
+          // Establecer errores en los campos del formulario
+          Object.entries(fieldErrors).forEach(([field, messages]) => {
+            const messageArray = Array.isArray(messages) ? messages : [messages];
+            const firstMessage = messageArray[0] || '';
+            
+            // Mapear campos del backend a campos del formulario
+            if (field === 'afp') {
+              responseForm.setError('afp', { 
+                type: 'server', 
+                message: firstMessage 
+              });
+              hasFieldErrors = true;
+            } else if (field === 'attachments' || field === 'files') {
+              responseForm.setError('attachments', { 
+                type: 'server', 
+                message: firstMessage 
+              });
+              hasFieldErrors = true;
+            } else if (field === 'actividades') {
+              responseForm.setError('actividades', { 
+                type: 'server', 
+                message: firstMessage 
+              });
+              hasFieldErrors = true;
+            }
+          });
+          
+          // Construir mensaje de error más detallado
+          const errorMessages = Object.entries(fieldErrors)
+            .flatMap(([field, messages]) => 
+              Array.isArray(messages) 
+                ? messages.map(msg => `${field}: ${msg}`)
+                : [`${field}: ${messages}`]
+            )
+            .join('\n');
+          
+          if (errorMessages) {
+            errorMessage = `Errores de validación:\n${errorMessages}`;
+          }
+        } else if (originalData?.message) {
+          errorMessage = originalData.message;
+        }
+      }
       
       // Mostrar toast de error SIN cerrar el modal para que el usuario pueda ver el error
       toast.error("Error al enviar respuesta", {
         description: errorMessage,
-        duration: 6000,
+        duration: 8000,
       });
+      
+      // Si hay errores de campo específicos, hacer scroll al primer campo con error
+      if (hasFieldErrors) {
+        setTimeout(() => {
+          const firstErrorField = document.querySelector('[data-field-error="true"]') || 
+                                  document.querySelector('.text-destructive');
+          if (firstErrorField) {
+            firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
     }
   };
 
@@ -1873,57 +2081,63 @@ const AdminSolicitudesPage: React.FC = () => {
                     <FormField
                       control={responseWithCompensacionesForm.control}
                     name="newStatus"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nuevo Estado *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              {field.value ? (
-                                <div className="flex items-center gap-2">
-                                  <div className={`h-3 w-3 rounded-full ${
-                                    field.value === "in_progress" ? "bg-blue-500" :
-                                    field.value === "resolved" ? "bg-green-500" :
-                                    "bg-red-500"
-                                  }`}></div>
-                                  <span>{
-                                    field.value === "in_progress" ? "En Revisión" :
-                                    field.value === "resolved" ? "Completado" :
-                                    "Rechazado"
-                                  }</span>
-                                </div>
-                              ) : (
-                                <SelectValue placeholder="Seleccione el nuevo estado" />
+                    render={({ field }) => {
+                      const isCertificadoConvenio = solicitudToRespond?.request_type === 'certificado-convenio';
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Nuevo Estado *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                {field.value ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className={`h-3 w-3 rounded-full ${
+                                      field.value === "in_progress" ? "bg-blue-500" :
+                                      field.value === "resolved" ? "bg-green-500" :
+                                      "bg-red-500"
+                                    }`}></div>
+                                    <span>{
+                                      field.value === "in_progress" ? "En Revisión" :
+                                      field.value === "resolved" ? "Completado" :
+                                      "Rechazado"
+                                    }</span>
+                                  </div>
+                                ) : (
+                                  <SelectValue placeholder="Seleccione el nuevo estado" />
+                                )}
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {!isCertificadoConvenio && (
+                                <SelectItem value="in_progress">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                                    <span>En Revisión</span>
+                                  </div>
+                                </SelectItem>
                               )}
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="in_progress">
-                              <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                                <span>En Revisión</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="resolved">
-                              <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                                <span>Completado</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="rejected">
-                              <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                                <span>Rechazado</span>
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Seleccione el estado que tendrá la solicitud después de enviar la respuesta.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                              <SelectItem value="resolved">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                                  <span>Completado</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="rejected">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                                  <span>Rechazado</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Seleccione el estado que tendrá la solicitud después de enviar la respuesta.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                     {/* Asunto del correo */}
@@ -2252,7 +2466,10 @@ const AdminSolicitudesPage: React.FC = () => {
                     <FormField
                       control={responseForm.control}
                     name="newStatus"
-                    render={({ field }) => (
+                    render={({ field }) => {
+                      const isCertificadoConvenio = solicitudToRespond?.request_type === 'certificado-convenio';
+                      
+                      return (
                       <FormItem>
                         <FormLabel>Nuevo Estado *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
@@ -2277,12 +2494,14 @@ const AdminSolicitudesPage: React.FC = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="in_progress">
-                              <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-                                <span>En Revisión</span>
-                              </div>
-                            </SelectItem>
+                            {!isCertificadoConvenio && (
+                              <SelectItem value="in_progress">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                                  <span>En Revisión</span>
+                                </div>
+                              </SelectItem>
+                            )}
                             <SelectItem value="resolved">
                               <div className="flex items-center gap-2">
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
@@ -2302,7 +2521,8 @@ const AdminSolicitudesPage: React.FC = () => {
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
-                    )}
+                      );
+                    }}
                   />
 
                     {/* Asunto del correo */}
@@ -2374,11 +2594,166 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
+                    {requiresFondoPensionesAnnex && (
+                      <Alert className="bg-amber-50 border-amber-200 text-amber-800">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle className="text-sm font-semibold">Anexo requerido</AlertTitle>
+                        <AlertDescription className="text-xs">
+                          Es requerido adjuntar las planillas de pagos de seguridad social para certificados dirigidos a fondo de pensiones.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {requiresFondoPensionesAnnex && (
+                      <FormField
+                        control={responseForm.control}
+                        name="afp"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              AFP {requiresFondoPensionesAnnex ? '(requerido si no está en el sistema)' : '(opcional)'}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Ej: Porvenir, Colfondos, Protección..."
+                                {...field}
+                                className={responseForm.formState.errors.afp ? 'border-red-500' : ''}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {requiresFondoPensionesAnnex 
+                                ? 'El campo AFP es requerido. No se encontró en el Excel del afiliado y debe ser proporcionado en la solicitud.'
+                                : 'Indique el fondo de pensiones si aplica o es NINGUNO en ProSanet'
+                              }
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    {requiresActividadesForm && (
+                      <FormField
+                        control={responseForm.control}
+                        name="actividades"
+                        render={({ field }) => {
+                          const actividades = field.value || [];
+                          
+                          const agregarActividad = () => {
+                            field.onChange([...actividades, ""]);
+                          };
+                          
+                          const eliminarActividad = (index: number) => {
+                            const nuevasActividades = actividades.filter((_: string, i: number) => i !== index);
+                            field.onChange(nuevasActividades);
+                          };
+                          
+                          const actualizarActividad = (index: number, valor: string) => {
+                            const nuevasActividades = [...actividades];
+                            nuevasActividades[index] = valor;
+                            field.onChange(nuevasActividades);
+                          };
+                          
+                          const moverArriba = (index: number) => {
+                            if (index === 0) return;
+                            const nuevasActividades = [...actividades];
+                            [nuevasActividades[index - 1], nuevasActividades[index]] = [nuevasActividades[index], nuevasActividades[index - 1]];
+                            field.onChange(nuevasActividades);
+                          };
+                          
+                          const moverAbajo = (index: number) => {
+                            if (index === actividades.length - 1) return;
+                            const nuevasActividades = [...actividades];
+                            [nuevasActividades[index], nuevasActividades[index + 1]] = [nuevasActividades[index + 1], nuevasActividades[index]];
+                            field.onChange(nuevasActividades);
+                          };
+                          
+                          return (
+                            <FormItem>
+                              <FormLabel>Actividades a incluir en el certificado *</FormLabel>
+                              <FormDescription className="mb-3">
+                                Agregue las actividades realizadas que se incluirán en el certificado. Puede agregar tantas actividades como necesite y reordenarlas según sea necesario.
+                              </FormDescription>
+                              <div className="space-y-2 max-h-[400px] overflow-y-auto border border-gray-200 rounded-md p-4 bg-gray-50">
+                                {actividades.length === 0 ? (
+                                  <p className="text-sm text-gray-500 text-center py-4">
+                                    No hay actividades agregadas. Haga clic en "Agregar Actividad" para comenzar.
+                                  </p>
+                                ) : (
+                                  actividades.map((actividad: string, index: number) => (
+                                    <div key={index} className="flex items-start gap-2 bg-white p-3 rounded-md border border-gray-200">
+                                      <div className="flex-shrink-0 pt-2">
+                                        <span className="text-sm font-medium text-gray-600">{index + 1}.</span>
+                                      </div>
+                                      <div className="flex-1">
+                                        <Textarea
+                                          value={actividad}
+                                          onChange={(e) => actualizarActividad(index, e.target.value)}
+                                          placeholder={`Actividad ${index + 1}`}
+                                          maxLength={500}
+                                          className="w-full min-h-[60px] resize-y"
+                                          rows={2}
+                                        />
+                                      </div>
+                                      <div className="flex-shrink-0 flex items-center gap-1">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => moverArriba(index)}
+                                          disabled={index === 0}
+                                          className="h-8 w-8"
+                                          title="Mover arriba"
+                                        >
+                                          <ArrowUp className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => moverAbajo(index)}
+                                          disabled={index === actividades.length - 1}
+                                          className="h-8 w-8"
+                                          title="Mover abajo"
+                                        >
+                                          <ArrowDown className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => eliminarActividad(index)}
+                                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          title="Eliminar actividad"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={agregarActividad}
+                                  className="w-full mt-2"
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Agregar Actividad {actividades.length > 0 && `(${actividades.length})`}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    )}
+
                     {/* Adjuntar archivos */}
                     <FormField
                       control={responseForm.control}
                       name="attachments"
-                    render={({ field }) => {
+                      render={({ field }) => {
                       const files = field.value ? Array.from(field.value as FileList) : [];
                       const hasFiles = files.length > 0;
                       
@@ -2457,7 +2832,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           <FormLabel>
                             <div className="flex items-center gap-2">
                               <Paperclip className="h-4 w-4" />
-                              Adjuntar Archivos (Opcional)
+                              {requiresFondoPensionesAnnex ? 'Adjuntar Archivos *' : 'Adjuntar Archivos (Opcional)'}
                             </div>
                           </FormLabel>
                           <FormControl>

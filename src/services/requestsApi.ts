@@ -172,6 +172,8 @@ export const requestsApiService = {
       email_subject: string;
       email_body: string;
       attachments?: FileList;
+      actividades?: string[];
+      afp?: string;
     }
   ): Promise<ApiRequest> {
     try {
@@ -180,17 +182,33 @@ export const requestsApiService = {
         throw new Error('ID inválido - debe ser un string de 10 dígitos');
       }
 
-      // Si hay archivos adjuntos, usar FormData
-      if (data.attachments && data.attachments.length > 0) {
+      // Si hay archivos adjuntos, actividades o AFP, usar FormData
+      if ((data.attachments && data.attachments.length > 0) || (data.actividades && data.actividades.length > 0) || data.afp) {
         const formData = new FormData();
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
         
+        // Agregar AFP si está presente
+        if (data.afp && data.afp.trim() !== '') {
+          formData.append('afp', data.afp.trim());
+        }
+        
         // Agregar archivos como attachments[0], attachments[1], etc.
-        Array.from(data.attachments).forEach((file, index) => {
-          formData.append(`attachments[${index}]`, file);
-        });
+        if (data.attachments && data.attachments.length > 0) {
+          Array.from(data.attachments).forEach((file, index) => {
+            formData.append(`attachments[${index}]`, file);
+          });
+        }
+        
+        // Agregar actividades como actividades[0], actividades[1], etc.
+        if (data.actividades && data.actividades.length > 0) {
+          data.actividades.forEach((actividad, index) => {
+            if (actividad.trim() !== '') {
+              formData.append(`actividades[${index}]`, actividad.trim());
+            }
+          });
+        }
 
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond`,
@@ -199,6 +217,7 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
+            timeout: data.actividades && data.actividades.length > 0 ? 60000 : 45000, // 60 segundos si hay actividades, 45 segundos si solo hay archivos
           }
         );
 
@@ -219,13 +238,63 @@ export const requestsApiService = {
 
         return response.data.data;
       } else {
-        // Sin archivos, usar JSON
+        // Sin archivos, usar JSON o FormData si hay actividades o AFP
+        if ((data.actividades && data.actividades.length > 0) || data.afp) {
+          const formData = new FormData();
+          formData.append('status', data.status);
+          formData.append('email_subject', data.email_subject);
+          formData.append('email_body', data.email_body);
+          
+          // Agregar AFP si está presente
+          if (data.afp && data.afp.trim() !== '') {
+            formData.append('afp', data.afp.trim());
+          }
+          
+          // Agregar actividades
+          if (data.actividades && data.actividades.length > 0) {
+            data.actividades.forEach((actividad, index) => {
+              if (actividad.trim() !== '') {
+                formData.append(`actividades[${index}]`, actividad.trim());
+              }
+            });
+          }
+          
+          const response = await requestsApi.post<ApiResponse<ApiRequest>>(
+            `/api/requests/${id}/respond`,
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+              timeout: 60000, // 60 segundos - proceso largo que genera certificado con actividades y envía email
+            }
+          );
+
+          if (!response.data.success) {
+            if (response.data.errors) {
+              const errorMessages = Object.entries(response.data.errors)
+                .flatMap(([field, messages]) => 
+                  Array.isArray(messages) 
+                    ? messages.map(msg => `${field}: ${msg}`)
+                    : [`${field}: ${messages}`]
+                )
+                .join('\n');
+              throw new Error(`Errores de validación:\n${errorMessages}`);
+            }
+            throw new Error(response.data.message || "Error al enviar la respuesta");
+          }
+
+          return response.data.data;
+        }
+        
+        // Sin archivos ni actividades ni AFP, usar JSON
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond`,
           {
             status: data.status,
             email_subject: data.email_subject,
             email_body: data.email_body,
+            ...(data.afp && data.afp.trim() !== '' ? { afp: data.afp.trim() } : {}),
           }
         );
 

@@ -26,7 +26,7 @@ const api = axios.create({
 export const authenticatedApi = axios.create({
     baseURL: API_CONFIG.BASE_URL,
     withCredentials: false,
-    timeout: 20000, // 20 segundos - timeout general para peticiones autenticadas
+    timeout: 45000, // 45 segundos - timeout general para peticiones autenticadas
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

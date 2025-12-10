@@ -35,6 +35,11 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       setValue("infoCertificado.fechaIngresoRetiro" as any, true, { shouldValidate: false });
   }, [setValue]);
 
+  // En certificados de convenio sindical, "Otros" NO está permitido
+  // Desmarcar automáticamente si está marcado
+
+  // Limpiar campos dependientes cuando se desmarca "Otros"
+
   // Limpiar campos dependientes cuando se desmarcan los checkboxes
   useEffect(() => {
     if (!watchInfoCertificado?.dirigidoAEntidad) {
@@ -137,8 +142,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       }
     }
     // Si se selecciona "Otros"
-    // NOTA: "Otros" SÍ se puede combinar con "Valor de compensaciones" y "Adicionar actividades"
+    // NOTA: "Otros" SÍ se puede combinar con "Valor de compensaciones", pero NO con "Adicionar actividades"
     else if (infoCert.otros) {
+      // Deseleccionar "Adicionar actividades" (son mutuamente excluyentes)
+      if (infoCert.adicionarActividades) {
+        // @ts-ignore
+        setValue("infoCertificado.adicionarActividades" as any, false, { shouldValidate: false });
+      }
       // Deseleccionar otras opciones excluyentes (excepto valorCompensaciones)
       if (infoCert.paraSubsidioVivienda) {
         // @ts-ignore
@@ -156,11 +166,16 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         // @ts-ignore
         setValue("infoCertificado.dirigidoBancolombia" as any, false, { shouldValidate: false });
       }
-      // NO deseleccionar "Valor de compensaciones" ni "Adicionar actividades" (se pueden combinar)
+      // NO deseleccionar "Valor de compensaciones" (se pueden combinar)
     }
-    // Si se selecciona "Valor de compensaciones" solo (sin subsidios ni otros)
-    // NOTA: "Valor de compensaciones" SÍ se puede combinar con subsidios y otros, así que NO los deseleccionamos
-    else if (infoCert.valorCompensaciones && !infoCert.paraSubsidioVivienda && !infoCert.paraSubsidioDesempleo && !infoCert.otros) {
+    // Si se selecciona "Valor de compensaciones"
+    // NOTA: "Valor de compensaciones" SÍ se puede combinar con subsidios y otros, pero NO con "Adicionar actividades"
+    else if (infoCert.valorCompensaciones) {
+      // Deseleccionar "Adicionar actividades" (son mutuamente excluyentes)
+      if (infoCert.adicionarActividades) {
+        // @ts-ignore
+        setValue("infoCertificado.adicionarActividades" as any, false, { shouldValidate: false });
+      }
       // Deseleccionar otras opciones excluyentes (pero NO los subsidios ni otros, ya que se pueden combinar)
       if (infoCert.dirigidoFondoPensiones) {
         // @ts-ignore
@@ -194,6 +209,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         if (infoCert.adicionarActividades) {
           // @ts-ignore
           setValue("infoCertificado.adicionarActividades" as any, false, { shouldValidate: false });
+        }
+        
+        // Si se selecciona "Dirigido al Fondo de Pensiones", deseleccionar "Dirigido a una entidad en particular"
+        // porque el sistema lo asigna automáticamente
+        if (opcionSeleccionada === 'dirigidoFondoPensiones' && infoCert.dirigidoAEntidad) {
+          // @ts-ignore
+          setValue("infoCertificado.dirigidoAEntidad" as any, false, { shouldValidate: false });
         }
       }
     }
@@ -235,6 +257,10 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         // @ts-ignore
         setValue("infoCertificado.dirigidoBancolombia" as any, false, { shouldValidate: false });
       }
+      if (infoCert.dirigidoFondoPensiones) {
+        // @ts-ignore
+        setValue("infoCertificado.dirigidoFondoPensiones" as any, false, { shouldValidate: false });
+      }
     }
   }, [
     watchInfoCertificado?.dirigidoAEntidad,
@@ -252,6 +278,22 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
     }
   }, [
     watchInfoCertificado?.dirigidoBancolombia,
+    watchInfoCertificado?.dirigidoAEntidad,
+    setValue
+  ]);
+
+  // Si se selecciona "Dirigido al Fondo de Pensiones", no se puede marcar "Dirigido a una entidad en particular"
+  // porque el sistema lo asigna automáticamente
+  useEffect(() => {
+    const infoCert = watchInfoCertificado;
+    if (!infoCert) return;
+
+    if (infoCert.dirigidoFondoPensiones && infoCert.dirigidoAEntidad) {
+      // @ts-ignore
+      setValue("infoCertificado.dirigidoAEntidad" as any, false, { shouldValidate: false });
+    }
+  }, [
+    watchInfoCertificado?.dirigidoFondoPensiones,
     watchInfoCertificado?.dirigidoAEntidad,
     setValue
   ]);
@@ -296,10 +338,9 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
   ]);
 
   // "Adicionar actividades" es independiente y solo se puede mezclar con:
-  // - valorCompensaciones
   // - dirigidoAEntidad
   // - otros
-  // Es excluyente con: paraSubsidioVivienda, paraSubsidioDesempleo, dirigidoFondoPensiones, dirigidoBancolombia
+  // Es excluyente con: valorCompensaciones, paraSubsidioVivienda, paraSubsidioDesempleo, dirigidoFondoPensiones, dirigidoBancolombia
   
   // Manejar exclusión de "Adicionar actividades" cuando se selecciona
   useEffect(() => {
@@ -308,6 +349,23 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
 
     // Si "Adicionar actividades" está seleccionado, deseleccionar opciones excluyentes
     if (infoCert.adicionarActividades) {
+      // Deseleccionar "Valor de compensaciones" (son mutuamente excluyentes)
+      if (infoCert.valorCompensaciones) {
+        // @ts-ignore
+        setValue("infoCertificado.valorCompensaciones" as any, false, { shouldValidate: false });
+        // Resetear el flag de marcado manual
+        valorCompensacionesMarcadoManualmente.current = false;
+      }
+      // Deseleccionar "Otros" (son mutuamente excluyentes)
+      if (infoCert.otros) {
+        // @ts-ignore
+        setValue("infoCertificado.otros" as any, false, { shouldValidate: false });
+        // También limpiar el campo de descripción
+        // @ts-ignore
+        setValue("otrosDescripcion" as any, '', { shouldValidate: false });
+        // @ts-ignore
+        setValue("adjuntarArchivoAdicional" as any, undefined, { shouldValidate: false });
+      }
       if (infoCert.paraSubsidioVivienda) {
         // @ts-ignore
         setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
@@ -353,10 +411,11 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
             watchInfoCertificado?.paraSubsidioDesempleo;
           
           // Deshabilitar si otra opción del grupo excluyente está seleccionada (excepto subsidios y otros)
-          // "Adicionar actividades" y "Otros" NO son excluyentes con "Valor de compensaciones"
+          // "Otros" NO es excluyente con "Valor de compensaciones", pero "Adicionar actividades" SÍ lo es
           const otraOpcionExcluyenteSeleccionada = 
             watchInfoCertificado?.dirigidoFondoPensiones ||
-            watchInfoCertificado?.dirigidoBancolombia;
+            watchInfoCertificado?.dirigidoBancolombia ||
+            watchInfoCertificado?.adicionarActividades;
           
           const isDisabled = esObligatorioPorSubsidio || (!!otraOpcionExcluyenteSeleccionada && !field.value);
           
@@ -384,10 +443,12 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         <FormField control={control} name={"infoCertificado.dirigidoAEntidad" as any} render={({ field }) => {
           // Deshabilitar si "Dirigido a Bancolombia" está seleccionado
           // O si "Para subsidio de vivienda" o "Para subsidio de desempleo" están seleccionados
+          // O si "Dirigido al Fondo de Pensiones" está seleccionado (el sistema lo asigna automáticamente)
           const debeDeshabilitar = 
             watchInfoCertificado?.dirigidoBancolombia ||
             watchInfoCertificado?.paraSubsidioVivienda ||
-            watchInfoCertificado?.paraSubsidioDesempleo;
+            watchInfoCertificado?.paraSubsidioDesempleo ||
+            watchInfoCertificado?.dirigidoFondoPensiones;
           
           const isDisabled = !!debeDeshabilitar && !field.value;
           
@@ -539,8 +600,10 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
           }}/>
         )}
         <FormField control={control} name={"infoCertificado.adicionarActividades" as any} render={({ field }) => {
-          // Deshabilitar si una opción excluyente está seleccionada (excepto valorCompensaciones y otros)
+          // Deshabilitar si una opción excluyente está seleccionada (excepto otros)
+          // "Valor de compensaciones" y "Adicionar actividades" son mutuamente excluyentes
           const opcionExcluyenteSeleccionada = 
+            watchInfoCertificado?.valorCompensaciones ||
             watchInfoCertificado?.paraSubsidioVivienda ||
             watchInfoCertificado?.paraSubsidioDesempleo ||
             watchInfoCertificado?.dirigidoFondoPensiones ||
@@ -580,12 +643,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         )}
         <FormField control={control} name={"infoCertificado.otros" as any} render={({ field }) => {
           // Deshabilitar si otra opción del grupo excluyente está seleccionada
-          // "Valor de compensaciones" y "Adicionar actividades" NO son excluyentes con "Otros"
+          // "Valor de compensaciones" NO es excluyente con "Otros", pero "Adicionar actividades" SÍ lo es
           const otraOpcionSeleccionada = 
             watchInfoCertificado?.paraSubsidioVivienda ||
             watchInfoCertificado?.paraSubsidioDesempleo ||
             watchInfoCertificado?.dirigidoFondoPensiones ||
-            watchInfoCertificado?.dirigidoBancolombia;
+            watchInfoCertificado?.dirigidoBancolombia ||
+            watchInfoCertificado?.adicionarActividades;
           
           const isDisabled = !!otraOpcionSeleccionada && !field.value;
           

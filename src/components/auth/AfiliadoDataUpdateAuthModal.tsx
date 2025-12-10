@@ -15,7 +15,7 @@ interface AfiliadoDataUpdateAuthModalProps {
 }
 
 const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = ({ open, onClose, onSuccess }) => {
-  const { authenticateForDataUpdate, afiliado, isAuthenticated } = useAfiliadoAuth();
+  const { authenticateForDataUpdate, afiliado, isAuthenticated, fechaExpedicion } = useAfiliadoAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     tipoDocumento: 'CC',
@@ -24,15 +24,51 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
   });
 
   // Si el usuario ya está autenticado con el otro API, prediligenciar tipo y número de documento
+  // Si también tiene fecha de expedición guardada, usarla y autenticar automáticamente
   React.useEffect(() => {
     if (open) {
       if (isAuthenticated && afiliado) {
-        // Prediligenciar tipo y número de documento si ya está autenticado
-        setFormData({
-          tipoDocumento: afiliado.tipo_documento || 'CC',
-          numeroDocumento: afiliado.documento || '',
-          fechaExpedicion: '', // La fecha de expedición siempre se necesita
-        });
+        // Si tiene fecha de expedición guardada, autenticar automáticamente
+        if (fechaExpedicion) {
+          setLoading(true);
+          let cancelled = false;
+          
+          authenticateForDataUpdate(
+            afiliado.tipo_documento || '',
+            afiliado.documento || '',
+            fechaExpedicion
+          )
+            .then(() => {
+              if (!cancelled) {
+                setLoading(false);
+                onSuccess();
+              }
+            })
+            .catch((error) => {
+              if (!cancelled) {
+                console.warn('Autenticación automática falló, mostrando formulario:', error);
+                setLoading(false);
+                // Si falla, mostrar formulario con fecha prellenada
+                setFormData({
+                  tipoDocumento: afiliado.tipo_documento || 'CC',
+                  numeroDocumento: afiliado.documento || '',
+                  fechaExpedicion: fechaExpedicion, // Usar la fecha guardada
+                });
+              }
+            });
+          
+          // Cleanup: cancelar autenticación si el modal se cierra
+          return () => {
+            cancelled = true;
+          };
+        } else {
+          // Prediligenciar tipo y número de documento si ya está autenticado pero no tiene fecha
+          setFormData({
+            tipoDocumento: afiliado.tipo_documento || 'CC',
+            numeroDocumento: afiliado.documento || '',
+            fechaExpedicion: '', // La fecha de expedición se necesita
+          });
+        }
       } else {
         // Resetear formulario si no está autenticado
         setFormData({
@@ -42,7 +78,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
         });
       }
     }
-  }, [open, isAuthenticated, afiliado]);
+  }, [open, isAuthenticated, afiliado, fechaExpedicion, authenticateForDataUpdate, onSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +129,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
       setFormData({
         tipoDocumento: afiliado.tipo_documento || 'CC',
         numeroDocumento: afiliado.documento || '',
-        fechaExpedicion: '',
+        fechaExpedicion: fechaExpedicion || '', // Preservar fecha de expedición si existe
       });
     } else {
       setFormData({
@@ -137,16 +173,24 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
           <div className="h-px bg-gray-200 mt-4"></div>
         </DialogHeader>
         
+        {loading && isAuthenticated && afiliado && fechaExpedicion ? (
+          <div className="px-6 pb-6 pt-4 flex flex-col items-center justify-center py-8">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary-prosalud-dark border-r-transparent mb-4"></div>
+            <p className="text-gray-600 text-base">Autenticando automáticamente...</p>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="px-6 pb-6 pt-4">
           <div className="space-y-5">
             {isAuthenticated && afiliado ? (
               // Si ya está autenticado, mostrar información y solo pedir fecha de expedición
               <>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-blue-800">
-                    Ya estás autenticado. Solo necesitamos tu fecha de expedición para continuar.
-                  </p>
-                </div>
+                {!fechaExpedicion && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ya estás autenticado. Solo necesitamos tu fecha de expedición para continuar.
+                    </p>
+                  </div>
+                )}
                 
                 <div className="space-y-3 bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center gap-2">
@@ -274,6 +318,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
