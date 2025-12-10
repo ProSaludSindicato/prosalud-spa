@@ -55,7 +55,7 @@ export const adminExcelFilesService = {
     
     // If the file doesn't have the correct MIME type, create a new File with the correct type
     // We read the file as an ArrayBuffer to preserve the exact content
-    if (!file.type || file.type !== correctMimeType || file.type === 'application/zip') {
+    if (!file.type || file.type !== correctMimeType || file.type === 'application/zip' as string) {
       // Read the file content as ArrayBuffer to preserve it exactly
       const arrayBuffer = await file.arrayBuffer();
       // Create a new Blob with the correct MIME type

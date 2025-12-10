@@ -173,8 +173,11 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
         // Refrescar la lista para obtener URLs actualizadas
         refetchListado();
       } else {
+        const errorMessage = response.success === false 
+          ? (response as { success: false; message: string }).message 
+          : 'No se pudo generar el enlace al PDF.';
         toast.error('Error al obtener el certificado', {
-          description: response.success ? 'No se pudo generar el enlace al PDF.' : response.message,
+          description: errorMessage,
         });
       }
     } catch (error: any) {
@@ -609,7 +612,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{listadoData.message}</AlertDescription>
+                  <AlertDescription>{(listadoData as { success: false; message: string }).message}</AlertDescription>
                 </Alert>
               ) : null}
             </CardContent>

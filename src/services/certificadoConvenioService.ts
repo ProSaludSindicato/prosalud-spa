@@ -72,8 +72,9 @@ export async function consultarCertificado(
       });
       return response.data as ConsultarCertificadoResponse;
     } else {
+      const errorData = response.data as ConsultarCertificadoError;
       logger.warn('Certificado no encontrado', {
-        message: response.data.message,
+        message: errorData.message,
       });
       return response.data as ConsultarCertificadoError;
     }
@@ -203,10 +204,11 @@ export async function listarCertificados(
       });
       return response.data as ListarCertificadosResponse;
     } else {
+      const errorData = response.data as ListarCertificadosError;
       logger.warn('Error al listar certificados', {
-        message: response.data.message,
+        message: errorData.message,
       });
-      return response.data as ListarCertificadosError;
+      return errorData;
     }
   } catch (error: any) {
     logger.error('Error al listar certificados', {
