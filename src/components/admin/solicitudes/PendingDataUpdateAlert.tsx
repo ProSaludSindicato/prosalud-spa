@@ -28,9 +28,16 @@ export const PendingDataUpdateAlert: React.FC<PendingDataUpdateAlertProps> = ({
 
   const payload = pendingUpdate.payload || {};
   // El correo puede estar en 'correo', 'nuevoEmail' o 'nuevo_email'
-  const nuevoEmail = payload.correo || payload.nuevoEmail || payload.nuevo_email;
+  const nuevoEmailRaw = payload.correo || payload.nuevoEmail || payload.nuevo_email;
+  // Si no hay correo nuevo, usar el correo actual de la solicitud (no hay cambio)
+  const nuevoEmail = nuevoEmailRaw && nuevoEmailRaw.trim() !== '' ? nuevoEmailRaw : pendingUpdate.email;
+  const hayCambioCorreo = nuevoEmailRaw && nuevoEmailRaw.trim() !== '' && nuevoEmailRaw !== pendingUpdate.email;
+  
   // El teléfono puede estar en 'celular', 'nuevoTelefono' o 'nuevo_telefono'
-  const nuevoTelefono = payload.celular || payload.nuevoTelefono || payload.nuevo_telefono;
+  const nuevoTelefonoRaw = payload.celular || payload.nuevoTelefono || payload.nuevo_telefono;
+  // Si no hay teléfono nuevo, usar el teléfono actual de la solicitud (no hay cambio)
+  const nuevoTelefono = nuevoTelefonoRaw && nuevoTelefonoRaw.trim() !== '' ? nuevoTelefonoRaw : pendingUpdate.phone_number;
+  const hayCambioTelefono = nuevoTelefonoRaw && nuevoTelefonoRaw.trim() !== '' && nuevoTelefonoRaw !== pendingUpdate.phone_number;
 
   const handleViewUpdate = () => {
     if (onViewUpdate) {
@@ -72,7 +79,8 @@ export const PendingDataUpdateAlert: React.FC<PendingDataUpdateAlertProps> = ({
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 <span>
-                  <strong>Nuevo correo:</strong> {nuevoEmail}
+                  <strong>{hayCambioCorreo ? 'Nuevo correo:' : 'Correo actual:'}</strong> {nuevoEmail}
+                  {!hayCambioCorreo && <span className="text-xs text-gray-600 ml-1">(sin cambios)</span>}
                 </span>
               </div>
             )}
@@ -80,7 +88,8 @@ export const PendingDataUpdateAlert: React.FC<PendingDataUpdateAlertProps> = ({
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 <span>
-                  <strong>Nuevo teléfono:</strong> {nuevoTelefono}
+                  <strong>{hayCambioTelefono ? 'Nuevo teléfono:' : 'Teléfono actual:'}</strong> {nuevoTelefono}
+                  {!hayCambioTelefono && <span className="text-xs text-gray-600 ml-1">(sin cambios)</span>}
                 </span>
               </div>
             )}

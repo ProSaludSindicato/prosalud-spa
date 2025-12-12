@@ -614,8 +614,10 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
         id_number: afiliado.documento || '',
         name: afiliado.nombres || '',
         last_name: afiliado.apellidos || '',
-        email: data.correo || afiliado.correo_personal || '',
-        phone_number: data.celular || afiliado.celular || '',
+        // Usar siempre los valores actuales del afiliado, no los nuevos del formulario
+        // Los nuevos valores solo van en el payload
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
         payload,
         files,
         ...(recaptchaToken && { recaptcha_token: recaptchaToken })

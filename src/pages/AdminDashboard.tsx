@@ -1,6 +1,7 @@
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Users, GraduationCap, Heart, BarChart3, Settings, Upload, Download, CheckCircle2,
@@ -86,6 +87,7 @@ const dashboardUploadConfigs: Record<DashboardUploadType, DashboardUploadConfig>
 const AdminDashboard: React.FC = () => {
   const { can } = usePermissions();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showUserModal, setShowUserModal] = useState(false);
   const [showUploadConfirmDialog, setShowUploadConfirmDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -94,6 +96,60 @@ const AdminDashboard: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingType, setUploadingType] = useState<AdminExcelFileType | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const hasProcessedUploadParam = useRef(false);
+
+  const handleUploadButtonClick = (type: DashboardUploadType) => {
+    if (isUploading) return;
+
+    if (selectedFileUrl) {
+      URL.revokeObjectURL(selectedFileUrl);
+      setSelectedFileUrl(null);
+    }
+    setSelectedFile(null);
+    setUploadContext(type);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    fileInputRef.current?.click();
+  };
+
+  // Verificar si hay un parámetro de URL para abrir el diálogo de carga
+  useEffect(() => {
+    const uploadParam = searchParams.get('upload');
+    
+    // Solo procesar si hay parámetro, tenemos permisos, no estamos subiendo, y no lo hemos procesado ya
+    if (uploadParam === 'afiliados' && can(FILE_PERMISSIONS.afiliados) && !isUploading && !hasProcessedUploadParam.current) {
+      // Marcar como procesado INMEDIATAMENTE para evitar ejecuciones múltiples
+      hasProcessedUploadParam.current = true;
+      
+      // Remover el parámetro de la URL primero
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('upload');
+      setSearchParams(newSearchParams, { replace: true });
+      
+      // Abrir el diálogo de carga después de un pequeño delay
+      // Usar una función que no dependa del estado para evitar re-ejecuciones
+      const timer = setTimeout(() => {
+        if (fileInputRef.current && !isUploading) {
+          setUploadContext('afiliados');
+          fileInputRef.current.value = '';
+          fileInputRef.current.click();
+        }
+      }, 300);
+      
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+    
+    // Resetear el flag cuando el parámetro ya no está presente y no estamos en proceso de carga
+    if (!searchParams.get('upload') && !isUploading && uploadContext !== 'afiliados') {
+      hasProcessedUploadParam.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, can, isUploading, uploadContext]);
   
   // Fetch real data from various modules
   const { data: usersData, isLoading: loadingUsers } = useQuery({
@@ -359,23 +415,6 @@ const AdminDashboard: React.FC = () => {
     if (!open && !isUploading) {
       resetFileInput();
     }
-  };
-
-  const handleUploadButtonClick = (type: DashboardUploadType) => {
-    if (isUploading) return;
-
-    if (selectedFileUrl) {
-      URL.revokeObjectURL(selectedFileUrl);
-      setSelectedFileUrl(null);
-    }
-    setSelectedFile(null);
-    setUploadContext(type);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-
-    fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

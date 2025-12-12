@@ -62,6 +62,8 @@ import { parentescos } from '@/components/actualizar-datos-personales/formOption
 import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
 import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpdates";
 import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
+import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/UpdateAfiliadosReminderDialog";
+import { useNavigate } from "react-router-dom";
 
 // Helper function to convert ApiRequest to Request
 const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
@@ -252,6 +254,7 @@ const requiresManualCompensaciones = (solicitud: Request): boolean => {
 const AdminSolicitudesPage: React.FC = () => {
   const { can } = usePermissions();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSolicitud, setSelectedSolicitud] = useState<Request | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -270,6 +273,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [requiresFondoPensionesAnnex, setRequiresFondoPensionesAnnex] = useState(false);
   const [requiresActividadesForm, setRequiresActividadesForm] = useState(false);
   const [isTransitioningRequest, setIsTransitioningRequest] = useState(false);
+  const [showUpdateAfiliadosReminder, setShowUpdateAfiliadosReminder] = useState(false);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -583,7 +587,21 @@ const AdminSolicitudesPage: React.FC = () => {
     }
     const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
     
-    if (needsCompensaciones) {
+    // Mensaje predefinido para solicitudes de actualización de datos personales
+    if (solicitud.request_type === 'actualizar-datos-personales') {
+      const emailSubject = `Actualización de Datos Personales - Solicitud #${solicitud.id}`;
+      const emailBody = `Su solicitud ha sido procesada y los datos han sido actualizados en nuestro sistema.\n`
+      
+      responseForm.reset({
+        newStatus: defaultStatus,
+        emailSubject,
+        emailBody,
+        afp: "",
+        actividades: undefined,
+        attachments: undefined,
+      });
+      responseForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
+    } else if (needsCompensaciones) {
       // Generar sugerencias de texto según el tipo de certificado
       const payload = solicitud.payload || {};
       let infoCertificado = payload.infoCertificado || {};
@@ -711,14 +729,36 @@ const AdminSolicitudesPage: React.FC = () => {
       // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
       const correoActual = solicitudToRespond.email;
       // El correo solicitado es el que está en el payload de la solicitud de actualización
-      const correoSolicitado = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email || 'N/A';
+      const correoSolicitadoRaw = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email;
+      // Si no hay correo solicitado, usar el correo actual (no hay cambio)
+      const correoSolicitado = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' ? correoSolicitadoRaw : correoActual;
+      const hayCambioCorreo = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' && correoSolicitadoRaw !== correoActual;
       
-      const confirmed = window.confirm(
-        `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-        `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
-        `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
-        `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`
-      );
+      // Si se va a aprobar (resolved) una solicitud de actualización de datos personales,
+      // el correo de envío será el nuevo correo (o el actual si no hay cambio)
+      const isAprobandoActualizacion = solicitudToRespond.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
+      const correoEnvio = isAprobandoActualizacion ? correoSolicitado : correoActual;
+      
+      const mensaje = isAprobandoActualizacion
+        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+          (hayCambioCorreo
+            ? `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
+              `ya que los datos serán actualizados en el sistema.\n\n` +
+              `Correo actual en sistema: ${correoActual}\n` +
+              `Nuevo correo solicitado: ${correoSolicitado}\n\n`
+            : `Al aprobar esta solicitud de actualización, el correo se enviará al correo actual (${correoActual}), ` +
+              `ya que no hay cambios en el correo electrónico.\n\n` +
+              `Correo actual en sistema: ${correoActual}\n\n`) +
+          `¿Desea continuar con la aprobación?`
+        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+          (hayCambioCorreo
+            ? `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+              `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n`
+            : `Si responde ahora, el correo se enviará al correo actual (${correoActual}). ` +
+              `No hay cambios en el correo electrónico en la solicitud de actualización pendiente.\n\n`) +
+          `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`;
+      
+      const confirmed = window.confirm(mensaje);
       
       if (!confirmed) {
         return; // El usuario canceló, no enviar la respuesta
@@ -784,6 +824,9 @@ const AdminSolicitudesPage: React.FC = () => {
       // Resetear estado
       setIsSubmittingResponse(false);
 
+      // Verificar si se completó una solicitud de actualización de datos personales
+      const isActualizacionCompletada = solicitudToRespond?.request_type === 'actualizar-datos-personales' && finalStatus === 'resolved';
+
       // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
       toast.success("Respuesta enviada exitosamente", {
         description: `La respuesta a la solicitud #${solicitudId} ha sido enviada exitosamente al afiliado.`,
@@ -801,6 +844,14 @@ const AdminSolicitudesPage: React.FC = () => {
       // Refrescar actualizaciones pendientes si se procesó una actualización de datos
       if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
         refetchPendingUpdates();
+      }
+
+      // Mostrar recordatorio para actualizar afiliados si se completó una actualización de datos
+      if (isActualizacionCompletada) {
+        // Mostrar el diálogo de recordatorio después de un pequeño delay
+        setTimeout(() => {
+          setShowUpdateAfiliadosReminder(true);
+        }, 1000);
       }
       
       // Actualizar la solicitud seleccionada con los datos más recientes del servidor
@@ -922,14 +973,36 @@ const AdminSolicitudesPage: React.FC = () => {
       // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
       const correoActual = solicitudToRespond.email;
       // El correo solicitado es el que está en el payload de la solicitud de actualización
-      const correoSolicitado = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email || 'N/A';
+      const correoSolicitadoRaw = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email;
+      // Si no hay correo solicitado, usar el correo actual (no hay cambio)
+      const correoSolicitado = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' ? correoSolicitadoRaw : correoActual;
+      const hayCambioCorreo = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' && correoSolicitadoRaw !== correoActual;
       
-      const confirmed = window.confirm(
-        `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-        `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
-        `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
-        `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`
-      );
+      // Si se va a aprobar (resolved) una solicitud de actualización de datos personales,
+      // el correo de envío será el nuevo correo (o el actual si no hay cambio)
+      const isAprobandoActualizacion = solicitudToRespond.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
+      const correoEnvio = isAprobandoActualizacion ? correoSolicitado : correoActual;
+      
+      const mensaje = isAprobandoActualizacion
+        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+          (hayCambioCorreo
+            ? `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
+              `ya que los datos serán actualizados en el sistema.\n\n` +
+              `Correo actual en sistema: ${correoActual}\n` +
+              `Nuevo correo solicitado: ${correoSolicitado}\n\n`
+            : `Al aprobar esta solicitud de actualización, el correo se enviará al correo actual (${correoActual}), ` +
+              `ya que no hay cambios en el correo electrónico.\n\n` +
+              `Correo actual en sistema: ${correoActual}\n\n`) +
+          `¿Desea continuar con la aprobación?`
+        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+          (hayCambioCorreo
+            ? `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+              `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n`
+            : `Si responde ahora, el correo se enviará al correo actual (${correoActual}). ` +
+              `No hay cambios en el correo electrónico en la solicitud de actualización pendiente.\n\n`) +
+          `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`;
+      
+      const confirmed = window.confirm(mensaje);
       
       if (!confirmed) {
         return; // El usuario canceló, no enviar la respuesta
@@ -952,6 +1025,9 @@ const AdminSolicitudesPage: React.FC = () => {
       // Resetear estado
       setIsSubmittingResponse(false);
 
+      // Verificar si se completó una solicitud de actualización de datos personales
+      const isActualizacionCompletada = solicitudToRespond?.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
+
       // Calcular Total Ingresos para el mensaje
       const t_ingresos = data.t_basicos + data.t_auxilios;
 
@@ -972,6 +1048,14 @@ const AdminSolicitudesPage: React.FC = () => {
       // Refrescar actualizaciones pendientes si se procesó una actualización de datos
       if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
         refetchPendingUpdates();
+      }
+
+      // Mostrar recordatorio para actualizar afiliados si se completó una actualización de datos
+      if (isActualizacionCompletada) {
+        // Mostrar el diálogo de recordatorio después de un pequeño delay
+        setTimeout(() => {
+          setShowUpdateAfiliadosReminder(true);
+        }, 1000);
       }
       
       // Actualizar la solicitud seleccionada con los datos más recientes del servidor
@@ -3215,6 +3299,16 @@ const AdminSolicitudesPage: React.FC = () => {
               onOpenChange={setVerificarCertificadoOpen}
             />
           )}
+
+          {/* Diálogo de recordatorio para actualizar afiliados */}
+          <UpdateAfiliadosReminderDialog
+            open={showUpdateAfiliadosReminder}
+            onOpenChange={setShowUpdateAfiliadosReminder}
+            onUploadClick={() => {
+              // Navegar al dashboard con parámetro para abrir el diálogo de carga automáticamente
+              navigate('/admin?upload=afiliados');
+            }}
+          />
         </motion.div>
       </div>
     </AdminLayout>
