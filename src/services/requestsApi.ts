@@ -173,7 +173,6 @@ export const requestsApiService = {
       email_body: string;
       attachments?: FileList;
       actividades?: string[];
-      afp?: string;
     }
   ): Promise<ApiRequest> {
     try {
@@ -182,17 +181,12 @@ export const requestsApiService = {
         throw new Error('ID inválido - debe ser un string de 10 dígitos');
       }
 
-      // Si hay archivos adjuntos, actividades o AFP, usar FormData
-      if ((data.attachments && data.attachments.length > 0) || (data.actividades && data.actividades.length > 0) || data.afp) {
+      // Si hay archivos adjuntos o actividades, usar FormData
+      if ((data.attachments && data.attachments.length > 0) || (data.actividades && data.actividades.length > 0)) {
         const formData = new FormData();
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
-        
-        // Agregar AFP si está presente
-        if (data.afp && data.afp.trim() !== '') {
-          formData.append('afp', data.afp.trim());
-        }
         
         // Agregar archivos como attachments[0], attachments[1], etc.
         if (data.attachments && data.attachments.length > 0) {
@@ -238,17 +232,12 @@ export const requestsApiService = {
 
         return response.data.data;
       } else {
-        // Sin archivos, usar JSON o FormData si hay actividades o AFP
-        if ((data.actividades && data.actividades.length > 0) || data.afp) {
+        // Sin archivos, usar JSON o FormData si hay actividades
+        if (data.actividades && data.actividades.length > 0) {
           const formData = new FormData();
           formData.append('status', data.status);
           formData.append('email_subject', data.email_subject);
           formData.append('email_body', data.email_body);
-          
-          // Agregar AFP si está presente
-          if (data.afp && data.afp.trim() !== '') {
-            formData.append('afp', data.afp.trim());
-          }
           
           // Agregar actividades
           if (data.actividades && data.actividades.length > 0) {
@@ -287,14 +276,13 @@ export const requestsApiService = {
           return response.data.data;
         }
         
-        // Sin archivos ni actividades ni AFP, usar JSON
+        // Sin archivos ni actividades, usar JSON
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond`,
           {
             status: data.status,
             email_subject: data.email_subject,
             email_body: data.email_body,
-            ...(data.afp && data.afp.trim() !== '' ? { afp: data.afp.trim() } : {}),
           },
           {
             timeout: 120000, // 120 segundos - proceso puede ser largo al generar documentos y enviar emails

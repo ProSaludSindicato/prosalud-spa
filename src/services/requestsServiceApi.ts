@@ -128,7 +128,6 @@ export const requestsService = {
       emailBody: string;
       attachments?: FileList;
       actividades?: string[];
-      afp?: string;
     }
   ): Promise<Request> {
     // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
@@ -143,7 +142,6 @@ export const requestsService = {
       email_body: data.emailBody,
       attachments: data.attachments,
       actividades: data.actividades,
-      afp: data.afp,
     });
     
     return mapApiRequestToFrontendRequest(updatedApiRequest);

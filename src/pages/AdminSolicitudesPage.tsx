@@ -122,7 +122,6 @@ const responseFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
-  afp: z.string().trim().max(100, "El nombre del fondo no puede exceder 100 caracteres").optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -293,7 +292,6 @@ const AdminSolicitudesPage: React.FC = () => {
       newStatus: "in_progress",
       emailSubject: "",
       emailBody: "",
-      afp: "",
       actividades: [],
       attachments: undefined,
     },
@@ -596,7 +594,6 @@ const AdminSolicitudesPage: React.FC = () => {
         newStatus: defaultStatus,
         emailSubject,
         emailBody,
-        afp: "",
         actividades: undefined,
         attachments: undefined,
       });
@@ -661,16 +658,8 @@ const AdminSolicitudesPage: React.FC = () => {
       if (isFondoPensiones) {
         emailSubject = `Certificado de Convenio - Fondo de Pensiones - Solicitud #${solicitud.id}`;
         
-        // Obtener AFP si está disponible en el payload
-        const payload = solicitud.payload || {};
-        const afpValue = payload.afp || "";
-        
         emailBody = "Adjunto encontrará su certificado de convenio dirigido al fondo de pensiones en formato PDF.\n\n";
         emailBody += "Este certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio para corrección de historia.";
-        
-        if (afpValue && afpValue.trim() !== "") {
-          emailBody += `\n\nFondo de Pensiones: ${afpValue}`;
-        }
         
         // Agregar fecha de generación
         const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
@@ -699,7 +688,6 @@ const AdminSolicitudesPage: React.FC = () => {
         newStatus: defaultStatus,
         emailSubject,
         emailBody,
-        afp: "",
         actividades: needsActividades ? [] : undefined,
         attachments: undefined,
       });
@@ -801,24 +789,14 @@ const AdminSolicitudesPage: React.FC = () => {
     }
     
     try {
-      // Incluir AFP en el cuerpo si se proporcionó
-      const trimmedAfp = data.afp?.trim();
-      let finalEmailBody = data.emailBody;
-      
-      if (trimmedAfp) {
-        finalEmailBody = `${finalEmailBody}\n\nAFP: ${trimmedAfp}`;
-      }
-
       // Enviar respuesta usando la API del backend
       // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
-      // El AFP también se envía en FormData si está presente
       const updatedRequest = await requestsService.sendResponse(solicitudId, {
         newStatus: finalStatus,
         emailSubject: data.emailSubject,
-        emailBody: finalEmailBody,
+        emailBody: data.emailBody,
         attachments: data.attachments,
         actividades: requiresActividadesForm ? (data.actividades || []) : undefined,
-        afp: data.afp && data.afp.trim() !== '' ? data.afp.trim() : undefined,
       });
 
       // Resetear estado
@@ -907,13 +885,7 @@ const AdminSolicitudesPage: React.FC = () => {
             const firstMessage = messageArray[0] || '';
             
             // Mapear campos del backend a campos del formulario
-            if (field === 'afp') {
-              responseForm.setError('afp', { 
-                type: 'server', 
-                message: firstMessage 
-              });
-              hasFieldErrors = true;
-            } else if (field === 'attachments' || field === 'files') {
+            if (field === 'attachments' || field === 'files') {
               responseForm.setError('attachments', { 
                 type: 'server', 
                 message: firstMessage 
@@ -2928,34 +2900,6 @@ const AdminSolicitudesPage: React.FC = () => {
                           Es requerido adjuntar las planillas de pagos de seguridad social para certificados dirigidos a fondo de pensiones.
                         </AlertDescription>
                       </Alert>
-                    )}
-
-                    {requiresFondoPensionesAnnex && (
-                      <FormField
-                        control={responseForm.control}
-                        name="afp"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              AFP {requiresFondoPensionesAnnex ? '(requerido si no está en el sistema)' : '(opcional)'}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Ej: Porvenir, Colfondos, Protección..."
-                                {...field}
-                                className={responseForm.formState.errors.afp ? 'border-red-500' : ''}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              {requiresFondoPensionesAnnex 
-                                ? 'El campo AFP es requerido. No se encontró en el Excel del afiliado y debe ser proporcionado en la solicitud.'
-                                : 'Indique el fondo de pensiones si aplica o es NINGUNO en ProSanet'
-                              }
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     )}
 
                     {requiresActividadesForm && (
