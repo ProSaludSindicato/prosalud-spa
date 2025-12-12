@@ -55,10 +55,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { requestsService } from "@/services/requestsServiceApi";
 import { Request } from "@/types/requests";
+import { ApiRequest } from "@/services/requestsApi";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
 import { parentescos } from '@/components/actualizar-datos-personales/formOptions';
 import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
+import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpdates";
+import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
+
+// Helper function to convert ApiRequest to Request
+const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
+  const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
+    switch (apiStatus) {
+      case 'PENDING':
+        return 'pending';
+      case 'IN_REVIEW':
+        return 'in_progress';
+      case 'REJECTED':
+        return 'rejected';
+      case 'COMPLETED':
+        return 'resolved';
+      default:
+        return 'pending';
+    }
+  };
+
+  return {
+    id: apiRequest.id?.toString() || '',
+    request_type: apiRequest.request_type as Request['request_type'],
+    id_type: apiRequest.document_type as Request['id_type'],
+    id_number: apiRequest.document_number || '',
+    name: apiRequest.name || '',
+    last_name: apiRequest.last_name || '',
+    email: apiRequest.email || '',
+    phone_number: apiRequest.phone_number || '',
+    payload: apiRequest.payload || {},
+    status: mapApiStatusToFrontendStatus(apiRequest.status),
+    created_at: apiRequest.created_at || '',
+    processed_at: apiRequest.processed_at,
+    resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
+      ? apiRequest.processed_at 
+      : undefined,
+    responses: [],
+    responses_count: apiRequest.responses_count ?? 0,
+    files: undefined,
+    files_count: apiRequest.files_count,
+  };
+};
 
 // Schema para el formulario de respuesta
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
@@ -226,7 +269,18 @@ const AdminSolicitudesPage: React.FC = () => {
   const [useCompensacionesForm, setUseCompensacionesForm] = useState(false);
   const [requiresFondoPensionesAnnex, setRequiresFondoPensionesAnnex] = useState(false);
   const [requiresActividadesForm, setRequiresActividadesForm] = useState(false);
+  const [isTransitioningRequest, setIsTransitioningRequest] = useState(false);
 
+  // Hook para gestionar actualizaciones pendientes de datos personales
+  const {
+    pendingUpdates,
+    hasPendingUpdate,
+    getPendingUpdate,
+    refetch: refetchPendingUpdates,
+  } = usePendingPersonalDataUpdates({
+    enabled: true,
+    refetchInterval: 120000, // Refrescar cada 2 minutos
+  });
 
   // Form para la respuesta normal
   const responseForm = useForm<ResponseFormValues>({
@@ -272,6 +326,8 @@ const AdminSolicitudesPage: React.FC = () => {
       const solicitud = allSolicitudes.find(s => s.id === viewId);
       if (solicitud) {
         setSelectedSolicitud(solicitud);
+        // Scroll al inicio para asegurar que el modal sea visible
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         // Remove the view parameter from URL
         const newSearchParams = new URLSearchParams(searchParams);
         newSearchParams.delete('view');
@@ -279,6 +335,25 @@ const AdminSolicitudesPage: React.FC = () => {
       }
     }
   }, [searchParams, allSolicitudes, setSearchParams]);
+
+  // Efecto para asegurar que el modal esté visible cuando se selecciona una solicitud
+  useEffect(() => {
+    if (selectedSolicitud) {
+      // Pequeño delay para asegurar que el modal se haya renderizado
+      const timer = setTimeout(() => {
+        // Scroll de la página al inicio si es necesario
+        if (window.scrollY > 100) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        // Asegurar que el diálogo esté visible
+        const dialog = document.querySelector('[role="dialog"]');
+        if (dialog) {
+          dialog.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedSolicitud]);
 
   // El backend ya filtra las solicitudes según las asignaciones del usuario
   // No es necesario filtrar en el frontend
@@ -426,9 +501,45 @@ const AdminSolicitudesPage: React.FC = () => {
       id: solicitud.id,
       estado: solicitud.status,
     });
-    setSelectedSolicitud(solicitud);
-    // Resetear campos expandidos al abrir una nueva solicitud
-    setExpandedFields({});
+    
+    // Si ya hay una solicitud seleccionada y es diferente, mostrar transición
+    if (selectedSolicitud && selectedSolicitud.id !== solicitud.id) {
+      setIsTransitioningRequest(true);
+      // Cerrar el diálogo actual primero
+      setSelectedSolicitud(null);
+      setExpandedFields({});
+      
+      // Después de un breve delay, abrir la nueva solicitud con animación
+      setTimeout(() => {
+        setSelectedSolicitud(solicitud);
+        // Scroll de la página al inicio para asegurar que el modal sea visible
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Resetear transición después de que el modal se haya renderizado
+        setTimeout(() => {
+          setIsTransitioningRequest(false);
+          // Scroll suave al inicio del contenido del diálogo
+          setTimeout(() => {
+            const dialogContent = document.querySelector('[role="dialog"] [class*="overflow-y-auto"]');
+            if (dialogContent) {
+              dialogContent.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }, 50);
+        }, 200);
+      }, 300);
+    } else {
+      // Si no hay solicitud seleccionada o es la misma, abrir directamente
+      setSelectedSolicitud(solicitud);
+      setExpandedFields({});
+      // Scroll de la página al inicio para asegurar que el modal sea visible
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Scroll al inicio del contenido del diálogo después de que se renderice
+      setTimeout(() => {
+        const dialogContent = document.querySelector('[role="dialog"] [class*="overflow-y-auto"]');
+        if (dialogContent) {
+          dialogContent.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
+    }
   };
 
   const handleOpenResponseDialog = (solicitud: Request) => {
@@ -594,6 +705,26 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleSubmitResponse = async (data: ResponseFormValues) => {
     if (!solicitudToRespond) return;
 
+    // Verificar si hay actualización pendiente antes de responder
+    const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
+    if (pendingUpdate) {
+      // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
+      const correoActual = solicitudToRespond.email;
+      // El correo solicitado es el que está en el payload de la solicitud de actualización
+      const correoSolicitado = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email || 'N/A';
+      
+      const confirmed = window.confirm(
+        `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+        `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+        `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
+        `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`
+      );
+      
+      if (!confirmed) {
+        return; // El usuario canceló, no enviar la respuesta
+      }
+    }
+
     if (requiresFondoPensionesAnnex) {
       const hasFiles = data.attachments && (data.attachments as FileList).length > 0;
       if (!hasFiles) {
@@ -666,6 +797,11 @@ const AdminSolicitudesPage: React.FC = () => {
       
       // Refetch para actualizar la lista primero
       const refetchResult = await refetch();
+      
+      // Refrescar actualizaciones pendientes si se procesó una actualización de datos
+      if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
+        refetchPendingUpdates();
+      }
       
       // Actualizar la solicitud seleccionada con los datos más recientes del servidor
       // Esto asegura que tenemos la información completa incluyendo archivos y respuestas actualizadas
@@ -780,6 +916,26 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleSubmitResponseWithCompensaciones = async (data: ResponseWithCompensacionesFormValues) => {
     if (!solicitudToRespond) return;
 
+    // Verificar si hay actualización pendiente antes de responder
+    const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
+    if (pendingUpdate) {
+      // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
+      const correoActual = solicitudToRespond.email;
+      // El correo solicitado es el que está en el payload de la solicitud de actualización
+      const correoSolicitado = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email || 'N/A';
+      
+      const confirmed = window.confirm(
+        `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
+        `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+        `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
+        `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`
+      );
+      
+      if (!confirmed) {
+        return; // El usuario canceló, no enviar la respuesta
+      }
+    }
+
     setIsSubmittingResponse(true);
     const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
     try {
@@ -812,6 +968,11 @@ const AdminSolicitudesPage: React.FC = () => {
       
       // Refetch para actualizar la lista primero
       const refetchResult = await refetch();
+      
+      // Refrescar actualizaciones pendientes si se procesó una actualización de datos
+      if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
+        refetchPendingUpdates();
+      }
       
       // Actualizar la solicitud seleccionada con los datos más recientes del servidor
       if (selectedSolicitud?.id === solicitudId) {
@@ -1222,10 +1383,27 @@ const AdminSolicitudesPage: React.FC = () => {
                                   <div className="bg-gray-100 p-2 rounded-full">
                                     <User className="h-4 w-4 text-gray-600" />
                                   </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900">
-                                      {solicitud.name} {solicitud.last_name}
-                                    </p>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-medium text-gray-900">
+                                        {solicitud.name} {solicitud.last_name}
+                                      </p>
+                                      {hasPendingUpdate(solicitud.id_number) &&
+                                       solicitud.status !== 'resolved' &&
+                                       solicitud.status !== 'rejected' &&
+                                       solicitud.request_type !== 'actualizar-datos-personales' && (
+                                        <PendingDataUpdateBadge
+                                          hasPendingUpdate={true}
+                                          onClick={() => {
+                                            const pendingUpdate = getPendingUpdate(solicitud.id_number);
+                                            if (pendingUpdate) {
+                                              const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                                              handleViewDetails(convertedRequest);
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                    </div>
                                     <p className="text-sm text-gray-600">{solicitud.email}</p>
                                     <p className="text-xs text-gray-500">
                                       {solicitud.id_type}: {solicitud.id_number}
@@ -1380,11 +1558,24 @@ const AdminSolicitudesPage: React.FC = () => {
           {/* Request Details Dialog */}
           {selectedSolicitud && (
             <Dialog open={!!selectedSolicitud} onOpenChange={() => {
-              setSelectedSolicitud(null);
-              // Resetear campos expandidos al cerrar el diálogo
-              setExpandedFields({});
+              if (!isTransitioningRequest) {
+                setSelectedSolicitud(null);
+                setIsTransitioningRequest(false);
+                // Resetear campos expandidos al cerrar el diálogo
+                setExpandedFields({});
+              }
             }}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white relative">
+                {isTransitioningRequest && (
+                  <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 text-primary-prosalud animate-spin" />
+                      <p className="text-sm text-gray-700 font-medium">
+                        Cargando solicitud de actualización...
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <DialogTitle className="sr-only">
                   Detalles de Solicitud #{selectedSolicitud.id}
                 </DialogTitle>
@@ -1404,6 +1595,27 @@ const AdminSolicitudesPage: React.FC = () => {
                   </div>
 
                   <div className="p-6 space-y-6">
+                    {/* Alerta de actualización pendiente */}
+                    {selectedSolicitud && 
+                     hasPendingUpdate(selectedSolicitud.id_number) &&
+                     selectedSolicitud.status !== 'resolved' &&
+                     selectedSolicitud.status !== 'rejected' &&
+                     selectedSolicitud.request_type !== 'actualizar-datos-personales' && (
+                      <PendingDataUpdateAlert
+                        pendingUpdate={getPendingUpdate(selectedSolicitud.id_number)!}
+                        documentNumber={selectedSolicitud.id_number}
+                        onViewUpdate={() => {
+                          const pendingUpdate = getPendingUpdate(selectedSolicitud.id_number);
+                          if (pendingUpdate) {
+                            const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                            handleViewDetails(convertedRequest);
+                          }
+                        }}
+                        variant="warning"
+                      />
+                    )}
+                    
+
                     {/* Información del Solicitante */}
                     <Card className="border border-gray-200 shadow-sm">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
@@ -1965,6 +2177,27 @@ const AdminSolicitudesPage: React.FC = () => {
                   }
                 </DialogDescription>
               </DialogHeader>
+
+              {/* Alerta de actualización pendiente */}
+              {solicitudToRespond && 
+               hasPendingUpdate(solicitudToRespond.id_number) &&
+               solicitudToRespond.status !== 'resolved' &&
+               solicitudToRespond.status !== 'rejected' &&
+               solicitudToRespond.request_type !== 'actualizar-datos-personales' && (
+                <PendingDataUpdateAlert
+                  pendingUpdate={getPendingUpdate(solicitudToRespond.id_number)!}
+                  documentNumber={solicitudToRespond.id_number}
+                  onViewUpdate={() => {
+                    const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
+                    if (pendingUpdate) {
+                      const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                      handleCloseResponseDialog();
+                      handleViewDetails(convertedRequest);
+                    }
+                  }}
+                  variant="warning"
+                />
+              )}
 
               {useCompensacionesForm ? (
                 <Form {...responseWithCompensacionesForm}>

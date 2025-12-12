@@ -567,4 +567,20 @@ export const requestsApiService = {
       throw error;
     }
   },
+
+  // Get pending personal data update requests
+  async getPendingPersonalDataUpdates(): Promise<ApiRequest[]> {
+    try {
+      const response = await requestsApi.get<ApiResponse<ApiRequest[]>>("/api/requests/pending-personal-data-updates");
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Error al obtener solicitudes pendientes de actualización");
+      }
+
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
 };
