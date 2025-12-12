@@ -1,8 +1,8 @@
 export const API_CONFIG = {
-  PUBLIC_BASE_URL: import.meta.env.VITE_PUBLIC_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://prosalud.laravel.cloud',
-  ADMIN_BASE_URL: import.meta.env.VITE_ADMIN_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://prosalud.laravel.cloud',
+  PUBLIC_BASE_URL: import.meta.env.VITE_PUBLIC_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
+  ADMIN_BASE_URL: import.meta.env.VITE_ADMIN_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
 
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://prosalud.laravel.cloud',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
   // BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://prosalud.test',
 
   // Common endpoints
