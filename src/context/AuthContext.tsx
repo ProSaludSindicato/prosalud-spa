@@ -102,13 +102,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Si es 401 o 403, el token es inválido o la cuenta está desactivada
         if (errorStatus === 401 || errorStatus === 403) {
+          const currentPath = window.location.pathname;
+          const isAdminRoute = currentPath.startsWith('/admin');
+          
           logger.warn('Token invalid or account disabled, clearing session', {
             status: errorStatus,
             message: errorMessage,
+            currentPath,
+            isAdminRoute,
           });
           authService.clearSession();
           setUser(null);
           setLoading(false);
+          
+          // Si estamos en una ruta del admin, redirigir al login
+          if (isAdminRoute) {
+            logger.info('Redirecting to login from AuthContext due to expired session');
+            setTimeout(() => {
+              window.location.href = '/auth/login';
+            }, 100);
+          }
           return;
         }
         
@@ -160,9 +173,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       // Solo limpiar sesión si es error de autenticación explícito
       const cachedUser = authService.getUser();
+      const currentPath = window.location.pathname;
+      const isAdminRoute = currentPath.startsWith('/admin');
+      
       if (error.response?.status === 401 || error.response?.status === 403) {
         authService.clearSession();
         setUser(null);
+        
+        // Si estamos en una ruta del admin, redirigir al login
+        if (isAdminRoute) {
+          logger.info('Redirecting to login from AuthContext (catch block) due to expired session');
+          setTimeout(() => {
+            window.location.href = '/auth/login';
+          }, 100);
+        }
       } else if (cachedUser) {
         // Mantener usuario en caché para otros errores
         setUser(cachedUser);
@@ -252,8 +276,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Si es 401/403 durante refresh explícito, limpiar sesión
       if (status === 401 || status === 403) {
+        const currentPath = window.location.pathname;
+        const isAdminRoute = currentPath.startsWith('/admin');
+        
         authService.clearSession();
         setUser(null);
+        
+        // Si estamos en una ruta del admin, redirigir al login
+        if (isAdminRoute) {
+          logger.info('Redirecting to login from AuthContext (refreshUser) due to expired session');
+          setTimeout(() => {
+            window.location.href = '/auth/login';
+          }, 100);
+        }
       }
     }
   }, []);

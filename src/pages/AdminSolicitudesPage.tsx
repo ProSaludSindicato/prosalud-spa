@@ -2312,22 +2312,31 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                           </FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              {isOptimizing && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
-                                  <div className="flex items-center gap-2 text-sm text-primary-prosalud">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Optimizando imágenes...</span>
+                            <div className="space-y-2">
+                              <div className="relative">
+                                {isOptimizing && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
+                                    <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span>Optimizando imágenes...</span>
+                                    </div>
                                   </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileChange}
+                                    disabled={isOptimizing || files.length >= MAX_FILES}
+                                    className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
+                                  />
+                                  {hasFiles && (
+                                    <span className="text-sm text-gray-600 font-medium whitespace-nowrap">
+                                      {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                              <Input
-                                type="file"
-                                multiple
-                                onChange={handleFileChange}
-                                disabled={isOptimizing || files.length >= MAX_FILES}
-                                className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
-                              />
+                              </div>
                             </div>
                           </FormControl>
                           <FormDescription>
@@ -2836,22 +2845,31 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                           </FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              {isOptimizing && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
-                                  <div className="flex items-center gap-2 text-sm text-primary-prosalud">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Optimizando imágenes...</span>
+                            <div className="space-y-2">
+                              <div className="relative">
+                                {isOptimizing && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md z-10">
+                                    <div className="flex items-center gap-2 text-sm text-primary-prosalud">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span>Optimizando imágenes...</span>
+                                    </div>
                                   </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileChange}
+                                    disabled={isOptimizing || files.length >= MAX_FILES}
+                                    className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
+                                  />
+                                  {hasFiles && (
+                                    <span className="text-sm text-gray-600 font-medium whitespace-nowrap">
+                                      {files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                              <Input
-                                type="file"
-                                multiple
-                                onChange={handleFileChange}
-                                disabled={isOptimizing || files.length >= MAX_FILES}
-                                className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
-                              />
+                              </div>
                             </div>
                           </FormControl>
                           <FormDescription>

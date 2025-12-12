@@ -1,8 +1,12 @@
 import axios from "axios";
 import { API_CONFIG } from "../config/api";
 import { logger } from "@/utils/logger";
+import { authService } from "./authService";
 
 const TOKEN_KEY = 'prosalud_auth_token';
+
+// Bandera para evitar múltiples redirecciones simultáneas
+let isRedirecting = false;
 
 /**
  * Instancia de axios para peticiones públicas (sin autenticación)
@@ -10,7 +14,7 @@ const TOKEN_KEY = 'prosalud_auth_token';
 const api = axios.create({
     baseURL: API_CONFIG.PUBLIC_BASE_URL,
     withCredentials: false,
-    timeout: 10000,
+    timeout: 20000, // 20 segundos - timeout para peticiones públicas (envío de solicitudes por afiliados)
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -26,7 +30,7 @@ const api = axios.create({
 export const authenticatedApi = axios.create({
     baseURL: API_CONFIG.BASE_URL,
     withCredentials: false,
-    timeout: 45000, // 45 segundos - timeout general para peticiones autenticadas
+    timeout: 60000, // 60 segundos - timeout general para peticiones autenticadas
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -75,6 +79,28 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Detectar errores de CORS específicamente
+    const isCorsError = 
+      error.code === 'ERR_NETWORK' && 
+      !error.response && 
+      (error.message?.includes('CORS') || error.message?.includes('Network Error') || error.message?.includes('Failed to fetch'));
+    
+    if (isCorsError) {
+      logger.error("CORS error detected", {
+        url: error.config?.url,
+        method: error.config?.method,
+        baseURL: error.config?.baseURL,
+        message: error.message,
+        code: error.code,
+      });
+      
+      // Agregar información adicional al error para mejor diagnóstico
+      const corsError = new Error('Error de CORS: El servidor no permite solicitudes desde este origen. Verifica la configuración del backend.');
+      (corsError as any).isCorsError = true;
+      (corsError as any).originalError = error;
+      return Promise.reject(corsError);
+    }
+    
     logger.error("API request error", {
       url: error.config?.url,
       method: error.config?.method,
@@ -116,19 +142,40 @@ authenticatedApi.interceptors.response.use(
         isDashboardQuery,
       });
     } else if (status === 401) {
-      // Si recibimos 401, NO hacer nada aquí
-      // Dejar que AuthContext maneje completamente la limpieza de sesión
-      // Esto evita limpiar la sesión prematuramente durante la validación inicial
       const isAuthValidation = url.includes('/api/auth/me');
+      const isAdminRoute = currentPath.startsWith('/admin');
       
       logger.warn('Unauthorized request in authenticatedApi', {
         url,
         currentPath,
         isAuthValidation,
+        isAdminRoute,
       });
       
-      // NO limpiar ni redirigir aquí - AuthContext lo manejará
-      // Solo loguear para debugging
+      // Si es una petición de validación inicial, dejar que AuthContext lo maneje
+      // Esto evita limpiar la sesión prematuramente durante la validación inicial
+      if (isAuthValidation) {
+        // NO limpiar ni redirigir aquí - AuthContext lo manejará
+        // Solo loguear para debugging
+      } else if (isAdminRoute && !isRedirecting) {
+        // Si estamos en una ruta del admin y la sesión expiró, redirigir al login
+        // Usar bandera para evitar múltiples redirecciones simultáneas
+        isRedirecting = true;
+        
+        logger.info('Session expired in admin route, redirecting to login', {
+          url,
+          currentPath,
+        });
+        
+        // Limpiar la sesión
+        authService.clearSession();
+        
+        // Redirigir al login después de un pequeño delay para evitar problemas de estado
+        // Usar window.location en lugar de navigate para forzar una recarga completa
+        setTimeout(() => {
+          window.location.href = '/auth/login';
+        }, 100);
+      }
     } else {
       // Para otros errores, loguear normalmente
       logger.error("Authenticated API request error", {

@@ -27,7 +27,7 @@ const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimpl
           </p>
         )}
         <p className="font-semibold mt-2">
-          ⚠️ Importante: Asegúrese de que su correo electrónico esté actualizado en el sistema, 
+          ⚠️ Importante: Asegúrese de que su <u>correo electrónico</u> esté actualizado en el sistema, 
           ya que el certificado se enviará automáticamente a la dirección registrada.
         </p>
       </AlertDescription>

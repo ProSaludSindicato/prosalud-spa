@@ -108,13 +108,13 @@ const AccesoDirectoMovilPage: React.FC = () => {
                   <div className="bg-white/20 p-2 md:p-3 rounded-xl backdrop-blur-sm flex-shrink-0">
                     <Smartphone className="h-6 w-6 md:h-8 md:w-8" />
                   </div>
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold leading-tight">
+                  <h1 className="text-2xl md:text-5xl lg:text-5xl xl:text-5xl font-bold leading-tight">
                     Instala ProSalud en tu Móvil
                   </h1>
                 </div>
                 <p className="text-base md:text-lg lg:text-xl text-white/90 leading-relaxed">
                   Crea un acceso directo en tu dispositivo móvil para acceder a ProSalud de manera más rápida, 
-                  ágil y segura. ¡Es como tener nuestra app en tu teléfono!
+                  ágil y segura. <br></br><br></br> ¡Es como tener nuestra app en tu teléfono!
                 </p>
               </div>
               <div className="flex justify-center lg:justify-center items-end lg:relative lg:overflow-visible lg:h-full">

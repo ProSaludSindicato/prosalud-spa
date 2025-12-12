@@ -217,7 +217,7 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
-            timeout: data.actividades && data.actividades.length > 0 ? 60000 : 45000, // 60 segundos si hay actividades, 45 segundos si solo hay archivos
+            timeout: data.actividades && data.actividades.length > 0 ? 90000 : 60000, // 90 segundos si hay actividades, 60 segundos si solo hay archivos
           }
         );
 
@@ -266,7 +266,7 @@ export const requestsApiService = {
               headers: {
                 'Content-Type': 'multipart/form-data',
               },
-              timeout: 60000, // 60 segundos - proceso largo que genera certificado con actividades y envía email
+              timeout: 90000, // 90 segundos - proceso largo que genera certificado con actividades y envía email
             }
           );
 
@@ -378,7 +378,7 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
-            timeout: 60000, // 60 segundos - proceso largo que genera certificado y envía email
+            timeout: 90000, // 90 segundos - proceso largo que genera certificado y envía email
           }
         );
 
@@ -410,7 +410,7 @@ export const requestsApiService = {
             t_auxilios: data.t_auxilios,
           },
           {
-            timeout: 60000, // 60 segundos - proceso largo que genera certificado y envía email
+            timeout: 90000, // 90 segundos - proceso largo que genera certificado y envía email
           }
         );
 

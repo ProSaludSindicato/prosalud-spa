@@ -102,41 +102,77 @@ const isCertificadoSimple = (data: FormValues, estadoAfiliado?: string | null): 
   // 4. Si solo tiene fecha de ingreso/retiro, ya es simple
   // 5. Si tiene fecha de ingreso/retiro + dirigido a entidad (con nombre), también es simple
   // 6. Si tiene fecha de ingreso/retiro + valor de compensaciones Y el estado del afiliado es "Activo", también es simple (en su mayoría, excepto casos particulares)
+  // 7. Para afiliados activos, los certificados con información requerida para:
+  //    - Para subsidio de vivienda
+  //    - Para subsidio de desempleo
+  //    - Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud
+  //    en su mayoría serán procesados automáticamente
+  // 8. Los casos de: Otros, Adicionar actividades, Dirigido al Fondo de Pensiones para corrección de historia,
+  //    por ahora nunca son automáticos
   
   // Verificar si el afiliado está activo
   const isActivo = estadoAfiliado?.toLowerCase() === 'activo';
   
-  // Verificar que no tenga opciones que requieran revisión manual
-  // NOTA: valorCompensaciones puede ser simple si el estado es Activo, así que lo excluimos de hasComplexOptions
-  const hasComplexOptions = 
-    (!isActivo && infoCertificado.valorCompensaciones) || // Solo es complejo si NO está activo
-    infoCertificado.paraSubsidioDesempleo ||
-    infoCertificado.paraSubsidioVivienda ||
+  // Opciones que NUNCA son automáticas (siempre requieren revisión manual)
+  const opcionesNuncaAutomaticas = 
     infoCertificado.dirigidoFondoPensiones ||
     infoCertificado.adicionarActividades ||
-    infoCertificado.dirigidoBancolombia ||
     infoCertificado.otros ||
     actividadesPdf ||
     adjuntarArchivoAdicional ||
     otrosDescripcion?.trim();
   
-  // Si tiene opciones complejas, no es simple
-  if (hasComplexOptions) return false;
+  // Si tiene opciones que nunca son automáticas, no es simple
+  if (opcionesNuncaAutomaticas) return false;
   
-  // Si tiene fecha de ingreso/retiro y no tiene opciones complejas, es simple
-  // Si además tiene "dirigido a entidad", debe tener el nombre de la entidad
-  if (infoCertificado.fechaIngresoRetiro) {
-    // Si tiene "dirigido a entidad" marcado, debe tener el nombre
-    if (infoCertificado.dirigidoAEntidad) {
-      return !!dirigidoAQuien?.trim();
-    }
-    // Si solo tiene fecha de ingreso/retiro, es simple
-    // Si tiene fecha de ingreso/retiro + valor de compensaciones Y está activo, también es simple
-    if (infoCertificado.valorCompensaciones && isActivo) {
+  // Para afiliados activos, ciertas opciones pueden ser automáticas
+  if (isActivo) {
+    // Si tiene fecha de ingreso/retiro y alguna de estas opciones automáticas para activos
+    if (infoCertificado.fechaIngresoRetiro) {
+      const tieneOpcionesAutomaticasActivos = 
+        infoCertificado.paraSubsidioDesempleo ||
+        infoCertificado.paraSubsidioVivienda ||
+        infoCertificado.dirigidoBancolombia ||
+        infoCertificado.valorCompensaciones;
+      
+      // Si tiene "dirigido a entidad" marcado, debe tener el nombre
+      if (infoCertificado.dirigidoAEntidad) {
+        // Si tiene opciones automáticas para activos, es simple
+        if (tieneOpcionesAutomaticasActivos) {
+          return !!dirigidoAQuien?.trim();
+        }
+        // Si solo tiene "dirigido a entidad", es simple si tiene el nombre
+        return !!dirigidoAQuien?.trim();
+      }
+      
+      // Si tiene opciones automáticas para activos, es simple
+      if (tieneOpcionesAutomaticasActivos) {
+        return true;
+      }
+      
+      // Si solo tiene fecha de ingreso/retiro, es simple
       return true;
     }
-    // Si solo tiene fecha de ingreso/retiro, es simple
-    return true;
+  } else {
+    // Para afiliados NO activos, estas opciones requieren revisión manual
+    const hasComplexOptions = 
+      (!isActivo && infoCertificado.valorCompensaciones) || // Solo es complejo si NO está activo
+      infoCertificado.paraSubsidioDesempleo ||
+      infoCertificado.paraSubsidioVivienda ||
+      infoCertificado.dirigidoBancolombia;
+    
+    // Si tiene opciones complejas, no es simple
+    if (hasComplexOptions) return false;
+    
+    // Si tiene fecha de ingreso/retiro y no tiene opciones complejas, es simple
+    if (infoCertificado.fechaIngresoRetiro) {
+      // Si tiene "dirigido a entidad" marcado, debe tener el nombre
+      if (infoCertificado.dirigidoAEntidad) {
+        return !!dirigidoAQuien?.trim();
+      }
+      // Si solo tiene fecha de ingreso/retiro, es simple
+      return true;
+    }
   }
   
   return false;
