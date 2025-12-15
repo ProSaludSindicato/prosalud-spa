@@ -21,13 +21,17 @@ import {
   Calendar,
   Clock,
   BarChart3,
-  Activity
+  Activity,
+  PieChart,
+  Building2
 } from 'lucide-react';
 import { 
   listarCertificados,
   ListarCertificadosParams,
   CertificadoListItem,
-  consultarCertificado
+  consultarCertificado,
+  obtenerEstadisticas,
+  EstadisticasParams
 } from '@/services/certificadoConvenioService';
 import { toast } from 'sonner';
 import DataPagination from '@/components/ui/data-pagination';
@@ -119,6 +123,22 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
     },
     enabled: open,
     staleTime: 30 * 1000, // 30 segundos (más frecuente para datos de hoy)
+  });
+
+  // Query para estadísticas de certificados (usa los mismos filtros de fecha que la tabla)
+  const estadisticasParams: EstadisticasParams = {};
+  if (filters.fecha_desde) {
+    estadisticasParams.fecha_desde = filters.fecha_desde;
+  }
+  if (filters.fecha_hasta) {
+    estadisticasParams.fecha_hasta = filters.fecha_hasta;
+  }
+
+  const { data: estadisticasData, isLoading: isLoadingEstadisticas } = useQuery({
+    queryKey: ['certificados-estadisticas', estadisticasParams],
+    queryFn: () => obtenerEstadisticas(estadisticasParams),
+    enabled: open,
+    staleTime: 60 * 1000, // 1 minuto
   });
 
   const handleClose = () => {
@@ -354,7 +374,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Métricas */}
+          {/* Métricas Rápidas */}
           {metrics && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-l-4 border-l-primary-prosalud">
@@ -436,6 +456,257 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
               </Card>
             </div>
           )}
+
+          {/* Estadísticas Detalladas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="h-5 w-5" />
+                Estadísticas de Certificados
+                {(filters.fecha_desde || filters.fecha_hasta) && (
+                  <span className="text-sm font-normal text-gray-500">
+                    (Filtradas por fecha)
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Contenido de Estadísticas */}
+              {isLoadingEstadisticas ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-prosalud" />
+                </div>
+              ) : estadisticasData?.success ? (
+                <div className="space-y-6">
+                  {/* Resumen General */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Resumen General
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Con Compensaciones</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.con_compensaciones.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Con Actividades</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.con_actividades.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Dirigidos a AFP</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.dirigidos_afp.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Subsidio Vivienda</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.subsidio_vivienda.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Bancolombia</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.bancolombia.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Subsidio Desempleo</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.subsidio_desempleo.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Básicos</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.basicos.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="text-sm text-gray-600 mb-1">Otros</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {estadisticasData.data.resumen.otros.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Distribución por Tipo */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <PieChart className="h-5 w-5" />
+                        Distribución por Tipo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {Object.entries(estadisticasData.data.por_tipo).map(([tipo, cantidad]) => {
+                          const total = estadisticasData.data.resumen.total_certificados;
+                          const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : 0;
+                          const porcentajeNum = parseFloat(porcentaje);
+                          const tipoLabels: Record<string, string> = {
+                            basico: 'Básico',
+                            bancolombia: 'Bancolombia',
+                            subsidio_vivienda: 'Subsidio Vivienda',
+                            subsidio_desempleo: 'Subsidio Desempleo',
+                            con_actividades: 'Con Actividades',
+                            dirigido_afp: 'Dirigido a AFP',
+                            otros: 'Otros'
+                          };
+                          return (
+                            <div key={tipo} className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">
+                                  {tipoLabels[tipo] || tipo}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {cantidad.toLocaleString()} certificados
+                                </span>
+                              </div>
+                              <div className="relative w-full bg-gray-200 rounded-full h-4">
+                                <div
+                                  className="bg-primary-prosalud h-4 rounded-full transition-all flex items-center justify-end pr-2"
+                                  style={{ width: `${porcentajeNum}%`, minWidth: porcentajeNum > 0 ? '40px' : '0' }}
+                                >
+                                  {porcentajeNum > 5 && (
+                                    <span className="text-xs font-medium text-white">
+                                      {porcentaje}%
+                                    </span>
+                                  )}
+                                </div>
+                                {porcentajeNum <= 5 && porcentajeNum > 0 && (
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-700">
+                                    {porcentaje}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Entidades */}
+                  {estadisticasData.data.top_entidades.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Building2 className="h-5 w-5" />
+                          Top Entidades
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>#</TableHead>
+                                <TableHead>Entidad</TableHead>
+                                <TableHead className="text-right">Cantidad</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {estadisticasData.data.top_entidades.map((entidad, index) => (
+                                <TableRow key={index}>
+                                  <TableCell className="font-medium">{index + 1}</TableCell>
+                                  <TableCell>{entidad.entidad}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Badge variant="outline">{entidad.cantidad.toLocaleString()}</Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Distribución Mensual */}
+                  {estadisticasData.data.distribucion_mensual.length > 0 && (() => {
+                    // Ordenar por mes (más reciente primero) y tomar solo los últimos 6 meses
+                    const ultimos6Meses = [...estadisticasData.data.distribucion_mensual]
+                      .sort((a, b) => b.mes.localeCompare(a.mes))
+                      .slice(0, 6);
+                    const maxCantidad = Math.max(...ultimos6Meses.map(d => d.cantidad));
+                    
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5" />
+                            Distribución Mensual (Últimos 6 Meses)
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {ultimos6Meses.map((item) => {
+                              const porcentaje = maxCantidad > 0 ? ((item.cantidad / maxCantidad) * 100).toFixed(1) : 0;
+                              const fecha = new Date(item.mes + '-01');
+                              const mesNombre = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                              return (
+                                <div key={item.mes} className="space-y-1">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium text-gray-700 capitalize">
+                                      {mesNombre}
+                                    </span>
+                                    <span className="text-sm text-gray-600">
+                                      {item.cantidad.toLocaleString()} certificados
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-3">
+                                    <div
+                                      className="bg-gradient-to-r from-primary-prosalud to-primary-prosalud-dark h-3 rounded-full transition-all"
+                                      style={{ width: `${porcentaje}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+
+                  {/* Filtros Aplicados */}
+                  {(estadisticasData.data.filtros_aplicados.fecha_desde || estadisticasData.data.filtros_aplicados.fecha_hasta) && (
+                    <Alert>
+                      <Calendar className="h-4 w-4" />
+                      <AlertTitle>Filtros Aplicados</AlertTitle>
+                      <AlertDescription>
+                        {estadisticasData.data.filtros_aplicados.fecha_desde && (
+                          <div>Desde: {estadisticasData.data.filtros_aplicados.fecha_desde}</div>
+                        )}
+                        {estadisticasData.data.filtros_aplicados.fecha_hasta && (
+                          <div>Hasta: {estadisticasData.data.filtros_aplicados.fecha_hasta}</div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              ) : estadisticasData && !estadisticasData.success ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {(estadisticasData as { success: false; message: string }).message}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </CardContent>
+          </Card>
 
           {/* Filtros */}
           <Card>
