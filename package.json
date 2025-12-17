@@ -45,6 +45,7 @@
     "@types/jspdf": "^2.0.0",
     "@types/react-google-recaptcha": "^2.1.9",
     "@uiw/react-json-view": "^2.0.0-alpha.36",
+    "@vercel/analytics": "^1.6.1",
     "ai": "^5.0.60",
     "axios": "^1.12.1",
     "browser-image-compression": "^2.0.2",

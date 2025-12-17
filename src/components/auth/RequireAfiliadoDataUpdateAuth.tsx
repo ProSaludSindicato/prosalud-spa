@@ -29,7 +29,7 @@ const RequireAfiliadoDataUpdateAuth: React.FC<RequireAfiliadoDataUpdateAuthProps
         
         // Cambiar el texto después de 2 segundos
         const textTimer = setTimeout(() => {
-          setLoadingText('Consultando datos personales...');
+          setLoadingText('Consultando información...');
         }, 2000);
         
         authenticateForDataUpdate(
