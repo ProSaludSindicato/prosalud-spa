@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { DownloadCloud } from 'lucide-react';
 
 const RequisitosAnualDiferidaSection: React.FC = () => {
-  // Archivos almacenados localmente en public/files/
   const formatoRequisitoUrl = '/files/Procedimiento_Compensación_Anual_Diferida.pdf';
   const formatoSolicitudUrl = '/files/Solicitud_compensacion_Anual _Diferida.pdf';
 
