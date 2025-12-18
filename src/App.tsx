@@ -229,8 +229,8 @@ const AppRoutes = () => {
               } 
             />
 
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
+            {/* 404 Route - TEMPORAL: Redirige a inicio en vez de mostrar 404 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
       <Toaster />

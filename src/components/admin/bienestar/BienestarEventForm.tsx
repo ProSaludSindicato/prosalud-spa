@@ -365,16 +365,20 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     if (event) {
       // Actualización de evento existente
       // Asegurarse de que todos los campos requeridos se envíen siempre
+      // Usar los valores del formulario (que siempre tienen valores por defecto del evento)
       const updateData: UpdateWellnessEventData = {
-        title: data.title || event.title || '',
-        date: data.date || event.date || '',
-        category: data.category || event.category || '',
-        location: data.location || event.location || '',
-        description: data.description !== undefined ? (data.description || '') : (event.description || ''),
-        attendees: data.attendees !== undefined ? data.attendees : event.attendees,
-        gift: data.gift !== undefined ? (data.gift || '') : (event.gift || ''),
+        // Campos requeridos - SIEMPRE enviar (el formulario siempre tiene estos valores)
+        title: data.title,
+        date: data.date,
+        category: data.category,
+        location: data.location,
+        // Campos opcionales - enviar si están definidos
+        description: data.description !== undefined ? data.description : (event.description !== undefined ? event.description : undefined),
+        attendees: data.attendees !== undefined ? data.attendees : (event.attendees !== undefined ? event.attendees : undefined),
+        gift: data.gift !== undefined ? data.gift : (event.gift !== undefined ? event.gift : undefined),
         provider: data.provider || event.provider || "ProSalud",
         is_visible: event.isVisible !== undefined ? event.isVisible : true,
+        // Archivos - solo enviar si hay nuevos
         images: images.length > 0 ? images : undefined,
         attendance_list: listadoAsistencia || undefined,
         eliminar_attendance_list: eliminarListadoAsistencia && !listadoAsistencia ? true : undefined,
@@ -382,18 +386,22 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       
       logger.debug("Enviando datos para actualizar evento", {
         eventId: event.id,
+        formData: data,
         updateData: {
           title: updateData.title,
           date: updateData.date,
           category: updateData.category,
           location: updateData.location,
-          hasDescription: updateData.description !== undefined,
+          description: updateData.description,
           attendees: updateData.attendees,
-          hasGift: updateData.gift !== undefined,
+          gift: updateData.gift,
           provider: updateData.provider,
+          is_visible: updateData.is_visible,
           tieneNuevasImagenes: images.length > 0,
           tieneListadoAsistencia: !!listadoAsistencia,
+          eliminarListadoAsistencia: updateData.eliminar_attendance_list,
         },
+        allKeys: Object.keys(updateData),
       });
       
       updateMutation.mutate(updateData);

@@ -202,22 +202,25 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
     
     const formData = new FormData();
     
-    // Agregar campos requeridos
-    formData.append('title', data.title);
-    formData.append('date', data.date);
-    formData.append('category', data.category);
-    formData.append('location', data.location);
+    // Agregar campos requeridos - todos como strings según la documentación
+    formData.append('title', String(data.title));
+    formData.append('date', String(data.date));
+    formData.append('category', String(data.category));
+    formData.append('location', String(data.location));
     
     // Agregar campos opcionales
-    if (data.description) formData.append('description', data.description);
+    if (data.description) formData.append('description', String(data.description));
     if (data.attendees !== undefined) formData.append('attendees', String(data.attendees));
-    if (data.gift) formData.append('gift', data.gift);
-    if (data.is_visible !== undefined) formData.append('is_visible', String(data.is_visible));
+    if (data.gift) formData.append('gift', String(data.gift));
+    if (data.is_visible !== undefined) {
+      // Enviar como string 'true' o 'false' según la documentación
+      formData.append('is_visible', data.is_visible ? 'true' : 'false');
+    }
     
-    // Agregar imágenes
+    // Agregar imágenes - usar 'images[]' (sin índice) según la documentación del backend
     if (data.images && data.images.length > 0) {
-      data.images.forEach((file, index) => {
-        formData.append(`images[${index}]`, file);
+      data.images.forEach((file) => {
+        formData.append('images[]', file);
       });
       logger.debug('Imágenes adjuntadas al crear evento', { total: data.images.length });
     }
@@ -267,44 +270,57 @@ export async function updateWellnessEvent(
       id,
       hasImages: Boolean(data.images && data.images.length > 0),
       dataKeys: Object.keys(data),
+      dataValues: {
+        title: data.title,
+        date: data.date,
+        category: data.category,
+        location: data.location,
+        description: data.description,
+        attendees: data.attendees,
+        gift: data.gift,
+        provider: data.provider,
+        is_visible: data.is_visible,
+      },
     });
     
     const formData = new FormData();
     
-    // Agregar campos principales (siempre se envían si están definidos)
-    // Usar valores por defecto para asegurar que siempre se envíen los campos requeridos
+    // Agregar campos principales - SIEMPRE enviar si están definidos en el objeto data
+    // IMPORTANTE: Todos los campos deben enviarse como strings en FormData según la documentación
     if (data.title !== undefined) {
-      formData.append('title', data.title || '');
+      formData.append('title', String(data.title));
     }
     if (data.date !== undefined) {
-      formData.append('date', data.date || '');
+      formData.append('date', String(data.date));
     }
     if (data.category !== undefined) {
-      formData.append('category', data.category || '');
+      formData.append('category', String(data.category));
     }
     if (data.location !== undefined) {
-      formData.append('location', data.location || '');
+      formData.append('location', String(data.location));
     }
     if (data.description !== undefined) {
-      formData.append('description', data.description || '');
+      formData.append('description', String(data.description || ''));
     }
     if (data.attendees !== undefined && data.attendees !== null) {
       formData.append('attendees', String(data.attendees));
     }
     if (data.gift !== undefined) {
-      formData.append('gift', data.gift || '');
+      formData.append('gift', String(data.gift || ''));
     }
     if (data.provider !== undefined) {
-      formData.append('provider', data.provider || '');
+      formData.append('provider', String(data.provider || ''));
     }
     if (data.is_visible !== undefined) {
-      formData.append('is_visible', String(data.is_visible));
+      // Enviar como string 'true' o 'false' según la documentación
+      formData.append('is_visible', data.is_visible ? 'true' : 'false');
     }
     
     // Agregar nuevas imágenes si existen (reemplazarán las anteriores)
+    // IMPORTANTE: Usar 'images[]' (sin índice) según la documentación del backend
     if (data.images && data.images.length > 0) {
-      data.images.forEach((file, index) => {
-        formData.append(`images[${index}]`, file);
+      data.images.forEach((file) => {
+        formData.append('images[]', file);
       });
       logger.debug('Actualizando imágenes de evento', { total: data.images.length });
     }
@@ -323,13 +339,24 @@ export async function updateWellnessEvent(
     
     // Logging detallado del FormData
     const formDataEntries = Array.from(formData.entries());
+    const formDataValues = formDataEntries.map(([key, value]) => {
+      // Para archivos, mostrar solo el nombre y tipo
+      if (value instanceof File) {
+        return [key, { type: 'File', name: value.name, size: value.size }];
+      }
+      return [key, value];
+    });
+    
     logger.debug('Campos preparados para actualización de evento', {
       totalEntries: formDataEntries.length,
-      keys: formDataEntries.map(([key]) => key),
+      entries: formDataValues,
     });
     
     if (formDataEntries.length === 0) {
-      logger.error('Intento de actualizar evento sin cambios');
+      logger.error('Intento de actualizar evento sin cambios - FormData vacío', {
+        receivedData: data,
+        dataKeys: Object.keys(data),
+      });
       throw new Error('No hay datos para actualizar');
     }
     

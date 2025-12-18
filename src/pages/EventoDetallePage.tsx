@@ -276,7 +276,7 @@ const EventoDetallePage: React.FC = () => {
                       <div><strong>Lugar:</strong> {event.location}</div>
                     </li>
                   )}
-                  {event.attendees && (
+                  {event.attendees != null && Number(event.attendees) > 0 && (
                     <li className="flex items-start">
                       <Users size={18} className="mr-3 mt-0.5 text-secondary-prosaludgreen flex-shrink-0" />
                       <div><strong>Asistentes:</strong> Aprox. {event.attendees}</div>
