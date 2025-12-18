@@ -32,6 +32,9 @@ const ConfirmacionCorreoSection = () => {
                 Actualizar datos personales
               </Link>.
             </p>
+            <p className="font-normal text-sm text-gray-700 mt-2">
+              <strong>Importante:</strong> Si no visualiza el correo, revise su bandeja de SPAM.
+            </p>
           </div>
         </div>
       </div>

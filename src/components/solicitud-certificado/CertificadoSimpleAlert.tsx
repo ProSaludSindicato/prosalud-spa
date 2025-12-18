@@ -30,6 +30,9 @@ const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimpl
           ⚠️ Importante: Asegúrese de que su <u>correo electrónico</u> esté actualizado en el sistema, 
           ya que el certificado se enviará automáticamente a la dirección registrada.
         </p>
+        <p className="mt-2 text-sm">
+          <strong>Nota:</strong> Si no visualiza el correo, revise su bandeja de SPAM.
+        </p>
       </AlertDescription>
     </Alert>
   );

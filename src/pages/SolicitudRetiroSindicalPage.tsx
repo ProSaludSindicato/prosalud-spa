@@ -111,6 +111,8 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
             Su solicitud ha sido recibida y será procesada según los procedimientos establecidos.
             <br />
             <strong className="mt-2 block font-semibold">Importante:</strong> En caso de requerir información adicional nos comunicaremos con usted.
+            <br />
+            <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
           </>
         ),
         duration: 8000,

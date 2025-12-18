@@ -246,7 +246,13 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
       form.reset();
       
       toast.success('Solicitud de actualización de datos enviada', {
-        description: response.message || 'Su solicitud ha sido recibida. Se procesará según los plazos establecidos.',
+        description: (
+          <>
+            {response.message || 'Su solicitud ha sido recibida. Se procesará según los plazos establecidos.'}
+            <br />
+            <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
+          </>
+        ),
         duration: 8000,
         icon: <CheckCircle2 className="h-5 w-5 text-emerald-600" />
       });

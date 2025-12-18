@@ -289,12 +289,16 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
                 Recibirá el certificado en su correo electrónico en los próximos minutos.
                 <br />
                 <strong className="mt-2 block font-semibold">Importante:</strong> Asegúrese de que su correo electrónico esté actualizado en el sistema.
+                <br />
+                <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
               </>
             ) : (
               <>
                 Recibirá el certificado en su correo en los próximos días hábiles.
                 <br />
                 <strong className="mt-2 block font-semibold">Tenga presente:</strong> Solamente en caso de presentarse alguna inconsistencia nos comunicaremos con usted.
+                <br />
+                <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
               </>
             )}
           </>

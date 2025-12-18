@@ -113,7 +113,13 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
       form.reset();
 
       toast.success("Solicitud enviada", {
-        description: "Su solicitud de microcrédito ha sido enviada para revisión.",
+        description: (
+          <>
+            Su solicitud de microcrédito ha sido enviada para revisión.
+            <br />
+            <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
+          </>
+        ),
       });
 
       // Redirect with a longer delay to ensure the toast is visible before unmount

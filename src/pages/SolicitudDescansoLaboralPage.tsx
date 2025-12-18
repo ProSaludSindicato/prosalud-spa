@@ -130,6 +130,8 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
             Su solicitud será revisada y en caso de ser aprobada será incluida junto con la compensación correspondiente.
             <br />
             <strong className="mt-2 block font-semibold">Tenga presente:</strong> Solamente en caso de presentarse alguna inconsistencia nos comunicaremos con usted.
+            <br />
+            <span className="mt-1 block text-sm">Si no visualiza el correo, revise su bandeja de SPAM.</span>
           </>
         ),
         duration: 8000,
