@@ -25,7 +25,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   const isExternalLink = linkTo.startsWith('http://') || linkTo.startsWith('https://');
 
   const cardContent = (
-    <div className="flex flex-col h-full min-h-[180px]">
+    <div className="flex flex-col h-full min-h-[180px] pointer-events-none">
       {/* Header con icono y título */}
       <div className="mb-3 flex items-start gap-3 min-h-[3rem]">
         {imageUrl ? (
@@ -74,7 +74,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   );
 
   const commonClasses = cn(
-    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02] hover:bg-prosalud-hover",
+    "block bg-card p-6 rounded-lg shadow-lg group border border-prosalud-border transform transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary-prosalud hover:scale-[1.02] hover:bg-prosalud-hover cursor-pointer clickable",
     className
   );
 

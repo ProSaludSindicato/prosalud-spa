@@ -15,10 +15,10 @@ const Footer: React.FC = () => {
             <div className="flex items-center space-x-4">
               {" "}
               {/* Container for both logos */}
-              <Link to="https://www.minsalud.gov.co" target="_blank" rel="noopener noreferrer" className="inline-block">
+              <Link to="https://www.minsalud.gov.co" target="_blank" rel="noopener noreferrer" className="inline-block cursor-pointer clickable">
                 <img src={minsaludLogoUrl} alt="Minsalud Logo" className="h-28 md:h-32" width={600} height={56} />
               </Link>
-              <Link to="/" className="inline-block">
+              <Link to="/" className="inline-block cursor-pointer clickable">
                 <img src={logoUrl} alt="ProSalud Logo" className="h-20 md:h-24" width={400} height={265} />
               </Link>
             </div>
@@ -32,34 +32,34 @@ const Footer: React.FC = () => {
             <h3 className="text-md font-semibold text-white mb-4 uppercase tracking-wider">Enlaces Útiles</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/faq" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/faq" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Preguntas Frecuentes
                 </Link>
               </li>
               <li>
-                <Link to="/contacto" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/contacto" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Contacto
                 </Link>
               </li>
               <li>
-                <Link to="/ayuda/acceso-directo-movil" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/ayuda/acceso-directo-movil" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Instalar como App
                 </Link>
               </li>
               <li>
-                <Link to="/terminos" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/terminos" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Términos y Condiciones
                 </Link>
               </li>
               <li>
-                <Link to="/privacidad" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/privacidad" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Política de Privacidad
                 </Link>
               </li>
               <li>
                 <Link
                   to="/nosotros/quienes-somos"
-                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   ¿Quiénes somos?
                 </Link>
@@ -74,7 +74,7 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/servicios/certificado-convenio"
-                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   Certificado de Convenio
                 </Link>
@@ -82,20 +82,20 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/servicios/consulta-pagos"
-                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   Consulta de Pagos
                 </Link>
               </li>
               <li>
-                <Link to="/servicios/sst" className="text-sm hover:text-secondary-prosaludgreen transition-colors">
+                <Link to="/servicios/sst" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
                   Seguridad y Salud
                 </Link>
               </li>
               <li>
                 <Link
                   to="/servicios/actualizar-datos-personales"
-                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   Actualizar Datos Personales
                 </Link>
@@ -103,7 +103,7 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/servicios/incapacidad-maternidad"
-                  className="text-sm hover:text-secondary-prosaludgreen transition-colors"
+                  className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   Incapacidades y Licencias
                 </Link>
@@ -146,7 +146,7 @@ const Footer: React.FC = () => {
             {' '}de Google.
           </p>*/}
           <p className="text-xs text-slate-500 mt-2">
-            Algunas imágenes diseñadas por <a href="http://www.freepik.es/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">Freepik</a>.
+            Algunas imágenes diseñadas por <a href="http://www.freepik.es/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300 cursor-pointer clickable">Freepik</a>.
           </p>
         </div>
       </div>

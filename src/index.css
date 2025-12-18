@@ -195,6 +195,59 @@
   }
 }
 
+/* Estilos globales para cursor pointer - fuera de @layer para mayor especificidad */
+a,
+a *,
+button:not(:disabled),
+button:not(:disabled) *,
+[role="button"]:not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]) *,
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+label[for],
+.cursor-pointer,
+.cursor-pointer * {
+  cursor: pointer !important;
+}
+
+/* Links de React Router también deben tener cursor pointer */
+[data-router-link],
+[data-router-link] * {
+  cursor: pointer !important;
+}
+
+/* Asegurar cursor pointer en hover para todos los elementos clickeables */
+a:hover,
+a:hover *,
+button:not(:disabled):hover,
+button:not(:disabled):hover *,
+[role="button"]:not([aria-disabled="true"]):hover,
+[role="button"]:not([aria-disabled="true"]):hover *,
+input[type="button"]:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+input[type="reset"]:not(:disabled):hover,
+label[for]:hover {
+  cursor: pointer !important;
+}
+
+/* Excepciones para elementos deshabilitados */
+button:disabled,
+button:disabled *,
+[role="button"][aria-disabled="true"],
+[role="button"][aria-disabled="true"] *,
+a[aria-disabled="true"],
+a[aria-disabled="true"] *,
+input:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Elementos con pointer-events-none no deben bloquear el cursor del padre */
+[style*="pointer-events: none"],
+.pointer-events-none {
+  pointer-events: none !important;
+}
+
 /* Animaciones optimizadas - solo las esenciales */
 @keyframes fadeInUp {
   from {
@@ -224,6 +277,12 @@
 
 /* Estilos para componentes críticos */
 @layer components {
+  /* Clase específica para asegurar cursor pointer en elementos clickeables */
+  .clickable,
+  .clickable * {
+    cursor: pointer !important;
+  }
+  
   /* Optimización de accordion triggers - simplificado */
   .category-accordion-trigger {
     position: relative;
