@@ -102,23 +102,23 @@ export const requestsService = {
   },
 
   async getRequestById(id: string): Promise<Request | null> {
-    const numericId = parseInt(id, 10);
-    if (isNaN(numericId)) {
-      throw new Error('ID inválido - se requiere un ID numérico válido');
+    // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
+    if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+      throw new Error('ID inválido - debe ser un string de 10 dígitos');
     }
 
-    const apiRequest = await requestsApiService.getRequestById(numericId);
+    const apiRequest = await requestsApiService.getRequestById(id);
     return mapApiRequestToFrontendRequest(apiRequest);
   },
 
   async updateRequestStatus(id: string, status: Request['status'], notes?: string): Promise<Request> {
-    const numericId = parseInt(id, 10);
-    if (isNaN(numericId)) {
-      throw new Error('ID inválido - se requiere un ID numérico válido');
+    // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
+    if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+      throw new Error('ID inválido - debe ser un string de 10 dígitos');
     }
 
     const apiStatus = mapFrontendStatusToApiStatus(status);
-    const updatedApiRequest = await requestsApiService.updateRequestStatus(numericId, apiStatus);
+    const updatedApiRequest = await requestsApiService.updateRequestStatus(id, apiStatus);
     return mapApiRequestToFrontendRequest(updatedApiRequest);
   },
 
@@ -224,12 +224,12 @@ export const requestsService = {
 
   // Validate request (manual validation step)
   async validateRequest(id: string): Promise<Request> {
-    const numericId = parseInt(id, 10);
-    if (isNaN(numericId)) {
-      throw new Error('ID inválido - se requiere un ID numérico válido');
+    // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
+    if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+      throw new Error('ID inválido - debe ser un string de 10 dígitos');
     }
 
-    const apiRequest = await requestsApiService.validateRequest(numericId);
+    const apiRequest = await requestsApiService.validateRequest(id);
     return mapApiRequestToFrontendRequest(apiRequest);
   },
 

@@ -159,14 +159,16 @@ authenticatedApi.interceptors.response.use(
       if (isAuthValidation) {
         // NO limpiar ni redirigir aquí - AuthContext lo manejará
         // Solo loguear para debugging
-      } else if (isAdminRoute && !isRedirecting && !hasToken) {
-        // Solo redirigir si NO hay token - si hay token, puede ser un error temporal
-        // Usar bandera para evitar múltiples redirecciones simultáneas
+      } else if (!isRedirecting) {
+        // Si recibimos 401 en cualquier otra petición, el token ha expirado
+        // Limpiar sesión y redirigir al login automáticamente
         isRedirecting = true;
         
-        logger.info('Session expired in admin route (no token), redirecting to login', {
+        logger.info('Token expired (401 received), clearing session and redirecting to login', {
           url,
           currentPath,
+          isAdminRoute,
+          hadToken: !!hasToken,
         });
         
         // Limpiar la sesión
@@ -176,14 +178,11 @@ authenticatedApi.interceptors.response.use(
         // Usar window.location en lugar de navigate para forzar una recarga completa
         setTimeout(() => {
           window.location.href = '/auth/login';
+          // Resetear la bandera después de un tiempo para permitir futuras redirecciones
+          setTimeout(() => {
+            isRedirecting = false;
+          }, 2000);
         }, 100);
-      } else if (isAdminRoute && hasToken) {
-        // Si hay token pero recibimos 401, puede ser un error temporal
-        // No redirigir inmediatamente - dejar que AuthContext lo maneje
-        logger.warn('401 received but token exists, letting AuthContext handle it', {
-          url,
-          currentPath,
-        });
       }
     } else {
       // Para otros errores, loguear normalmente

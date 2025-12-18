@@ -130,8 +130,13 @@ export const requestsApiService = {
   },
 
   // Get specific request by ID
-  async getRequestById(id: number): Promise<ApiRequest> {
+  async getRequestById(id: string): Promise<ApiRequest> {
     try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
       const response = await requestsApi.get<ApiResponse<ApiRequest>>(`/api/requests/${id}`);
 
       if (!response.data.success) {
@@ -147,10 +152,15 @@ export const requestsApiService = {
 
   // Update request status
   async updateRequestStatus(
-    id: number,
+    id: string,
     status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED",
   ): Promise<ApiRequest> {
     try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
       const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/api/requests/${id}/status`, {
         status,
       });
@@ -578,8 +588,13 @@ export const requestsApiService = {
   },
 
   // Validate request (manual validation step)
-  async validateRequest(id: number): Promise<ApiRequest> {
+  async validateRequest(id: string): Promise<ApiRequest> {
     try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
       const response = await requestsApi.post<ApiResponse<ApiRequest>>(`/api/requests/${id}/validate`);
 
       if (!response.data.success) {

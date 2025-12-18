@@ -69,20 +69,31 @@ class AuthService {
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Si recibimos 401, NO limpiar sesión aquí
-        // Dejar que AuthContext maneje la limpieza de sesión completamente
         if (error.response?.status === 401) {
           const isAuthMeRequest = error.config?.url?.includes('/api/auth/me');
+          const currentPath = window.location.pathname;
+          const isAdminRoute = currentPath.startsWith('/admin');
           
           logger.warn('Unauthorized request in authService', {
             url: error.config?.url,
             status: error.response?.status,
             isAuthMeRequest,
-            currentPath: window.location.pathname,
+            currentPath,
+            isAdminRoute,
           });
           
-          // NO hacer nada aquí - dejar que AuthContext maneje todo
-          // Esto evita limpiar la sesión prematuramente
+          // Si es una petición de validación inicial, dejar que AuthContext lo maneje
+          // Esto evita limpiar la sesión prematuramente durante la validación inicial
+          if (!isAuthMeRequest && isAdminRoute) {
+            // Si no es validación inicial y estamos en admin, limpiar y redirigir
+            logger.info('Token expired in authService (non-validation request), clearing session and redirecting to login');
+            this.clearSession();
+            
+            setTimeout(() => {
+              window.location.href = '/auth/login';
+            }, 100);
+          }
+          // Si es validación inicial, dejar que AuthContext lo maneje
         }
 
         // Si recibimos 403 cuenta desactivada

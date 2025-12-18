@@ -83,7 +83,7 @@ const AfiliacionComfenalcoPage: React.FC = () => {
               </div>
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6 animate-fade-in tracking-tight">
-              Afiliación a Comfenalco
+              Proceso de afiliación de beneficiarios
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl max-w-3xl mx-auto animate-fade-in animation-delay-200 font-light px-2 mb-4">
               Accede a los beneficios de Comfenalco Antioquia
@@ -100,9 +100,8 @@ const AfiliacionComfenalcoPage: React.FC = () => {
             <Alert className="border-orange-200 bg-orange-50">
               <AlertCircle className="h-5 w-5 text-orange-600" />
               <AlertDescription className="text-orange-800">
-                <strong>Importante:</strong> ProSalud NO realiza el proceso de afiliación a Comfenalco. 
-                Como afiliado al sindicato, debes realizar este trámite directamente con Comfenalco Antioquia 
-                una vez hayas completado tu proceso de vinculación con ProSalud.
+                <strong>Importante:</strong> ProSalud se encarga de realizar el proceso de afiliación a Comfenalco de sus agremiados,
+                pero la afiliación del grupo familiar es responsabilidad de cada afiliado y el proceso se hace directamente en las oficinas de comfenalco.
               </AlertDescription>
             </Alert>
 
