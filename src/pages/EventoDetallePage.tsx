@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
-import { getWellnessEvent, getWellnessEvents } from '@/services/wellnessEventsApi';
+import { publicWellnessEventsApi } from '@/services/publicWellnessEventsApi';
 import { CalendarDays, MapPin, Users, Gift, Briefcase, ChevronLeft, Maximize, Home, LayoutGrid, GalleryVertical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -23,18 +23,18 @@ const EventoDetallePage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   
-  // Obtener el evento específico
+  // Obtener el evento específico desde el API público
   const { data: event, isLoading, error } = useQuery({
-    queryKey: ['wellness-event', eventId],
-    queryFn: () => getWellnessEvent(eventId!),
+    queryKey: ['wellness-event-public', eventId],
+    queryFn: () => publicWellnessEventsApi.getPublicEvent(eventId!),
     enabled: !!eventId,
     staleTime: 5 * 60 * 1000,
   });
 
-  // Obtener todos los eventos para la navegación
+  // Obtener todos los eventos para la navegación desde el API público
   const { data: allEvents = [] } = useQuery({
     queryKey: ['wellness-events-public'],
-    queryFn: () => getWellnessEvents({ is_visible: true }),
+    queryFn: () => publicWellnessEventsApi.getPublicEvents() as Promise<any[]>,
     staleTime: 5 * 60 * 1000,
   });
 

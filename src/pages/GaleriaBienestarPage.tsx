@@ -8,7 +8,7 @@ import MainLayout from "@/components/layout/MainLayout"
 import EventsGrid from "@/components/galeria-bienestar/EventsGrid"
 import EventFilters from "@/components/galeria-bienestar/EventFilters"
 import DataPagination from "@/components/ui/data-pagination"
-import { getWellnessEvents } from "@/services/wellnessEventsApi"
+import { publicWellnessEventsApi } from "@/services/publicWellnessEventsApi"
 import { Link } from "react-router-dom"
 import {
   Breadcrumb,
@@ -26,10 +26,10 @@ const GaleriaBienestarPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"date-desc" | "date-asc">("date-desc")
   const [filterCategory, setFilterCategory] = useState<string>("all")
 
-  // Fetch events from API
+  // Fetch events from public API (no authentication required)
   const { data: events = [], isLoading, error } = useQuery({
     queryKey: ['wellness-events-public'],
-    queryFn: () => getWellnessEvents({ is_visible: true }),
+    queryFn: () => publicWellnessEventsApi.getPublicEvents() as Promise<any[]>,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
