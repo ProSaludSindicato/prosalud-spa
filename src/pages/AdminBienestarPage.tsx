@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images, FileText, Download } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -286,6 +286,29 @@ const AdminBienestarPage: React.FC = () => {
                                 disabled={toggleVisibilityMutation.isPending}
                               />
                             </div>
+
+                            {/* Attendance List Button */}
+                            {(event.attendanceListPath || event.attendanceList) && (
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  if (event.attendanceList?.fileUrl) {
+                                    window.open(event.attendanceList.fileUrl, '_blank');
+                                  } else {
+                                    toast({
+                                      title: "Listado de asistencia",
+                                      description: "El archivo está disponible pero no hay URL temporal. Por favor, edita el evento para regenerar la URL.",
+                                      variant: "default"
+                                    });
+                                  }
+                                }}
+                                className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-700"
+                                title="Ver/Descargar listado de asistencia"
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Ver Listado de Asistencia
+                              </Button>
+                            )}
 
                             {/* Edit Button */}
                             {can('wellness_events.edit') && (

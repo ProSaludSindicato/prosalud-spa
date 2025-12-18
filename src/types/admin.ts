@@ -31,6 +31,11 @@ export interface BienestarEvent {
   images: { url: string; alt?: string; isMain: boolean }[];
   isVisible: boolean;
   createdAt: string;
+  attendanceListPath?: string;
+  attendanceList?: {
+    fileUrl: string;
+    urlExpiresAt: string;
+  };
 }
 
 export interface ComfenalcoEvent {

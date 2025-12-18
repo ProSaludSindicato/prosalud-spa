@@ -22,6 +22,11 @@ export interface WellnessEventResponse {
   provider: string;
   is_visible: boolean;
   images: WellnessEventImage[];
+  attendance_list_path?: string;
+  attendance_list?: {
+    file_url: string;
+    url_expires_at: string;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -68,6 +73,7 @@ export interface CreateWellnessEventData {
   gift?: string;
   is_visible?: boolean;
   images?: File[];
+  attendance_list?: File;
 }
 
 export interface UpdateWellnessEventData {
@@ -81,6 +87,8 @@ export interface UpdateWellnessEventData {
   provider?: string;
   is_visible?: boolean;
   images?: File[];
+  attendance_list?: File;
+  eliminar_attendance_list?: boolean;
 }
 
 /**
@@ -131,7 +139,12 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
       };
     }),
     isVisible: apiEvent.is_visible,
-    createdAt: apiEvent.created_at || new Date().toISOString().split('T')[0]
+    createdAt: apiEvent.created_at || new Date().toISOString().split('T')[0],
+    attendanceListPath: apiEvent.attendance_list_path,
+    attendanceList: apiEvent.attendance_list ? {
+      fileUrl: apiEvent.attendance_list.file_url,
+      urlExpiresAt: apiEvent.attendance_list.url_expires_at,
+    } : undefined,
   };
 }
 
@@ -209,17 +222,20 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
       logger.debug('Imágenes adjuntadas al crear evento', { total: data.images.length });
     }
     
+    // Agregar listado de asistencia
+    if (data.attendance_list) {
+      formData.append('attendance_list', data.attendance_list);
+      logger.debug('Listado de asistencia adjuntado al crear evento');
+    }
+    
     const totalCampos = Array.from(formData.keys()).length;
     logger.debug('FormData generado para creación de evento', { totalCampos });
     
+    // NO incluir Content-Type: el navegador lo agrega automáticamente con el boundary correcto
+    // El interceptor de axios ya elimina Content-Type cuando detecta FormData
     const response = await api.post<WellnessEventResponse>(
       '/api/wellness-events',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     
     logger.debug('Respuesta recibida al crear evento de bienestar', { status: response.status });
@@ -250,36 +266,38 @@ export async function updateWellnessEvent(
     logger.debug('Actualizando evento de bienestar', {
       id,
       hasImages: Boolean(data.images && data.images.length > 0),
+      dataKeys: Object.keys(data),
     });
     
     const formData = new FormData();
     
     // Agregar campos principales (siempre se envían si están definidos)
-    if (data.title !== undefined && data.title !== null) {
-      formData.append('title', data.title);
+    // Usar valores por defecto para asegurar que siempre se envíen los campos requeridos
+    if (data.title !== undefined) {
+      formData.append('title', data.title || '');
     }
-    if (data.date !== undefined && data.date !== null) {
-      formData.append('date', data.date);
+    if (data.date !== undefined) {
+      formData.append('date', data.date || '');
     }
-    if (data.category !== undefined && data.category !== null) {
-      formData.append('category', data.category);
+    if (data.category !== undefined) {
+      formData.append('category', data.category || '');
     }
-    if (data.location !== undefined && data.location !== null) {
-      formData.append('location', data.location);
+    if (data.location !== undefined) {
+      formData.append('location', data.location || '');
     }
-    if (data.description !== undefined && data.description !== null) {
-      formData.append('description', data.description);
+    if (data.description !== undefined) {
+      formData.append('description', data.description || '');
     }
     if (data.attendees !== undefined && data.attendees !== null) {
       formData.append('attendees', String(data.attendees));
     }
-    if (data.gift !== undefined && data.gift !== null) {
-      formData.append('gift', data.gift);
+    if (data.gift !== undefined) {
+      formData.append('gift', data.gift || '');
     }
-    if (data.provider !== undefined && data.provider !== null) {
-      formData.append('provider', data.provider);
+    if (data.provider !== undefined) {
+      formData.append('provider', data.provider || '');
     }
-    if (data.is_visible !== undefined && data.is_visible !== null) {
+    if (data.is_visible !== undefined) {
       formData.append('is_visible', String(data.is_visible));
     }
     
@@ -291,10 +309,23 @@ export async function updateWellnessEvent(
       logger.debug('Actualizando imágenes de evento', { total: data.images.length });
     }
     
+    // Agregar listado de asistencia si existe (reemplaza el existente)
+    if (data.attendance_list) {
+      formData.append('attendance_list', data.attendance_list);
+      logger.debug('Listado de asistencia adjuntado al actualizar evento');
+    }
+    
+    // Eliminar listado de asistencia si se solicita
+    if (data.eliminar_attendance_list === true) {
+      formData.append('eliminar_attendance_list', 'true');
+      logger.debug('Solicitando eliminación de listado de asistencia');
+    }
+    
     // Logging detallado del FormData
     const formDataEntries = Array.from(formData.entries());
     logger.debug('Campos preparados para actualización de evento', {
       totalEntries: formDataEntries.length,
+      keys: formDataEntries.map(([key]) => key),
     });
     
     if (formDataEntries.length === 0) {
@@ -302,14 +333,12 @@ export async function updateWellnessEvent(
       throw new Error('No hay datos para actualizar');
     }
     
+    // Usar PUT directamente según la documentación de la API
+    // NO incluir Content-Type: el navegador lo agrega automáticamente con el boundary correcto
+    // El interceptor de axios ya elimina Content-Type cuando detecta FormData
     const response = await api.put<WellnessEventResponse>(
       `/api/wellness-events/${id}`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     
     logger.debug('Evento de bienestar actualizado correctamente', { status: response.status });

@@ -3,13 +3,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2 } from "lucide-react";
+import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2, FileText, Download, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
@@ -59,6 +60,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [mainImageIndex, setMainImageIndex] = useState(0);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [listadoAsistencia, setListadoAsistencia] = useState<File | null>(null);
+  const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
+  const [eliminarListadoAsistencia, setEliminarListadoAsistencia] = useState(false);
   const queryClient = useQueryClient();
 
   const form = useForm<FormData>({
@@ -110,6 +114,16 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         const mainIndex = event.images.findIndex((img) => img.isMain);
         setMainImageIndex(mainIndex >= 0 ? mainIndex : 0);
       }
+      
+      // Resetear el listado de asistencia al editar
+      setListadoAsistencia(null);
+      setListadoAsistenciaError('');
+      setEliminarListadoAsistencia(false);
+    } else {
+      // Resetear al crear nuevo evento
+      setListadoAsistencia(null);
+      setListadoAsistenciaError('');
+      setEliminarListadoAsistencia(false);
     }
   }, [event, form]);
 
@@ -297,6 +311,49 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     }
   };
 
+  const handleListadoAsistenciaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      const errorMsg = 'El listado debe ser PDF o Excel (.pdf, .xls, .xlsx).';
+      setListadoAsistenciaError(errorMsg);
+      toast.error('Formato no válido', {
+        description: errorMsg,
+      });
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      const errorMsg = 'El archivo no puede exceder 4MB.';
+      setListadoAsistenciaError(errorMsg);
+      toast.error('Archivo muy grande', {
+        description: errorMsg,
+      });
+      return;
+    }
+
+    setListadoAsistencia(file);
+    setListadoAsistenciaError('');
+    // Si se sube un nuevo archivo, cancelar la eliminación del existente
+    setEliminarListadoAsistencia(false);
+  };
+
+  const removeListadoAsistencia = () => {
+    setListadoAsistencia(null);
+    setListadoAsistenciaError('');
+    // Si hay un listado existente en el evento, marcar para eliminarlo
+    if (event?.attendanceListPath || event?.attendanceList) {
+      setEliminarListadoAsistencia(true);
+    }
+  };
+
   const onSubmit = (data: FormData) => {
     if (!event && images.length === 0) {
       toast.error("Imágenes requeridas", {
@@ -307,21 +364,36 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
     if (event) {
       // Actualización de evento existente
+      // Asegurarse de que todos los campos requeridos se envíen siempre
       const updateData: UpdateWellnessEventData = {
-        title: data.title,
-        date: data.date,
-        category: data.category,
-        location: data.location,
-        description: data.description || "",
-        attendees: data.attendees,
-        gift: data.gift || "",
-        provider: data.provider || "ProSalud",
+        title: data.title || event.title || '',
+        date: data.date || event.date || '',
+        category: data.category || event.category || '',
+        location: data.location || event.location || '',
+        description: data.description !== undefined ? (data.description || '') : (event.description || ''),
+        attendees: data.attendees !== undefined ? data.attendees : event.attendees,
+        gift: data.gift !== undefined ? (data.gift || '') : (event.gift || ''),
+        provider: data.provider || event.provider || "ProSalud",
+        is_visible: event.isVisible !== undefined ? event.isVisible : true,
         images: images.length > 0 ? images : undefined,
+        attendance_list: listadoAsistencia || undefined,
+        eliminar_attendance_list: eliminarListadoAsistencia && !listadoAsistencia ? true : undefined,
       };
       
       logger.debug("Enviando datos para actualizar evento", {
         eventId: event.id,
-        tieneNuevasImagenes: images.length > 0,
+        updateData: {
+          title: updateData.title,
+          date: updateData.date,
+          category: updateData.category,
+          location: updateData.location,
+          hasDescription: updateData.description !== undefined,
+          attendees: updateData.attendees,
+          hasGift: updateData.gift !== undefined,
+          provider: updateData.provider,
+          tieneNuevasImagenes: images.length > 0,
+          tieneListadoAsistencia: !!listadoAsistencia,
+        },
       });
       
       updateMutation.mutate(updateData);
@@ -337,6 +409,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         gift: data.gift,
         is_visible: true, // Boolean, not string
         images,
+        attendance_list: listadoAsistencia || undefined,
       };
       createMutation.mutate(createData);
     }
@@ -520,6 +593,122 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
             {/* Columna derecha */}
             <div className="space-y-6">
+              {/* Listado de Asistencia */}
+              <Card className="border shadow-sm bg-white">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Listado de Asistencia</CardTitle>
+                      <CardDescription>Archivo opcional con el listado de asistencia</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {listadoAsistenciaError && (
+                      <Alert className="bg-red-50 border-red-200">
+                        <AlertDescription className="text-sm text-red-800">
+                          {listadoAsistenciaError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {/* Mostrar listado existente si hay uno y no se ha subido uno nuevo */}
+                    {event && (event.attendanceListPath || event.attendanceList) && !listadoAsistencia && !eliminarListadoAsistencia && (
+                      <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <FileText className="h-8 w-8 text-green-600" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">Listado de asistencia existente</p>
+                              <p className="text-xs text-gray-500">
+                                {event.attendanceListPath ? 'Archivo guardado' : 'URL disponible'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {event.attendanceList?.fileUrl && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  window.open(event.attendanceList?.fileUrl, '_blank');
+                                }}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                title="Ver/Descargar listado de asistencia"
+                              >
+                                <Download className="h-4 w-4 mr-1" />
+                                Ver
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={removeListadoAsistencia}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Eliminar listado de asistencia"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {listadoAsistencia ? (
+                      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{listadoAsistencia.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {(listadoAsistencia.size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setListadoAsistencia(null);
+                              setListadoAsistenciaError('');
+                              // Si había uno existente, restaurar el estado
+                              if (event?.attendanceListPath || event?.attendanceList) {
+                                setEliminarListadoAsistencia(false);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                        <input
+                          type="file"
+                          accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          onChange={handleListadoAsistenciaUpload}
+                          className="hidden"
+                          id="listado-asistencia-upload"
+                        />
+                        <label htmlFor="listado-asistencia-upload" className="cursor-pointer">
+                          <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm font-medium text-gray-600 mb-1">Seleccionar listado de asistencia</p>
+                          <p className="text-xs text-gray-500">PDF o Excel (.pdf, .xls, .xlsx) - máx. 4MB</p>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Imágenes */}
               <Card className="border shadow-sm bg-white">
                 <CardHeader className="pb-4">
