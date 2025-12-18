@@ -23,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   /**
    * Cargar usuario desde el backend usando el token almacenado
@@ -37,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logger.info('No token found in localStorage');
         setUser(null);
         setLoading(false);
+        setHasInitialized(true);
         return;
       }
 
@@ -68,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(userData);
         logger.debug('User validated successfully with backend');
         setLoading(false);
+        setHasInitialized(true);
       } catch (error: any) {
         const errorStatus = error.response?.status;
         const errorMessage = error.message || '';
@@ -91,12 +94,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             logger.info('Keeping cached user despite invalid response structure');
             setUser(cachedUser);
             setLoading(false);
+            setHasInitialized(true);
             return;
           }
           // Solo limpiar si no hay caché
           authService.clearSession();
           setUser(null);
           setLoading(false);
+          setHasInitialized(true);
           return;
         }
         
@@ -111,16 +116,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             currentPath,
             isAdminRoute,
           });
-          authService.clearSession();
-          setUser(null);
-          setLoading(false);
           
-          // Si estamos en una ruta del admin, redirigir al login
-          if (isAdminRoute) {
-            logger.info('Redirecting to login from AuthContext due to expired session');
-            setTimeout(() => {
-              window.location.href = '/auth/login';
-            }, 100);
+          // Solo limpiar si realmente no hay usuario en caché válido
+          // Si hay usuario en caché y acabamos de hacer login, puede ser un problema temporal
+          if (!cachedUser) {
+            authService.clearSession();
+            setUser(null);
+            setLoading(false);
+            setHasInitialized(true);
+            
+            // Si estamos en una ruta del admin, redirigir al login
+            if (isAdminRoute) {
+              logger.info('Redirecting to login from AuthContext due to expired session');
+              setTimeout(() => {
+                window.location.href = '/auth/login';
+              }, 100);
+            }
+          } else {
+            // Si hay usuario en caché, mantenerlo y solo loguear el error
+            // Esto evita el ciclo de recarga después del login
+            logger.warn('Token validation failed but keeping cached user (may be temporary)', {
+              status: errorStatus,
+              cachedUserId: cachedUser.id,
+            });
+            setUser(cachedUser);
+            setLoading(false);
+            setHasInitialized(true);
           }
           return;
         }
@@ -134,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             setUser(cachedUser);
             setLoading(false);
+            setHasInitialized(true);
             return;
           }
         }
@@ -147,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           setUser(cachedUser);
           setLoading(false);
+          setHasInitialized(true);
           return;
         }
         
@@ -165,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
         setLoading(false);
+        setHasInitialized(true);
       }
     } catch (error: any) {
       logger.error('Unexpected error in loadUser', {
@@ -177,15 +201,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isAdminRoute = currentPath.startsWith('/admin');
       
       if (error.response?.status === 401 || error.response?.status === 403) {
-        authService.clearSession();
-        setUser(null);
-        
-        // Si estamos en una ruta del admin, redirigir al login
-        if (isAdminRoute) {
-          logger.info('Redirecting to login from AuthContext (catch block) due to expired session');
-          setTimeout(() => {
-            window.location.href = '/auth/login';
-          }, 100);
+        if (!cachedUser) {
+          authService.clearSession();
+          setUser(null);
+          
+          // Si estamos en una ruta del admin, redirigir al login
+          if (isAdminRoute) {
+            logger.info('Redirecting to login from AuthContext (catch block) due to expired session');
+            setTimeout(() => {
+              window.location.href = '/auth/login';
+            }, 100);
+          }
+        } else {
+          // Mantener usuario en caché si existe
+          setUser(cachedUser);
         }
       } else if (cachedUser) {
         // Mantener usuario en caché para otros errores
@@ -195,6 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
       }
       setLoading(false);
+      setHasInitialized(true);
     }
   }, []);
 
@@ -218,6 +248,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUser(response.user);
+      setLoading(false);
+      setHasInitialized(true);
       logger.info('Login successful', { userId: response.user.id });
     } catch (error: any) {
       logger.error('Login failed', error);
@@ -343,10 +375,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Cargar usuario al montar el componente
+   * Solo ejecutar una vez al inicio, no después de cada navegación
    */
   useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+    if (!hasInitialized) {
+      loadUser();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasInitialized]);
 
   const value = useMemo(
     () => ({
