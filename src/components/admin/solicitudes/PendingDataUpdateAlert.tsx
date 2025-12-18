@@ -63,10 +63,10 @@ export const PendingDataUpdateAlert: React.FC<PendingDataUpdateAlertProps> = ({
   return (
     <Alert className={`${variantStyles[variant]} mb-4`}>
       <AlertTriangle className={`h-5 w-5 ${iconColors[variant]}`} />
-      <AlertTitle className="font-semibold">
+      <AlertTitle className="font-semibold text-left">
         ⚠️ Actualización de Datos Personales Pendiente
       </AlertTitle>
-      <AlertDescription className="mt-2 space-y-2">
+      <AlertDescription className="mt-2 space-y-2 text-left">
         <p className="font-medium">
           Este afiliado tiene una solicitud pendiente de actualización de datos personales.
           Se recomienda procesarla antes de responder a otras solicitudes para evitar enviar

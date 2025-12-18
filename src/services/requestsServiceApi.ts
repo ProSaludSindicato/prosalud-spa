@@ -83,6 +83,8 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
       ? apiRequest.processed_at 
       : undefined,
+    validated_at: apiRequest.validated_at || undefined,
+    validated_by: apiRequest.validated_by || undefined,
     responses: apiRequest.responses?.map(mapApiResponseToFrontendResponse) || [],
     responses_count: apiRequest.responses_count ?? apiRequest.responses?.length ?? 0,
     files,
@@ -218,6 +220,17 @@ export const requestsService = {
 
   async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
     return requestsApiService.downloadFile(requestId, fileKey);
+  },
+
+  // Validate request (manual validation step)
+  async validateRequest(id: string): Promise<Request> {
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId)) {
+      throw new Error('ID inválido - se requiere un ID numérico válido');
+    }
+
+    const apiRequest = await requestsApiService.validateRequest(numericId);
+    return mapApiRequestToFrontendRequest(apiRequest);
   },
 
   // Map frontend request type to backend request type

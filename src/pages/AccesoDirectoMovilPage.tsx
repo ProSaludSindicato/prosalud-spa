@@ -30,8 +30,8 @@ const AccesoDirectoMovilPage: React.FC = () => {
 
   // IDs de videos de YouTube (reemplazar con los IDs reales)
   const videoIds = {
-    android: 'iQk2JD7Fixg',
-    ios: 'rxKF6MQ08PI'
+    android: 'kPEziK-rsII',
+    ios: 'uXKHLYVAG4E'
   };
 
   useEffect(() => {

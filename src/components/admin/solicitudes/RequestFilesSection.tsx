@@ -56,6 +56,93 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const formatMimeType = (mimeType: string): string => {
+    // Mapeo de tipos MIME comunes a nombres más amigables
+    const mimeTypeMap: Record<string, string> = {
+      // Documentos de Word
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+      'application/msword': 'Word',
+      'application/vnd.ms-word': 'Word',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.template': 'Word Template',
+      
+      // Documentos de Excel
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+      'application/vnd.ms-excel': 'Excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.template': 'Excel Template',
+      
+      // Documentos de PowerPoint
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint',
+      'application/vnd.ms-powerpoint': 'PowerPoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.template': 'PowerPoint Template',
+      
+      // PDF
+      'application/pdf': 'PDF',
+      
+      // Imágenes
+      'image/jpeg': 'JPEG',
+      'image/jpg': 'JPG',
+      'image/png': 'PNG',
+      'image/gif': 'GIF',
+      'image/webp': 'WebP',
+      'image/svg+xml': 'SVG',
+      
+      // Texto
+      'text/plain': 'Texto',
+      'text/csv': 'CSV',
+      'text/html': 'HTML',
+      
+      // Otros
+      'application/zip': 'ZIP',
+      'application/x-zip-compressed': 'ZIP',
+      'application/json': 'JSON',
+      'application/xml': 'XML',
+    };
+
+    // Si tenemos un mapeo directo, usarlo
+    if (mimeTypeMap[mimeType.toLowerCase()]) {
+      return mimeTypeMap[mimeType.toLowerCase()];
+    }
+
+    // Para tipos MIME de Office con formato vnd.openxmlformats
+    if (mimeType.includes('wordprocessingml')) {
+      return 'Word';
+    }
+    if (mimeType.includes('spreadsheetml')) {
+      return 'Excel';
+    }
+    if (mimeType.includes('presentationml')) {
+      return 'PowerPoint';
+    }
+
+    // Para tipos genéricos, extraer la parte después de la barra y formatear
+    const parts = mimeType.split('/');
+    if (parts.length === 2) {
+      const subtype = parts[1];
+      
+      // Si contiene "word" o "document", es Word
+      if (subtype.includes('word') || subtype.includes('document')) {
+        return 'Word';
+      }
+      
+      // Si contiene "excel" o "spreadsheet", es Excel
+      if (subtype.includes('excel') || subtype.includes('spreadsheet')) {
+        return 'Excel';
+      }
+      
+      // Si contiene "powerpoint" o "presentation", es PowerPoint
+      if (subtype.includes('powerpoint') || subtype.includes('presentation')) {
+        return 'PowerPoint';
+      }
+      
+      // Para otros tipos, tomar solo la primera parte antes del punto o guión
+      const firstPart = subtype.split('.')[0].split('-')[0];
+      return firstPart.charAt(0).toUpperCase() + firstPart.slice(1).toLowerCase();
+    }
+
+    // Fallback: retornar el tipo original formateado
+    return mimeType.split('/')[1]?.split('.')[0]?.toUpperCase() || 'FILE';
+  };
+
   const isUrlExpired = (urlExpiresAt: string | null): boolean => {
     if (!urlExpiresAt) return true;
     return new Date(urlExpiresAt) < new Date();
@@ -150,7 +237,7 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
                           variant="outline"
                           className={`text-xs shrink-0 bg-gray-100`}
                         >
-                          {file.mime_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                          {formatMimeType(file.mime_type)}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500">

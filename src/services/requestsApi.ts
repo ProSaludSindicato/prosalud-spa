@@ -39,6 +39,8 @@ export interface ApiRequest {
   formatted_created_at: string;
   processed_at: string | null;
   formatted_processed_at: string;
+  validated_at?: string | null;
+  validated_by?: string | null;
   responses?: ApiRequestResponse[];
   responses_count?: number;
   files?: Record<string, ApiRequestFile>;
@@ -566,6 +568,22 @@ export const requestsApiService = {
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Error al obtener solicitudes pendientes de actualización");
+      }
+
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // Validate request (manual validation step)
+  async validateRequest(id: number): Promise<ApiRequest> {
+    try {
+      const response = await requestsApi.post<ApiResponse<ApiRequest>>(`/api/requests/${id}/validate`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Error al validar la solicitud");
       }
 
       return response.data.data;

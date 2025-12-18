@@ -98,6 +98,8 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
     resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
       ? apiRequest.processed_at 
       : undefined,
+    validated_at: apiRequest.validated_at || undefined,
+    validated_by: apiRequest.validated_by || undefined,
     responses: [],
     responses_count: apiRequest.responses_count ?? 0,
     files: undefined,
@@ -215,6 +217,29 @@ const requiresAdicionarActividades = (solicitud: Request): boolean => {
   return checkFlag(infoCertificado.adicionarActividades);
 };
 
+// Función helper escalable para determinar qué tipos de solicitudes requieren validación manual
+// Fácil de extender agregando nuevos tipos al array
+const REQUEST_TYPES_REQUIRING_VALIDATION: Request['request_type'][] = [
+  'descanso-laboral', // Compensación por Descanso
+  'compensacion-anual', // Compensación Anual Diferida
+  'certificado-convenio', // Certificado de Convenio (solo pendientes, verificado en requiresManualValidation)
+  'verificacion-pagos', // Verificación de Pagos
+];
+
+const requiresManualValidation = (solicitud: Request): boolean => {
+  // Solo para solicitudes pendientes o en revisión
+  if (solicitud.status !== 'pending' && solicitud.status !== 'in_progress') {
+    return false;
+  }
+
+  // Verificar si el tipo de solicitud requiere validación
+  return REQUEST_TYPES_REQUIRING_VALIDATION.includes(solicitud.request_type);
+};
+
+const isRequestValidated = (solicitud: Request): boolean => {
+  return !!solicitud.validated_at && !!solicitud.validated_by;
+};
+
 // Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
 const requiresManualCompensaciones = (solicitud: Request): boolean => {
   // Solo para certificados de convenio
@@ -273,6 +298,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [requiresActividadesForm, setRequiresActividadesForm] = useState(false);
   const [isTransitioningRequest, setIsTransitioningRequest] = useState(false);
   const [showUpdateAfiliadosReminder, setShowUpdateAfiliadosReminder] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -706,6 +732,36 @@ const AdminSolicitudesPage: React.FC = () => {
     setRequiresActividadesForm(false);
     responseForm.reset();
     responseWithCompensacionesForm.reset();
+  };
+
+  const handleValidateRequest = async (solicitud: Request) => {
+    if (!solicitud) return;
+
+    setIsValidating(true);
+    try {
+      const updatedRequest = await requestsService.validateRequest(solicitud.id);
+      
+      // Actualizar la solicitud seleccionada si es la misma
+      if (selectedSolicitud?.id === solicitud.id) {
+        setSelectedSolicitud(updatedRequest);
+      }
+
+      // Refetch para actualizar la lista
+      await refetch();
+
+      toast.success("Solicitud validada exitosamente", {
+        description: `La solicitud #${solicitud.id} ha sido validada y está lista para ser gestionada.`,
+        duration: 4000,
+      });
+    } catch (error) {
+      logger.error("Error al validar solicitud", error instanceof Error ? error.message : error);
+      toast.error("Error al validar solicitud", {
+        description: getErrorMessage(error),
+        duration: 6000,
+      });
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleSubmitResponse = async (data: ResponseFormValues) => {
@@ -1510,9 +1566,32 @@ const AdminSolicitudesPage: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge className={getStatusColor(solicitud.status)}>
-                                  {getStatusLabel(solicitud.status)}
-                                </Badge>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge className={getStatusColor(solicitud.status)}>
+                                    {getStatusLabel(solicitud.status)}
+                                  </Badge>
+                                  {requiresManualValidation(solicitud) && (
+                                    <span 
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                                        isRequestValidated(solicitud) 
+                                          ? "bg-green-50 text-green-700 border border-green-200" 
+                                          : "bg-orange-50 text-orange-700 border border-orange-200"
+                                      }`}
+                                    >
+                                      {isRequestValidated(solicitud) ? (
+                                        <>
+                                          <CheckCircle className="h-3 w-3" />
+                                          Validada
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Clock className="h-3 w-3" />
+                                          Sin Validar
+                                        </>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div>
@@ -1573,6 +1652,21 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
+                                    {can('requests.respond') && requiresManualValidation(solicitud) && !isRequestValidated(solicitud) && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                      <DropdownMenuItem onClick={() => handleValidateRequest(solicitud)} disabled={isValidating}>
+                                        {isValidating ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Validando...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Validar Solicitud
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                    )}
                                     {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
                                       <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
@@ -1621,7 +1715,7 @@ const AdminSolicitudesPage: React.FC = () => {
                 setExpandedFields({});
               }
             }}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white relative">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white relative">
                 {isTransitioningRequest && (
                   <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
                     <div className="flex flex-col items-center gap-3">
@@ -1635,8 +1729,8 @@ const AdminSolicitudesPage: React.FC = () => {
                 <DialogTitle className="sr-only">
                   Detalles de Solicitud #{selectedSolicitud.id}
                 </DialogTitle>
-                <div className="bg-white min-h-full">
-                  <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="bg-white min-h-full w-full overflow-x-hidden">
+                  <div className="flex items-center justify-between p-6 border-b border-gray-200 w-full">
                     <div className="flex items-center space-x-3">
                       <div className="bg-primary-prosalud/10 p-2 rounded-lg">
                         <FileText className="h-6 w-6 text-primary-prosalud" />
@@ -1650,7 +1744,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-6 space-y-6">
+                  <div className="p-6 space-y-6 w-full overflow-x-hidden">
                     {/* Alerta de actualización pendiente */}
                     {selectedSolicitud && 
                      hasPendingUpdate(selectedSolicitud.id_number) &&
@@ -1673,26 +1767,26 @@ const AdminSolicitudesPage: React.FC = () => {
                     
 
                     {/* Información del Solicitante */}
-                    <Card className="border border-gray-200 shadow-sm">
+                    <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
                         <CardTitle className="text-lg font-semibold text-gray-900">
                           Información del Solicitante
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
+                      <CardContent className="p-6 space-y-4 w-full overflow-x-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                          <div className="space-y-2 min-w-0">
                             <label className="text-sm font-medium text-gray-700">Documento</label>
-                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">
+                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">
                                 {selectedSolicitud.id_type} {selectedSolicitud.id_number}
                               </p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Nombre completo</label>
-                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">
+                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">
                                 {selectedSolicitud.name && selectedSolicitud.last_name
                                   ? `${selectedSolicitud.name} ${selectedSolicitud.last_name}`.trim()
                                   : selectedSolicitud.name || selectedSolicitud.last_name || "No especificado"}
@@ -1701,17 +1795,17 @@ const AdminSolicitudesPage: React.FC = () => {
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Correo Electrónico</label>
-                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">{selectedSolicitud.email || "No especificado"}</p>
+                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">{selectedSolicitud.email || "No especificado"}</p>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Teléfono</label>
-                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
+                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
                               {/* NOTA: En el panel admin NO se debe ofuscar ningún dato.
                                   Los datos se muestran tal cual vienen del backend.
                                   Si los datos vienen ofuscados del backend, eso es un problema del backend que debe resolverse allí. */}
-                              <p className="text-gray-900">{selectedSolicitud.phone_number || "No especificado"}</p>
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">{selectedSolicitud.phone_number || "No especificado"}</p>
                             </div>
                           </div>
                         </div>
@@ -1719,18 +1813,18 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
 
                     {/* Información de la Solicitud */}
-                    <Card className="border border-gray-200 shadow-sm">
+                    <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
                         <CardTitle className="text-lg font-semibold text-gray-900">
                           Información de la Solicitud
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
+                      <CardContent className="p-6 space-y-4 w-full overflow-x-hidden">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                          <div className="space-y-2 min-w-0">
                             <label className="text-sm font-medium text-gray-700">Tipo de Solicitud</label>
-                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
-                              <p className="text-gray-900">{getRequestTypeLabel(selectedSolicitud.request_type)}</p>
+                            <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">{getRequestTypeLabel(selectedSolicitud.request_type)}</p>
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -1741,6 +1835,43 @@ const AdminSolicitudesPage: React.FC = () => {
                               </Badge>
                             </div>
                           </div>
+                          {requiresManualValidation(selectedSolicitud) && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-gray-700">Estado de Validación</label>
+                              <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span 
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+                                      isRequestValidated(selectedSolicitud) 
+                                        ? "bg-green-50 text-green-700 border border-green-200" 
+                                        : "bg-orange-50 text-orange-700 border border-orange-200"
+                                    }`}
+                                  >
+                                    {isRequestValidated(selectedSolicitud) ? (
+                                      <>
+                                        <CheckCircle className="h-3 w-3" />
+                                        Validada
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Clock className="h-3 w-3" />
+                                        Sin Validar
+                                      </>
+                                    )}
+                                  </span>
+                                  {isRequestValidated(selectedSolicitud) && selectedSolicitud.validated_at && (
+                                    <span className="text-xs text-gray-600">
+                                      {new Date(selectedSolicitud.validated_at).toLocaleDateString("es-ES", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700">Fecha de Creación</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200">
@@ -1769,14 +1900,14 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
 
                     {/* Detalles Específicos */}
-                    <Card className="border border-gray-200 shadow-sm">
+                    <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">
                       <CardHeader className="bg-gray-50 border-b border-gray-200">
                         <CardTitle className="text-lg font-semibold text-gray-900">
                           Detalles Específicos de la Solicitud
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-6">
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <CardContent className="p-6 w-full overflow-x-hidden">
+                        <div className="bg-white border border-gray-200 rounded-lg p-4 w-full overflow-x-hidden">
                           {selectedSolicitud.payload &&
                           typeof selectedSolicitud.payload === "object" &&
                           Object.keys(selectedSolicitud.payload).length > 0 ? (
@@ -1867,40 +1998,40 @@ const AdminSolicitudesPage: React.FC = () => {
                                         </p>
                                         {parsedVal.map((beneficiario: any, idx: number) => (
                                           <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                              <div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs w-full overflow-x-hidden">
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Tipo Doc:</span>{' '}
-                                                <span className="text-gray-900">{beneficiario.tipo_documento || 'N/A'}</span>
+                                                <span className="text-gray-900 break-words">{beneficiario.tipo_documento || 'N/A'}</span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Documento:</span>{' '}
-                                                <span className="text-gray-900">{beneficiario.documento || 'N/A'}</span>
+                                                <span className="text-gray-900 break-words">{beneficiario.documento || 'N/A'}</span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Nombres:</span>{' '}
-                                                <span className="text-gray-900">{beneficiario.nombres || 'N/A'}</span>
+                                                <span className="text-gray-900 break-words">{beneficiario.nombres || 'N/A'}</span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Apellidos:</span>{' '}
-                                                <span className="text-gray-900">{beneficiario.apellidos || 'N/A'}</span>
+                                                <span className="text-gray-900 break-words">{beneficiario.apellidos || 'N/A'}</span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Fecha Nacimiento:</span>{' '}
-                                                <span className="text-gray-900">
+                                                <span className="text-gray-900 break-words">
                                                   {beneficiario.fecha_nacimiento 
                                                     ? new Date(beneficiario.fecha_nacimiento).toLocaleDateString('es-CO')
                                                     : 'N/A'}
                                                 </span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Parentesco:</span>{' '}
-                                                <span className="text-gray-900">
+                                                <span className="text-gray-900 break-words">
                                                   {getParentescoLabel(beneficiario.parentesco || '') || 'N/A'}
                                                 </span>
                                               </div>
-                                              <div>
+                                              <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Sexo:</span>{' '}
-                                                <span className="text-gray-900">
+                                                <span className="text-gray-900 break-words">
                                                   {beneficiario.sexo === 'M' ? 'Masculino' : 
                                                    beneficiario.sexo === 'F' ? 'Femenino' : 
                                                    beneficiario.sexo || 'N/A'}
@@ -1974,16 +2105,16 @@ const AdminSolicitudesPage: React.FC = () => {
                               const renderField = (key: string, value: any) => (
                                 <div
                                   key={key}
-                                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-2 border-b border-gray-100 last:border-b-0"
+                                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-2 border-b border-gray-100 last:border-b-0 w-full"
                                 >
-                                  <div className="md:col-span-1">
-                                    <label className="text-sm font-medium text-gray-700">
+                                  <div className="md:col-span-1 min-w-0">
+                                    <label className="text-sm font-medium text-gray-700 break-words">
                                       {formatFieldName(key)}
                                     </label>
                                   </div>
-                                  <div className="md:col-span-2">
-                                    <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 max-w-full overflow-auto">
-                                      <div className="text-gray-900 text-sm break-words">
+                                  <div className="md:col-span-2 min-w-0">
+                                    <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 w-full overflow-x-hidden">
+                                      <div className="text-gray-900 text-sm break-words overflow-wrap-anywhere">
                                         {formatValue(value)}
                                       </div>
                                     </div>
@@ -2174,9 +2305,40 @@ const AdminSolicitudesPage: React.FC = () => {
 
                     {/* Acciones */}
                     {can('requests.respond') && selectedSolicitud.status !== "resolved" && selectedSolicitud.status !== "rejected" && (
-                      <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                      <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                        {/* Botón de validar si requiere validación y no está validada */}
+                        {requiresManualValidation(selectedSolicitud) && !isRequestValidated(selectedSolicitud) && (
+                          <div>
+                            <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-3">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle className="text-sm font-semibold">Validación Recomendada</AlertTitle>
+                              <AlertDescription className="text-xs">
+                                Se recomienda validar esta solicitud antes de dar respuesta para verificar que la información y anexos sean correctos.
+                              </AlertDescription>
+                            </Alert>
+                            <Button
+                              onClick={() => handleValidateRequest(selectedSolicitud)}
+                              disabled={isValidating}
+                              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                            >
+                              {isValidating ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Validando...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Validar Solicitud
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Botón de responder */}
                         {requiresManualCompensaciones(selectedSolicitud) ? (
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col gap-2">
                             <Alert className="bg-amber-50 border-amber-200 text-amber-800">
                               <AlertCircle className="h-4 w-4" />
                               <AlertTitle className="text-sm font-semibold">Requiere Compensaciones Manuales</AlertTitle>

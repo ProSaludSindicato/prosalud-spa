@@ -29,6 +29,8 @@ export interface Request {
   created_at: string;
   processed_at?: string;
   resolved_at?: string;
+  validated_at?: string;
+  validated_by?: string;
   responses?: RequestResponse[];
   responses_count?: number;
   files?: Record<string, RequestFile>;
