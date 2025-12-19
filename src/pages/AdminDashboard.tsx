@@ -84,6 +84,28 @@ const dashboardUploadConfigs: Record<DashboardUploadType, DashboardUploadConfig>
   },
 };
 
+// Función para obtener la etiqueta del tipo de solicitud
+const getRequestTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    "certificado-convenio": "Certificado de Convenio",
+    "compensacion-anual": "Compensación Anual Diferida",
+    "verificacion-pagos": "Verificación de Pagos",
+    "compensacion-descanso": "Compensación por Descanso",
+    "descanso-laboral": "Compensación por Descanso", // Tipo del frontend mapeado desde backend
+    "actualizar-datos-personales": "Actualizar Datos Personales",
+    "solicitud-microcredito": "Solicitud de Microcrédito",
+    "solicitud-retiro-sindical": "Solicitud de Retiro Sindical",
+    "retiro-sindical": "Retiro Sindical",
+    "microcredito": "Solicitud de Microcrédito",
+    "incapacidad-licencia": "Incapacidades y Licencias",
+    "permisos-cambio-turnos": "Permisos y Cambio de Turnos",
+    "incapacidades-licencias": "Incapacidades y Licencias",
+    "permisos-turnos": "Permisos y Cambio de Turnos",
+    "solicitud-bienestar": "Solicitud de Bienestar",
+  };
+  return labels[type] || type;
+};
+
 const AdminDashboard: React.FC = () => {
   const { can } = usePermissions();
   const navigate = useNavigate();
@@ -952,7 +974,7 @@ const AdminDashboard: React.FC = () => {
                                       </span>
                                     </div>
                                     <p className="text-sm text-slate-600 truncate">
-                                      {request.request_type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                      {getRequestTypeLabel(request.request_type)}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
                                       {new Date(request.created_at).toLocaleDateString('es-ES', {

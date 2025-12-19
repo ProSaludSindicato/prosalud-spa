@@ -634,51 +634,46 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
                   )}
 
                   {/* Distribución Mensual */}
-                  {estadisticasData.data.distribucion_mensual.length > 0 && (() => {
-                    // Ordenar por mes (más reciente primero) y tomar solo los últimos 6 meses
-                    const ultimos6Meses = [...estadisticasData.data.distribucion_mensual]
-                      .sort((a, b) => b.mes.localeCompare(a.mes))
-                      .slice(0, 6);
-                    const maxCantidad = Math.max(...ultimos6Meses.map(d => d.cantidad));
-                    
-                    return (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5" />
-                            Distribución Mensual (Últimos 6 Meses)
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {ultimos6Meses.map((item) => {
-                              const porcentaje = maxCantidad > 0 ? ((item.cantidad / maxCantidad) * 100).toFixed(1) : 0;
-                              const fecha = new Date(item.mes + '-01');
-                              const mesNombre = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-                              return (
-                                <div key={item.mes} className="space-y-1">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm font-medium text-gray-700 capitalize">
-                                      {mesNombre}
-                                    </span>
-                                    <span className="text-sm text-gray-600">
-                                      {item.cantidad.toLocaleString()} certificados
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-3">
-                                    <div
-                                      className="bg-gradient-to-r from-primary-prosalud to-primary-prosalud-dark h-3 rounded-full transition-all"
-                                      style={{ width: `${porcentaje}%` }}
-                                    />
-                                  </div>
+                  {estadisticasData.data.distribucion_mensual.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5" />
+                          Distribución Mensual (Últimos 12 Meses)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {estadisticasData.data.distribucion_mensual.map((item) => {
+                            const maxCantidad = Math.max(
+                              ...estadisticasData.data.distribucion_mensual.map(d => d.cantidad)
+                            );
+                            const porcentaje = maxCantidad > 0 ? ((item.cantidad / maxCantidad) * 100).toFixed(1) : 0;
+                            const fecha = new Date(item.mes + '-01');
+                            const mesNombre = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                            return (
+                              <div key={item.mes} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-700 capitalize">
+                                    {mesNombre}
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    {item.cantidad.toLocaleString()} certificados
+                                  </span>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })()}
+                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                  <div
+                                    className="bg-gradient-to-r from-primary-prosalud to-primary-prosalud-dark h-3 rounded-full transition-all"
+                                    style={{ width: `${porcentaje}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Filtros Aplicados */}
                   {(estadisticasData.data.filtros_aplicados.fecha_desde || estadisticasData.data.filtros_aplicados.fecha_hasta) && (

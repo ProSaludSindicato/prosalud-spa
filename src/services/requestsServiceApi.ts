@@ -45,6 +45,25 @@ const mapFrontendStatusToApiStatus = (frontendStatus: Request['status']): 'PENDI
   }
 };
 
+// Map backend request type to frontend request type
+const mapBackendRequestTypeToFrontend = (backendType: string): Request['request_type'] => {
+  const typeMap: Record<string, Request['request_type']> = {
+    'solicitud-retiro-sindical': 'retiro-sindical',
+    'solicitud-microcredito': 'microcredito',
+    'incapacidades-licencias': 'incapacidad-licencia',
+    'compensacion-descanso': 'descanso-laboral',
+    // Tipos que son iguales en backend y frontend
+    'certificado-convenio': 'certificado-convenio',
+    'compensacion-anual': 'compensacion-anual',
+    'verificacion-pagos': 'verificacion-pagos',
+    'actualizar-datos-personales': 'actualizar-datos-personales',
+    'permisos-turnos': 'permisos-turnos',
+    'solicitud-bienestar': 'solicitud-bienestar',
+  };
+  
+  return typeMap[backendType] || (backendType as Request['request_type']);
+};
+
 // Map API file to frontend file
 const mapApiFileToFrontendFile = (apiFile: ApiRequestFile): RequestFile => {
   return {
@@ -69,7 +88,7 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
 
   return {
     id: apiRequest.id?.toString() || '',
-    request_type: apiRequest.request_type as Request['request_type'],
+    request_type: mapBackendRequestTypeToFrontend(apiRequest.request_type),
     id_type: apiRequest.document_type as Request['id_type'],
     id_number: apiRequest.document_number || '',
     name: apiRequest.name || '',

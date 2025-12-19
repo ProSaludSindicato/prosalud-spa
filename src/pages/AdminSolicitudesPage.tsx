@@ -65,6 +65,25 @@ import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/adm
 import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/UpdateAfiliadosReminderDialog";
 import { useNavigate } from "react-router-dom";
 
+// Map backend request type to frontend request type
+const mapBackendRequestTypeToFrontend = (backendType: string): Request['request_type'] => {
+  const typeMap: Record<string, Request['request_type']> = {
+    'solicitud-retiro-sindical': 'retiro-sindical',
+    'solicitud-microcredito': 'microcredito',
+    'incapacidades-licencias': 'incapacidad-licencia',
+    'compensacion-descanso': 'descanso-laboral',
+    // Tipos que son iguales en backend y frontend
+    'certificado-convenio': 'certificado-convenio',
+    'compensacion-anual': 'compensacion-anual',
+    'verificacion-pagos': 'verificacion-pagos',
+    'actualizar-datos-personales': 'actualizar-datos-personales',
+    'permisos-turnos': 'permisos-turnos',
+    'solicitud-bienestar': 'solicitud-bienestar',
+  };
+  
+  return typeMap[backendType] || (backendType as Request['request_type']);
+};
+
 // Helper function to convert ApiRequest to Request
 const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
   const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
@@ -84,7 +103,7 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
 
   return {
     id: apiRequest.id?.toString() || '',
-    request_type: apiRequest.request_type as Request['request_type'],
+    request_type: mapBackendRequestTypeToFrontend(apiRequest.request_type),
     id_type: apiRequest.document_type as Request['id_type'],
     id_number: apiRequest.document_number || '',
     name: apiRequest.name || '',
@@ -393,12 +412,17 @@ const AdminSolicitudesPage: React.FC = () => {
       "compensacion-anual": "Compensación Anual Diferida",
       "verificacion-pagos": "Verificación de Pagos",
       "compensacion-descanso": "Compensación por Descanso",
+      "descanso-laboral": "Compensación por Descanso", // Tipo del frontend mapeado desde backend
       "actualizar-datos-personales": "Actualizar Datos Personales",
       "solicitud-microcredito": "Solicitud de Microcrédito",
       "solicitud-retiro-sindical": "Solicitud de Retiro Sindical",
       "retiro-sindical": "Retiro Sindical",
+      "microcredito": "Solicitud de Microcrédito",
+      "incapacidad-licencia": "Incapacidades y Licencias",
       "permisos-cambio-turnos": "Permisos y Cambio de Turnos",
       "incapacidades-licencias": "Incapacidades y Licencias",
+      "permisos-turnos": "Permisos y Cambio de Turnos",
+      "solicitud-bienestar": "Solicitud de Bienestar",
     };
     return labels[type] || type;
   };
