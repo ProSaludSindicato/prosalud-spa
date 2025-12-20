@@ -81,8 +81,8 @@ const DescriptionSection: React.FC = () => {
           ))}
         </div>
 
-        <div className="max-w-3xl mx-auto text-center animate-fade-in" style={{ animationDelay: `${statsData.length * 150}ms` }}>
-          <p className="text-base sm:text-lg text-text-gray leading-relaxed px-4">
+        <div className="max-w-5xl mx-auto animate-fade-in" style={{ animationDelay: `${statsData.length * 150}ms` }}>
+          <p className="text-base sm:text-lg text-text-gray leading-relaxed px-4 text-justify">
             El Sindicato de Profesionales de la Salud ProSalud, es un Sindicato de gremio que funciona de conformidad con la Constitución Nacional, está orientado al bienestar de los afiliados de manera autogestionaria y autónoma, permitiendo el logro de los objetivos establecidos y la atención de procesos y subprocesos con capital humano capacitado en beneficio de todos los usuarios en las diferentes empresas receptoras del Servicio.
           </p>
         </div>

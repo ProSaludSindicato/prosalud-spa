@@ -19,6 +19,11 @@ const principiosData = [
 ];
 
 const PrinciplesSection: React.FC = () => {
+  // Dividir los principios en dos columnas
+  const mitad = Math.ceil(principiosData.length / 2);
+  const columnaIzquierda = principiosData.slice(0, mitad);
+  const columnaDerecha = principiosData.slice(mitad);
+
   return (
     <section className="py-16 md:py-24 bg-gradient-to-b from-background-light to-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,26 +33,59 @@ const PrinciplesSection: React.FC = () => {
             Compromisos fundamentales que rigen nuestra labor sindical.
           </p>
         </div>
-        <Accordion type="single" collapsible className="w-full max-w-4xl mx-auto space-y-3">
-          {principiosData.map((principio, index) => (
-            <AccordionItem
-              value={`item-${index}`}
-              key={index}
-              className="border border-prosalud-border bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <AccordionTrigger className="text-left hover:no-underline py-5 px-6 text-lg font-medium text-text-dark hover:text-primary-prosalud group w-full">
-                <div className="flex items-center">
-                  <principio.icon size={26} className="mr-4 text-secondary-prosaludgreen shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                  {principio.title}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="text-text-gray pt-0 p-6 text-base leading-relaxed bg-slate-50 rounded-b-lg">
-                {principio.content}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
+            {/* Columna izquierda */}
+            <div className="flex flex-col">
+              <Accordion type="single" collapsible className="w-full">
+                {columnaIzquierda.map((principio, index) => (
+                  <div key={index} className="mb-4 md:mb-5 last:mb-0">
+                    <AccordionItem
+                      value={`item-left-${index}`}
+                      className="border border-prosalud-border bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 animate-fade-in border-b-0"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <AccordionTrigger className="text-left hover:no-underline py-5 px-6 text-lg font-medium text-text-dark hover:text-primary-prosalud group w-full">
+                        <div className="flex items-center">
+                          <principio.icon size={26} className="mr-4 text-secondary-prosaludgreen shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                          {principio.title}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-text-gray pt-0 p-6 text-base leading-relaxed bg-slate-50 rounded-b-lg">
+                        {principio.content}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </div>
+                ))}
+              </Accordion>
+            </div>
+            
+            {/* Columna derecha */}
+            <div className="flex flex-col">
+              <Accordion type="single" collapsible className="w-full">
+                {columnaDerecha.map((principio, index) => (
+                  <div key={index} className="mb-4 md:mb-5 last:mb-0">
+                    <AccordionItem
+                      value={`item-right-${index}`}
+                      className="border border-prosalud-border bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 animate-fade-in border-b-0"
+                      style={{ animationDelay: `${(mitad + index) * 100}ms` }}
+                    >
+                      <AccordionTrigger className="text-left hover:no-underline py-5 px-6 text-lg font-medium text-text-dark hover:text-primary-prosalud group w-full">
+                        <div className="flex items-center">
+                          <principio.icon size={26} className="mr-4 text-secondary-prosaludgreen shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                          {principio.title}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-text-gray pt-0 p-6 text-base leading-relaxed bg-slate-50 rounded-b-lg">
+                        {principio.content}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </div>
+                ))}
+              </Accordion>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
