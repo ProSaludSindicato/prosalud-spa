@@ -4,7 +4,7 @@
 ## Descripción del Servicio
 Esta guía orienta a los afiliados sobre el proceso para reportar incapacidades (origen común o laboral) y licencias (maternidad, paternidad, etc.) al sindicato ProSalud.
 
-**Enlace a la página informativa en el sitio web:** [`/servicios/incapacidad-maternidad`](/servicios/incapacidad-maternidad)
+**Enlace a la página informativa en el sitio web:** [`/servicios/incapacidades-licencias`](/servicios/incapacidades-licencias)
 
 ## Proceso de Solicitud
 

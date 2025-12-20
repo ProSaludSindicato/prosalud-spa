@@ -1974,7 +1974,7 @@ const AdminSolicitudesPage: React.FC = () => {
                               // NOTA: En el panel admin NO se debe ofuscar ningún dato.
                               // Los datos se muestran tal cual vienen del backend sin aplicar ofuscación.
                               // Si los datos vienen ofuscados del backend, eso es un problema del backend que debe resolverse allí.
-                              const formatValue = (val: any): React.ReactNode => {
+                              const formatValue = (val: any, fieldKey?: string): React.ReactNode => {
                                 // Handle empty strings - mostrar como "No especificado" pero permitir strings vacíos para campos de proceso
                                 if (val === null || val === undefined) {
                                   return "No especificado";
@@ -1983,6 +1983,22 @@ const AdminSolicitudesPage: React.FC = () => {
                                 // Handle empty strings - para campos de proceso, mostrar "No especificado" si está vacío
                                 if (typeof val === 'string' && val.trim() === '') {
                                   return <span className="text-gray-400 italic">No especificado</span>;
+                                }
+                                
+                                // Transformar tipoDocumento para solicitudes de incapacidades y licencias
+                                if (selectedSolicitud.request_type === 'incapacidad-licencia' && 
+                                    fieldKey === 'tipoDocumento' && 
+                                    typeof val === 'string') {
+                                  const tipoDocumentoLabels: Record<string, string> = {
+                                    'incapacidad-comun': 'Incapacidad de Origen Común',
+                                    'incapacidad-laboral': 'Incapacidad de Origen Laboral',
+                                    'licencia-maternidad': 'Licencia de Maternidad',
+                                    'licencia-paternidad': 'Licencia de Paternidad',
+                                    'licencia-luto': 'Licencia por Luto',
+                                    'licencia-calamidad': 'Licencia por Calamidad',
+                                    'otro': 'Otro'
+                                  };
+                                  return tipoDocumentoLabels[val] || val;
                                 }
                                 
                                 // Handle boolean values and numeric booleans (1/0)
@@ -2139,7 +2155,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                   <div className="md:col-span-2 min-w-0">
                                     <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 w-full overflow-x-hidden">
                                       <div className="text-gray-900 text-sm break-words overflow-wrap-anywhere">
-                                        {formatValue(value)}
+                                        {formatValue(value, key)}
                                       </div>
                                     </div>
                                   </div>

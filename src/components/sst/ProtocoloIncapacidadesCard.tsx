@@ -34,7 +34,7 @@ const ProtocoloIncapacidadesCard: React.FC = () => {
         <p>
           Para una guía detallada sobre el trámite de incapacidades y licencias, incluyendo requisitos y recomendaciones, visita nuestra página dedicada.
         </p>
-        <Link to="/servicios/incapacidad-maternidad" className="block">
+        <Link to="/servicios/incapacidades-licencias" className="block">
           <Button className="my-5 w-full sm:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white">
             Ver Guía Completa de Incapacidades y Licencias
             <ArrowRightCircle size={20} className="ml-2" />

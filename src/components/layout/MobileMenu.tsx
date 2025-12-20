@@ -42,8 +42,8 @@ const MobileMenu: React.FC<MobileMenuProps> = ({ onClose, activeLinkClass, inact
                                   className={`category-accordion-trigger py-2 px-2 hover:bg-primary-prosalud-light hover:text-primary-prosalud text-sm`}
                                 >
                                   <div className="flex justify-between w-full items-center">
-                                    {/* Changed font-medium to font-semibold for category title */}
-                                    <span className="font-semibold">{subItem.name}</span>
+                                    {/* Changed font-medium to font-bold for category title */}
+                                    <span className="font-bold">{subItem.name}</span>
                                     <span className="plus-minus-icon">
                                       <Plus size={16} className="plus-icon" />
                                       <Minus size={16} className="minus-icon" />

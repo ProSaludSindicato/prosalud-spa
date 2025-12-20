@@ -113,10 +113,10 @@ export const searchData: SearchItem[] = [
     keywords: ["datos", "personales", "actualizar", "cuenta", "bancaria", "contacto", "educacion", "eps", "afp", "informacion", "banco"]
   },
   {
-    id: "incapacidad-maternidad",
+    id: "incapacidades-licencias",
     title: "Incapacidades y Licencias",
     description: "Gestiona incapacidades y licencias de maternidad",
-    path: "/servicios/incapacidad-maternidad",
+    path: "/servicios/incapacidades-licencias",
     category: "Servicios",
     keywords: ["incapacidad", "maternidad", "licencia", "salud", "ausencia", "permiso", "reposo"]
   },

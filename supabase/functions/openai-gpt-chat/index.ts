@@ -110,7 +110,7 @@ SERVICIOS Y SUS RUTAS EXACTAS:
 - Verificación de Pagos: /servicios/consulta-pagos
 - Certificado de Seguridad Social (Certificado de Aportes): /servicios/certificado-seguridad-social
 - Actualizar Datos Personales: /servicios/actualizar-datos-personales
-- Incapacidades y Licencias de Maternidad: /servicios/incapacidad-maternidad
+- Incapacidades y Licencias de Maternidad: /servicios/incapacidades-licencias
 - Seguridad y Salud en el Trabajo (SST): /servicios/sst
 - Galería de Bienestar: /servicios/galeria-bienestar
 - Permisos y Cambio de Turnos: /servicios/permisos-turnos

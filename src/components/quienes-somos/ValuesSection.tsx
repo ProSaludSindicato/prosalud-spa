@@ -25,17 +25,17 @@ const ValuesSection: React.FC = () => {
             Los pilares que guían cada una de nuestras acciones y decisiones.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
           {valoresData.map((valor, index) => (
             <div
               key={index}
-              className="bg-card p-6 sm:p-8 rounded-xl shadow-lg border border-prosalud-border hover:shadow-2xl transition-all duration-300 flex flex-col items-center text-center animate-scale-in group transform hover:scale-105"
+              className="bg-card p-4 sm:p-6 rounded-xl shadow-lg border border-prosalud-border hover:shadow-2xl transition-all duration-300 flex flex-col items-center text-center animate-scale-in group transform hover:scale-105"
               style={{ animationDelay: `${index * 150}ms` }}
             >
-              <div className="p-3 sm:p-4 bg-primary-prosalud-light rounded-full mb-4 sm:mb-6 group-hover:bg-primary-prosalud transition-colors duration-300">
-                <valor.icon size={40} className="text-primary-prosalud group-hover:text-white transition-colors duration-300" />
+              <div className="p-2 sm:p-3 bg-primary-prosalud-light rounded-full mb-3 sm:mb-4 group-hover:bg-primary-prosalud transition-colors duration-300">
+                <valor.icon size={32} className="text-primary-prosalud group-hover:text-white transition-colors duration-300" />
               </div>
-              <h3 className="text-xl sm:text-2xl font-semibold text-text-dark mb-2 sm:mb-3">{valor.title}</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-text-dark mb-2 sm:mb-3">{valor.title}</h3>
               <p className="text-sm sm:text-base text-text-gray leading-relaxed">{valor.description}</p>
             </div>
           ))}

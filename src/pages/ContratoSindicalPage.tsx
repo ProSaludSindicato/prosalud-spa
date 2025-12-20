@@ -35,9 +35,9 @@ const ContentSection: React.FC<ContentSectionProps> = ({
   bgColor = "bg-white",
   imageUrl 
 }) => (
-  <Card className={`shadow-lg hover:shadow-xl transition-all duration-300 ${bgColor} animate-fade-in overflow-hidden group`}>
+  <Card className={`shadow-lg hover:shadow-xl transition-all duration-300 ${bgColor} animate-fade-in overflow-hidden group h-full flex flex-col`}>
     {imageUrl && (
-      <div className="h-48 overflow-hidden">
+      <div className="h-48 overflow-hidden flex-shrink-0">
         <img 
           src={imageUrl} 
           alt={title}
@@ -45,7 +45,7 @@ const ContentSection: React.FC<ContentSectionProps> = ({
         />
       </div>
     )}
-    <CardHeader>
+    <CardHeader className="flex-shrink-0">
       <div className="flex items-center mb-3">
         <div className={`p-3 rounded-xl mr-4 ${iconColor === 'text-secondary-prosaludgreen' ? 'bg-green-100' : iconColor === 'text-accent-prosaludteal' ? 'bg-teal-100' : iconColor === 'text-blue-600' ? 'bg-blue-100' : 'bg-blue-50'}`}>
           <Icon className={`h-8 w-8 ${iconColor}`} />
@@ -56,7 +56,7 @@ const ContentSection: React.FC<ContentSectionProps> = ({
         </div>
       </div>
     </CardHeader>
-    <CardContent>
+    <CardContent className="flex-grow flex flex-col">
       {typeof details === 'string' ? (
         <p className="text-gray-700 leading-relaxed">{details}</p>
       ) : (
@@ -100,7 +100,7 @@ const ContratoSindicalPage: React.FC = () => {
         </div>
       ),
       iconColor: "text-secondary-prosaludgreen",
-      imageUrl: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+      imageUrl: "/images/contrato_sindical/calidad_afiliado.jpeg"
     },
     {
       icon: FileText,
@@ -130,7 +130,7 @@ const ContratoSindicalPage: React.FC = () => {
         </div>
       ),
       iconColor: "text-accent-prosaludteal",
-      imageUrl: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+      imageUrl: "/images/contrato_sindical/contrato.avif"
     },
     {
       icon: Gavel,
@@ -158,7 +158,7 @@ const ContratoSindicalPage: React.FC = () => {
         </div>
       ),
       iconColor: "text-primary-prosalud",
-      imageUrl: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+      imageUrl: "/images/contrato_sindical/naturaleza_juridica.avif"
     },
     {
       icon: AlertTriangle,
@@ -187,7 +187,7 @@ const ContratoSindicalPage: React.FC = () => {
           
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
             <h4 className="font-semibold text-amber-800 mb-2">Principios que rigen la relación:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               {["Democráticos", "Autogestión", "Colaboración", "Autorregulación"].map((principle, index) => (
                 <Badge key={index} className="bg-amber-100 text-amber-800">
                   {principle}
@@ -204,40 +204,42 @@ const ContratoSindicalPage: React.FC = () => {
         </div>
       ),
       iconColor: "text-blue-600",
-      imageUrl: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+      imageUrl: "/images/contrato_sindical/diferencias_contratos.jpeg"
     }
   ];
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
-        {/* Enhanced Hero Section */}
-        <div className="relative bg-gradient-to-r from-primary-prosalud via-blue-700 to-primary-prosalud text-white overflow-hidden">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSI0Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
+      <div className="min-h-screen bg-background-light">
+        {/* Hero Section */}
+        <div className="relative bg-gradient-to-br from-primary-prosalud via-primary-prosalud-dark to-slate-900 text-text-light overflow-hidden">
+          <div className="absolute inset-0 opacity-10">
+            {/* Background texture */}
+          </div>
           
-          <div className="container mx-auto px-4 py-16 relative">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 md:pt-12 pb-16 sm:pb-20 md:pb-24 lg:pb-32 relative z-10">
             <Breadcrumb className="mb-8">
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to="/" className="flex items-center gap-1 text-blue-200 hover:text-white transition-colors">
+                    <Link to="/" className="flex items-center gap-1 text-text-light/80 hover:text-text-light transition-colors">
                       <Home className="h-4 w-4" />
                       Inicio
                     </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="text-blue-200" />
+                <BreadcrumbSeparator className="text-text-light/60" />
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to="/nosotros/quienes-somos" className="flex items-center gap-1 text-blue-200 hover:text-white transition-colors">
+                    <Link to="/nosotros" className="flex items-center gap-1 text-text-light/80 hover:text-text-light transition-colors">
                       <Users className="h-4 w-4" /> 
                       Nosotros
                     </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="text-blue-200" />
+                <BreadcrumbSeparator className="text-text-light/60" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="flex items-center gap-1 font-medium text-white">
+                  <BreadcrumbPage className="flex items-center gap-1 font-medium text-text-light">
                     <FileText className="h-4 w-4" />
                     Contrato Sindical
                   </BreadcrumbPage>
@@ -246,23 +248,23 @@ const ContratoSindicalPage: React.FC = () => {
             </Breadcrumb>
 
             <div className="max-w-4xl mx-auto text-center">
-              <div className="inline-flex items-center justify-center bg-white/20 text-white p-4 rounded-full mb-6 shadow-lg backdrop-blur-sm">
+              <div className="inline-flex items-center justify-center bg-white/10 backdrop-blur-sm text-secondary-prosaludgreen p-4 rounded-full mb-6 shadow-lg">
                 <Briefcase size={48} />
               </div>
-              <h1 className="text-5xl sm:text-6xl font-bold mb-6 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6 animate-fade-in tracking-tight">
                 Contrato Sindical
               </h1>
-              <p className="text-xl text-blue-100 mb-8 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-lg sm:text-xl md:text-2xl max-w-3xl mx-auto animate-fade-in animation-delay-200 font-light px-2 mb-8">
                 Información esencial sobre la naturaleza, implicaciones y marco legal del contrato sindical en ProSalud
               </p>
 
               {/* Stats Section */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12 animate-fade-in animation-delay-400">
                 {heroStats.map((stat, index) => (
-                  <div key={index} className="bg-white/10 backdrop-blur-sm p-6 rounded-xl border border-white/20">
-                    <stat.icon className="h-8 w-8 text-yellow-400 mx-auto mb-3" />
-                    <div className="text-3xl font-bold text-white mb-2">{stat.number}</div>
-                    <div className="text-blue-100">{stat.label}</div>
+                  <div key={index} className="bg-white/10 backdrop-blur-sm p-6 rounded-xl border border-white/20 hover:bg-white/15 transition-colors">
+                    <stat.icon className="h-8 w-8 text-secondary-prosaludgreen mx-auto mb-3" />
+                    <div className="text-3xl font-bold text-text-light mb-2">{stat.number}</div>
+                    <div className="text-text-light/80 text-sm">{stat.label}</div>
                   </div>
                 ))}
               </div>
@@ -293,9 +295,9 @@ const ContratoSindicalPage: React.FC = () => {
           </div>
 
           {/* Main Content Sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16 items-stretch">
             {sections.map((section, index) => (
-              <div key={index} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+              <div key={index} className="animate-fade-in flex" style={{ animationDelay: `${index * 100}ms` }}>
                 <ContentSection
                   icon={section.icon}
                   title={section.title}

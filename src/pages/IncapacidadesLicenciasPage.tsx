@@ -43,9 +43,11 @@ type FormValuesIncapacidades = z.infer<typeof formSchemaIncapacidades>;
 
 const IncapacidadesLicenciasPageContent: React.FC = () => {
   const navigate = useNavigate();
-  const { afiliado } = useAfiliadoAuth();
+  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
+  
+  const activeConvenio = getActiveConvenio();
   const form = useForm<FormValuesIncapacidades>({
     resolver: zodResolver(formSchemaIncapacidades),
     defaultValues: {
@@ -77,6 +79,9 @@ const IncapacidadesLicenciasPageContent: React.FC = () => {
         files.certificadoIncapacidad = data.certificadoIncapacidad;
       }
 
+      const procesoValue = activeConvenio?.proceso ?? '';
+      const dondeRealizaProcesoValue = activeConvenio?.cliente ?? '';
+
       const requestData = {
         request_type: 'incapacidad-licencia',
         id_type: afiliado.tipo_documento || '',
@@ -86,6 +91,9 @@ const IncapacidadesLicenciasPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
+          // SIEMPRE incluir proceso y dondeRealizaProceso (incluso si están vacíos)
+          proceso: procesoValue,
+          dondeRealizaProceso: dondeRealizaProcesoValue,
           tipoDocumento: data.tipoDocumento,
           entidadExpedidora: data.entidadExpedidora,
           fechaExpedicion: data.fechaExpedicion,

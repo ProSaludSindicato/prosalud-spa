@@ -98,7 +98,7 @@ const newServices: Service[] = [
     icon: Hospital, 
     title: 'Incapacidades y licencias', 
     description: 'Reporta tu incapacidad o licencia de maternidad al sindicato.', 
-    linkTo: '/servicios/incapacidad-maternidad', 
+    linkTo: '/servicios/incapacidades-licencias', 
     category: 'Gestión Personal y Sindical',
     keywords: ['incapacidades', 'licencias', 'maternidad', 'reportar', 'salud', 'ausencia', 'medica']
   },

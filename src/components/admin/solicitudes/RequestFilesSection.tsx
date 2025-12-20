@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RequestFile } from '@/types/requests';
-import { Download, FileText, Image, File, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { Download, FileText, Image, File, Loader2, ExternalLink } from 'lucide-react';
 import { requestsService } from '@/services/requestsServiceApi';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
@@ -245,12 +245,6 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
                         <span>•</span>
                         <span>{file.original_name}</span>
                       </div>
-                      {urlExpired && file.download_url && (
-                        <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
-                          <AlertCircle className="h-3 w-3" />
-                          <span>URL temporal expirada, se usará el endpoint de descarga</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

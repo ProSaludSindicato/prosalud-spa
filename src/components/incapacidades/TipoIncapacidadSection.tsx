@@ -74,12 +74,8 @@ const TipoIncapacidadSection = <TFieldValues extends FieldValues>({
                   value={field.value ?? ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === '') {
-                      field.onChange(undefined);
-                    } else {
-                      const numValue = parseInt(value, 10);
-                      field.onChange(isNaN(numValue) ? undefined : numValue);
-                    }
+                    // Mantener como string para que coincida con el esquema de validación
+                    field.onChange(value === '' ? undefined : value);
                   }}
                 />
               </FormControl>

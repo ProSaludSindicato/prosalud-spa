@@ -102,7 +102,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link
-                  to="/servicios/incapacidad-maternidad"
+                  to="/servicios/incapacidades-licencias"
                   className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable"
                 >
                   Incapacidades y Licencias

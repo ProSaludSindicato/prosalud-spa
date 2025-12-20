@@ -98,7 +98,7 @@ const HeaderListItemWrapper: React.FC<{ subItem: MenuSubItem }> = ({ subItem }) 
     return (
       <li key={subItem.name} className="break-inside-avoid"> {/* Outer li for proper grid flow */}
         <div className="mb-2">
-          <h4 className="font-medium mb-1 text-sm text-primary-prosalud px-3 py-1">{subItem.name}</h4>
+          <h4 className="font-bold mb-1 text-sm text-primary-prosalud px-3 py-1">{subItem.name}</h4>
           <ul className="grid gap-1">
             {subItem.submenu.map((nestedSubItem) => (
               <HeaderListItem

@@ -156,18 +156,18 @@ const AccesoDirectoMovilPage: React.FC = () => {
 
           {/* Instructions Section with Tabs */}
           <div className="px-4 md:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               {/* Main Instructions - Takes 2 columns on desktop */}
-              <div className="lg:col-span-2">
-                <Card className="overflow-hidden">
+              <div className="lg:col-span-2 flex">
+                <Card className="overflow-hidden flex flex-col w-full">
                   <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
                     <CardTitle className="text-2xl text-center">Instrucciones por Dispositivo</CardTitle>
                     <CardDescription className="text-center">
                       Selecciona tu dispositivo para ver las instrucciones paso a paso
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-6">
-                    <Tabs defaultValue={defaultTab} className="w-full" onValueChange={setActiveTab}>
+                  <CardContent className="p-6 flex flex-col flex-grow">
+                    <Tabs defaultValue={defaultTab} className="w-full flex flex-col flex-grow" onValueChange={setActiveTab}>
                       <TabsList className="grid w-full grid-cols-2 mb-6 h-auto">
                         <TabsTrigger 
                           value="android" 
@@ -188,7 +188,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                       </TabsList>
 
                   {/* Android Tab Content */}
-                  <TabsContent value="android" className="space-y-6">
+                  <TabsContent value="android" className="space-y-6 flex-grow flex flex-col">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b">
                       <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                         <AndroidLogo />
@@ -201,7 +201,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 flex-grow flex flex-col">
                       <div className="flex gap-4">
                         <div className="flex-shrink-0">
                           <div className="w-8 h-8 bg-primary-prosalud text-white rounded-full flex items-center justify-center font-bold">
@@ -252,7 +252,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex gap-4">
+                      <div className="flex gap-4 mt-auto">
                         <div className="flex-shrink-0">
                           <div className="w-8 h-8 bg-primary-prosalud text-white rounded-full flex items-center justify-center font-bold">
                             4
@@ -278,7 +278,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                   </TabsContent>
 
                   {/* iOS Tab Content */}
-                  <TabsContent value="ios" className="space-y-6">
+                  <TabsContent value="ios" className="space-y-6 flex-grow flex flex-col">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b">
                       <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                         <AppleLogo />
@@ -291,7 +291,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 flex-grow flex flex-col">
                       <div className="flex gap-4">
                         <div className="flex-shrink-0">
                           <div className="w-8 h-8 bg-primary-prosalud text-white rounded-full flex items-center justify-center font-bold">
@@ -361,7 +361,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex gap-4">
+                      <div className="flex gap-4 mt-auto">
                         <div className="flex-shrink-0">
                           <div className="w-8 h-8 bg-primary-prosalud text-white rounded-full flex items-center justify-center font-bold">
                             4
@@ -391,8 +391,8 @@ const AccesoDirectoMovilPage: React.FC = () => {
               </div>
 
               {/* Tips Section - Sidebar on desktop, below on mobile */}
-              <div className="lg:col-span-1">
-                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-md sticky top-24">
+              <div className="lg:col-span-1 flex">
+                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-md sticky top-24 flex flex-col w-full">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <div className="bg-blue-500 p-2 rounded-lg">
@@ -401,7 +401,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                       <span>Consejos Útiles</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 flex flex-col flex-grow">
                     <ul className="space-y-3 text-gray-700">
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
