@@ -88,4 +88,6 @@ Para consultas, reportes o temas relacionados con Seguridad y Salud en el Trabaj
 - **Consultas generales**: 24-48 horas para respuesta inicial
 - **Incapacidades**: 3 días hábiles
 - **Solicitudes complejas**: Hasta 15 días hábiles para revisión completa
-- **Certificados**: 3-5 días hábiles
+- **Certificados de Convenio**: 
+  - ⚡ **Certificados automáticos** (sencillos, con compensaciones para afiliados activos, subsidio de vivienda para afiliados activos, dirigidos a Bancolombia): Envío instantáneo en segundos
+  - ⏳ **Certificados con validación adicional** (subsidio de desempleo, Fondo de Pensiones, con actividades adicionales, otros particulares): Hasta 5 días hábiles
