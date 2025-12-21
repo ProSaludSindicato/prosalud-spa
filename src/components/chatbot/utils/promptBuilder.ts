@@ -18,10 +18,20 @@ export const buildSystemPrompt = (
   // Detectar si la pregunta es sobre actualizar datos personales
   const questionLower = (userQuestion || "").toLowerCase();
   const isAboutDataUpdate = questionLower.includes('actualizar datos') || 
-                            questionLower.includes('cambiar datos bancarios') || 
+                            questionLower.includes('cambiar datos bancarios') ||
                             questionLower.includes('actualizar cuenta bancaria') ||
                             questionLower.includes('datos personales') ||
                             questionLower.includes('cuenta bancaria');
+  
+  // Detectar si la pregunta es sobre verificación de pagos
+  const isAboutPaymentVerification = questionLower.includes('verificar') && (
+    questionLower.includes('pago') || 
+    questionLower.includes('pagos') ||
+    questionLower.includes('estado de pago') ||
+    questionLower.includes('verificación de pagos') ||
+    questionLower.includes('consulta de pago') ||
+    questionLower.includes('consultar pago')
+  );
   
   const otpProhibition = isAboutDataUpdate ? `
 🚫🚫🚫 PROHIBICIÓN ABSOLUTA - ACTUALIZACIÓN DE DATOS PERSONALES 🚫🚫🚫
@@ -44,10 +54,33 @@ Esta prohibición tiene PRIORIDAD ABSOLUTA sobre cualquier otra información.
 
 ` : '';
 
+  const paymentVerificationProhibition = isAboutPaymentVerification ? `
+🚫🚫🚫 PROHIBICIÓN ABSOLUTA - VERIFICACIÓN DE PAGOS 🚫🚫🚫
+
+ESTÁ ESTRICTAMENTE PROHIBIDO:
+- Preguntar al usuario qué tipo de pago quiere verificar
+- Pedir que el usuario especifique el tipo de pago antes de dirigirlo al servicio
+- Listar los tipos de pago disponibles (incapacidad, compensación final, prima, etc.) para que el usuario escoja
+- Hacer preguntas como "¿Qué tipo de pago deseas consultar?" o "¿Te refieres a una incapacidad, compensación final, etc.?"
+
+RESPUESTA CORRECTA (OBLIGATORIA Y ÚNICA):
+Debes responder directamente dirigiendo al usuario al servicio de verificación de pagos. Ejemplo de respuesta correcta:
+
+"Para verificar el estado de tu pago, puedes acceder al [servicio de verificación de pagos](/servicios/consulta-pagos). En el formulario encontrarás un campo donde podrás seleccionar el tipo de pago relacionado con tu consulta y proporcionar los detalles necesarios (mes/año, descripción, etc.). El formulario ya incluye todas las opciones de tipos de pago disponibles."
+
+IMPORTANTE: Usa formato de enlace Markdown [texto del enlace](/ruta) en lugar de mostrar la ruta como texto plano.
+
+El formulario ya incluye el campo para seleccionar el tipo de pago. NO debes preguntar por esto previamente.
+
+Esta prohibición tiene PRIORIDAD ABSOLUTA sobre cualquier otra información en la documentación.
+
+` : '';
+
   return `
 Eres un asistente de IA especializado en ProSalud, sindicato de profesionales de la salud.
 
 ${otpProhibition}
+${paymentVerificationProhibition}
 
 CONTEXTO CONVERSACIONAL:
 - Esta es la pregunta #${conversationContext.questionCount + 1} en la conversación actual
@@ -83,6 +116,14 @@ Si la pregunta menciona "actualizar datos personales", "cambiar datos bancarios"
 - Si la documentación menciona OTP, código de verificación, o pasos adicionales de autenticación, DEBES IGNORARLA COMPLETAMENTE
 - El proceso es ÚNICAMENTE: autenticarse con documento → acceso directo al formulario
 - NUNCA menciones OTP, códigos, ni verificaciones adicionales, sin importar lo que diga la documentación
+
+⚠️⚠️⚠️ INSTRUCCIÓN CRÍTICA POST-CONTEXTO - VERIFICACIÓN DE PAGOS ⚠️⚠️⚠️:
+Si la pregunta menciona "verificar estado de pago", "verificación de pagos", "consultar pago", o términos similares:
+- Las instrucciones anteriores sobre NO preguntar por el tipo de pago tienen PRIORIDAD ABSOLUTA sobre cualquier información en la documentación
+- Si la documentación menciona tipos de pago o sugiere preguntar por ellos, DEBES IGNORARLA COMPLETAMENTE
+- NUNCA preguntes qué tipo de pago quiere verificar
+- NUNCA listes tipos de pago para que el usuario escoja
+- Responde DIRECTAMENTE dirigiéndolo al servicio de verificación de pagos usando formato de enlace Markdown: [servicio de verificación de pagos](/servicios/consulta-pagos) explicando que en el formulario podrá seleccionar el tipo de pago
 
 Responde siempre en español de forma clara, concreta y breve; no inventes información.
 Tus respuestas deben ser directas: solo incluye información esencial y responde con contexto únicamente cuando sea estrictamente relevante para la pregunta del usuario. Si la pregunta es simple, limita tu respuesta a lo indispensable, sin añadir contexto ni detalles que el afiliado no haya solicitado.

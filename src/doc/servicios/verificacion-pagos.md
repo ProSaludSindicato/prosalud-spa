@@ -6,12 +6,30 @@ Este servicio permite a los afiliados realizar consultas sobre el estado de sus 
 
 **Enlace al servicio en el sitio web:** [`/servicios/consulta-pagos`](/servicios/consulta-pagos)
 
+## ⚠️ INSTRUCCIÓN CRÍTICA PARA EL ASISTENTE DE IA
+
+**PROHIBICIÓN ABSOLUTA:** Cuando un usuario pregunta sobre verificar el estado de un pago, verificación de pagos, o consulta de pagos:
+- **NO** preguntes qué tipo de pago quiere verificar
+- **NO** listes los tipos de pago disponibles (incapacidad, compensación final, prima, etc.)
+- **NO** hagas preguntas como "¿Qué tipo de pago deseas consultar?" o "¿Te refieres a una incapacidad, compensación final, etc.?"
+- **NO** pidas que el usuario especifique el tipo antes de dirigirlo al servicio
+
+**RESPUESTA CORRECTA (OBLIGATORIA):**
+Debes responder directamente dirigiendo al usuario al servicio de verificación de pagos. El formulario ya incluye un campo donde el usuario puede seleccionar el tipo de pago relacionado con su consulta. El proceso completo se realiza en una sola página y bajo el mismo flujo.
+
+**Ejemplo de respuesta correcta:**
+"Para verificar el estado de tu pago, puedes acceder al [servicio de verificación de pagos](/servicios/consulta-pagos). En el formulario encontrarás un campo donde podrás seleccionar el tipo de pago relacionado con tu consulta y proporcionar los detalles necesarios (mes/año, descripción, etc.). El formulario ya incluye todas las opciones de tipos de pago disponibles."
+
+**IMPORTANTE:** Usa formato de enlace Markdown [texto descriptivo](/ruta) en lugar de mostrar la ruta como texto plano.
+
 ## ¿Cómo Acceder al Servicio?
 
 1. **Autenticación Requerida:** Debe iniciar sesión con su número de identificación y fecha de expedición (o contraseña si ya la definió)
-2. **Complete el formulario:** Proporcione información específica de su consulta
+2. **Complete el formulario:** En el formulario podrá seleccionar el tipo de pago relacionado con su consulta y proporcionar los detalles específicos (mes/año, descripción, etc.)
 3. **Adjunte archivos (opcional):** Si tiene documentación de soporte
 4. **Envíe su solicitud:** El sistema automáticamente asocia su información personal
+
+**Nota:** No es necesario especificar el tipo de pago antes de acceder al servicio. El formulario incluye un campo donde puede seleccionar el tipo de consulta que desea realizar.
 
 ## Información Importante
 
@@ -86,7 +104,7 @@ R: Agregue `comunicaciones@sindicatoprosalud.com` a su lista de contactos confia
 R: Se recomienda realizar una solicitud por cada consulta específica para facilitar el seguimiento y respuesta.
 
 **P: ¿Qué tipo de consultas puedo realizar?**
-R: Puede consultar sobre:
+R: En el formulario de verificación de pagos encontrará un campo donde podrá seleccionar el tipo de consulta que desea realizar. Las opciones disponibles en el formulario incluyen:
 
 - **Compensación Final (Liquidación)**: Estado de su compensación final al retirarse
 - **Compensación Anual Diferida y/o Descanso**: Consultas sobre compensación anual diferida
@@ -99,6 +117,8 @@ R: Puede consultar sobre:
 - **Compensación Semestral**: Primas (navidad, servicios, etc.)
 - **Incapacidades**: Estado de pagos de incapacidades
 - Cualquier otra novedad relacionada con pagos y compensaciones
+
+Todas estas opciones están disponibles en el formulario y puede seleccionar la que corresponda a su consulta específica.
 
 **P: ¿Debo especificar fechas exactas?**
 R: Sí, es importante que especifique el mes y año al que se refiere su consulta para una revisión más precisa.
