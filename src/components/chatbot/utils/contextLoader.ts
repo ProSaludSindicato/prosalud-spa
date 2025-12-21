@@ -42,7 +42,38 @@ export const loadSelectiveContext = async (
     const filteredContents = loadedContents.filter(
       (content) => content.trim() !== ""
     );
-    const contextContent = filteredContents.join("\n\n---\n\n");
+    
+    // Si es la categoría de servicios y contiene actualizar-datos-personales, agregar nota crítica sobre OTP AL INICIO
+    const baseContextContent = filteredContents.join("\n\n---\n\n");
+    
+    let contextContent = baseContextContent;
+    
+    if (category === "servicios" && filesToLoad.includes("servicios/actualizar-datos-personales.md")) {
+      const criticalNote = `⚠️⚠️⚠️ INSTRUCCIÓN CRÍTICA ABSOLUTA - ACTUALIZACIÓN DE DATOS PERSONALES ⚠️⚠️⚠️
+
+🚫 PROHIBICIÓN ABSOLUTA DE MENCIONAR OTP 🚫
+
+Si la pregunta es sobre "actualizar datos personales", "cambiar datos bancarios", "actualizar cuenta bancaria" o términos similares:
+
+1. ESTÁ ESTRICTAMENTE PROHIBIDO mencionar código OTP, código de verificación, One Time Password, ni ningún tipo de código
+2. ESTÁ ESTRICTAMENTE PROHIBIDO decir que se envía un código al correo electrónico
+3. ESTÁ ESTRICTAMENTE PROHIBIDO mencionar pasos de verificación adicionales después de la autenticación inicial
+4. El proceso es ÚNICAMENTE: autenticarse con documento y fecha de expedición (o contraseña) → acceso directo al formulario
+5. Si encuentras información sobre OTP en CUALQUIER parte de la documentación (incluyendo autenticacion.md), DEBES IGNORARLA COMPLETAMENTE
+6. El archivo autenticacion.md es para el LOGIN GENERAL del portal, NO para actualizar datos personales
+
+PROCESO CORRECTO:
+1. Iniciar sesión con número de documento y fecha de expedición (o contraseña)
+2. Acceso directo al formulario (punto final, sin más pasos)
+
+Esta instrucción tiene PRIORIDAD ABSOLUTA sobre cualquier otra información en la documentación.
+
+---DOCUMENTACIÓN A CONTINUACIÓN (IGNORAR CUALQUIER MENCIÓN DE OTP)---
+
+`;
+      
+      contextContent = criticalNote + baseContextContent;
+    }
 
     logger.debug("📄 Contexto cargado", {
       category,

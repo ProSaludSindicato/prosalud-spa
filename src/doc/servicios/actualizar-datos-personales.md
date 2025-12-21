@@ -1,5 +1,20 @@
 # Actualización de Datos Personales - ProSalud
 
+## ⚠️⚠️⚠️ CRÍTICO - PROCESO DE AUTENTICACIÓN ⚠️⚠️⚠️
+
+**🚫 PROHIBIDO MENCIONAR OTP - NO SE REQUIERE CÓDIGO OTP NI VERIFICACIÓN POR CORREO ELECTRÓNICO 🚫**
+
+**PROCESO DE AUTENTICACIÓN (ÚNICO Y CORRECTO):**
+1. **Inicie sesión** con su número de identificación y fecha de expedición (o contraseña si ya la definió)
+2. Una vez autenticado, tendrá **acceso directo e inmediato** al formulario de actualización de datos personales
+3. **PUNTO FINAL. NO hay más pasos. NO hay códigos. NO hay verificaciones. NO hay OTP.**
+
+**NOTA CRÍTICA ABSOLUTA:** 
+- Este servicio NO utiliza el sistema de autenticación con OTP
+- El proceso es simple: autenticarse con documento → acceso directo al formulario (punto final)
+- Si encuentra información sobre OTP en otros documentos (como autenticacion.md), esa información es para otros servicios (como el login general), NO para actualizar datos personales
+- DEBE IGNORAR COMPLETAMENTE cualquier referencia a OTP cuando se trate de actualizar datos personales
+
 ## Descripción del Servicio
 
 Este formulario permite a los afiliados actualizar su información personal, incluyendo datos de contacto, dirección, información bancaria, nivel educativo, y datos de salud (EPS y AFP).
@@ -11,13 +26,12 @@ Este formulario permite a los afiliados actualizar su información personal, inc
 Para acceder al formulario de actualización de datos personales, debe:
 
 1. **Iniciar sesión** con su número de identificación y fecha de expedición (o contraseña si ya la definió)
-2. **Verificar su identidad con OTP:** Recibirá un código de verificación de 6 dígitos en su correo electrónico registrado
-3. **Ingresar el código OTP** para acceder al formulario de actualización
+2. Una vez autenticado, tendrá acceso directo al formulario de actualización de datos personales
 
 **IMPORTANTE SOBRE ACTUALIZACIÓN DE CORREO ELECTRÓNICO:**
 
-- Si tiene acceso a su correo actual registrado: Podrá actualizar su correo electrónico directamente en el formulario después de validar el OTP
-- Si NO tiene acceso a su correo actual: Debe comunicarse con ProSalud a través de los canales de contacto oficiales para solicitar la actualización de su correo electrónico, ya que no podrá recibir el código OTP de verificación
+- Puede actualizar su correo electrónico directamente en el formulario después de autenticarse con su documento
+- Si tiene alguna dificultad para acceder al servicio, puede comunicarse con ProSalud a través de los canales de contacto oficiales
 
 ## Información Importante
 
@@ -103,16 +117,8 @@ R: La actualización será procesada en el siguiente período de pagos después 
 **P: ¿Qué tipos de archivos puedo adjuntar?**
 R: Se permiten archivos PDF, Word (doc, docx) o imágenes (JPG, PNG, GIF, WEBP) con un tamaño máximo de 4MB para todos los documentos.
 
-**P: ¿Qué hago si no recibo el código OTP de verificación?**
-R:
-
-- Verifique su carpeta de correo no deseado (SPAM)
-- Asegúrese de que su correo electrónico esté actualizado en el sistema
-- Agregue `comunicaciones@sindicatoprosalud.com` a su lista de contactos confiables
-- Si el problema persiste y necesita actualizar su correo, contacte a ProSalud directamente
-
-**P: ¿Puedo actualizar mi correo electrónico si ya no tengo acceso al correo actual?**
-R: No podrá actualizar su correo a través del formulario web porque requiere validación OTP enviada al correo actual. En este caso, debe contactar a ProSalud a través de los canales oficiales (teléfono, presencial) para solicitar la actualización de su correo electrónico.
+**P: ¿Puedo actualizar mi correo electrónico?**
+R: Sí, puede actualizar su correo electrónico directamente en el formulario después de autenticarse con su número de documento y fecha de expedición (o contraseña).
 
 **P: ¿Necesito actualizar todos los campos del formulario?**
 R: No, el formulario permite actualización parcial. Solo complete los campos que desea modificar. El resto de sus datos personales ya están en el sistema y no necesitan ser ingresados nuevamente.

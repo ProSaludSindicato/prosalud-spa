@@ -551,7 +551,8 @@ export default function ChatBot() {
           detectedCategory,
           selectiveContext,
           state.conversationContext,
-          incapacidadesInfo
+          incapacidadesInfo,
+          text // Pasar el texto de la pregunta para detectar si es sobre actualizar datos
         );
 
         // Insertar mensaje dinámico del sistema justo antes de la pregunta

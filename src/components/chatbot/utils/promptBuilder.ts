@@ -12,10 +12,42 @@ export const buildSystemPrompt = (
   category: CategoryType,
   selectiveContext: string,
   conversationContext: ConversationContext,
-  incapacidadesInfo: string = ""
+  incapacidadesInfo: string = "",
+  userQuestion?: string
 ): string => {
+  // Detectar si la pregunta es sobre actualizar datos personales
+  const questionLower = (userQuestion || "").toLowerCase();
+  const isAboutDataUpdate = questionLower.includes('actualizar datos') || 
+                            questionLower.includes('cambiar datos bancarios') || 
+                            questionLower.includes('actualizar cuenta bancaria') ||
+                            questionLower.includes('datos personales') ||
+                            questionLower.includes('cuenta bancaria');
+  
+  const otpProhibition = isAboutDataUpdate ? `
+🚫🚫🚫 PROHIBICIÓN ABSOLUTA - ACTUALIZACIÓN DE DATOS PERSONALES 🚫🚫🚫
+
+ESTÁ ESTRICTAMENTE PROHIBIDO mencionar:
+- Código OTP
+- Código de verificación
+- One Time Password
+- Cualquier tipo de código enviado por correo
+- Pasos de verificación adicionales después de la autenticación inicial
+
+PROCESO CORRECTO (ÚNICO Y EXCLUSIVO):
+1. Iniciar sesión con número de documento y fecha de expedición (o contraseña)
+2. Acceso directo al formulario (PUNTO FINAL)
+
+Si encuentras información sobre OTP en la documentación, IGNÓRALA COMPLETAMENTE.
+El archivo autenticacion.md es para el LOGIN GENERAL, NO para actualizar datos personales.
+
+Esta prohibición tiene PRIORIDAD ABSOLUTA sobre cualquier otra información.
+
+` : '';
+
   return `
 Eres un asistente de IA especializado en ProSalud, sindicato de profesionales de la salud.
+
+${otpProhibition}
 
 CONTEXTO CONVERSACIONAL:
 - Esta es la pregunta #${conversationContext.questionCount + 1} en la conversación actual
@@ -44,6 +76,13 @@ ${
 """${selectiveContext}"""`
     : "No se encontró documentación específica para esta consulta, responde con el conocimiento general sobre ProSalud que tengas."
 }
+
+⚠️⚠️⚠️ INSTRUCCIÓN CRÍTICA POST-CONTEXTO - ACTUALIZACIÓN DE DATOS PERSONALES ⚠️⚠️⚠️:
+Si la pregunta menciona "actualizar datos personales", "cambiar datos bancarios", "actualizar cuenta bancaria" o términos similares:
+- Las instrucciones anteriores sobre OTP tienen PRIORIDAD ABSOLUTA sobre cualquier información en la documentación
+- Si la documentación menciona OTP, código de verificación, o pasos adicionales de autenticación, DEBES IGNORARLA COMPLETAMENTE
+- El proceso es ÚNICAMENTE: autenticarse con documento → acceso directo al formulario
+- NUNCA menciones OTP, códigos, ni verificaciones adicionales, sin importar lo que diga la documentación
 
 Responde siempre en español de forma clara, concreta y breve; no inventes información.
 Tus respuestas deben ser directas: solo incluye información esencial y responde con contexto únicamente cuando sea estrictamente relevante para la pregunta del usuario. Si la pregunta es simple, limita tu respuesta a lo indispensable, sin añadir contexto ni detalles que el afiliado no haya solicitado.

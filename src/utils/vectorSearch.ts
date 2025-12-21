@@ -168,8 +168,19 @@ export async function searchRelevantChunks(query: string, topK: number = 5): Pro
       return chunk.similarity >= minSimilarity;
     });
     
+    // Filtrar explícitamente autenticacion.md si la query es sobre actualizar datos personales
+    const queryLower = query.toLowerCase();
+    const isAboutDataUpdate = queryLower.includes('actualizar datos') || 
+                              queryLower.includes('cambiar datos bancarios') || 
+                              queryLower.includes('actualizar cuenta bancaria') ||
+                              queryLower.includes('datos personales');
+    
+    const filteredChunks = isAboutDataUpdate 
+      ? relevantChunks.filter(chunk => !chunk.doc_path.includes('autenticacion.md'))
+      : relevantChunks;
+    
     // Si después del filtrado tenemos pocos resultados, usar todos los disponibles
-    const finalChunks = relevantChunks.length >= 2 ? relevantChunks : chunks;
+    const finalChunks = filteredChunks.length >= 2 ? filteredChunks : (isAboutDataUpdate ? filteredChunks : chunks);
     
     // Limitar al número solicitado pero garantizar diversidad de fuentes
     const diverseChunks = diversifyChunks(finalChunks.slice(0, topK));
