@@ -8,6 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/utils/logger';
 
+// Bandera para activar/desactivar temporalmente la consulta de eventos de Comfenalco
+// Cambiar a true cuando se quiera mostrar eventos nuevamente
+const ENABLE_COMFENALCO_EVENTS = false;
+
 const ComfenalcoSection: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const isVisible = useIntersectionObserver(sectionRef, { 
@@ -36,7 +40,7 @@ const ComfenalcoSection: React.FC = () => {
   const { data: events = [], isLoading, error } = useQuery({
     queryKey: ['public-comfenalco-events'],
     queryFn: publicComfenalcoApi.getPublicEvents,
-    enabled: isVisible, // Only fetch when section is visible
+    enabled: ENABLE_COMFENALCO_EVENTS && isVisible, // Only fetch when enabled and section is visible
   });
 
   // Helper function to check if event date has passed
@@ -134,6 +138,11 @@ const ComfenalcoSection: React.FC = () => {
   };
 
   // Early returns for different states
+  // Si los eventos están desactivados, no mostrar la sección
+  if (!ENABLE_COMFENALCO_EVENTS) {
+    return null;
+  }
+
   if (!isVisible || isLoading) {
     return (
       <section ref={sectionRef} className="py-16 md:py-20 bg-white">

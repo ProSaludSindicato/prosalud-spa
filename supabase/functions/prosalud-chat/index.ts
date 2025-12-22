@@ -11,16 +11,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // @ts-ignore
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Variable de entorno para habilitar/deshabilitar rate limiting (por defecto: habilitado)
-// @ts-ignore
 // TEMPORALMENTE DESHABILITADO - Rate limiting
-const ENABLE_RATE_LIMITING = false; // Deno.env.get('ENABLE_CHATBOT_RATE_LIMITING') !== 'false';
+const ENABLE_RATE_LIMITING = true;
 
 const RATE_LIMITS = {
-  messagesPerHour: 15,
-  messagesPerDay: 50,
-  maxConsecutive: 5,
-  cooldownMinutes: 2,
+  messagesPerHour: 10,
+  messagesPerDay: 30,
+  maxConsecutive: 3,
+  cooldownMinutes: 5,
 };
 
 const corsHeaders = {
