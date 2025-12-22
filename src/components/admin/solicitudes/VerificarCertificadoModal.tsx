@@ -362,7 +362,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-6xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <FileText className="h-6 w-6 text-primary-prosalud" />

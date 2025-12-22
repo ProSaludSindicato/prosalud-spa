@@ -475,43 +475,46 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           {/* Header */}
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
-              <CardHeader className="pb-6">
+              <CardHeader className="pb-4 sm:pb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-prosalud/10 p-3 rounded-lg">
-                      <Heart className="h-8 w-8 text-primary-prosalud" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-primary-prosalud/10 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                      <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-primary-prosalud" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">
                           Solicitudes de Bienestar
                         </CardTitle>
-                        <Badge variant="secondary" className="text-base px-3 py-1">
+                        <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
                           Total: {stats?.total || 0}
                         </Badge>
                       </div>
-                      <CardDescription className="text-base mt-2">
+                      <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
                         Gestiona las solicitudes de actividades de bienestar
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
                     {can('wellness_requests.view') && (
                       <Button
                         onClick={() => setShowExportDialog(true)}
                         variant="outline"
+                        className="w-full sm:w-auto"
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        Exportar Reporte
+                        <span className="hidden sm:inline">Exportar Reporte</span>
+                        <span className="sm:hidden">Exportar</span>
                       </Button>
                     )}
                     {can('wellness_requests.create') && (
                       <Button
                         onClick={() => setShowCreateForm(true)}
-                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Nueva Solicitud
+                        <span className="hidden sm:inline">Nueva Solicitud</span>
+                        <span className="sm:hidden">Nueva</span>
                       </Button>
                     )}
                   </div>
@@ -522,7 +525,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
           {/* Stats Cards */}
           <motion.div variants={itemVariants}>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -672,7 +675,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
+                    {/* Desktop Table View - Hidden on mobile */}
+                    <div className="hidden lg:block overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -824,6 +828,135 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       </Table>
                     </div>
 
+                    {/* Mobile Card View - Visible on mobile and tablet */}
+                    <div className="lg:hidden space-y-3">
+                      {sortedSolicitudes.map((solicitud) => (
+                        <Card key={solicitud.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              {/* Header with ID and actions */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-medium text-gray-900 text-sm">
+                                      #{solicitud.id}
+                                    </p>
+                                    <Badge className={getStatusColor(solicitud.estado)}>
+                                      {getStatusLabel(solicitud.estado)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <ActionMenu
+                                  solicitud={solicitud}
+                                  onViewDetails={handleViewDetails}
+                                  onEdit={handleEdit}
+                                  onChangeStatus={handleOpenStatusDialog}
+                                  onAddActivityRealized={handleAddActivityRealized}
+                                  onReviewActivity={handleReviewActivity}
+                                  can={can}
+                                />
+                              </div>
+
+                              {/* Actividad */}
+                              <div className="border-t pt-2">
+                                <p className="text-xs font-medium text-gray-500 mb-1">Actividad</p>
+                                <p className="font-medium text-gray-900 text-sm mb-2">
+                                  {solicitud.nombreActividad || 'N/A'}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  {solicitud.actividad_realizada && (
+                                    <>
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        Realizada
+                                      </Badge>
+                                      {solicitud.actividad_realizada.publicado_en_galeria === true ? (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                          <Globe className="h-3 w-3 mr-1" />
+                                          Publicado
+                                        </Badge>
+                                      ) : solicitud.actividad_realizada.publicado_en_galeria === false ? (
+                                        <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+                                          <EyeOff className="h-3 w-3 mr-1" />
+                                          No publicado
+                                        </Badge>
+                                      ) : null}
+                                    </>
+                                  )}
+                                </div>
+                                {solicitud.numeroParticipantes && (
+                                  <div className="text-xs text-gray-500 flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {solicitud.numeroParticipantes} participantes
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Centro de Costos y Sedes */}
+                              <div className="border-t pt-2">
+                                <div className="grid grid-cols-1 gap-2">
+                                  <div>
+                                    <p className="text-xs font-medium text-gray-500 mb-1">Centro de Costos</p>
+                                    <div className="flex items-center gap-2">
+                                      <Building className="h-4 w-4 text-gray-400" />
+                                      <span className="text-sm text-gray-900">
+                                        {solicitud.centroCostos || 'N/A'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-medium text-gray-500 mb-1">Sedes</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {Array.isArray(solicitud.sedes) && solicitud.sedes.length > 0 ? (
+                                        solicitud.sedes.slice(0, 2).map((sede: string) => (
+                                          <Badge key={sede} variant="outline" className="text-xs">
+                                            {sede}
+                                          </Badge>
+                                        ))
+                                      ) : (
+                                        <span className="text-sm text-gray-500">N/A</span>
+                                      )}
+                                      {Array.isArray(solicitud.sedes) && solicitud.sedes.length > 2 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          +{solicitud.sedes.length - 2}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Solicitante y Fecha */}
+                              <div className="border-t pt-2">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium text-gray-500 mb-1">Solicitante</p>
+                                    <p className="text-sm text-gray-900 truncate">
+                                      {solicitud.solicitante?.name || `ID: ${solicitud.solicitanteId}`}
+                                    </p>
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {solicitud.solicitante?.email || 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-medium text-gray-500 mb-1">Fecha Propuesta</p>
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Calendar className="h-4 w-4 text-gray-400" />
+                                      <span className="text-gray-900">
+                                        {solicitud.fechaPropuesta
+                                          ? new Date(solicitud.fechaPropuesta).toLocaleDateString('es-ES')
+                                          : 'N/A'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
                     <DataPagination
                       currentPage={currentPage}
                       totalPages={totalPages}
@@ -846,34 +979,34 @@ const AdminSolicitudBienestarPage: React.FC = () => {
         {/* Dialog de Detalles */}
         {selectedSolicitud && (
           <Dialog open={!!selectedSolicitud} onOpenChange={() => setSelectedSolicitud(null)}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
               <DialogTitle className="sr-only">
                 Detalles de la Solicitud de Bienestar #{selectedSolicitud.id}
               </DialogTitle>
               <div className="bg-white min-h-full">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-b border-gray-200">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-primary-prosalud/10 p-2 rounded-lg">
-                      <Heart className="h-6 w-6 text-primary-prosalud" />
+                    <div className="bg-primary-prosalud/10 p-2 rounded-lg flex-shrink-0">
+                      <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-primary-prosalud" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
+                    <div className="min-w-0">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
                         Detalles de la Solicitud de Bienestar #{selectedSolicitud.id}
                       </h2>
-                      <p className="text-sm text-gray-600">Información completa de la solicitud de bienestar</p>
+                      <p className="text-xs sm:text-sm text-gray-600">Información completa de la solicitud de bienestar</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Estado - Usando el mismo diseño que AdminSolicitudesPage */}
                 <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                       Información de la Solicitud
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700">Estado Actual</label>
@@ -923,12 +1056,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
                 {/* Información de la Actividad */}
                 <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                       Información de la Actividad
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     <div>
                       <label className="text-sm font-medium text-gray-700">Nombre de la Actividad</label>
                       <p className="mt-1 text-sm text-gray-900">
@@ -948,12 +1081,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
                 {/* Centro de Costos y Sedes */}
                 <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                       Centro de Costos y Sedes
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700">Centro de Costos</label>
@@ -993,12 +1126,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
                 {/* Fecha y Horarios */}
                 <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                       Fecha y Horarios
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700">Fecha Propuesta</label>
@@ -1027,12 +1160,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                 {/* Detalles/Souvenirs */}
                 {selectedSolicitud.requiereDetalles && (
                   <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gray-50 border-b border-gray-200">
-                      <CardTitle className="text-lg font-semibold text-gray-900">
+                    <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                         Detalles / Souvenirs
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       {Array.isArray(selectedSolicitud.detalles) &&
                       selectedSolicitud.detalles.length > 0 ? (
                         <div className="space-y-2">
@@ -1055,12 +1188,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
                 {/* Información del Solicitante */}
                 <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="bg-gray-50 border-b border-gray-200">
-                    <CardTitle className="text-lg font-semibold text-gray-900">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                       Información del Solicitante
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6">
+                  <CardContent className="p-4 sm:p-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700">Nombre Completo</label>
@@ -1105,7 +1238,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         )}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="p-4 sm:p-6 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-medium text-gray-700">Fecha Realizada</label>
@@ -1176,7 +1309,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         Actividad Realizada
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       <p className="text-sm text-gray-500 mb-4">
                         Aún no se ha registrado información de la actividad realizada.
                       </p>

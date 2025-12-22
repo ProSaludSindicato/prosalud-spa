@@ -124,7 +124,7 @@ const ExportRequestsDialog: React.FC<ExportRequestsDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-gray-900">
             Exportar Reporte de Solicitudes

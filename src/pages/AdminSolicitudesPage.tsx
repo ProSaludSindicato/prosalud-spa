@@ -1253,37 +1253,39 @@ const AdminSolicitudesPage: React.FC = () => {
           {/* Header */}
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
-              <CardHeader className="pb-6">
+              <CardHeader className="pb-4 sm:pb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-prosalud/10 p-3 rounded-lg">
-                      <FileText className="h-8 w-8 text-primary-prosalud" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-primary-prosalud/10 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                      <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary-prosalud" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <CardTitle className="text-3xl font-bold text-primary-prosalud">Gestión de Solicitudes</CardTitle>
-                        <Badge variant="secondary" className="text-base px-3 py-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">Gestión de Solicitudes</CardTitle>
+                        <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
                           Total: {stats?.total || 0}
                         </Badge>
                       </div>
-                      <CardDescription className="text-base mt-2">
+                      <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
                         Administra y procesa las solicitudes de los usuarios de ProSalud
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 items-end">
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
                     <Button
                       variant="outline"
                       onClick={() => setExportDialogOpen(true)}
+                      className="w-full sm:w-auto"
                     >
                       <FileText className="h-4 w-4 mr-2" />
-                      Exportar Reporte
+                      <span className="hidden sm:inline">Exportar Reporte</span>
+                      <span className="sm:hidden">Exportar</span>
                     </Button>
                     {can('requests.view') && (
                       <button
                         type="button"
                         onClick={() => setVerificarCertificadoOpen(true)}
-                        className="text-sm text-primary-prosalud hover:text-primary-prosalud-dark underline underline-offset-2 font-medium cursor-pointer"
+                        className="text-xs sm:text-sm text-primary-prosalud hover:text-primary-prosalud-dark underline underline-offset-2 font-medium cursor-pointer text-center sm:text-right"
                       >
                         Verificar certificado de convenio
                       </button>
@@ -1296,7 +1298,7 @@ const AdminSolicitudesPage: React.FC = () => {
 
           {/* Stats Cards */}
           <motion.div variants={itemVariants}>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -1379,8 +1381,8 @@ const AdminSolicitudesPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                  <div className="md:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                  <div className="sm:col-span-2 lg:col-span-2">
                     <div className="space-y-2">
                       <Label htmlFor="search-input">Buscar</Label>
                       <div className="relative">
@@ -1388,7 +1390,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         <Input
                           id="search-input"
                           type="text"
-                          placeholder="Buscar por ID, nombre, email o tipo de solicitud..."
+                          placeholder="Buscar por ID, nombre, email..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-10 h-10"
@@ -1431,10 +1433,11 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Select>
                     </div>
                   </div>
-                  <div>
-                    <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center gap-2">
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center justify-center gap-2">
                       <Brush className="w-4 h-4" />
-                      Limpiar Filtros
+                      <span className="sm:hidden">Limpiar</span>
+                      <span className="hidden sm:inline">Limpiar Filtros</span>
                     </Button>
                   </div>
                 </div>
@@ -1465,7 +1468,8 @@ const AdminSolicitudesPage: React.FC = () => {
                   </Alert>
                 ) : (
                   <>
-                    <div className="rounded-md border overflow-hidden">
+                    {/* Desktop Table View - Hidden on mobile */}
+                    <div className="hidden lg:block rounded-md border overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-gray-50">
@@ -1706,6 +1710,209 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Table>
                     </div>
 
+                    {/* Mobile Card View - Visible on mobile and tablet */}
+                    <div className="lg:hidden space-y-3">
+                      {paginatedData.map((solicitud) => (
+                        <Card key={solicitud.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              {/* Header with user info and actions */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-3 flex-1 min-w-0">
+                                  <div className="bg-gray-100 p-2 rounded-full flex-shrink-0">
+                                    <User className="h-4 w-4 text-gray-600" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                      <p className="font-medium text-gray-900 text-sm">
+                                        {solicitud.name} {solicitud.last_name}
+                                      </p>
+                                      {hasPendingUpdate(solicitud.id_number) &&
+                                       solicitud.status !== 'resolved' &&
+                                       solicitud.status !== 'rejected' &&
+                                       solicitud.request_type !== 'actualizar-datos-personales' && (
+                                        <PendingDataUpdateBadge
+                                          hasPendingUpdate={true}
+                                          onClick={() => {
+                                            const pendingUpdate = getPendingUpdate(solicitud.id_number);
+                                            if (pendingUpdate) {
+                                              const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                                              handleViewDetails(convertedRequest);
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 truncate">{solicitud.email}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {solicitud.id_type}: {solicitud.id_number}
+                                    </p>
+                                  </div>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={() => handleViewDetails(solicitud)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      Ver Detalles
+                                    </DropdownMenuItem>
+                                    {can('requests.respond') && requiresManualValidation(solicitud) && !isRequestValidated(solicitud) && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                      <DropdownMenuItem onClick={() => handleValidateRequest(solicitud)} disabled={isValidating}>
+                                        {isValidating ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Validando...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                            Validar Solicitud
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                      <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Dar Respuesta
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+
+                              {/* Type and ID */}
+                              <div className="border-t pt-2">
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-medium text-gray-500">Tipo de Solicitud</p>
+                                  <p className="text-xs text-gray-500">ID: {solicitud.id}</p>
+                                </div>
+                                <p className="font-medium text-gray-900 text-sm">
+                                  {getRequestTypeLabel(solicitud.request_type)}
+                                </p>
+                              </div>
+
+                              {/* Process and Hospital */}
+                              <div className="border-t pt-2">
+                                <p className="text-xs font-medium text-gray-500 mb-1">Proceso y Hospital</p>
+                                {(() => {
+                                  const hasProceso = solicitud.payload?.proceso && String(solicitud.payload.proceso).trim() !== '';
+                                  const hasDondeRealiza = solicitud.payload?.dondeRealizaProceso && String(solicitud.payload.dondeRealizaProceso).trim() !== '';
+                                  const hasSedeProceso = solicitud.payload?.sedeProceso && String(solicitud.payload.sedeProceso).trim() !== '';
+                                  const hasHospital = hasDondeRealiza || hasSedeProceso;
+                                  
+                                  if (!hasProceso && !hasHospital) {
+                                    return <p className="text-xs text-gray-400 italic">No disponible</p>;
+                                  }
+                                  
+                                  return (
+                                    <div className="space-y-1">
+                                      {hasProceso && (
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {solicitud.payload.proceso}
+                                        </p>
+                                      )}
+                                      {hasDondeRealiza && (
+                                        <p className="text-xs text-gray-600">
+                                          {solicitud.payload.dondeRealizaProceso}
+                                        </p>
+                                      )}
+                                      {!hasDondeRealiza && hasSedeProceso && (
+                                        <p className="text-xs text-gray-600">
+                                          {solicitud.payload.sedeProceso}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              {/* Status and Date */}
+                              <div className="border-t pt-2">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge className={getStatusColor(solicitud.status)}>
+                                      {getStatusLabel(solicitud.status)}
+                                    </Badge>
+                                    {requiresManualValidation(solicitud) && (
+                                      <span 
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                                          isRequestValidated(solicitud) 
+                                            ? "bg-green-50 text-green-700 border border-green-200" 
+                                            : "bg-orange-50 text-orange-700 border border-orange-200"
+                                        }`}
+                                      >
+                                        {isRequestValidated(solicitud) ? (
+                                          <>
+                                            <CheckCircle className="h-3 w-3" />
+                                            Validada
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Clock className="h-3 w-3" />
+                                            Sin Validar
+                                          </>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs text-gray-900 font-medium">
+                                      {new Date(solicitud.created_at).toLocaleDateString("es-ES", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {new Date(solicitud.created_at).toLocaleTimeString("es-ES", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                                {solicitud.status === "resolved" && solicitud.resolved_at && (
+                                  <p className="text-xs text-green-600 font-medium mt-2">
+                                    ✓ Resuelto:{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                    ,{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </p>
+                                )}
+                                {solicitud.status === "rejected" && solicitud.resolved_at && (
+                                  <p className="text-xs text-red-600 font-medium mt-2">
+                                    ✗ Rechazado:{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                    ,{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
                     <DataPagination
                       currentPage={currentPage}
                       totalPages={totalPages}
@@ -1739,7 +1946,7 @@ const AdminSolicitudesPage: React.FC = () => {
                 setExpandedFields({});
               }
             }}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white relative">
+              <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
                 {isTransitioningRequest && (
                   <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
                     <div className="flex flex-col items-center gap-3">
@@ -1753,22 +1960,22 @@ const AdminSolicitudesPage: React.FC = () => {
                 <DialogTitle className="sr-only">
                   Detalles de Solicitud #{selectedSolicitud.id}
                 </DialogTitle>
-                <div className="bg-white min-h-full w-full overflow-x-hidden">
-                  <div className="flex items-center justify-between p-6 border-b border-gray-200 w-full">
+                <div className="bg-white min-h-full w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-b border-gray-200 w-full">
                     <div className="flex items-center space-x-3">
-                      <div className="bg-primary-prosalud/10 p-2 rounded-lg">
-                        <FileText className="h-6 w-6 text-primary-prosalud" />
+                      <div className="bg-primary-prosalud/10 p-2 rounded-lg flex-shrink-0">
+                        <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary-prosalud" />
                       </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
+                      <div className="min-w-0">
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
                           Detalles de Solicitud #{selectedSolicitud.id}
                         </h2>
-                        <p className="text-sm text-gray-600">Información completa de la solicitud</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Información completa de la solicitud</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-6 space-y-6 w-full overflow-x-hidden">
+                  <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
                     {/* Alerta de actualización pendiente */}
                     {selectedSolicitud && 
                      hasPendingUpdate(selectedSolicitud.id_number) &&
@@ -1792,12 +1999,12 @@ const AdminSolicitudesPage: React.FC = () => {
 
                     {/* Información del Solicitante */}
                     <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">
-                      <CardHeader className="bg-gray-50 border-b border-gray-200">
-                        <CardTitle className="text-lg font-semibold text-gray-900">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                           Información del Solicitante
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-4 w-full overflow-x-hidden">
+                      <CardContent className="p-4 sm:p-6 space-y-4 w-full overflow-x-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                           <div className="space-y-2 min-w-0">
                             <label className="text-sm font-medium text-gray-700">Documento</label>
@@ -1838,12 +2045,12 @@ const AdminSolicitudesPage: React.FC = () => {
 
                     {/* Información de la Solicitud */}
                     <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">
-                      <CardHeader className="bg-gray-50 border-b border-gray-200">
-                        <CardTitle className="text-lg font-semibold text-gray-900">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
                           Información de la Solicitud
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-4 w-full overflow-x-hidden">
+                      <CardContent className="p-4 sm:p-6 space-y-4 w-full overflow-x-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                           <div className="space-y-2 min-w-0">
                             <label className="text-sm font-medium text-gray-700">Tipo de Solicitud</label>
@@ -2420,15 +2627,15 @@ const AdminSolicitudesPage: React.FC = () => {
               }
             }}
           >
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold text-gray-900">
+                <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-words">
                   {useCompensacionesForm 
                     ? `Responder con Compensaciones Manuales - Solicitud #${solicitudToRespond?.id}`
                     : `Dar Respuesta a Solicitud #${solicitudToRespond?.id}`
                   }
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-sm">
                   {useCompensacionesForm 
                     ? "Complete el formulario con los valores de compensaciones. El certificado se generará automáticamente y se enviará por correo al afiliado."
                     : "Complete el formulario para responder a la solicitud. El correo se enviará automáticamente al afiliado."
@@ -2900,19 +3107,20 @@ const AdminSolicitudesPage: React.FC = () => {
                   />
 
                     {/* Botones de acción */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handleCloseResponseDialog}
                         disabled={isSubmittingResponse}
+                        className="w-full sm:w-auto"
                       >
                         Cancelar
                       </Button>
                       <Button
                         type="submit"
                         disabled={isSubmittingResponse}
-                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
                         {isSubmittingResponse ? (
                           <>
@@ -3405,19 +3613,20 @@ const AdminSolicitudesPage: React.FC = () => {
                   />
 
                     {/* Botones de acción */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handleCloseResponseDialog}
                         disabled={isSubmittingResponse}
+                        className="w-full sm:w-auto"
                       >
                         Cancelar
                       </Button>
                       <Button
                         type="submit"
                         disabled={isSubmittingResponse}
-                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
                         {isSubmittingResponse ? (
                           <>
