@@ -910,38 +910,40 @@ const AdminSstPage: React.FC = () => {
 
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
-              <CardHeader className="pb-6">
+              <CardHeader className="pb-4 sm:pb-6">
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary-prosalud/10 p-3 rounded-lg">
-                      <ShieldCheck className="h-8 w-8 text-primary-prosalud" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="bg-primary-prosalud/10 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                      <ShieldCheck className="h-6 w-6 sm:h-8 sm:w-8 text-primary-prosalud" />
                     </div>
-                    <div>
-                      <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">
                         Gestión Dotación y EPP
                       </CardTitle>
-                      <CardDescription className="text-base mt-2">
+                      <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
                         Consulta afiliados activos, registra entregas de dotación y elementos de protección personal,
                         y guarda la firma de recibido como constancia.
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                    <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                    <Button type="button" variant="outline" size="sm" className="gap-2 w-full sm:w-auto" asChild>
                       <Link to="/admin/inventario?tab=hospital-requests">
                         <ClipboardList className="h-4 w-4" />
-                        Solicitudes de hospitales
+                        <span className="hidden sm:inline">Solicitudes de hospitales</span>
+                        <span className="sm:hidden">Solicitudes</span>
                       </Link>
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="gap-2"
+                      className="gap-2 w-full sm:w-auto"
                       onClick={handleOpenExportDialog}
                     >
                       <FileText className="h-4 w-4" />
-                      Exportar Reporte
+                      <span className="hidden sm:inline">Exportar Reporte</span>
+                      <span className="sm:hidden">Exportar</span>
                     </Button>
                   </div>
                 </div>
@@ -1010,7 +1012,7 @@ const AdminSstPage: React.FC = () => {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white"
+                      className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white w-full sm:w-auto"
                       onClick={() =>
                         setShowAffiliateList((prev) => {
                           const next = !prev;
@@ -1023,7 +1025,12 @@ const AdminSstPage: React.FC = () => {
                       disabled={isSearchingAffiliate}
                     >
                       <Users className="h-4 w-4" />
-                      {showAffiliateList ? 'Ocultar listado de afiliados' : 'Mostrar listado de afiliados'}
+                      <span className="hidden sm:inline">
+                        {showAffiliateList ? 'Ocultar listado de afiliados' : 'Mostrar listado de afiliados'}
+                      </span>
+                      <span className="sm:hidden">
+                        {showAffiliateList ? 'Ocultar listado' : 'Mostrar listado'}
+                      </span>
                     </Button>
                   </div>
                 </div>
@@ -1100,15 +1107,15 @@ const AdminSstPage: React.FC = () => {
           {showAffiliateList && (
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 p-4 sm:p-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="text-xl">Afiliados activos en Dotación y EPP</CardTitle>
-                    <CardDescription>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-lg sm:text-xl">Afiliados activos en Dotación y EPP</CardTitle>
+                    <CardDescription className="text-sm">
                       Lista general de afiliados activos.
                     </CardDescription>
                   </div>
-                  <div className="w-full sm:w-48">
+                  <div className="w-full sm:w-48 flex-shrink-0">
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Filtrar por hospital
                     </label>
@@ -1145,7 +1152,8 @@ const AdminSstPage: React.FC = () => {
                     <Separator />
                   </>
                 )}
-                <div>
+                {/* Desktop Table View - Hidden on mobile */}
+                <div className="hidden lg:block">
                   <Table>
                     <TableHeader className="sticky top-0 bg-slate-50 shadow-sm">
                       <TableRow>
@@ -1216,6 +1224,70 @@ const AdminSstPage: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Mobile Card View - Visible on mobile and tablet */}
+                <div className="lg:hidden space-y-3 p-4">
+                  {isLoadingAffiliates ? (
+                    <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando afiliados activos...
+                    </div>
+                  ) : totalItems === 0 ? (
+                    <div className="py-6 text-center text-sm text-slate-500">
+                      No se encontraron afiliados que coincidan con la búsqueda.
+                    </div>
+                  ) : (
+                    sortedAffiliates.map((affiliate) => {
+                      const isSelected = selectedAffiliate?.id === affiliate.id;
+                      return (
+                        <Card
+                          key={affiliate.id}
+                          onClick={() => handleSelectAffiliate(affiliate)}
+                          className={`cursor-pointer transition-all border-2 ${
+                            isSelected
+                              ? 'border-primary-prosalud bg-primary-prosalud/10 shadow-md'
+                              : 'border-slate-200 hover:border-primary-prosalud/50 hover:shadow-sm'
+                          }`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              {/* Header with name */}
+                              <div>
+                                <h3 className="font-semibold text-slate-800 text-base mb-1">
+                                  {affiliate.firstName} {affiliate.lastName}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-slate-700 text-sm">{affiliate.documentNumber}</span>
+                                  <span className="text-xs uppercase text-slate-400">{affiliate.documentType}</span>
+                                </div>
+                              </div>
+
+                              {/* Details */}
+                              <div className="grid grid-cols-1 gap-2 border-t pt-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium text-slate-500">Hospital</span>
+                                  <span className="text-sm text-slate-700">{affiliate.hospital}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium text-slate-500">Rol</span>
+                                  <span className="text-sm text-slate-700">{affiliate.role}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-medium text-slate-500">Última entrega</span>
+                                  <span className="text-sm text-slate-600">
+                                    {affiliate.lastDeliveryAt
+                                      ? new Date(affiliate.lastDeliveryAt).toLocaleDateString()
+                                      : 'Sin registro'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
                 <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Filter className="h-4 w-4" />
@@ -1284,15 +1356,15 @@ const AdminSstPage: React.FC = () => {
                   ? 'border-green-200 bg-green-50/30' 
                   : 'border-orange-200 bg-orange-50/30'
               }`}>
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-3 p-4 sm:p-6">
                   <div className="flex flex-col gap-4">
                     <div>
-                      <CardTitle className="text-xl mb-2">
+                      <CardTitle className="text-lg sm:text-xl mb-2 break-words">
                         Registro para {selectedAffiliate.firstName} {selectedAffiliate.lastName}
-                  </CardTitle>
-                  <CardDescription>
+                      </CardTitle>
+                      <CardDescription className="text-sm">
                         Selecciona el tipo de operación que deseas realizar.
-                  </CardDescription>
+                      </CardDescription>
                     </div>
                     <Tabs 
                       value={viewMode} 
@@ -1353,39 +1425,25 @@ const AdminSstPage: React.FC = () => {
                     };
 
                     return (
-                      <div className={`mt-3 rounded-lg border p-3 ${
-                        isRecent 
-                          ? 'border-yellow-300 bg-yellow-50' 
-                          : 'border-blue-200 bg-blue-50'
-                      }`}>
+                      <div className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3">
                         <div className="flex items-start gap-2">
-                          <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                            isRecent ? 'text-yellow-700' : 'text-blue-600'
-                          }`} />
+                          <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-yellow-700" />
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${
-                              isRecent ? 'text-yellow-900' : 'text-blue-900'
-                            }`}>
+                            <p className="text-sm font-medium text-yellow-900">
                               Última entrega registrada
                             </p>
-                            <p className={`text-xs mt-1 ${
-                              isRecent ? 'text-yellow-800' : 'text-blue-700'
-                            }`}>
+                            <p className="text-xs mt-1 text-yellow-800">
                               {formattedDate} ({timeElapsed})
                             </p>
                             {(lastDelivery.deliveredBy || lastDelivery.deliveredByName) && (
-                              <p className={`text-xs mt-1 ${
-                                isRecent ? 'text-yellow-700' : 'text-blue-600'
-                              }`}>
+                              <p className="text-xs mt-1 text-yellow-700">
                                 Entregado por: <span className="font-medium">{lastDelivery.deliveredByName || lastDelivery.deliveredBy}</span>
                               </p>
                             )}
                             {lastDelivery.items.length > 0 && (
                               <div className="mt-2 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <p className={`text-xs ${
-                                    isRecent ? 'text-yellow-700' : 'text-blue-600'
-                                  }`}>
+                                  <p className="text-xs text-yellow-700">
                                     {lastDelivery.items.length} elemento{lastDelivery.items.length > 1 ? 's' : ''} entregado{lastDelivery.items.length > 1 ? 's' : ''}
                                   </p>
                                   <div className="flex items-center gap-2">
@@ -1394,11 +1452,7 @@ const AdminSstPage: React.FC = () => {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => setShowLastDeliveryItems(!showLastDeliveryItems)}
-                                      className={`h-6 px-2 text-xs ${
-                                        isRecent
-                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100'
-                                          : 'text-blue-600 hover:text-blue-600 hover:bg-blue-100'
-                                      }`}
+                                      className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100"
                                     >
                                       {showLastDeliveryItems ? (
                                         <>
@@ -1417,11 +1471,7 @@ const AdminSstPage: React.FC = () => {
                                       variant="ghost"
                                       size="sm"
                                       onClick={handleGoToHistory}
-                                      className={`h-6 px-2 text-xs ${
-                                        isRecent 
-                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100' 
-                                          : 'text-blue-600 hover:text-blue-600 hover:bg-blue-100'
-                                      }`}
+                                      className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100"
                                     >
                                       <ExternalLink className="h-3 w-3 mr-1" />
                                       Ir al historial
@@ -1490,39 +1540,25 @@ const AdminSstPage: React.FC = () => {
                     };
 
                     return (
-                      <div className={`mt-3 rounded-lg border p-3 ${
-                        isRecent 
-                          ? 'border-yellow-300 bg-yellow-50' 
-                          : 'border-orange-200 bg-orange-50'
-                      }`}>
+                      <div className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3">
                         <div className="flex items-start gap-2">
-                          <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                            isRecent ? 'text-yellow-700' : 'text-orange-600'
-                          }`} />
+                          <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-yellow-700" />
                           <div className="flex-1">
-                            <p className={`text-sm font-medium ${
-                              isRecent ? 'text-yellow-900' : 'text-orange-900'
-                            }`}>
+                            <p className="text-sm font-medium text-yellow-900">
                               Última devolución registrada
                             </p>
-                            <p className={`text-xs mt-1 ${
-                              isRecent ? 'text-yellow-800' : 'text-orange-700'
-                            }`}>
+                            <p className="text-xs mt-1 text-yellow-800">
                               {formattedDate} ({timeElapsed})
                             </p>
                             {(lastReturn.receivedBy || lastReturn.receivedByName) && (
-                              <p className={`text-xs mt-1 ${
-                                isRecent ? 'text-yellow-700' : 'text-orange-600'
-                              }`}>
+                              <p className="text-xs mt-1 text-yellow-700">
                                 Recibido por: <span className="font-medium">{lastReturn.receivedByName || lastReturn.receivedBy}</span>
                               </p>
                             )}
                             {lastReturn.items.length > 0 && (
                               <div className="mt-2 space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <p className={`text-xs ${
-                                    isRecent ? 'text-yellow-700' : 'text-orange-600'
-                                  }`}>
+                                  <p className="text-xs text-yellow-700">
                                     {lastReturn.items.length} elemento{lastReturn.items.length > 1 ? 's' : ''} devuelto{lastReturn.items.length > 1 ? 's' : ''}
                                   </p>
                                   <div className="flex items-center gap-2">
@@ -1531,11 +1567,7 @@ const AdminSstPage: React.FC = () => {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => setShowLastReturnItems(!showLastReturnItems)}
-                                      className={`h-6 px-2 text-xs ${
-                                        isRecent
-                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100'
-                                          : 'text-orange-600 hover:text-orange-600 hover:bg-orange-100'
-                                      }`}
+                                      className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100"
                                     >
                                       {showLastReturnItems ? (
                                         <>
@@ -1554,11 +1586,7 @@ const AdminSstPage: React.FC = () => {
                                       variant="ghost"
                                       size="sm"
                                       onClick={handleGoToReturnHistory}
-                                      className={`h-6 px-2 text-xs ${
-                                        isRecent 
-                                          ? 'text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100' 
-                                          : 'text-orange-600 hover:text-orange-600 hover:bg-orange-100'
-                                      }`}
+                                      className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-700 hover:bg-yellow-100"
                                     >
                                       <ExternalLink className="h-3 w-3 mr-1" />
                                       Ir al historial
@@ -1611,20 +1639,20 @@ const AdminSstPage: React.FC = () => {
                   })()}
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <span className="text-xs uppercase text-slate-500">Tipo y número de documento</span>
-                      <p className="font-medium text-slate-800">
+                      <p className="font-medium text-slate-800 break-words">
                         {selectedAffiliate.documentType} {selectedAffiliate.documentNumber}
                       </p>
                     </div>
                     <div>
                       <span className="text-xs uppercase text-slate-500">Hospital</span>
-                      <p className="font-medium text-slate-800">{selectedAffiliate.hospital}</p>
+                      <p className="font-medium text-slate-800 break-words">{selectedAffiliate.hospital}</p>
                     </div>
                     <div>
                       <span className="text-xs uppercase text-slate-500">Proceso</span>
-                      <p className="font-medium text-slate-800">{selectedAffiliate.role}</p>
+                      <p className="font-medium text-slate-800 break-words">{selectedAffiliate.role}</p>
                     </div>
                   </div>
 
@@ -1700,10 +1728,10 @@ const AdminSstPage: React.FC = () => {
             }
           }}
         >
-          <DialogContent className="max-w-3xl bg-white">
+          <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle>Exportar entregas de Dotación y EPP</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg sm:text-xl break-words">Exportar entregas de Dotación y EPP</DialogTitle>
+              <DialogDescription className="text-sm">
                 Configura los filtros del reporte para obtener la trazabilidad y métricas de las entregas realizadas.
               </DialogDescription>
             </DialogHeader>
@@ -1795,16 +1823,17 @@ const AdminSstPage: React.FC = () => {
                 </p>
               )}
 
-              <DialogFooter>
+              <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleCloseExportDialog}
                   disabled={isExporting}
+                  className="w-full sm:w-auto"
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark text-white" disabled={isExporting}>
+                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto" disabled={isExporting}>
                   {isExporting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1813,7 +1842,8 @@ const AdminSstPage: React.FC = () => {
                   ) : (
                     <>
                       <Download className="h-4 w-4" />
-                      Exportar Reporte
+                      <span className="hidden sm:inline">Exportar Reporte</span>
+                      <span className="sm:hidden">Exportar</span>
                     </>
                   )}
                 </Button>

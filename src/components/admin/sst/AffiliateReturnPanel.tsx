@@ -149,6 +149,7 @@ export function AffiliateReturnPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSignatureDrawerOpen, setIsSignatureDrawerOpen] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [returnReason, setReturnReason] = useState<SstReturnReason>('replacement');
   const [generalDotationSize, setGeneralDotationSize] = useState<string | null>(null);
@@ -618,22 +619,22 @@ export function AffiliateReturnPanel({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <Card className="border shadow-sm min-w-0">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-2xl">Elementos a devolver</CardTitle>
-              <CardDescription>
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-lg sm:text-xl lg:text-2xl break-words">Elementos a devolver</CardTitle>
+              <CardDescription className="text-sm">
                 Selecciona los elementos de EPP y dotación que el afiliado está devolviendo.
               </CardDescription>
             </div>
             {selectedCount > 0 && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="text-sm flex-shrink-0">
                 {selectedCount} elementos seleccionados
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-4 sm:p-6">
           <div className="space-y-2">
             <Label htmlFor="item-search" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Buscar artículo
@@ -711,7 +712,7 @@ export function AffiliateReturnPanel({
                   </div>
                 )}
                 {category === 'Dotación' && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-1.5">
                       <Label
                         htmlFor="general-dotation-size"
@@ -780,7 +781,8 @@ export function AffiliateReturnPanel({
                     </div>
                   </div>
                 )}
-                <div className="overflow-x-auto rounded-lg border">
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -824,8 +826,8 @@ export function AffiliateReturnPanel({
                             <TableCell>
                               <div className="flex items-center gap-2.5">
                                 {item.defaultColor && renderColorSwatch(item.defaultColor)}
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-slate-800">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-medium text-slate-800 break-words">
                                     {item.name}
                                     {item.gender && <span className="font-bold"> ({item.gender})</span>}
                                   </span>
@@ -881,6 +883,7 @@ export function AffiliateReturnPanel({
                                 onChange={(event) =>
                                   handleQuantityChange(item.id, event.target.value)
                                 }
+                                className="w-32"
                               />
                             </TableCell>
                             <TableCell>
@@ -917,6 +920,131 @@ export function AffiliateReturnPanel({
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-3">
+                  {items.map((item) => {
+                    const isSelected = Boolean(selectedItems[item.id]);
+                    const itemState = selectedItems[item.id];
+                    const hasVariants = item.variants && item.variants.length > 0;
+                    const variant =
+                      hasVariants && itemState?.variantIndex !== undefined
+                        ? item.variants[itemState.variantIndex]
+                        : undefined;
+                    const itemKey = getItemKey(item.baseId ?? item.id, variant);
+                    const available = availableQuantities.get(itemKey) ?? 0;
+                    const delivered = deliveredQuantities.get(itemKey) ?? 0;
+                    const returned = returnedQuantities.get(itemKey) ?? 0;
+
+                    return (
+                      <Card
+                        key={item.id}
+                        className={cn(
+                          "border-2 transition-all",
+                          isSelected ? "border-primary-prosalud bg-primary-prosalud/5" : "border-slate-200"
+                        )}
+                      >
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => handleToggleItem(item, Boolean(checked))}
+                                  aria-label={`Seleccionar ${item.name}${item.gender ? ` (${item.gender})` : ''}`}
+                                />
+                                {item.defaultColor && renderColorSwatch(item.defaultColor)}
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <span className="font-medium text-slate-800 break-words">
+                                    {item.name}
+                                    {item.gender && <span className="font-bold"> ({item.gender})</span>}
+                                  </span>
+                                  {item.defaultColor && (
+                                    <span className="text-xs text-slate-600">
+                                      {resolveSstColorInfo(item.defaultColor)?.label ?? item.defaultColor}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 border-t pt-3">
+                              <div>
+                                <Label className="text-xs font-medium text-slate-500 mb-1 block">Talla</Label>
+                                {hasVariants ? (
+                                  <Select
+                                    disabled={!isSelected}
+                                    value={String(itemState?.variantIndex ?? 0)}
+                                    onValueChange={(value) =>
+                                      handleVariantChange(item.id, Number.parseInt(value, 10))
+                                    }
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Selecciona la talla" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {item.variants?.map((variant, index) => (
+                                        <SelectItem
+                                          key={`${item.id}-${index}`}
+                                          value={String(index)}
+                                        >
+                                          {variant.size || 'Única'}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-sm text-slate-500">—</span>
+                                )}
+                              </div>
+                              <div>
+                                <Label className="text-xs font-medium text-slate-500 mb-1 block">Cantidad</Label>
+                                <Input
+                                  type="number"
+                                  disabled={!isSelected}
+                                  value={
+                                    !isSelected
+                                      ? ''
+                                      : itemState?.quantity === ''
+                                      ? ''
+                                      : itemState?.quantity ?? ''
+                                  }
+                                  onChange={(event) =>
+                                    handleQuantityChange(item.id, event.target.value)
+                                  }
+                                  className="w-full"
+                                />
+                              </div>
+                            </div>
+                            {delivered > 0 && (
+                              <div className="border-t pt-3">
+                                <Label className="text-xs font-medium text-slate-500 mb-1 block">Pendiente por devolver</Label>
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className={cn(
+                                      "text-sm font-semibold",
+                                      available > 0 ? "text-green-700" : "text-slate-500"
+                                    )}>
+                                      {available}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      pendiente{available !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 leading-tight">
+                                    {delivered} entregado{delivered !== 1 ? 's' : ''}
+                                    {returned > 0 && (
+                                      <> - {returned} devuelto{returned !== 1 ? 's' : ''}</>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               </div>
             );
             })
@@ -926,16 +1054,16 @@ export function AffiliateReturnPanel({
 
       <div className="space-y-6 min-w-0">
         <Card className="border shadow-sm w-full overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <RotateCcw className="h-5 w-5 text-primary-prosalud" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5 text-primary-prosalud" />
               Resumen de devolución
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Completa la información de devolución y registra los elementos devueltos.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 p-4 sm:p-6">
             <div className="grid gap-4">
               <div className="grid gap-1.5">
                 <Label>Motivo de devolución</Label>
@@ -1037,16 +1165,42 @@ export function AffiliateReturnPanel({
         />
 
         <Card className="border shadow-sm w-full overflow-hidden" ref={historyScrollRef}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <RotateCcw className="h-5 w-5 text-primary-prosalud" />
-              Historial de devoluciones
-            </CardTitle>
-            <CardDescription>
-              Devoluciones registradas anteriormente para este afiliado.
-            </CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5 text-primary-prosalud" />
+                  Historial de devoluciones
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Devoluciones registradas anteriormente para este afiliado.
+                </CardDescription>
+              </div>
+              {returnHistory.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                  className="flex-shrink-0 gap-2"
+                >
+                  {isHistoryExpanded ? (
+                    <>
+                      <ChevronUp className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ocultar</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4" />
+                      <span className="hidden sm:inline">Mostrar</span>
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent>
+          {isHistoryExpanded && (
+            <CardContent className="p-4 sm:p-6">
             {returnHistory.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
                 Aún no hay devoluciones registradas en el sistema para este afiliado.
@@ -1288,6 +1442,7 @@ export function AffiliateReturnPanel({
               </div>
             )}
           </CardContent>
+          )}
         </Card>
       </div>
     </div>
