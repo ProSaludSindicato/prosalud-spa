@@ -25,8 +25,21 @@ import RequisitosDescansoSection from '@/components/solicitud-descanso/Requisito
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
+const coordinadorasPermitidas = [
+  'Catalina Hoyos Martinez',
+  'Diana Zulay Figueroa Londoño',
+  'Beatriz Veronica Bernal Velez',
+  'Luz Maria Garcia Rincon',
+  'Maria Alejandra Garcia Mesa',
+] as const;
+
 const formSchema = z.object({
-  coordinadorVoBo: z.string().min(2, "Este campo es requerido."),
+  coordinadorVoBo: z.string()
+    .min(1, "Este campo es requerido.")
+    .refine(
+      (val) => coordinadorasPermitidas.includes(val as any),
+      "Debe seleccionar un coordinador de la lista."
+    ),
   fechaInicioDescanso: z.string().min(1, "Este campo es requerido.").refine((val) => {
     const date = new Date(val);
     return !isNaN(date.getTime()) && date >= new Date(new Date().setHours(0, 0, 0, 0));

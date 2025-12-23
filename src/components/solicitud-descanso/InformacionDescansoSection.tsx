@@ -3,6 +3,7 @@ import React from 'react';
 import { Control, FieldValues, FieldPath } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Briefcase } from 'lucide-react';
 
 interface InformacionDescansoSectionProps<TFieldValues extends FieldValues> {
@@ -12,6 +13,13 @@ interface InformacionDescansoSectionProps<TFieldValues extends FieldValues> {
 const InformacionDescansoSection = <TFieldValues extends FieldValues>({
   control,
 }: InformacionDescansoSectionProps<TFieldValues>) => {
+  const coordinadoras = [
+    'Catalina Hoyos Martinez',
+    'Diana Zulay Figueroa Londoño',
+    'Beatriz Veronica Bernal Velez',
+    'Luz Maria Garcia Rincon',
+    'Maria Alejandra Garcia Mesa',
+  ];
 
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
@@ -26,7 +34,18 @@ const InformacionDescansoSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Coordinador que da el V°B° *</FormLabel>
               <FormControl>
-                <Input placeholder="Nombre del coordinador" {...field} />
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione un coordinador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coordinadoras.map((coordinadora) => (
+                      <SelectItem key={coordinadora} value={coordinadora}>
+                        {coordinadora}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FormControl>
               <FormMessage />
             </FormItem>

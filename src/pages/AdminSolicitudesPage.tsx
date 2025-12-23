@@ -2207,6 +2207,16 @@ const AdminSolicitudesPage: React.FC = () => {
                                   };
                                   return tipoDocumentoLabels[val] || val;
                                 }
+
+                                // Para solicitudes de incapacidades y licencias, el campo numeroDias siempre debe tratarse como número,
+                                // incluso cuando su valor sea 1, para evitar que se muestre como un booleano ("✓ Sí").
+                                if (
+                                  (selectedSolicitud.request_type === 'incapacidad-licencia' ||
+                                   selectedSolicitud.request_type === 'incapacidades-licencias') &&
+                                  fieldKey === 'numeroDias'
+                                ) {
+                                  return String(val);
+                                }
                                 
                                 // Handle boolean values and numeric booleans (1/0)
                                 if (val === true || val === 1 || val === '1' || val === 'true') {
