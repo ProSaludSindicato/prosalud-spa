@@ -269,6 +269,37 @@ const AdminSstPage: React.FC = () => {
     };
   }, [currentPage, itemsPerPage, hospitalFilter, listFilterTerm, showFeedbackBanner]);
 
+  // Helper function to search affiliate by document number trying all document types
+  const searchAffiliateByDocumentNumber = async (
+    documentNumber: string,
+    signal?: AbortSignal,
+  ): Promise<SstAffiliate | null> => {
+    // Try all possible document types: CC, CE, PT
+    const documentTypes: SstDocumentType[] = ['CC', 'CE', 'PT'];
+    
+    for (const documentType of documentTypes) {
+      if (signal?.aborted) {
+        return null;
+      }
+      
+      try {
+        const affiliate = await sstAdminService.getAffiliateByDocument(documentType, documentNumber, signal);
+        if (affiliate) {
+          return affiliate; // Found, return immediately
+        }
+      } catch (error: any) {
+        // If 404, continue to next type
+        if (error?.status === 404) {
+          continue;
+        }
+        // For other errors, re-throw
+        throw error;
+      }
+    }
+    
+    return null; // Not found with any document type
+  };
+
   // Read search parameter from URL and set searchTerm, then auto-search
   useEffect(() => {
     const searchParam = searchParams.get('search');
@@ -283,14 +314,14 @@ const AdminSstPage: React.FC = () => {
       setSearchTerm(trimmed);
       
       // Parse document type and number from format "TYPE-NUMBER" or just "NUMBER"
-      let documentType: SstDocumentType = 'CC';
+      let documentType: SstDocumentType | null = null;
       let documentNumber = trimmed;
       
       if (trimmed.includes('-')) {
         const parts = trimmed.split('-');
         const possibleType = parts[0].toUpperCase();
-        // Check if first part is a valid document type
-        if (['CC', 'CE', 'TI', 'PA'].includes(possibleType)) {
+        // Check if first part is a valid document type (including PT)
+        if (['CC', 'CE', 'TI', 'PA', 'PT'].includes(possibleType)) {
           documentType = possibleType as SstDocumentType;
           documentNumber = parts.slice(1).join('-');
         }
@@ -300,7 +331,14 @@ const AdminSstPage: React.FC = () => {
       if (documentNumber && /^\d+$/.test(documentNumber)) {
         const controller = new AbortController();
         setIsSearchingAffiliate(true);
-        sstAdminService.getAffiliateByDocument(documentType, documentNumber, controller.signal)
+        
+        // If document type is specified, search only with that type
+        // Otherwise, try all possible document types
+        const searchPromise = documentType
+          ? sstAdminService.getAffiliateByDocument(documentType, documentNumber, controller.signal)
+          : searchAffiliateByDocumentNumber(documentNumber, controller.signal);
+        
+        searchPromise
           .then((affiliate) => {
             if (affiliate) {
               handleSelectAffiliate(affiliate);
@@ -535,7 +573,8 @@ const AdminSstPage: React.FC = () => {
     const controller = new AbortController();
     setIsSearchingAffiliate(true);
     try {
-      const affiliate = await sstAdminService.getAffiliateByDocument('CC', trimmed, controller.signal);
+      // Search with all document types (CC, CE, PT) - independent of document type
+      const affiliate = await searchAffiliateByDocumentNumber(trimmed, controller.signal);
 
       if (!affiliate) {
         showFeedbackBanner(
