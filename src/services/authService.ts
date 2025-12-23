@@ -25,6 +25,8 @@ export interface LoginCredentials {
   email: string;
   password: string;
   device_name?: string;
+  recaptcha_token?: string;
+  recaptcha_action?: string;
 }
 
 /**
@@ -113,11 +115,19 @@ class AuthService {
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      const payload = {
+      const payload: any = {
         email: credentials.email,
         password: credentials.password,
         device_name: credentials.device_name || 'Panel Admin',
       };
+
+      // Agregar token de reCAPTCHA si está disponible
+      if (credentials.recaptcha_token) {
+        payload.recaptcha_token = credentials.recaptcha_token;
+      }
+      if (credentials.recaptcha_action) {
+        payload.recaptcha_action = credentials.recaptcha_action;
+      }
 
       logger.info('Attempting login', { email: credentials.email });
 

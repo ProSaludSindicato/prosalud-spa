@@ -13,6 +13,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom"
 import { motion } from "framer-motion"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/context/AuthContext"
+import { getRecaptchaToken } from "@/utils/recaptcha"
+import { handleRecaptchaError, isRecaptchaError } from "@/utils/recaptchaErrorHandler"
 
 // Validation schema
 const formSchema = z.object({
@@ -59,7 +61,11 @@ const LoginForm: React.FC = () => {
     setIsSubmitting(true)
 
     try {
-      await login(values.email, values.password, "Panel Admin")
+      // 1. Obtener token de reCAPTCHA antes de la petición
+      const recaptchaToken = await getRecaptchaToken('login');
+
+      // 2. Realizar login con el token
+      await login(values.email, values.password, "Panel Admin", recaptchaToken || undefined)
 
       toast({
         title: "¡Bienvenido!",
@@ -69,15 +75,26 @@ const LoginForm: React.FC = () => {
       const from = (location.state as any)?.from?.pathname || '/admin'
       navigate(from, { replace: true })
     } catch (error: any) {
-      const message = error?.message || 'Credenciales inválidas o error de autenticación.'
-      form.setError("root", { message })
-      setLoginAttempts((prev) => prev + 1)
-      
-      toast({
-        title: "Error de autenticación",
-        description: message,
-        variant: "destructive",
-      })
+      // Manejar errores de reCAPTCHA específicamente
+      if (isRecaptchaError(error)) {
+        const message = handleRecaptchaError(error);
+        form.setError("root", { message });
+        toast({
+          title: "Error de verificación",
+          description: message,
+          variant: "destructive",
+        });
+      } else {
+        const message = error?.message || 'Credenciales inválidas o error de autenticación.'
+        form.setError("root", { message })
+        setLoginAttempts((prev) => prev + 1)
+        
+        toast({
+          title: "Error de autenticación",
+          description: message,
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsSubmitting(false)
     }

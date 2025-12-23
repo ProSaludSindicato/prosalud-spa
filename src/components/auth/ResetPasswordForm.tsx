@@ -11,6 +11,8 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { getRecaptchaToken } from '@/utils/recaptcha';
+import { handleRecaptchaError, isRecaptchaError } from '@/utils/recaptchaErrorHandler';
 
 // Validador de contraseñas seguras (mismo que DefinePasswordForm)
 const passwordSchema = z
@@ -119,11 +121,22 @@ const ResetPasswordForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await api.post('/api/auth/reset-password', {
+      // Obtener token de reCAPTCHA antes de la petición
+      const recaptchaToken = await getRecaptchaToken('reset_password');
+
+      const payload: any = {
         token: token,
         password: values.password,
         password_confirmation: values.confirmPassword,
-      });
+      };
+
+      // Agregar token de reCAPTCHA si está disponible
+      if (recaptchaToken) {
+        payload.recaptcha_token = recaptchaToken;
+        payload.recaptcha_action = 'reset_password';
+      }
+
+      await api.post('/api/auth/reset-password', payload);
 
       setIsSuccess(true);
       toast({
@@ -137,6 +150,16 @@ const ResetPasswordForm: React.FC = () => {
         navigate('/auth/login');
       }, 3000);
     } catch (error: any) {
+      // Manejar errores de reCAPTCHA específicamente
+      if (isRecaptchaError(error)) {
+        toast({
+          title: "Error de verificación",
+          description: handleRecaptchaError(error),
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Manejar errores de validación (422)
       if (error.response?.status === 422) {
         const errors = error.response.data?.errors;

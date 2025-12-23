@@ -11,6 +11,8 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { getRecaptchaToken } from '@/utils/recaptcha';
+import { handleRecaptchaError, isRecaptchaError } from '@/utils/recaptchaErrorHandler';
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -38,9 +40,20 @@ const ForgotPasswordForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await api.post('/api/auth/forgot-password', {
+      // Obtener token de reCAPTCHA antes de la petición
+      const recaptchaToken = await getRecaptchaToken('forgot_password');
+
+      const payload: any = {
         email: values.email,
-      });
+      };
+
+      // Agregar token de reCAPTCHA si está disponible
+      if (recaptchaToken) {
+        payload.recaptcha_token = recaptchaToken;
+        payload.recaptcha_action = 'forgot_password';
+      }
+
+      const response = await api.post('/api/auth/forgot-password', payload);
 
       // Usar el mensaje de la API si está disponible, o el mensaje por defecto
       const message = response.data?.message || 
@@ -53,6 +66,16 @@ const ForgotPasswordForm: React.FC = () => {
         className: "border-green-200 bg-green-50 text-green-800"
       });
     } catch (error: any) {
+      // Manejar errores de reCAPTCHA específicamente
+      if (isRecaptchaError(error)) {
+        toast({
+          title: "Error de verificación",
+          description: handleRecaptchaError(error),
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Manejar errores de validación (422)
       if (error.response?.status === 422) {
         const errors = error.response.data?.errors;

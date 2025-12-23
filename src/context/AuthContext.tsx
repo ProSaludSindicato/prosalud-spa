@@ -231,12 +231,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Login con credenciales
    */
-  const login = useCallback(async (email: string, password: string, deviceName?: string) => {
+  const login = useCallback(async (email: string, password: string, deviceName?: string, recaptchaToken?: string) => {
     try {
       const credentials: LoginCredentials = {
         email,
         password,
         device_name: deviceName || 'Panel Admin',
+        recaptcha_token: recaptchaToken,
+        recaptcha_action: 'login',
       };
 
       const response = await authService.login(credentials);

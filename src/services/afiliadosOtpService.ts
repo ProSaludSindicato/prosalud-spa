@@ -20,6 +20,8 @@ export interface RequestOtpRequest {
   tipo_documento: string;
   documento: string;
   fecha_expedicion: string;
+  recaptcha_token?: string;
+  recaptcha_action?: string;
 }
 
 export interface RequestOtpResponse {
@@ -127,9 +129,23 @@ export interface ApiErrorResponse {
  */
 export const requestOtp = async (data: RequestOtpRequest): Promise<RequestOtpResponse> => {
   try {
+    const payload: any = {
+      tipo_documento: data.tipo_documento,
+      documento: data.documento,
+      fecha_expedicion: data.fecha_expedicion,
+    };
+
+    // Agregar token de reCAPTCHA si está disponible
+    if (data.recaptcha_token) {
+      payload.recaptcha_token = data.recaptcha_token;
+    }
+    if (data.recaptcha_action) {
+      payload.recaptcha_action = data.recaptcha_action;
+    }
+
     const response = await otpApi.post<RequestOtpResponse>(
       API_CONFIG.ENDPOINTS.AFILIADOS_REQUEST_OTP,
-      data
+      payload
     );
 
     return response.data;
@@ -139,12 +155,22 @@ export const requestOtp = async (data: RequestOtpRequest): Promise<RequestOtpRes
       const errorData: ApiErrorResponse = error.response.data || {};
 
       if (status === 400) {
+        // Verificar si es error de reCAPTCHA
+        if (errorData.message?.includes('recaptcha') || errorData.message?.includes('reCAPTCHA')) {
+          throw error; // Re-lanzar para que el componente maneje el error de reCAPTCHA
+        }
         const message = errorData.message || 'Los datos proporcionados no son válidos.';
         throw new Error(message);
       } else if (status === 401) {
         throw new Error('Credenciales incorrectas o el afiliado no tiene correo electrónico registrado');
+      } else if (status === 403) {
+        // Error de verificación de reCAPTCHA
+        if (errorData.message?.includes('recaptcha') || errorData.message?.includes('reCAPTCHA')) {
+          throw error; // Re-lanzar para que el componente maneje el error de reCAPTCHA
+        }
+        throw new Error(errorData.message || 'Acceso denegado');
       } else if (status === 429) {
-        throw new Error('Has solicitado demasiados códigos. Por favor, espera un momento antes de intentar nuevamente.');
+        throw error; // Re-lanzar para que el componente maneje el error de rate limiting
       } else if (status === 500) {
         throw new Error('Error al enviar el código de verificación. Por favor, intenta nuevamente más tarde.');
       } else if (status === 503) {

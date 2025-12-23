@@ -9,6 +9,8 @@ import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { toast } from 'sonner';
 import { Loader2, X, IdCard, Hash, Calendar, Mail, ArrowLeft, RefreshCw } from 'lucide-react';
 import { requestOtp, verifyOtp } from '@/services/afiliadosOtpService';
+import { getRecaptchaToken } from '@/utils/recaptcha';
+import { handleRecaptchaError, isRecaptchaError } from '@/utils/recaptchaErrorHandler';
 
 interface AfiliadoOtpAuthModalProps {
   open: boolean;
@@ -124,10 +126,15 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
 
     setRequestingOtp(true);
     try {
+      // Obtener token de reCAPTCHA antes de la petición
+      const recaptchaToken = await getRecaptchaToken('request_otp');
+
       const response = await requestOtp({
         tipo_documento: formData.tipoDocumento,
         documento: formData.numeroDocumento,
         fecha_expedicion: formData.fechaExpedicion,
+        recaptcha_token: recaptchaToken || undefined,
+        recaptcha_action: 'request_otp',
       });
 
       setSessionId(response.session_id);
@@ -143,9 +150,16 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
         description: 'Se ha enviado un código de verificación a tu correo electrónico.',
       });
     } catch (error: any) {
-      toast.error('Error al solicitar código', {
-        description: error.message || 'No se pudo enviar el código de verificación.',
-      });
+      // Manejar errores de reCAPTCHA específicamente
+      if (isRecaptchaError(error)) {
+        toast.error('Error de verificación', {
+          description: handleRecaptchaError(error),
+        });
+      } else {
+        toast.error('Error al solicitar código', {
+          description: error.message || 'No se pudo enviar el código de verificación.',
+        });
+      }
     } finally {
       setRequestingOtp(false);
     }
@@ -200,10 +214,15 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
 
     setRequestingOtp(true);
     try {
+      // Obtener token de reCAPTCHA antes de la petición
+      const recaptchaToken = await getRecaptchaToken('request_otp');
+
       const response = await requestOtp({
         tipo_documento: formData.tipoDocumento,
         documento: formData.numeroDocumento,
         fecha_expedicion: formData.fechaExpedicion,
+        recaptcha_token: recaptchaToken || undefined,
+        recaptcha_action: 'request_otp',
       });
 
       setSessionId(response.session_id);
@@ -218,9 +237,16 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
         description: 'Se ha enviado un nuevo código de verificación a tu correo electrónico.',
       });
     } catch (error: any) {
-      toast.error('Error al reenviar código', {
-        description: error.message || 'No se pudo reenviar el código de verificación.',
-      });
+      // Manejar errores de reCAPTCHA específicamente
+      if (isRecaptchaError(error)) {
+        toast.error('Error de verificación', {
+          description: handleRecaptchaError(error),
+        });
+      } else {
+        toast.error('Error al reenviar código', {
+          description: error.message || 'No se pudo reenviar el código de verificación.',
+        });
+      }
     } finally {
       setRequestingOtp(false);
     }
