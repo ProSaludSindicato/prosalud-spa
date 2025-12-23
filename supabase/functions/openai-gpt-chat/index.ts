@@ -246,7 +246,7 @@ SERVICIOS Y SUS RUTAS EXACTAS:
 
 ⚠️ IMPORTANTE - CERTIFICADO DE APORTES A LA SEGURIDAD SOCIAL:
 Para consultar el certificado de aportes a la seguridad social, existen DOS proveedores según la fecha:
-1. **Aportes en Línea** (https://www.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx): Para consultar aportes realizados HASTA AGOSTO DE 2022
+1. **Aportes en Línea** (https://empresas.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx): Para consultar aportes realizados HASTA AGOSTO DE 2022
 2. **ARUS SUAPORTE** (https://www.suaporte.com.co): Para consultar aportes realizados DESDE SEPTIEMBRE DE 2022 hasta la fecha actual
 
 ⚠️ IMPORTANTE - REQUISITOS PARA COMPENSACIÓN ANUAL POR DESCANSO (VACACIONES):

@@ -11,7 +11,7 @@ Este servicio permite a los afiliados de ProSalud obtener su comprobante de apor
 ### 1. Aportes en Línea
 **Para consultar aportes realizados HASTA AGOSTO DE 2022**
 
-- **Portal:** https://www.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx
+- **Portal:** https://empresas.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx
 - **Cobertura:** Aportes desde el inicio hasta agosto de 2022
 
 ### 2. ARUS SUAPORTE

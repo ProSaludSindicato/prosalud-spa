@@ -10,7 +10,7 @@ import { Info } from 'lucide-react';
 
 const CertificadoSeguridadSocialPage: React.FC = () => {
   const arusSuaporteLink = "https://www.suaporte.com.co/Web/faces/pages/comprobantes/consultadirecta/consultaDirectaLogin.xhtml?_gl=1*17d7pkb*_gcl_aw*R0NMLjE2NTQ1NDc3NzcuQ2p3S0NBand5X2FVQmhBQ0Vpd0EySUhIUUZoVHN2YWdqZlZXOWxsQkkxX3RzelFac1lTR2RfOTB0Nk4tdURQbVZBcHp6emxvcVZNb2VCb0MzdGNRQXZEX0J3RQ..*_ga*MTU1MDY3NzU5LjE2NTEyNjYzNDM.*_ga_9F469EXLBS*MTY1NTg0Mzk4Ni4xMDQuMC4xNjU1ODQ0MTgxLjA.&_ga=2.99911518.1148086000.1655827255-155067759.1651266343&_gac=1.158993096.1654547787.CjwKCAjwy_aUBhACEiwA2IHHQFhTsvagjfVW9llBI1_tszQZsYSGd_90t6N-uDPmVApzzzloqVMoeBoC3tcQAvD_BwE";
-  const aportesEnLineaLink = "https://www.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx";
+  const aportesEnLineaLink = "https://empresas.aportesenlinea.com/Autoservicio/CertificadoAportes.aspx";
 
   return (
     <MainLayout>
