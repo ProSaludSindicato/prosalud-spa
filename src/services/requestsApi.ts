@@ -1,5 +1,5 @@
 import { authenticatedApi } from "./api";
-import { getErrorMessage } from "@/utils/errorSanitizer";
+import { getErrorMessage, sanitizeErrorForLogging } from "@/utils/errorSanitizer";
 import { logger } from "@/utils/logger";
 
 // Use authenticated API client for requests endpoints
@@ -84,18 +84,17 @@ requestsApi.interceptors.response.use(
       return Promise.reject(error);
     }
     
-    logger.error("Requests API response error", {
-      status,
-      statusText: error.response?.statusText,
-      message: error.message,
-      url,
-    });
+    // Sanitizar error para logging - solo detalles seguros en producción
+    const sanitizedError = sanitizeErrorForLogging(error);
+    logger.error("Requests API response error", sanitizedError);
     return Promise.reject(error);
   },
 );
 
 const handleApiError = (error: any) => {
-  logger.error("Requests API error handled", getErrorMessage(error));
+  // Sanitizar error para logging - solo detalles seguros en producción
+  const sanitizedError = sanitizeErrorForLogging(error);
+  logger.error("Requests API error handled", sanitizedError);
 
   // Handle network errors
   if (error.code === "ERR_NETWORK" || error.message.includes("CORS")) {

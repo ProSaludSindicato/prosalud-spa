@@ -1,5 +1,5 @@
 import { authenticatedApi } from "./api";
-import { getErrorMessage } from "@/utils/errorSanitizer";
+import { getErrorMessage, sanitizeErrorForLogging } from "@/utils/errorSanitizer";
 import { logger } from "@/utils/logger";
 
 // Use authenticated API client for request assignments endpoints
@@ -27,12 +27,9 @@ export interface SaveAssignmentsPayload {
  * Maneja errores de la API de asignaciones
  */
 const handleApiError = (error: any): never => {
-  logger.error("Request assignments API error", {
-    status: error.response?.status,
-    statusText: error.response?.statusText,
-    message: error.response?.data?.message,
-    errors: error.response?.data?.errors,
-  });
+  // Sanitizar error para logging - solo detalles seguros en producción
+  const sanitizedError = sanitizeErrorForLogging(error);
+  logger.error("Request assignments API error", sanitizedError);
 
   // Si hay errores de validación, construir mensaje detallado
   if (error.response?.status === 422 && error.response?.data?.errors) {

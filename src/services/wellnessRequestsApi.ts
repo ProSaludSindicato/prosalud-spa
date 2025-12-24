@@ -1,5 +1,5 @@
 import { authenticatedApi } from './api';
-import { getErrorMessage } from '@/utils/errorSanitizer';
+import { getErrorMessage, sanitizeErrorForLogging } from '@/utils/errorSanitizer';
 import { logger } from '@/utils/logger';
 
 // Use authenticated API instance
@@ -201,7 +201,9 @@ wellnessRequestsApi.interceptors.response.use(
 );
 
 const handleApiError = (error: any) => {
-  logger.error('Wellness Request API error', getErrorMessage(error));
+  // Sanitizar error para logging - solo detalles seguros en producción
+  const sanitizedError = sanitizeErrorForLogging(error);
+  logger.error('Wellness Request API error', sanitizedError);
 
   // Handle network errors
   if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {

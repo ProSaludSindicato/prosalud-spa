@@ -13,6 +13,7 @@ import type {
 } from '@/types/adminSst';
 import { buildAdminApiUrl } from '@/config/api';
 import { logger } from '@/utils/logger';
+import { sanitizeErrorForLogging } from '@/utils/errorSanitizer';
 
 const BASE_PATH = '/api/dotacion-epp';
 
@@ -82,7 +83,9 @@ const parseErrorMessage = async (response: Response): Promise<never> => {
       message = data.message;
     }
   } catch (error) {
-    logger.error('No fue posible parsear el mensaje de error del API Dotación & EPP', error instanceof Error ? error.message : error);
+    // Sanitizar error para logging - solo detalles seguros en producción
+    const sanitizedError = sanitizeErrorForLogging(error);
+    logger.error('No fue posible parsear el mensaje de error del API Dotación & EPP', sanitizedError);
   }
 
   const apiError = new Error(message) as Error & { status?: number };

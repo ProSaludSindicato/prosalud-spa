@@ -382,3 +382,48 @@ export const getErrorMessage = (error: any): string => {
   return sanitizeError(error).message;
 };
 
+/**
+ * Sanitiza información de error para logging
+ * En producción, solo loguea información segura
+ * En desarrollo, loguea detalles completos para debugging
+ */
+export const sanitizeErrorForLogging = (error: any): any => {
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+  
+  // En desarrollo, retornar el error completo para debugging
+  if (isDev) {
+    return error;
+  }
+  
+  // En producción, sanitizar información sensible
+  const sanitized: any = {
+    message: error?.message || 'Error desconocido',
+    code: error?.code,
+  };
+  
+  // Solo incluir información HTTP segura
+  if (error?.response) {
+    sanitized.status = error.response.status;
+    sanitized.statusText = error.response.statusText;
+    sanitized.url = error.config?.url;
+    sanitized.method = error.config?.method;
+    
+    // NO incluir error.response.data en producción (puede contener info sensible)
+    // Solo incluir si es un mensaje de error genérico y seguro
+    if (error.response.data?.message && typeof error.response.data.message === 'string') {
+      const message = error.response.data.message;
+      // Solo incluir si no parece contener información técnica sensible
+      if (!message.includes('SQL') && 
+          !message.includes('Exception') && 
+          !message.includes('Stack trace') &&
+          !message.includes('at ') &&
+          !message.includes('.php:') &&
+          !message.includes('\\')) {
+        sanitized.responseMessage = message;
+      }
+    }
+  }
+  
+  return sanitized;
+};
+

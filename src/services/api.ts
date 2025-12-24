@@ -2,6 +2,7 @@ import axios from "axios";
 import { API_CONFIG } from "../config/api";
 import { logger } from "@/utils/logger";
 import { authService } from "./authService";
+import { sanitizeErrorForLogging } from "@/utils/errorSanitizer";
 
 const TOKEN_KEY = 'prosalud_auth_token';
 
@@ -86,13 +87,22 @@ api.interceptors.response.use(
       (error.message?.includes('CORS') || error.message?.includes('Network Error') || error.message?.includes('Failed to fetch'));
     
     if (isCorsError) {
-      logger.error("CORS error detected", {
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL,
-        message: error.message,
-        code: error.code,
-      });
+      // En desarrollo, log completo; en producción, sanitizado
+      if (import.meta.env.DEV) {
+        logger.error("CORS error detected", {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+          message: error.message,
+          code: error.code,
+        });
+      } else {
+        logger.error("CORS error detected", {
+          url: error.config?.url,
+          method: error.config?.method,
+          code: error.code,
+        });
+      }
       
       // Agregar información adicional al error para mejor diagnóstico
       const corsError = new Error('Error de CORS: El servidor no permite solicitudes desde este origen. Verifica la configuración del backend.');
@@ -101,14 +111,9 @@ api.interceptors.response.use(
       return Promise.reject(corsError);
     }
     
-    logger.error("API request error", {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: error.message,
-      code: error.code,
-    });
+    // Sanitizar error para logging en producción
+    const sanitizedError = sanitizeErrorForLogging(error);
+    logger.error("API request error", sanitizedError);
     
     return Promise.reject(error);
   },
@@ -185,15 +190,9 @@ authenticatedApi.interceptors.response.use(
         }, 100);
       }
     } else {
-      // Para otros errores, loguear normalmente
-      logger.error("Authenticated API request error", {
-        url,
-        method: error.config?.method,
-        status,
-        statusText: error.response?.statusText,
-        message: error.message,
-        code: error.code,
-      });
+      // Para otros errores, sanitizar para logging en producción
+      const sanitizedError = sanitizeErrorForLogging(error);
+      logger.error("Authenticated API request error", sanitizedError);
     }
     
     return Promise.reject(error);
