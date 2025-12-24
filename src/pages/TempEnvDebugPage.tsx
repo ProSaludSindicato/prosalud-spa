@@ -3,7 +3,7 @@
  * 
  * ⚠️ ELIMINAR DESPUÉS DE VERIFICAR LAS VARIABLES DE ENTORNO
  * 
- * Ruta: /admin/temp-debug-verification-env-variables-check
+ * Ruta: /temp-debug-verification-env-variables-check
  */
 
 import React from 'react';
@@ -46,16 +46,29 @@ const TempEnvDebugPage: React.FC = () => {
   // Función para determinar si está usando fallback
   const isUsingFallback = (varName: string, currentValue: string | undefined) => {
     if (!currentValue) return true;
-    if (!envVars[varName as keyof typeof envVars]) return true;
     
-    // Verificar si el valor actual coincide con los fallbacks conocidos
-    if (varName === 'VITE_PUBLIC_API_BASE_URL' || varName === 'VITE_ADMIN_API_BASE_URL' || varName === 'VITE_API_BASE_URL') {
-      return currentValue === 'https://prosalud.test';
+    // VITE_API_BASE_URL es requerida - no tiene fallback hardcodeado
+    if (varName === 'VITE_API_BASE_URL') {
+      return !envVars.VITE_API_BASE_URL; // Solo true si no está definida
     }
+    
+    // VITE_PUBLIC_API_BASE_URL puede usar VITE_API_BASE_URL como fallback (pero no hardcode)
+    if (varName === 'VITE_PUBLIC_API_BASE_URL') {
+      return !envVars.VITE_PUBLIC_API_BASE_URL && !envVars.VITE_API_BASE_URL; // Solo true si ninguna está definida
+    }
+    
+    // VITE_ADMIN_API_BASE_URL puede usar VITE_API_BASE_URL como fallback (pero no hardcode)
+    if (varName === 'VITE_ADMIN_API_BASE_URL') {
+      return !envVars.VITE_ADMIN_API_BASE_URL && !envVars.VITE_API_BASE_URL; // Solo true si ninguna está definida
+    }
+    
+    // VITE_RECAPTCHA_SITE_KEY ya no tiene fallback - si la app carga, está definida
     if (varName === 'VITE_RECAPTCHA_SITE_KEY') {
-      return currentValue === '6LfTGhksAAAAANaQkiOUEGeJkHjoaFyzLNSv5xiP';
+      return false; // No hay fallback, es requerida
     }
-    return false;
+    
+    // Para otras variables, verificar si no están definidas
+    return !envVars[varName as keyof typeof envVars];
   };
 
   const variables = [
@@ -63,29 +76,31 @@ const TempEnvDebugPage: React.FC = () => {
       name: 'VITE_PUBLIC_API_BASE_URL',
       envValue: envVars.VITE_PUBLIC_API_BASE_URL,
       currentValue: currentValues.PUBLIC_BASE_URL,
-      fallback: 'https://prosalud.test',
-      description: 'URL base para el sitio web público',
+      fallback: envVars.VITE_API_BASE_URL ? 'Usa VITE_API_BASE_URL como fallback' : 'REQUERIDA (VITE_API_BASE_URL o VITE_PUBLIC_API_BASE_URL)',
+      description: 'URL base para el sitio web público (usa VITE_API_BASE_URL si no está definida)',
     },
     {
       name: 'VITE_ADMIN_API_BASE_URL',
       envValue: envVars.VITE_ADMIN_API_BASE_URL,
       currentValue: currentValues.ADMIN_BASE_URL,
-      fallback: 'https://prosalud.test',
-      description: 'URL base para el panel de administración',
+      fallback: envVars.VITE_API_BASE_URL ? 'Usa VITE_API_BASE_URL como fallback' : 'REQUERIDA (VITE_API_BASE_URL o VITE_ADMIN_API_BASE_URL)',
+      description: 'URL base para el panel de administración (usa VITE_API_BASE_URL si no está definida)',
     },
     {
       name: 'VITE_API_BASE_URL',
       envValue: envVars.VITE_API_BASE_URL,
       currentValue: currentValues.BASE_URL,
-      fallback: 'https://prosalud.test',
-      description: 'URL base general (fallback para ambas)',
+      fallback: 'REQUERIDA (sin fallback por seguridad)',
+      description: 'URL base general (requerida, sin fallback hardcodeado)',
+      required: true,
     },
     {
       name: 'VITE_RECAPTCHA_SITE_KEY',
       envValue: envVars.VITE_RECAPTCHA_SITE_KEY,
       currentValue: currentValues.RECAPTCHA_SITE_KEY,
-      fallback: '6LfTGhksAAAAANaQkiOUEGeJkHjoaFyzLNSv5xiP',
-      description: 'Clave del sitio para reCAPTCHA',
+      fallback: 'REQUERIDA (sin fallback por seguridad)',
+      description: 'Clave del sitio para reCAPTCHA Enterprise (requerida, sin fallback)',
+      required: true,
     },
     {
       name: 'VITE_SUPABASE_URL',
@@ -188,7 +203,7 @@ const TempEnvDebugPage: React.FC = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         {status.icon}
                         <h3 className="text-lg font-semibold text-gray-900 font-mono">
                           {variable.name}
@@ -202,7 +217,12 @@ const TempEnvDebugPage: React.FC = () => {
                         >
                           {status.text}
                         </span>
-                        {usingFallback && (
+                        {(variable as any).required && (
+                          <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
+                            REQUERIDA
+                          </span>
+                        )}
+                        {usingFallback && !(variable as any).required && (
                           <span className="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
                             USANDO FALLBACK
                           </span>
@@ -234,9 +254,14 @@ const TempEnvDebugPage: React.FC = () => {
                             <span className="text-red-600 italic">[NO DEFINIDA]</span>
                           )}
                       </div>
-                      {usingFallback && (
+                      {usingFallback && !(variable as any).required && (
                         <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 border border-yellow-200 rounded p-2">
                           ⚠️ Usando valor fallback: <strong>{variable.fallback}</strong>
+                        </div>
+                      )}
+                      {(variable as any).required && !variable.envValue && (
+                        <div className="mt-2 text-xs text-red-700 bg-red-100 border border-red-200 rounded p-2">
+                          ⚠️ Esta variable es requerida y no tiene fallback. La aplicación puede fallar si no está definida.
                         </div>
                       )}
                     </div>

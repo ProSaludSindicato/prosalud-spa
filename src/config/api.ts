@@ -1,9 +1,23 @@
-export const API_CONFIG = {
-  PUBLIC_BASE_URL: import.meta.env.VITE_PUBLIC_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
-  ADMIN_BASE_URL: import.meta.env.VITE_ADMIN_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
+// Validación de variables de entorno para URLs de API
+// IMPORTANTE: Las variables de entorno deben estar configuradas - sin fallbacks hardcodeados por seguridad
+const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+if (!VITE_API_BASE_URL) {
+  throw new Error(
+    'VITE_API_BASE_URL debe estar definida en las variables de entorno. ' +
+    'Esta variable es requerida para el funcionamiento de la aplicación.'
+  );
+}
 
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://api.prosalud.org.co',
-  // BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://prosalud.test',
+// PUBLIC_BASE_URL puede usar VITE_PUBLIC_API_BASE_URL específica o VITE_API_BASE_URL como fallback
+const PUBLIC_BASE_URL = import.meta.env.VITE_PUBLIC_API_BASE_URL || VITE_API_BASE_URL;
+
+// ADMIN_BASE_URL puede usar VITE_ADMIN_API_BASE_URL específica o VITE_API_BASE_URL como fallback
+const ADMIN_BASE_URL = import.meta.env.VITE_ADMIN_API_BASE_URL || VITE_API_BASE_URL;
+
+export const API_CONFIG = {
+  PUBLIC_BASE_URL,
+  ADMIN_BASE_URL,
+  BASE_URL: VITE_API_BASE_URL,
 
   // Common endpoints
   ENDPOINTS: {
@@ -37,8 +51,17 @@ export const buildApiUrl = (endpoint: string): string => {
 };
 
 // reCAPTCHA configuration (Enterprise)
+// IMPORTANTE: VITE_RECAPTCHA_SITE_KEY debe estar definida en las variables de entorno
+// Sin fallback por seguridad - la aplicación fallará claramente si no está configurada
+if (!import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
+  throw new Error(
+    'VITE_RECAPTCHA_SITE_KEY debe estar definida en las variables de entorno. ' +
+    'Esta variable es requerida para el funcionamiento de reCAPTCHA Enterprise.'
+  );
+}
+
 export const RECAPTCHA_CONFIG = {
-  SITE_KEY: import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LfTGhksAAAAANaQkiOUEGeJkHjoaFyzLNSv5xiP',
+  SITE_KEY: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
 } as const;
 
 // Environment configuration

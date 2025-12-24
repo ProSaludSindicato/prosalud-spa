@@ -159,7 +159,11 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
 
     // Create a custom axios instance for this request to avoid Content-Type header conflicts
     // When sending FormData, axios automatically sets Content-Type to multipart/form-data
-    const baseURL = publicApi.defaults.baseURL || 'https://prosalud.test';
+    // baseURL debe estar configurado en publicApi desde API_CONFIG.PUBLIC_BASE_URL
+    if (!publicApi.defaults.baseURL) {
+      throw new Error('PUBLIC_BASE_URL no está configurada. Verifica VITE_PUBLIC_API_BASE_URL o VITE_API_BASE_URL en las variables de entorno.');
+    }
+    const baseURL = publicApi.defaults.baseURL;
     const response = await axios.post(
       `${baseURL}/api/requests`,
       formData,

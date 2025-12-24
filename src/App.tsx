@@ -233,7 +233,7 @@ const AppRoutes = () => {
 
             {/* TEMPORAL: Página de debug de variables de entorno - ELIMINAR DESPUÉS DE PRUEBAS */}
             <Route 
-              path="/admin/temp-debug-verification-env-variables-check" 
+              path="/temp-debug-verification-env-variables-check" 
               element={<TempEnvDebugPage />} 
             />
 

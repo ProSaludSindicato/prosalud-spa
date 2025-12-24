@@ -119,21 +119,6 @@
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     </noscript>
-
-    <!-- Google reCAPTCHA Enterprise -->
-    <!-- Note: El site key se carga dinámicamente desde la configuración -->
-    <script>
-      // Cargar reCAPTCHA Enterprise con el site key desde la configuración
-      // El site key se obtiene de VITE_RECAPTCHA_SITE_KEY o el valor por defecto
-      (function() {
-        const siteKey = '6LfTGhksAAAAANaQkiOUEGeJkHjoaFyzLNSv5xiP'; // Valor por defecto, se puede sobrescribir con env var
-        const script = document.createElement('script');
-        script.src = `https://www.google.com/recaptcha/enterprise.js?render=${siteKey}`;
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
-      })();
-    </script>
 </head>
 
   <body>
