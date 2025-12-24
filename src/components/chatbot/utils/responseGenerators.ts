@@ -71,6 +71,15 @@ No pudimos procesar tu solicitud en este momento.
 };
 
 /**
+ * Normaliza el estado de incapacidad: convierte "PAGADA" a "RECONOCIDA"
+ */
+const normalizeEstado = (estado: string | undefined | null): string => {
+  if (!estado) return estado || "";
+  const estadoUpper = estado.toUpperCase();
+  return estadoUpper === "PAGADA" ? "RECONOCIDA" : estado;
+};
+
+/**
  * Genera respuesta con múltiples incapacidades
  */
 export const generateMultipleIncapacidadesResponse = (incapacidades: any[]): { content: string; selectionOptions: any[] } => {
@@ -84,7 +93,7 @@ A continuación se muestran tus incapacidades:`;
     radicado: inc["N° Radicado"] || "N/A",
     periodo: `${inc["Fecha Incio Incapacidad"]} al ${inc["Fecha Fin Incapacidad"]}`,
     dias: inc["Dias Incapacidad"],
-    estado: inc.estado,
+    estado: normalizeEstado(inc.estado),
     valor: inc["valor Incapacidad Recibido"],
   }));
 
@@ -102,6 +111,7 @@ A continuación se muestran tus incapacidades:`;
 const getStatusIcon = (estado: string): string => {
   switch (estado?.toUpperCase()) {
     case "PAGADA":
+    case "RECONOCIDA":
       return "✅";
     case "EN_PROCESO":
       return "🔄";
@@ -136,9 +146,36 @@ export const generateIncapacidadResponse = (
     keys: Object.keys(incapacidad || {}).slice(0, 8),
   });
 
-  const statusIcon = getStatusIcon(estado);
+  // Determinar el estado de reconocimiento de compensación
+  const estadoUpper = estado?.toUpperCase() || "";
+  const tieneValorRecibido = incapacidad["valor Incapacidad Recibido"] && 
+    incapacidad["valor Incapacidad Recibido"].toString().trim() !== "" &&
+    incapacidad["valor Incapacidad Recibido"].toString().trim() !== "N/A";
+  
+  // Determinar si fue reconocida (usando "RECONOCIDA" en lugar de "PAGADA")
+  const esEstadoReconocido = estadoUpper === "PAGADA" || estadoUpper === "RECONOCIDA";
+  const fueReconocida = esEstadoReconocido || tieneValorRecibido;
+  
+  // Si el estado es desconocido, no podemos determinar el estado de reconocimiento
+  const estadoDesconocido = estadoUpper === "DESCONOCIDO" || !estado || estado.trim() === "";
+  
+  // Determinar el texto del título y el icono
+  let tituloEstado: string;
+  let statusIcon: string;
+  
+  if (estadoDesconocido) {
+    // Si el estado es desconocido, usar el estado original
+    statusIcon = getStatusIcon(estado);
+    tituloEstado = estado;
+  } else if (fueReconocida) {
+    statusIcon = "✅";
+    tituloEstado = "Reconocida";
+  } else {
+    statusIcon = "⏳";
+    tituloEstado = "Pendiente por reconocer";
+  }
 
-  let response = `${statusIcon} **Detalle de tu incapacidad - ${estado}**\n\n`;
+  let response = `${statusIcon} **Detalle de tu incapacidad - ${tituloEstado}**\n\n`;
 
   // Mensaje aclaratorio sobre EPS
   response += `💡 *Cuando la EPS es Sura o Colmena, el pago se realiza a través de ProSalud, quien reconoce y transfiere la incapacidad al afiliado.*\n\n*Si la EPS es otra, el afiliado debe gestionar el trámite directamente con su EPS por los canales que esta tenga disponibles para el reconocimiento y pago de la incapacidad.*\n\n`;
@@ -170,11 +207,10 @@ ${incapacidad.ADMINISTRADORA ? `- Administradora: ${incapacidad.ADMINISTRADORA}\
 ${incapacidad.RADICADO ? `- Radicado adicional: ${incapacidad.RADICADO}\n` : ""}${incapacidad["FECHA ENVIO"] ? `- Fecha envío: ${incapacidad["FECHA ENVIO"]}\n` : ""}
 `;
 
-  // Información de pago
-  if (incapacidad["valor Incapacidad Recibido"]) {
-    response += `**💰 Información de pago:**
-- Valor recibido: ${incapacidad["valor Incapacidad Recibido"]}
-- Estado: ${estado}
+  // Información de reconocimiento de compensación (solo si el estado no es desconocido)
+  if (!estadoDesconocido) {
+    response += `**💰 Estado de compensación:**
+- ${fueReconocida ? "✅ Reconocida" : "⏳ Pendiente por reconocer"}
 
 `;
   }
@@ -271,7 +307,6 @@ Tu compensación final está en proceso
 
 - Nombre: ${liquidacion["NOMBRE"] || liquidacion.nombre || "N/A"}
 - Documento: ${liquidacion["TIPO DE DOCUMENTO"] || liquidacion.tipo_documento || "N/A"} ${liquidacion["N° DOCUMENTO"] || liquidacion.numero_documento || "N/A"}
-- Fecha expedición: ${liquidacion["FECHA EXPEDICION"] || liquidacion.fecha_expedicion || "N/A"}
 
 `;
 
@@ -297,6 +332,23 @@ ${liquidacion["N° CONVENIOS PENDIENTES"] ? `- Convenios pendientes: ${liquidaci
 `;
   }
 
+  // Función helper para determinar si un documento está completo
+  const isDocumentoCompleto = (valor: string | undefined | null): boolean => {
+    if (!valor) return false;
+    const valorUpper = valor.toString().trim().toUpperCase();
+    // Valores que indican que el documento está completo
+    const valoresCompletos = ["OK", "COMPLETO", "ENTREGADO", "FIRMADO", "APROBADO"];
+    // Valores que indican que el documento está pendiente
+    const valoresPendientes = ["PTE", "PENDIENTE", "PEND", "N/A", ""];
+    
+    // Si está en la lista de pendientes, no está completo
+    if (valoresPendientes.includes(valorUpper)) return false;
+    // Si está en la lista de completos, está completo
+    if (valoresCompletos.includes(valorUpper)) return true;
+    // Si no coincide con ninguno, considerar pendiente por seguridad
+    return false;
+  };
+
   // Estado de documentos detallado
   response += `**📄 Estado de tus documentos:**
 
@@ -308,7 +360,12 @@ ${liquidacion["N° CONVENIOS PENDIENTES"] ? `- Convenios pendientes: ${liquidaci
   const actaCompromiso = liquidacion["ACTA DE COMPROMISO"];
   const cartaRetiro = liquidacion["CARTA RETIRO"];
 
-  response += `${solicitudAfiliacion && solicitudAfiliacion !== "N/A" ? "✅" : "⏳"} Solicitud de afiliación: ${solicitudAfiliacion && solicitudAfiliacion !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaEntendimiento && actaEntendimiento !== "N/A" ? "✅" : "⏳"} Acta de entendimiento: ${actaEntendimiento && actaEntendimiento !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaCompromiso && actaCompromiso !== "N/A" ? "✅" : "⏳"} Acta de compromiso: ${actaCompromiso && actaCompromiso !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n${cartaRetiro && cartaRetiro !== "N/A" ? "✅" : "⏳"} Carta de retiro: ${cartaRetiro && cartaRetiro !== "N/A" ? "Entregado y completo" : "Pendiente por entregar"}\n\n`;
+  const solicitudCompleta = isDocumentoCompleto(solicitudAfiliacion);
+  const actaEntendimientoCompleta = isDocumentoCompleto(actaEntendimiento);
+  const actaCompromisoCompleta = isDocumentoCompleto(actaCompromiso);
+  const cartaRetiroCompleta = isDocumentoCompleto(cartaRetiro);
+
+  response += `${solicitudCompleta ? "✅" : "⏳"} Solicitud de afiliación: ${solicitudCompleta ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaEntendimientoCompleta ? "✅" : "⏳"} Acta de entendimiento: ${actaEntendimientoCompleta ? "Entregado y completo" : "Pendiente por entregar"}\n\n${actaCompromisoCompleta ? "✅" : "⏳"} Acta de compromiso: ${actaCompromisoCompleta ? "Entregado y completo" : "Pendiente por entregar"}\n\n${cartaRetiroCompleta ? "✅" : "⏳"} Carta de retiro: ${cartaRetiroCompleta ? "Entregado y completo" : "Pendiente por entregar"}\n\n`;
 
   // Detalle de documentos pendientes
   if (tieneDocumentosPendientes) {

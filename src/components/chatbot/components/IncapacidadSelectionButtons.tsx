@@ -24,13 +24,21 @@ export const IncapacidadSelectionButtons: React.FC<IncapacidadSelectionButtonsPr
   onSelect,
 }) => {
   const getStatusIcon = (estado: string) => {
-    switch (estado) {
-      case "PAGADA": return "✅";
+    const estadoUpper = estado?.toUpperCase() || "";
+    switch (estadoUpper) {
+      case "PAGADA":
+      case "RECONOCIDA": return "✅";
       case "EN_PROCESO": return "🔄";
       case "PENDIENTE_DOCUMENTOS": return "📋";
       case "RECHAZADA": return "❌";
       default: return "ℹ️";
     }
+  };
+
+  // Normaliza el estado para mostrar: convierte "PAGADA" a "RECONOCIDA"
+  const normalizeEstado = (estado: string): string => {
+    const estadoUpper = estado?.toUpperCase() || "";
+    return estadoUpper === "PAGADA" ? "RECONOCIDA" : estado;
   };
 
   return (
@@ -68,7 +76,7 @@ export const IncapacidadSelectionButtons: React.FC<IncapacidadSelectionButtonsPr
                 <div>Período: {option.periodo}</div>
                 <div className="flex items-center gap-3">
                   <span>Días: {option.dias}</span>
-                  <span>Estado: {option.estado}</span>
+                  <span>Estado: {normalizeEstado(option.estado)}</span>
                 </div>
                 {option.valor && (
                   <div className="font-medium text-prosalud-salud dark:text-prosalud-salud-light">

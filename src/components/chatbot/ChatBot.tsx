@@ -1665,16 +1665,16 @@ export default function ChatBot() {
                 <ScrollToBottomButton onClick={() => scrollToBottom(state.messagesEndRef)} />
               )}
 
-              {/* Trámites rápidos - TEMPORALMENTE OCULTO */}
-              {/* {!state.showIncapacidadForm && !state.showLiquidacionForm && (
+              {/* Trámites rápidos */}
+              {!state.showIncapacidadForm && !state.showLiquidacionForm && (
                 <QuickActions
                   showQuickActions={state.showQuickActions}
                   onToggle={() => state.setShowQuickActions(!state.showQuickActions)}
                   onOpenIncapacidadForm={openIncapacidadForm}
                   onOpenLiquidacionForm={openLiquidacionForm}
-                  isDisabled={false} // TEMPORALMENTE DESHABILITADO - Rate limit: state.rateLimitInfo.messagesHour >= RATE_LIMITS.messagesPerHour || state.rateLimitInfo.messagesDay >= RATE_LIMITS.messagesPerDay
+                  isDisabled={false}
                 />
-              )} */}
+              )}
 
               {/* Preguntas sugeridas */}
               {!state.showIncapacidadForm && !state.showLiquidacionForm && state.showSuggestions && (
