@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Upload, X, Loader2, Image as ImageIcon, FileText, Info, AlertTriangle, Maximize2, ChevronLeft, ChevronRight, Trash2, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 import { 
   wellnessRequestsService, 
   WellnessRequest, 
@@ -19,7 +20,6 @@ import {
   CreateWellnessActivityRealizedData,
   UpdateWellnessActivityRealizedData,
 } from '@/services/wellnessRequestsApi';
-import { logger } from '@/utils/logger';
 import { optimizeImages, isImageFile } from '@/utils/imageOptimizer';
 
 const activityRealizedSchema = z.object({
@@ -215,7 +215,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
         });
       }
     } catch (error) {
-      console.error('Error al optimizar imágenes:', error);
+      logger.error('Error al optimizar imágenes:', error);
       toast.error('Error al optimizar imágenes', {
         description: 'Se usarán las imágenes sin optimizar.',
         duration: 3000,

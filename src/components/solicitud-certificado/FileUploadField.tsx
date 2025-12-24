@@ -8,6 +8,7 @@ import { FileCheck, FileX, Loader2 } from 'lucide-react';
 import { formatFileSize } from './utils';
 import { optimizeFileList, isImageFile } from '@/utils/imageOptimizer';
 import { toast } from 'sonner';
+import { logger } from '@/utils/logger';
 
 interface FileUploadFieldProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -127,7 +128,7 @@ const FileUploadField = <TFieldValues extends FieldValues>({
                           });
                         }
                       } catch (error) {
-                        console.error('Error al optimizar imágenes:', error);
+                        logger.error('Error al optimizar imágenes:', error);
                         toast.error('Error al optimizar imágenes', {
                           description: 'Se subirán las imágenes sin optimizar.',
                           duration: 3000,

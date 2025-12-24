@@ -1,5 +1,6 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
+import { logger } from '@/utils/logger';
 
 // Declaración de tipos para grecaptcha en window
 declare global {
@@ -45,14 +46,14 @@ const InvisibleRecaptcha = forwardRef<InvisibleRecaptchaRef, InvisibleRecaptchaP
             // Si no está disponible después de un tiempo, marcar como no disponible
             setTimeout(() => {
               if (!window.grecaptcha) {
-                console.warn('reCAPTCHA no está disponible. El formulario continuará sin verificación.');
+                logger.warn('reCAPTCHA no está disponible. El formulario continuará sin verificación.');
                 setIsAvailable(false);
                 setHasError(true);
               }
             }, 3000);
           }
         } catch (error) {
-          console.warn('Error verificando disponibilidad de reCAPTCHA:', error);
+          logger.warn('Error verificando disponibilidad de reCAPTCHA:', error);
           setIsAvailable(false);
           setHasError(true);
         }
@@ -65,7 +66,7 @@ const InvisibleRecaptcha = forwardRef<InvisibleRecaptchaRef, InvisibleRecaptchaP
       execute: async () => {
         // Si reCAPTCHA no está disponible, retornar null pero permitir continuar
         if (!isAvailable || !recaptchaRef.current) {
-          console.warn('reCAPTCHA no disponible. Continuando sin token.');
+          logger.warn('reCAPTCHA no disponible. Continuando sin token.');
           return null;
         }
 
@@ -74,7 +75,7 @@ const InvisibleRecaptcha = forwardRef<InvisibleRecaptchaRef, InvisibleRecaptchaP
           setHasError(false);
           return token;
         } catch (error) {
-          console.error('Error ejecutando reCAPTCHA:', error);
+          logger.error('Error ejecutando reCAPTCHA:', error);
           setHasError(true);
           // No llamar onError aquí - permitir que el usuario continúe
           // El backend puede manejar la ausencia del token
@@ -106,7 +107,7 @@ const InvisibleRecaptcha = forwardRef<InvisibleRecaptchaRef, InvisibleRecaptchaP
         }}
         onErrored={() => {
           // Solo loguear errores, no bloquear al usuario
-          console.warn('Error en reCAPTCHA');
+          logger.warn('Error en reCAPTCHA');
           setHasError(true);
           
           // Si ya estaba inicializado y hay un error, notificar pero no bloquear

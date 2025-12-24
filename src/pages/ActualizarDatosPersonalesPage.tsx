@@ -16,6 +16,7 @@ import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoData
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 import { municipios, estadosCiviles, nivelesEducativos, tiposCuenta, bancos, epsList, afpList } from '@/components/actualizar-datos-personales/formOptions';
 import { isObfuscated } from '@/utils/obfuscate';
 
@@ -604,7 +605,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       try {
         recaptchaToken = await recaptchaRef.current?.execute() ?? null;
       } catch (error) {
-        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        logger.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
         // No bloquear al usuario - permitir continuar
       }
 
@@ -792,7 +793,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
               onVerify={() => {}}
               onError={() => {
                 // Solo loguear, no bloquear al usuario
-                console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+                logger.warn('Error en reCAPTCHA, pero permitiendo continuar');
               }}
             />
                         

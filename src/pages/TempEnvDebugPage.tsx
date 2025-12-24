@@ -9,6 +9,7 @@
 import React from 'react';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { API_CONFIG, RECAPTCHA_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 const TempEnvDebugPage: React.FC = () => {
   // Obtener todas las variables de entorno relevantes
@@ -130,25 +131,25 @@ const TempEnvDebugPage: React.FC = () => {
   const usingFallbackCount = variables.filter(v => isUsingFallback(v.name, v.currentValue || undefined)).length;
 
   // También imprimir en consola para facilitar copiar
-  console.log('='.repeat(80));
-  console.log('🔍 VERIFICACIÓN DE VARIABLES DE ENTORNO');
-  console.log('='.repeat(80));
-  console.log(`📅 Timestamp: ${new Date().toISOString()}`);
-  console.log('\n📋 VARIABLES DE ENTORNO:');
+  logger.debug('='.repeat(80));
+  logger.debug('🔍 VERIFICACIÓN DE VARIABLES DE ENTORNO');
+  logger.debug('='.repeat(80));
+  logger.debug(`📅 Timestamp: ${new Date().toISOString()}`);
+  logger.debug('\n📋 VARIABLES DE ENTORNO:');
   variables.forEach(v => {
     const status = getStatus(v.envValue);
-    console.log(`\n${status.icon.props.className?.includes('green') ? '✅' : '❌'} ${v.name}`);
-    console.log(`   Estado: ${status.text}`);
-    console.log(`   Valor en env: ${v.envValue || '[NO DEFINIDA]'}`);
-    console.log(`   Valor actual usado: ${v.currentValue}`);
+    logger.debug(`\n${status.icon.props.className?.includes('green') ? '✅' : '❌'} ${v.name}`);
+    logger.debug(`   Estado: ${status.text}`);
+    logger.debug(`   Valor en env: ${v.envValue || '[NO DEFINIDA]'}`);
+    logger.debug(`   Valor actual usado: ${v.currentValue}`);
     if (isUsingFallback(v.name, v.currentValue)) {
-      console.log(`   ⚠️  Usando fallback: ${v.fallback}`);
+      logger.debug(`   ⚠️  Usando fallback: ${v.fallback}`);
     }
-    console.log(`   Descripción: ${v.description}`);
+    logger.debug(`   Descripción: ${v.description}`);
   });
-  console.log('\n' + '='.repeat(80));
-  console.log(`📊 RESUMEN: ${undefinedCount} no definidas, ${usingFallbackCount} usando fallback`);
-  console.log('='.repeat(80));
+  logger.debug('\n' + '='.repeat(80));
+  logger.debug(`📊 RESUMEN: ${undefinedCount} no definidas, ${usingFallbackCount} usando fallback`);
+  logger.debug('='.repeat(80));
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">

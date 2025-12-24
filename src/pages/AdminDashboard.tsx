@@ -252,11 +252,11 @@ const AdminDashboard: React.FC = () => {
     queryKey: ['dashboard-deliveries'],
     queryFn: async () => {
       const result = await sstAdminService.getDeliveryHistory({ page: 1, pageSize: 5 });
-      console.log('📦 Deliveries Data from API:', result);
-      console.log('📦 Deliveries Items:', result?.items);
+      logger.debug('📦 Deliveries Data from API:', result);
+      logger.debug('📦 Deliveries Items:', result?.items);
       if (result?.items && result.items.length > 0) {
-        console.log('📦 First Delivery Item:', result.items[0]);
-        console.log('📦 First Delivery Keys:', Object.keys(result.items[0]));
+        logger.debug('📦 First Delivery Item:', result.items[0]);
+        logger.debug('📦 First Delivery Keys:', Object.keys(result.items[0]));
       }
       return result;
     },

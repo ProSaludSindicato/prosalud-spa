@@ -1,5 +1,6 @@
 import { authenticatedApi } from './api';
 import { buildAdminApiUrl } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 export type AdminExcelFileType = 'afiliados' | 'incapacidades' | 'liquidaciones' | 'delegados' | 'compensaciones';
 
@@ -86,7 +87,7 @@ export const adminExcelFilesService = {
     formData.append('file', fileToUpload, fileToUpload.name);
 
     // Debug: Log file information
-    console.debug('Uploading Excel file:', {
+    logger.debug('Uploading Excel file:', {
       originalName: file.name,
       originalType: file.type,
       correctedType: fileToUpload.type,

@@ -9,6 +9,7 @@ import ReportTypeSelector from './components/ReportTypeSelector';
 import ReportInfoCard from './components/ReportInfoCard';
 import DateRangeSelector from './components/DateRangeSelector';
 import { API_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 interface ExportReportDialogProps {
   open: boolean;
@@ -30,7 +31,7 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
     try {
       return localStorage.getItem('prosalud_auth_token');
     } catch (error) {
-      console.error('Error al obtener token:', error);
+      logger.error('Error al obtener token:', error);
       return null;
     }
   };

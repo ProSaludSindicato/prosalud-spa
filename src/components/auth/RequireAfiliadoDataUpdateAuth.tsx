@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import AfiliadoDataUpdateAuthModal from './AfiliadoDataUpdateAuthModal';
+import { logger } from '@/utils/logger';
 
 interface RequireAfiliadoDataUpdateAuthProps {
   children: React.ReactNode;
@@ -46,7 +47,7 @@ const RequireAfiliadoDataUpdateAuth: React.FC<RequireAfiliadoDataUpdateAuthProps
           .catch((error) => {
             // Si falla la autenticación automática, mostrar modal
             clearTimeout(textTimer);
-            console.warn('Autenticación automática falló, mostrando modal:', error);
+            logger.warn('Autenticación automática falló, mostrando modal:', error);
             setShowModal(true);
             setHasChecked(true);
             setIsAuthenticating(false);

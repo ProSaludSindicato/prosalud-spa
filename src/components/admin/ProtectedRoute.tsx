@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
 import { AlertCircle } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -65,7 +66,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (!hasPermission) {
       // Log para debugging
-      console.warn('Access denied - Missing permissions', {
+      logger.warn('Access denied - Missing permissions', {
         requiredPermissions,
         userPermissions: user?.permissions || [],
         userRoles: user?.roles || [],

@@ -208,7 +208,7 @@ const parseInfoCertificado = (solicitud: Request): Record<string, any> => {
     try {
       infoCertificado = JSON.parse(infoCertificado);
     } catch (e) {
-      console.warn('Error al parsear infoCertificado:', e);
+      logger.warn('Error al parsear infoCertificado:', e);
       infoCertificado = {};
     }
   }
@@ -2986,7 +2986,7 @@ const AdminSolicitudesPage: React.FC = () => {
                               });
                             }
                           } catch (error) {
-                            console.error("Error al optimizar imágenes:", error);
+                            logger.error("Error al optimizar imágenes:", error);
                             toast.error("Error al optimizar imágenes", {
                               description: "Se subirán las imágenes sin optimizar.",
                               duration: 3000,
@@ -3495,7 +3495,7 @@ const AdminSolicitudesPage: React.FC = () => {
                               });
                             }
                           } catch (error) {
-                            console.error("Error al optimizar imágenes:", error);
+                            logger.error("Error al optimizar imágenes:", error);
                             toast.error("Error al optimizar imágenes", {
                               description: "Se subirán las imágenes sin optimizar.",
                               duration: 3000,

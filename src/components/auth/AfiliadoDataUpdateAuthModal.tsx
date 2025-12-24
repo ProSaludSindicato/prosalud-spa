@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { toast } from 'sonner';
 import { Loader2, X, IdCard, Hash, Calendar } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 interface AfiliadoDataUpdateAuthModalProps {
   open: boolean;
@@ -46,7 +47,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
             })
             .catch((error) => {
               if (!cancelled) {
-                console.warn('Autenticación automática falló, mostrando formulario:', error);
+                logger.warn('Autenticación automática falló, mostrando formulario:', error);
                 setLoading(false);
                 // Si falla, mostrar formulario con fecha prellenada
                 setFormData({

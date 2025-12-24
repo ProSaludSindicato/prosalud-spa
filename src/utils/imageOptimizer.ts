@@ -1,4 +1,5 @@
 import imageCompression, { type Options } from 'browser-image-compression';
+import { logger } from '@/utils/logger';
 
 /**
  * Tipos MIME de imágenes soportadas
@@ -144,7 +145,7 @@ export async function optimizeImage(
 
     return optimizedFile;
   } catch (error) {
-    console.error('Error al optimizar la imagen:', error);
+    logger.error('Error al optimizar la imagen:', error);
     throw new Error('No se pudo optimizar la imagen. Por favor, intente nuevamente.');
   }
 }

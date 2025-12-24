@@ -15,6 +15,7 @@ import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
@@ -78,7 +79,7 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
       try {
         recaptchaToken = await recaptchaRef.current?.execute() ?? null;
       } catch (error) {
-        console.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        logger.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
         // No bloquear al usuario - permitir continuar
       }
 
@@ -191,7 +192,7 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
               onVerify={() => {}}
               onError={() => {
                 // Solo loguear, no bloquear al usuario
-                console.warn('Error en reCAPTCHA, pero permitiendo continuar');
+                logger.warn('Error en reCAPTCHA, pero permitiendo continuar');
               }}
             />
             

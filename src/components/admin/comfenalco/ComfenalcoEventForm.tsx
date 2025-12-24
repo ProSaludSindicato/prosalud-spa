@@ -17,6 +17,7 @@ import type { ComfenalcoEvent as AdminComfenalcoEvent } from '@/types/admin';
 import { CreateComfenalcoEventData, UpdateComfenalcoEventData } from '@/types/comfenalco';
 import { baseNameValidation, baseTextValidation, baseUrlValidation, baseCategoryValidation } from '@/hooks/useFormValidation';
 import { optimizeImage, isImageFile } from '@/utils/imageOptimizer';
+import { logger } from '@/utils/logger';
 
 const formSchema = z.object({
   title: baseNameValidation.min(5, 'El título debe tener al menos 5 caracteres'),
@@ -143,7 +144,7 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
             duration: 2000,
           });
         } catch (error) {
-          console.error('Error al optimizar imagen:', error);
+          logger.error('Error al optimizar imagen:', error);
           toast({
             title: "Error al optimizar imagen",
             description: "Se usará la imagen sin optimizar.",

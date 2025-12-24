@@ -1,4 +1,5 @@
 import { RECAPTCHA_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 
 // Declaración de tipos para grecaptcha en window (reCAPTCHA Enterprise)
 declare global {
@@ -96,7 +97,7 @@ export async function getRecaptchaToken(action: string): Promise<string | null> 
   try {
     // Verificar que estemos en el navegador
     if (typeof window === 'undefined') {
-      console.warn('reCAPTCHA no está disponible (SSR). Continuando sin token.');
+      logger.warn('reCAPTCHA no está disponible (SSR). Continuando sin token.');
       return null;
     }
 
@@ -105,14 +106,14 @@ export async function getRecaptchaToken(action: string): Promise<string | null> 
       try {
         await loadRecaptchaScript();
       } catch (error) {
-        console.warn('No se pudo cargar reCAPTCHA. Continuando sin token:', error);
+        logger.warn('No se pudo cargar reCAPTCHA. Continuando sin token:', error);
         return null;
       }
     }
 
     // Verificar nuevamente después de intentar cargar
     if (!window.grecaptcha || !window.grecaptcha.enterprise) {
-      console.warn('reCAPTCHA Enterprise no está disponible después de intentar cargar. Continuando sin token.');
+      logger.warn('reCAPTCHA Enterprise no está disponible después de intentar cargar. Continuando sin token.');
       return null;
     }
 
@@ -130,13 +131,13 @@ export async function getRecaptchaToken(action: string): Promise<string | null> 
 
     // Verificar nuevamente después de ready
     if (!window.grecaptcha || !window.grecaptcha.enterprise) {
-      console.warn('reCAPTCHA Enterprise no está disponible después de ready. Continuando sin token.');
+      logger.warn('reCAPTCHA Enterprise no está disponible después de ready. Continuando sin token.');
       return null;
     }
 
     // Ejecutar reCAPTCHA Enterprise con la acción especificada
     if (!window.grecaptcha.enterprise.execute) {
-      console.warn('reCAPTCHA Enterprise execute no está disponible. Continuando sin token.');
+      logger.warn('reCAPTCHA Enterprise execute no está disponible. Continuando sin token.');
       return null;
     }
 
@@ -146,7 +147,7 @@ export async function getRecaptchaToken(action: string): Promise<string | null> 
 
     return token;
   } catch (error) {
-    console.error('Error al obtener token de reCAPTCHA:', error);
+    logger.error('Error al obtener token de reCAPTCHA:', error);
     // No bloquear al usuario - permitir continuar sin token
     // El backend puede manejar la ausencia del token
     return null;

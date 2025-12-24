@@ -14,6 +14,7 @@ import { usersApi } from '@/services/adminApi';
 import { rolesApiAdapter } from '@/services/rolesApiAdapter';
 import { nameValidation, emailValidation } from '@/hooks/useFormValidation';
 import AdminModal from '@/components/admin/common/AdminModal';
+import { logger } from '@/utils/logger';
 
 const formSchema = z.object({
   name: nameValidation,
@@ -120,7 +121,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log('onSubmit called with data:', data);
+    logger.debug('onSubmit called with data:', data);
     if (user) {
       // En edición, solo actualizar nombre, email, rol y estado activo
       const userData = {
@@ -129,7 +130,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         role: data.role,
         isActive: Boolean(data.isActive), // Asegurar que sea booleano
       };
-      console.log('Updating user with data:', userData);
+      logger.debug('Updating user with data:', userData);
       updateMutation.mutate({ id: user.id, data: userData });
     } else {
       // En creación, el backend crea el usuario inactivo sin contraseña
@@ -138,7 +139,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         email: data.email,
         role: data.role,
       };
-      console.log('Creating user with data:', userData);
+      logger.debug('Creating user with data:', userData);
       createMutation.mutate(userData);
     }
   };
@@ -146,7 +147,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   const handleFormSubmit = handleSubmit(
     onSubmit,
     (errors) => {
-      console.log('Validation errors:', errors);
+      logger.debug('Validation errors:', errors);
       // Mostrar errores de validación
       const firstError = Object.values(errors)[0];
       if (firstError) {

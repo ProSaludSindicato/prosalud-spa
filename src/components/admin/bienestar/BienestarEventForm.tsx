@@ -282,7 +282,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         });
       }
     } catch (error) {
-      console.error("Error al optimizar imágenes:", error);
+      logger.error("Error al optimizar imágenes:", error);
       toast.error("Error al optimizar imágenes", {
         description: "Se usarán las imágenes sin optimizar.",
         duration: 3000,
