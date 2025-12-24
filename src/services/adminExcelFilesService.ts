@@ -1,7 +1,7 @@
 import { authenticatedApi } from './api';
 import { buildAdminApiUrl } from '@/config/api';
 
-export type AdminExcelFileType = 'afiliados' | 'incapacidades' | 'liquidaciones' | 'delegados';
+export type AdminExcelFileType = 'afiliados' | 'incapacidades' | 'liquidaciones' | 'delegados' | 'compensaciones';
 
 interface ExcelUploadEndpointConfig {
   endpoint: string;
@@ -14,6 +14,19 @@ export interface AdminExcelUploadResponse {
   file_size?: number;
   disk?: string;
   error_code?: string;
+  backup_path?: string;
+  rows_count?: number;
+}
+
+export interface AdminExcelFileInfo {
+  success: boolean;
+  exists: boolean;
+  file_path?: string;
+  disk?: string;
+  file_size?: number;
+  last_modified?: string;
+  readable?: boolean;
+  message?: string;
 }
 
 const endpointConfig: Record<AdminExcelFileType, ExcelUploadEndpointConfig> = {
@@ -21,6 +34,7 @@ const endpointConfig: Record<AdminExcelFileType, ExcelUploadEndpointConfig> = {
   incapacidades: { endpoint: '/api/incapacidades-file/upload' },
   liquidaciones: { endpoint: '/api/liquidaciones-file/upload' },
   delegados: { endpoint: '/api/delegados-file/upload' },
+  compensaciones: { endpoint: '/api/compensaciones-file/upload' },
 };
 
 export const adminExcelFilesService = {
@@ -87,6 +101,25 @@ export const adminExcelFilesService = {
       formData
     );
 
+    return response.data;
+  },
+
+  async getFileInfo(type: 'compensaciones'): Promise<AdminExcelFileInfo> {
+    const endpoint = '/api/compensaciones-file/info';
+    const response = await authenticatedApi.get<AdminExcelFileInfo>(
+      buildAdminApiUrl(endpoint)
+    );
+    return response.data;
+  },
+
+  async downloadFile(type: 'compensaciones'): Promise<Blob> {
+    const endpoint = '/api/compensaciones-file/download';
+    const response = await authenticatedApi.get<Blob>(
+      buildAdminApiUrl(endpoint),
+      {
+        responseType: 'blob',
+      }
+    );
     return response.data;
   },
 };

@@ -5,7 +5,8 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Users, GraduationCap, Heart, BarChart3, Settings, Upload, Download, CheckCircle2,
-  ClipboardList, Package, AlertCircle, ArrowRight, Clock, Loader2, TrendingUp, Activity
+  ClipboardList, Package, AlertCircle, ArrowRight, Clock, Loader2, TrendingUp, Activity,
+  FileText, RefreshCw, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import UserFormModal from '@/components/admin/usuarios/UserFormModal';
 import { useNavigate } from 'react-router-dom';
 
-import { adminExcelFilesService, type AdminExcelFileType } from '@/services/adminExcelFilesService';
+import { adminExcelFilesService, type AdminExcelFileType, type AdminExcelFileInfo } from '@/services/adminExcelFilesService';
 import { usersApi } from '@/services/adminApi';
 import { requestsService } from '@/services/requestsServiceApi';
 import { wellnessRequestsService } from '@/services/wellnessRequestsApi';
@@ -28,8 +29,9 @@ import type { SstDeliveryRecord } from '@/types/adminSst';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FILE_PERMISSIONS } from '@/config/permissions';
+import { logger } from '@/utils/logger';
 
-type DashboardUploadType = Extract<AdminExcelFileType, 'afiliados' | 'incapacidades' | 'liquidaciones'>;
+type DashboardUploadType = Extract<AdminExcelFileType, 'afiliados' | 'incapacidades' | 'liquidaciones' | 'compensaciones'>;
 
 interface DashboardUploadConfig {
   buttonLabel: string;
@@ -82,6 +84,18 @@ const dashboardUploadConfigs: Record<DashboardUploadType, DashboardUploadConfig>
     successFallback: 'Archivo de liquidaciones actualizado exitosamente.',
     errorFallback: 'No fue posible actualizar el archivo de liquidaciones.',
   },
+  compensaciones: {
+    buttonLabel: 'Actualizar compensaciones de afiliados activos',
+    uploadingLabel: 'Cargando compensaciones...',
+    dialogTitle: 'Confirmar actualización de compensaciones de afiliados activos',
+    description:
+      'Se reemplazará el archivo de compensaciones de afiliados activos. El archivo debe contener una hoja llamada "DINAMICA" con las columnas: Documento, T. Basicos, T. Auxilios, T. Ingresos. Se creará un respaldo automático del archivo anterior.',
+    resourceLabel: 'compensaciones',
+    storageName: 'COMPENSACIONES_AFILIADOS_ACTIVOS.xlsx',
+    maxSizeMB: 10,
+    successFallback: 'Archivo de compensaciones actualizado exitosamente.',
+    errorFallback: 'No fue posible actualizar el archivo de compensaciones.',
+  },
 };
 
 // Función para obtener la etiqueta del tipo de solicitud
@@ -119,6 +133,10 @@ const AdminDashboard: React.FC = () => {
   const [uploadingType, setUploadingType] = useState<AdminExcelFileType | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasProcessedUploadParam = useRef(false);
+  const [compensacionesFileInfo, setCompensacionesFileInfo] = useState<AdminExcelFileInfo | null>(null);
+  const [isLoadingFileInfo, setIsLoadingFileInfo] = useState(false);
+  const [isDownloadingFile, setIsDownloadingFile] = useState(false);
+  const [isCompensacionesCardExpanded, setIsCompensacionesCardExpanded] = useState(true);
 
   const handleUploadButtonClick = (type: DashboardUploadType) => {
     if (isUploading) return;
@@ -495,6 +513,10 @@ const AdminDashboard: React.FC = () => {
 
       if (response.success) {
         toast.success(response.message || config.successFallback);
+        // Refresh file info if it's compensaciones
+        if (type === 'compensaciones') {
+          await fetchCompensacionesFileInfo();
+        }
       } else {
         toast.error(response.message || config.errorFallback);
       }
@@ -529,9 +551,57 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const fetchCompensacionesFileInfo = async () => {
+    try {
+      setIsLoadingFileInfo(true);
+      const info = await adminExcelFilesService.getFileInfo('compensaciones');
+      setCompensacionesFileInfo(info);
+    } catch (error) {
+      logger.error('Error al obtener información del archivo de compensaciones', error);
+      toast.error('No fue posible obtener la información del archivo actual.');
+    } finally {
+      setIsLoadingFileInfo(false);
+    }
+  };
+
+  const handleDownloadCompensacionesFile = async () => {
+    if (isDownloadingFile) return;
+    
+    try {
+      setIsDownloadingFile(true);
+      const blob = await adminExcelFilesService.downloadFile('compensaciones');
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'COMPENSACIONES_AFILIADOS_ACTIVOS.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Archivo descargado exitosamente');
+    } catch (error) {
+      logger.error('Error al descargar archivo de compensaciones', error);
+      toast.error('No fue posible descargar el archivo. Intenta nuevamente.');
+    } finally {
+      setIsDownloadingFile(false);
+    }
+  };
+
+  // Fetch file info on mount if user has permission
+  useEffect(() => {
+    if (can(FILE_PERMISSIONS.compensaciones)) {
+      fetchCompensacionesFileInfo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const renderUploadButton = (type: DashboardUploadType) => {
     const config = dashboardUploadConfigs[type];
     const isTypeLoading = isUploading && uploadingType === type;
+    const isCompensaciones = type === 'compensaciones';
 
     return (
       <motion.button
@@ -541,10 +611,12 @@ const AdminDashboard: React.FC = () => {
         whileHover={{ scale: isUploading ? 1 : 1.02 }}
         whileTap={{ scale: isUploading ? 1 : 0.98 }}
         disabled={isUploading}
-        className="flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        className={`flex items-center space-x-3 p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors duration-300 border border-slate-200 disabled:opacity-60 disabled:cursor-not-allowed ${
+          isCompensaciones ? 'justify-start' : ''
+        }`}
       >
         <Upload className="h-8 w-8 text-primary-prosalud flex-shrink-0" />
-        <span className="font-medium text-text-dark">
+        <span className={`font-medium text-text-dark ${isCompensaciones ? 'text-left' : ''}`}>
           {isTypeLoading ? config.uploadingLabel : config.buttonLabel}
         </span>
       </motion.button>
@@ -902,6 +974,7 @@ const AdminDashboard: React.FC = () => {
                   {can(FILE_PERMISSIONS.afiliados) && renderUploadButton('afiliados')}
                   {can(FILE_PERMISSIONS.incapacidades) && renderUploadButton('incapacidades')}
                   {can(FILE_PERMISSIONS.liquidaciones) && renderUploadButton('liquidaciones')}
+                  {can(FILE_PERMISSIONS.compensaciones) && renderUploadButton('compensaciones')}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1258,6 +1331,143 @@ const AdminDashboard: React.FC = () => {
             </div>
           </motion.div>
 
+          {/* Compensaciones File Info Section */}
+          {can(FILE_PERMISSIONS.compensaciones) && (
+            <motion.div variants={itemVariants}>
+              <Card className="bg-white border shadow-sm">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-6 w-6 text-primary-prosalud" />
+                      <div>
+                        <CardTitle className="text-xl">
+                          Archivo de Compensaciones Actual
+                        </CardTitle>
+                        <CardDescription>
+                          Información del archivo de compensaciones de afiliados activos actualmente en uso
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsCompensacionesCardExpanded(!isCompensacionesCardExpanded)}
+                      className="flex items-center gap-2"
+                    >
+                      {isCompensacionesCardExpanded ? (
+                        <>
+                          <ChevronUp className="h-4 w-4" />
+                          <span className="hidden sm:inline">Ocultar</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4" />
+                          <span className="hidden sm:inline">Mostrar</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardHeader>
+                {isCompensacionesCardExpanded && (
+                  <CardContent>
+                    {isLoadingFileInfo ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary-prosalud" />
+                        <span className="ml-2 text-slate-600">Cargando información del archivo...</span>
+                      </div>
+                    ) : compensacionesFileInfo?.exists ? (
+                      <div className="space-y-4">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-900">Estado:</span>
+                            <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                              Archivo disponible
+                            </span>
+                          </div>
+                          {compensacionesFileInfo.file_path && (
+                            <div className="flex items-start justify-between">
+                              <span className="text-sm font-semibold text-slate-900">Ruta:</span>
+                              <span className="text-sm text-slate-700 text-right break-all ml-4">
+                                {compensacionesFileInfo.file_path}
+                              </span>
+                            </div>
+                          )}
+                          {compensacionesFileInfo.file_size && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-slate-900">Tamaño:</span>
+                              <span className="text-sm text-slate-700">
+                                {(compensacionesFileInfo.file_size / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </div>
+                          )}
+                          {compensacionesFileInfo.last_modified && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-slate-900">Última modificación:</span>
+                              <span className="text-sm text-slate-700">
+                                {new Date(compensacionesFileInfo.last_modified).toLocaleString('es-ES', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleDownloadCompensacionesFile}
+                            disabled={isDownloadingFile}
+                            className="flex items-center gap-2"
+                          >
+                            {isDownloadingFile ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Descargando...
+                              </>
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4" />
+                                Descargar archivo actual
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={fetchCompensacionesFileInfo}
+                            disabled={isLoadingFileInfo}
+                            className="flex items-center gap-2"
+                          >
+                            <RefreshCw className={`h-4 w-4 ${isLoadingFileInfo ? 'animate-spin' : ''}`} />
+                            Actualizar información
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-900">
+                              Archivo no encontrado
+                            </p>
+                            <p className="text-sm text-amber-700 mt-1">
+                              {compensacionesFileInfo?.message || 'No hay un archivo de compensaciones cargado en el sistema.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            </motion.div>
+          )}
 
           {/* Charts Section */}
           <motion.div variants={itemVariants} className="space-y-6">

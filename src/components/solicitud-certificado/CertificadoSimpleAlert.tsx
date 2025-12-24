@@ -23,7 +23,7 @@ const CertificadoSimpleAlert: React.FC<CertificadoSimpleAlertProps> = ({ isSimpl
         </p>
         {tieneValorCompensaciones && (
           <p className="mb-2 mt-2 text-sm italic">
-            <strong>Nota:</strong> Los certificados de convenio con valor de compensaciones para afiliados activos, en su mayoría (si no son casos particulares) también podrán ser enviados de manera automática.
+            Los certificados de convenio con valor de compensaciones para afiliados activos, en su mayoría (si no son casos particulares) también podrán ser enviados de manera automática.
           </p>
         )}
         <p className="font-semibold mt-2">

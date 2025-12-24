@@ -181,6 +181,7 @@ export const FILE_PERMISSIONS = {
   incapacidades: 'incapacidades_files.manage',
   liquidaciones: 'liquidaciones_files.manage',
   delegados: 'delegados_files.manage',
+  compensaciones: 'compensaciones_files.manage',
 } as const;
 
 /**
