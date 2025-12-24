@@ -38,6 +38,44 @@ const AfiliadoOtpAuthModal: React.FC<AfiliadoOtpAuthModalProps> = ({ open, onClo
   const [otpSuccess, setOtpSuccess] = useState(false);
   const [emailObfuscated, setEmailObfuscated] = useState<string | null>(null);
 
+  // Controlar visibilidad del badge de reCAPTCHA cuando el modal está abierto
+  React.useEffect(() => {
+    if (open) {
+      document.body.classList.add('show-recaptcha-badge');
+    } else {
+      // Solo remover la clase si no estamos en una ruta que también requiere el badge
+      // El MainLayout se encargará de mantenerla si es necesario
+      const routesWithRecaptcha = [
+        '/auth/login',
+        '/auth/forgot-password',
+        '/auth/restablecer-contraseña',
+        '/auth/definir-contraseña',
+      ];
+      const isSolicitudAfiliado = window.location.pathname.startsWith('/servicios/');
+      const shouldKeepBadge = routesWithRecaptcha.includes(window.location.pathname) || isSolicitudAfiliado;
+      
+      if (!shouldKeepBadge) {
+        document.body.classList.remove('show-recaptcha-badge');
+      }
+    }
+
+    return () => {
+      // En cleanup, verificar si debemos mantener la clase según la ruta
+      const routesWithRecaptcha = [
+        '/auth/login',
+        '/auth/forgot-password',
+        '/auth/restablecer-contraseña',
+        '/auth/definir-contraseña',
+      ];
+      const isSolicitudAfiliado = window.location.pathname.startsWith('/servicios/');
+      const shouldKeepBadge = routesWithRecaptcha.includes(window.location.pathname) || isSolicitudAfiliado;
+      
+      if (!shouldKeepBadge) {
+        document.body.classList.remove('show-recaptcha-badge');
+      }
+    };
+  }, [open]);
+
   // Si el usuario ya está autenticado, usar sus datos
   React.useEffect(() => {
     if (open) {

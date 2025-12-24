@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import Bot from '@/components/chatbot/ChatBot';
@@ -9,6 +10,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const location = useLocation();
   // Security: Add security headers and basic protections
   useEffect(() => {
     // Security: Add meta tags for security
@@ -67,6 +69,41 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       document.head.appendChild(meta);
     }
   }, []);
+
+  // Controlar visibilidad del badge de reCAPTCHA según la ruta
+  useEffect(() => {
+    // Rutas donde el badge debe ser visible
+    const routesWithRecaptcha = [
+      '/auth/login',
+      '/auth/forgot-password',
+      '/auth/restablecer-contraseña',
+      '/auth/definir-contraseña',
+    ];
+
+    // Rutas que deben ser excluidas (no mostrar badge)
+    const excludedRoutes = [
+      '/servicios/galeria-bienestar',
+    ];
+
+    // Rutas de solicitudes de afiliados (todas las que empiezan con /servicios/ excepto las excluidas)
+    const isSolicitudAfiliado = location.pathname.startsWith('/servicios/') && 
+                                 !excludedRoutes.some(route => location.pathname.startsWith(route));
+
+    // Verificar si la ruta actual requiere mostrar el badge
+    const shouldShowBadge = routesWithRecaptcha.includes(location.pathname) || isSolicitudAfiliado;
+
+    // Agregar o remover la clase del body
+    if (shouldShowBadge) {
+      document.body.classList.add('show-recaptcha-badge');
+    } else {
+      document.body.classList.remove('show-recaptcha-badge');
+    }
+
+    // Cleanup al desmontar
+    return () => {
+      document.body.classList.remove('show-recaptcha-badge');
+    };
+  }, [location.pathname]);
 
   // Manejar el badge de reCAPTCHA para expandir/colapsar al hacer click/touch
   useEffect(() => {

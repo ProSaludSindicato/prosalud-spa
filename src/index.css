@@ -4,6 +4,7 @@
 @tailwind utilities;
 
 /* Estilos para reCAPTCHA badge - mover a esquina inferior izquierda y colapsar por defecto */
+/* Oculto por defecto, solo visible en páginas específicas */
 .grecaptcha-badge {
   bottom: 20px !important;
   left: 20px !important;
@@ -11,10 +12,17 @@
   z-index: 40 !important; /* Debajo del chatbot (z-50) pero visible */
   width: 70px !important; /* Ancho suficiente para mostrar el logo completo */
   overflow: hidden !important;
-  transition: width 0.3s ease !important;
+  transition: width 0.3s ease, visibility 0.3s ease, opacity 0.3s ease !important;
   cursor: pointer !important;
-  visibility: visible !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
   -webkit-tap-highlight-color: transparent !important; /* Eliminar highlight en móviles */
+}
+
+/* Mostrar badge solo cuando el body tiene la clase show-recaptcha-badge */
+body.show-recaptcha-badge .grecaptcha-badge {
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Contenedor interno del badge - colapsado por defecto */
