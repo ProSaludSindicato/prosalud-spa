@@ -487,7 +487,8 @@ const AdminSolicitudesPage: React.FC = () => {
         resolved: 0,
         rejected: 0,
         this_month: 0,
-        avg_resolution_time: 0
+        avg_resolution_time: 0,
+        unvalidated: 0
       };
     }
 
@@ -496,6 +497,11 @@ const AdminSolicitudesPage: React.FC = () => {
     const in_progress = allSolicitudes.filter(r => r.status === 'in_progress').length;
     const resolved = allSolicitudes.filter(r => r.status === 'resolved').length;
     const rejected = allSolicitudes.filter(r => r.status === 'rejected').length;
+    
+    // Calculate unvalidated requests (require validation but haven't been validated yet)
+    const unvalidated = allSolicitudes.filter(r => 
+      requiresManualValidation(r) && !isRequestValidated(r)
+    ).length;
     
     const currentMonth = new Date().getMonth();
     const this_month = allSolicitudes.filter(r => 
@@ -524,7 +530,8 @@ const AdminSolicitudesPage: React.FC = () => {
       resolved,
       rejected,
       this_month,
-      avg_resolution_time
+      avg_resolution_time,
+      unvalidated
     };
   }, [allSolicitudes]);
 
@@ -1298,7 +1305,7 @@ const AdminSolicitudesPage: React.FC = () => {
 
           {/* Stats Cards */}
           <motion.div variants={itemVariants}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -1308,6 +1315,20 @@ const AdminSolicitudesPage: React.FC = () => {
                     </div>
                     <div className="p-2 rounded-full">
                       <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-orange-500 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Sin Validar</p>
+                      <p className="text-2xl font-bold text-orange-600">{stats?.unvalidated || 0}</p>
+                    </div>
+                    <div className="p-2 rounded-full">
+                      <AlertCircle className="h-5 w-5 text-orange-600" />
                     </div>
                   </div>
                 </CardContent>
