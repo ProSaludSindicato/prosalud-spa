@@ -33,6 +33,7 @@ import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
 import AdminChatbotPage from '@/pages/AdminChatbotPage';
 import AdminVotacionesPage from '@/pages/AdminVotacionesPage';
 import AdminSstPage from '@/pages/AdminSstPage';
+import TempEnvDebugPage from '@/pages/TempEnvDebugPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -228,6 +229,12 @@ const AppRoutes = () => {
                   <AdminSstPage />
                 </ProtectedRoute>
               } 
+            />
+
+            {/* TEMPORAL: Página de debug de variables de entorno - ELIMINAR DESPUÉS DE PRUEBAS */}
+            <Route 
+              path="/admin/temp-debug-verification-env-variables-check" 
+              element={<TempEnvDebugPage />} 
             />
 
             {/* 404 Route - TEMPORAL: Redirige a inicio en vez de mostrar 404 */}
