@@ -68,13 +68,47 @@ const backendApi = authenticatedApi;
 export const realUsersApi = {
   async getUsers(page = 1, search = "", status = ""): Promise<BackendPaginatedResponse<BackendUser>> {
     try {
+      // Obtener todos los usuarios sin paginación del backend
+      // Hacemos llamadas iterativas hasta obtener todos los usuarios
       const params = new URLSearchParams();
       if (search) params.append("search", search);
       if (status) params.append("is_active", status === "active" ? "true" : "false");
-      params.append("per_page", "15");
+      // Usar un número grande para intentar obtener todos los usuarios en una sola llamada
+      params.append("per_page", "1000");
 
-      const response = await backendApi.get<BackendPaginatedResponse<BackendUser>>(`/api/users?${params}`);
-      return response.data;
+      const firstResponse = await backendApi.get<BackendPaginatedResponse<BackendUser>>(`/api/users?${params}`);
+      
+      // Si hay más páginas, hacer llamadas adicionales para obtener todos los usuarios
+      let allUsers = [...firstResponse.data.data];
+      let currentPage = firstResponse.data.pagination.current_page;
+      const lastPage = firstResponse.data.pagination.last_page;
+      
+      // Si hay más de una página, obtener todas las páginas restantes
+      while (currentPage < lastPage) {
+        currentPage++;
+        const pageParams = new URLSearchParams();
+        if (search) pageParams.append("search", search);
+        if (status) pageParams.append("is_active", status === "active" ? "true" : "false");
+        pageParams.append("per_page", "1000");
+        pageParams.append("page", String(currentPage));
+        
+        const pageResponse = await backendApi.get<BackendPaginatedResponse<BackendUser>>(`/api/users?${pageParams}`);
+        allUsers = [...allUsers, ...pageResponse.data.data];
+      }
+      
+      // Retornar todos los usuarios en una sola respuesta sin paginación
+      return {
+        success: firstResponse.data.success,
+        data: allUsers,
+        pagination: {
+          current_page: 1,
+          per_page: allUsers.length,
+          total: allUsers.length,
+          last_page: 1,
+          from: 1,
+          to: allUsers.length,
+        },
+      };
     } catch (error) {
       logger.error("Error al obtener usuarios", error instanceof Error ? error.message : error);
       throw error;
