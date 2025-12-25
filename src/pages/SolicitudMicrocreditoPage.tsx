@@ -22,7 +22,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle, DollarSign } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { submitRequest } from "@/services/requestsService";
-import RequireAfiliadoAuth from "@/components/auth/RequireAfiliadoAuth";
+import RequireActiveAfiliadoAuth from "@/components/auth/RequireActiveAfiliadoAuth";
 import { useAfiliadoAuth } from "@/context/AfiliadoAuthContext";
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from "@/components/shared/InvisibleRecaptcha";
 import { RECAPTCHA_CONFIG } from "@/config/api";
@@ -127,10 +127,25 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
       setTimeout(() => {
         navigate("/");
       }, 2000);
-    } catch (error) {
-      toast.error("Error", {
-        description: "Error al enviar solicitud. Por favor intente nuevamente.",
-      });
+    } catch (error: any) {
+      // Verificar si el error es sobre un afiliado retirado
+      const isRetiradoError = error?.isValidationError && 
+        error?.errors?.request_type?.some((msg: string) => 
+          msg.toLowerCase().includes('retirado')
+        );
+      
+      if (isRetiradoError) {
+        const retiradoMessage = error.errors.request_type.find((msg: string) => 
+          msg.toLowerCase().includes('retirado')
+        );
+        toast.error("Acceso restringido", {
+          description: retiradoMessage || "No puede realizar esta solicitud porque se encuentra retirado del sindicato.",
+        });
+      } else {
+        toast.error("Error", {
+          description: "Error al enviar solicitud. Por favor intente nuevamente.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -302,9 +317,9 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
 
 const SolicitudMicrocreditoPage: React.FC = () => {
   return (
-    <RequireAfiliadoAuth>
+    <RequireActiveAfiliadoAuth procedureName="Solicitud de Microcrédito">
       <SolicitudMicrocreditoPageContent />
-    </RequireAfiliadoAuth>
+    </RequireActiveAfiliadoAuth>
   );
 };
 

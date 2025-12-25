@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Home, DownloadCloud, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import RequireActiveAfiliadoAuth from '@/components/auth/RequireActiveAfiliadoAuth';
 
 const SolicitudPermisosCambioTurnosPageContent: React.FC = () => {
   // Archivos almacenados localmente en public/files/
@@ -49,6 +49,7 @@ const SolicitudPermisosCambioTurnosPageContent: React.FC = () => {
                 </h1>
             </div>
           </header>
+        
         <div className="bg-card p-6 md:p-8 rounded-lg shadow-lg border border-prosalud-border">
           
           <div className="mb-6 p-6 border-2 border-primary-prosalud rounded-lg shadow-lg bg-primary-prosalud/5 text-center">
@@ -111,9 +112,9 @@ const SolicitudPermisosCambioTurnosPageContent: React.FC = () => {
 
 const SolicitudPermisosCambioTurnosPage: React.FC = () => {
   return (
-    <RequireAfiliadoAuth>
+    <RequireActiveAfiliadoAuth procedureName="Permisos y Cambio de Turnos">
       <SolicitudPermisosCambioTurnosPageContent />
-    </RequireAfiliadoAuth>
+    </RequireActiveAfiliadoAuth>
   );
 };
 

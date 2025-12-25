@@ -11,7 +11,7 @@ import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL } from '@/components/solicitud-ce
 import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { submitRequest } from '@/services/requestsService';
-import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import RequireActiveAfiliadoAuth from '@/components/auth/RequireActiveAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
@@ -134,18 +134,35 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
         navigate('/');
       }, 500);
     } catch (error) {
-      handleError();
+      handleError(error);
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  const handleError = () => {
-    toast.error('Error al enviar el formulario', {
-      description: 'Por favor verifique los datos ingresados e intente nuevamente.',
-      duration: 5000,
-      icon: <AlertCircle className="h-5 w-5 text-red-600" />,
-    });
+  const handleError = (error: any) => {
+    // Verificar si el error es sobre un afiliado retirado
+    const isRetiradoError = error?.isValidationError && 
+      error?.errors?.request_type?.some((msg: string) => 
+        msg.toLowerCase().includes('retirado')
+      );
+    
+    if (isRetiradoError) {
+      const retiradoMessage = error.errors.request_type.find((msg: string) => 
+        msg.toLowerCase().includes('retirado')
+      );
+      toast.error('Acceso restringido', {
+        description: retiradoMessage || 'No puede realizar esta solicitud porque se encuentra retirado del sindicato.',
+        duration: 5000,
+        icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+      });
+    } else {
+      toast.error('Error al enviar el formulario', {
+        description: 'Por favor verifique los datos ingresados e intente nuevamente.',
+        duration: 5000,
+        icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+      });
+    }
   };
 
   return (
@@ -225,9 +242,9 @@ const SolicitudAnualDiferidaPageContent: React.FC = () => {
 
 const SolicitudAnualDiferidaPage: React.FC = () => {
   return (
-    <RequireAfiliadoAuth>
+    <RequireActiveAfiliadoAuth procedureName="Compensación Anual Diferida">
       <SolicitudAnualDiferidaPageContent />
-    </RequireAfiliadoAuth>
+    </RequireActiveAfiliadoAuth>
   );
 };
 
