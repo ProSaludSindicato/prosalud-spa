@@ -3,14 +3,20 @@ import ReCAPTCHA from 'react-google-recaptcha';
 import { logger } from '@/utils/logger';
 
 // Declaración de tipos para grecaptcha en window
+// Nota: La declaración completa está en src/utils/recaptcha.ts
+// Esta es solo una declaración mínima para compatibilidad con react-google-recaptcha
 declare global {
   interface Window {
     grecaptcha?: {
-      ready: (callback: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
-      render: (container: string | HTMLElement, options: any) => number;
-      reset: (widgetId?: number) => void;
-      getResponse: (widgetId?: number) => string;
+      enterprise?: {
+        ready: (callback: () => void) => void;
+        execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      };
+      ready?: (callback: () => void) => void;
+      execute?: (siteKey: string, options: { action: string }) => Promise<string>;
+      render?: (container: string | HTMLElement, options: any) => number;
+      reset?: (widgetId?: number) => void;
+      getResponse?: (widgetId?: number) => string;
     };
   }
 }

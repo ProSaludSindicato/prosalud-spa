@@ -8,6 +8,7 @@ import {
   sanitizeId,
   sanitizeGeneral,
   sanitizeHtml,
+  sanitizeUrl,
   validateEmailFormat,
   validatePhoneFormat,
   validateIdFormat,
@@ -117,6 +118,16 @@ export const useSanitizedInput = () => {
   );
 
   /**
+   * Sanitiza URL
+   */
+  const sanitizeUrlInput = useCallback(
+    (value: string, options?: SanitizationOptions): string => {
+      return sanitizeUrl(value, options);
+    },
+    []
+  );
+
+  /**
    * Valida formato de email
    */
   const validateEmail = useCallback((email: string): boolean => {
@@ -163,6 +174,7 @@ export const useSanitizedInput = () => {
     sanitizeId: sanitizeIdInput,
     sanitizeHtml: sanitizeHtmlInput,
     sanitizeGeneral: sanitizeGeneralInput,
+    sanitizeUrl: sanitizeUrlInput,
     validateEmail,
     validatePhone,
     validateId,

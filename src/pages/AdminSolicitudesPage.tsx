@@ -469,7 +469,7 @@ const AdminSolicitudesPage: React.FC = () => {
     }
 
     if (selectedType !== "all") {
-      filtered = filtered.filter((request) => request.request_type === selectedType);
+      filtered = filtered.filter((request) => request.request_type === selectedType as Request['request_type']);
     }
 
     filtered.sort((a, b) => {
@@ -2226,9 +2226,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 // Para solicitudes de incapacidades y licencias, el campo numeroDias siempre debe tratarse como número,
                                 // incluso cuando su valor sea 1, para evitar que se muestre como un booleano ("✓ Sí").
                                 if (
-                                  (selectedSolicitud.request_type === 'incapacidad-licencia' ||
-                                   selectedSolicitud.request_type === 'incapacidades-licencias') &&
-                                  fieldKey === 'numeroDias'
+                                  (selectedSolicitud.request_type === 'incapacidad-licencia') && fieldKey === 'numeroDias'
                                 ) {
                                   return String(val);
                                 }

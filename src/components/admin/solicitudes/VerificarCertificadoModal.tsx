@@ -552,7 +552,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
                       <div className="space-y-4">
                         {Object.entries(estadisticasData.data.por_tipo).map(([tipo, cantidad]) => {
                           const total = estadisticasData.data.resumen.total_certificados;
-                          const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : 0;
+                          const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : '0';
                           const porcentajeNum = parseFloat(porcentaje);
                           const tipoLabels: Record<string, string> = {
                             basico: 'Básico',

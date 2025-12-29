@@ -16,6 +16,7 @@ import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } f
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
 import { logger } from "@/utils/logger";
 import { optimizeImages, isImageFile } from "@/utils/imageOptimizer";
+import { useSanitizedInput } from "@/hooks/useSanitizedInput";
 
 const formSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
