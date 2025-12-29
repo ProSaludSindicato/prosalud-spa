@@ -330,6 +330,15 @@ const AdminSolicitudesPage: React.FC = () => {
     refetchInterval: 120000, // Refrescar cada 2 minutos
   });
 
+  // Helper para verificar si una actualización pendiente requiere cambio de correo
+  const pendingUpdateRequiresEmailChange = (pendingUpdate: ApiRequest): boolean => {
+    const payload = pendingUpdate.payload || {};
+    // El correo nuevo puede estar en 'correo', 'nuevoEmail' o 'nuevo_email'
+    const nuevoEmailRaw = payload.correo || payload.nuevoEmail || payload.nuevo_email;
+    // Si hay correo nuevo y es diferente del actual, hay cambio
+    return nuevoEmailRaw && nuevoEmailRaw.trim() !== '' && nuevoEmailRaw !== pendingUpdate.email;
+  };
+
   // Form para la respuesta normal
   const responseForm = useForm<ResponseFormValues>({
     resolver: zodResolver(responseFormSchema),
@@ -798,39 +807,30 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleSubmitResponse = async (data: ResponseFormValues) => {
     if (!solicitudToRespond) return;
 
-    // Verificar si hay actualización pendiente antes de responder
+    // Verificar si hay actualización pendiente que requiera cambio de correo antes de responder
     const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
-    if (pendingUpdate) {
+    if (pendingUpdate && pendingUpdateRequiresEmailChange(pendingUpdate)) {
       // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
       const correoActual = solicitudToRespond.email;
       // El correo solicitado es el que está en el payload de la solicitud de actualización
       const correoSolicitadoRaw = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email;
-      // Si no hay correo solicitado, usar el correo actual (no hay cambio)
       const correoSolicitado = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' ? correoSolicitadoRaw : correoActual;
-      const hayCambioCorreo = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' && correoSolicitadoRaw !== correoActual;
       
       // Si se va a aprobar (resolved) una solicitud de actualización de datos personales,
-      // el correo de envío será el nuevo correo (o el actual si no hay cambio)
+      // el correo de envío será el nuevo correo
       const isAprobandoActualizacion = solicitudToRespond.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
       const correoEnvio = isAprobandoActualizacion ? correoSolicitado : correoActual;
       
       const mensaje = isAprobandoActualizacion
-        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-          (hayCambioCorreo
-            ? `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
-              `ya que los datos serán actualizados en el sistema.\n\n` +
-              `Correo actual en sistema: ${correoActual}\n` +
-              `Nuevo correo solicitado: ${correoSolicitado}\n\n`
-            : `Al aprobar esta solicitud de actualización, el correo se enviará al correo actual (${correoActual}), ` +
-              `ya que no hay cambios en el correo electrónico.\n\n` +
-              `Correo actual en sistema: ${correoActual}\n\n`) +
+        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales que requiere cambio de correo.\n\n` +
+          `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
+          `ya que los datos serán actualizados en el sistema.\n\n` +
+          `Correo actual en sistema: ${correoActual}\n` +
+          `Nuevo correo solicitado: ${correoSolicitado}\n\n` +
           `¿Desea continuar con la aprobación?`
-        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-          (hayCambioCorreo
-            ? `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
-              `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n`
-            : `Si responde ahora, el correo se enviará al correo actual (${correoActual}). ` +
-              `No hay cambios en el correo electrónico en la solicitud de actualización pendiente.\n\n`) +
+        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales que requiere cambio de correo.\n\n` +
+          `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+          `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
           `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`;
       
       const confirmed = window.confirm(mensaje);
@@ -1026,39 +1026,30 @@ const AdminSolicitudesPage: React.FC = () => {
   const handleSubmitResponseWithCompensaciones = async (data: ResponseWithCompensacionesFormValues) => {
     if (!solicitudToRespond) return;
 
-    // Verificar si hay actualización pendiente antes de responder
+    // Verificar si hay actualización pendiente que requiera cambio de correo antes de responder
     const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
-    if (pendingUpdate) {
+    if (pendingUpdate && pendingUpdateRequiresEmailChange(pendingUpdate)) {
       // El correo actual es el correo de la solicitud que se está respondiendo (el que está en el sistema actualmente)
       const correoActual = solicitudToRespond.email;
       // El correo solicitado es el que está en el payload de la solicitud de actualización
       const correoSolicitadoRaw = pendingUpdate.payload?.correo || pendingUpdate.payload?.nuevoEmail || pendingUpdate.payload?.nuevo_email;
-      // Si no hay correo solicitado, usar el correo actual (no hay cambio)
       const correoSolicitado = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' ? correoSolicitadoRaw : correoActual;
-      const hayCambioCorreo = correoSolicitadoRaw && correoSolicitadoRaw.trim() !== '' && correoSolicitadoRaw !== correoActual;
       
       // Si se va a aprobar (resolved) una solicitud de actualización de datos personales,
-      // el correo de envío será el nuevo correo (o el actual si no hay cambio)
+      // el correo de envío será el nuevo correo
       const isAprobandoActualizacion = solicitudToRespond.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
       const correoEnvio = isAprobandoActualizacion ? correoSolicitado : correoActual;
       
       const mensaje = isAprobandoActualizacion
-        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-          (hayCambioCorreo
-            ? `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
-              `ya que los datos serán actualizados en el sistema.\n\n` +
-              `Correo actual en sistema: ${correoActual}\n` +
-              `Nuevo correo solicitado: ${correoSolicitado}\n\n`
-            : `Al aprobar esta solicitud de actualización, el correo se enviará al correo actual (${correoActual}), ` +
-              `ya que no hay cambios en el correo electrónico.\n\n` +
-              `Correo actual en sistema: ${correoActual}\n\n`) +
+        ? `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales que requiere cambio de correo.\n\n` +
+          `Al aprobar esta solicitud de actualización, el correo se enviará al nuevo correo (${correoSolicitado}), ` +
+          `ya que los datos serán actualizados en el sistema.\n\n` +
+          `Correo actual en sistema: ${correoActual}\n` +
+          `Nuevo correo solicitado: ${correoSolicitado}\n\n` +
           `¿Desea continuar con la aprobación?`
-        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales.\n\n` +
-          (hayCambioCorreo
-            ? `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
-              `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n`
-            : `Si responde ahora, el correo se enviará al correo actual (${correoActual}). ` +
-              `No hay cambios en el correo electrónico en la solicitud de actualización pendiente.\n\n`) +
+        : `⚠️ ADVERTENCIA: Este afiliado tiene una solicitud pendiente de actualización de datos personales que requiere cambio de correo.\n\n` +
+          `Si responde ahora, el correo se enviará al correo actual (${correoActual}), ` +
+          `pero el afiliado ha solicitado cambiarlo a: ${correoSolicitado}\n\n` +
           `¿Desea continuar con la respuesta o prefiere procesar primero la actualización de datos?`;
       
       const confirmed = window.confirm(mensaje);
@@ -2002,20 +1993,23 @@ const AdminSolicitudesPage: React.FC = () => {
                      hasPendingUpdate(selectedSolicitud.id_number) &&
                      selectedSolicitud.status !== 'resolved' &&
                      selectedSolicitud.status !== 'rejected' &&
-                     selectedSolicitud.request_type !== 'actualizar-datos-personales' && (
-                      <PendingDataUpdateAlert
-                        pendingUpdate={getPendingUpdate(selectedSolicitud.id_number)!}
-                        documentNumber={selectedSolicitud.id_number}
-                        onViewUpdate={() => {
-                          const pendingUpdate = getPendingUpdate(selectedSolicitud.id_number);
-                          if (pendingUpdate) {
-                            const convertedRequest = convertApiRequestToRequest(pendingUpdate);
-                            handleViewDetails(convertedRequest);
-                          }
-                        }}
-                        variant="warning"
-                      />
-                    )}
+                     selectedSolicitud.request_type !== 'actualizar-datos-personales' && (() => {
+                       const pendingUpdate = getPendingUpdate(selectedSolicitud.id_number);
+                       // Solo mostrar alerta si la actualización requiere cambio de correo
+                       return pendingUpdate && pendingUpdateRequiresEmailChange(pendingUpdate) ? (
+                         <PendingDataUpdateAlert
+                           pendingUpdate={pendingUpdate}
+                           documentNumber={selectedSolicitud.id_number}
+                           onViewUpdate={() => {
+                             if (pendingUpdate) {
+                               const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                               handleViewDetails(convertedRequest);
+                             }
+                           }}
+                           variant="warning"
+                         />
+                       ) : null;
+                     })()}
                     
 
                     {/* Información del Solicitante */}
@@ -2679,21 +2673,24 @@ const AdminSolicitudesPage: React.FC = () => {
                hasPendingUpdate(solicitudToRespond.id_number) &&
                solicitudToRespond.status !== 'resolved' &&
                solicitudToRespond.status !== 'rejected' &&
-               solicitudToRespond.request_type !== 'actualizar-datos-personales' && (
-                <PendingDataUpdateAlert
-                  pendingUpdate={getPendingUpdate(solicitudToRespond.id_number)!}
-                  documentNumber={solicitudToRespond.id_number}
-                  onViewUpdate={() => {
-                    const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
-                    if (pendingUpdate) {
-                      const convertedRequest = convertApiRequestToRequest(pendingUpdate);
-                      handleCloseResponseDialog();
-                      handleViewDetails(convertedRequest);
-                    }
-                  }}
-                  variant="warning"
-                />
-              )}
+               solicitudToRespond.request_type !== 'actualizar-datos-personales' && (() => {
+                 const pendingUpdate = getPendingUpdate(solicitudToRespond.id_number);
+                 // Solo mostrar alerta si la actualización requiere cambio de correo
+                 return pendingUpdate && pendingUpdateRequiresEmailChange(pendingUpdate) ? (
+                   <PendingDataUpdateAlert
+                     pendingUpdate={pendingUpdate}
+                     documentNumber={solicitudToRespond.id_number}
+                     onViewUpdate={() => {
+                       if (pendingUpdate) {
+                         const convertedRequest = convertApiRequestToRequest(pendingUpdate);
+                         handleCloseResponseDialog();
+                         handleViewDetails(convertedRequest);
+                       }
+                     }}
+                     variant="warning"
+                   />
+                 ) : null;
+               })()}
 
               {useCompensacionesForm ? (
                 <Form {...responseWithCompensacionesForm}>
