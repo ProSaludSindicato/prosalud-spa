@@ -2177,6 +2177,8 @@ const AdminSolicitudesPage: React.FC = () => {
                                   'adicionarActividades': 'Adicionar Actividades',
                                   'dirigidoBancolombia': 'Dirigido Bancolombia',
                                   'otros': 'Otros',
+                                  'montoSolicitado': 'Monto Solicitado',
+                                  'monto_solicitado': 'Monto Solicitado',
                                 };
                                 
                                 if (fieldNameMap[str]) {
@@ -2205,6 +2207,27 @@ const AdminSolicitudesPage: React.FC = () => {
                                 // Handle empty strings - para campos de proceso, mostrar "No especificado" si está vacío
                                 if (typeof val === 'string' && val.trim() === '') {
                                   return <span className="text-gray-400 italic">No especificado</span>;
+                                }
+                                
+                                // Formatear Monto Solicitado como dinero COP para solicitudes de microcrédito
+                                const isMicrocredito = selectedSolicitud.request_type === 'microcredito' || selectedSolicitud.request_type === 'solicitud-microcredito';
+                                const isMontoSolicitado = fieldKey === 'montoSolicitado' || fieldKey === 'monto_solicitado';
+                                
+                                if (isMicrocredito && isMontoSolicitado) {
+                                  // Convertir el valor a número si es string
+                                  const numericValue = typeof val === 'string' ? parseFloat(val.replace(/\./g, '')) : Number(val);
+                                  
+                                  if (!isNaN(numericValue)) {
+                                    // Formatear como dinero COP con separadores de miles
+                                    const formatted = new Intl.NumberFormat('es-CO', {
+                                      style: 'currency',
+                                      currency: 'COP',
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 0,
+                                    }).format(numericValue);
+                                    
+                                    return <span className="font-semibold text-primary-prosalud">{formatted}</span>;
+                                  }
                                 }
                                 
                                 // Transformar tipoDocumento para solicitudes de incapacidades y licencias
