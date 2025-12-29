@@ -6,12 +6,29 @@ import { logger } from "@/utils/logger";
 const requestsApi = authenticatedApi;
 
 // Request and response interfaces based on the API documentation
+export interface ApiResponseAttachment {
+  id: number;
+  original_name: string;
+  download_url: string | null;
+  url_expires_at: string | null;
+  created_at: string;
+}
+
+export interface ApiResponseResponder {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface ApiRequestResponse {
   id: number;
   status: "PENDING" | "IN_REVIEW" | "REJECTED" | "COMPLETED";
   email_subject: string;
   email_body: string;
   created_at: string;
+  responded_by?: ApiResponseResponder | null;
+  attachments?: ApiResponseAttachment[];
+  attachments_count?: number;
 }
 
 export interface ApiRequestFile {
@@ -459,6 +476,30 @@ export const requestsApiService = {
 
       const response = await requestsApi.get(
         `/api/requests/${requestId}/files/${fileKey}`,
+        {
+          responseType: 'blob', // Important: specify blob response type
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // Download a response attachment
+  async downloadResponseAttachment(responseId: number, attachmentId: number): Promise<Blob> {
+    try {
+      if (!responseId || typeof responseId !== 'number' || responseId <= 0) {
+        throw new Error('ID de respuesta inválido');
+      }
+      if (!attachmentId || typeof attachmentId !== 'number' || attachmentId <= 0) {
+        throw new Error('ID de anexo inválido');
+      }
+
+      const response = await requestsApi.get(
+        `/api/requests/responses/${responseId}/attachments/${attachmentId}`,
         {
           responseType: 'blob', // Important: specify blob response type
         }

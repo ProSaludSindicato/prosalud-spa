@@ -58,6 +58,7 @@ import { Request } from "@/types/requests";
 import { ApiRequest } from "@/services/requestsApi";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
+import ResponseAttachmentsSection from "@/components/admin/solicitudes/ResponseAttachmentsSection";
 import { parentescos } from '@/components/actualizar-datos-personales/formOptions';
 import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
 import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpdates";
@@ -2526,6 +2527,14 @@ const AdminSolicitudesPage: React.FC = () => {
                                       </span>
                                     </div>
                                   </div>
+
+                                  {/* Responded By */}
+                                  {response.responded_by && (
+                                    <div className="text-xs text-gray-600 mb-3">
+                                      Respondido por: <strong>{response.responded_by.name}</strong>
+                                      <span className="text-gray-500"> ({response.responded_by.email})</span>
+                                    </div>
+                                  )}
                                   
                                   {/* Email Subject */}
                                   <div className="mb-3">
@@ -2554,7 +2563,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                   </div>
                                   
                                   {/* Email Body */}
-                                  <div>
+                                  <div className="mb-3">
                                     <label className="text-sm font-medium text-gray-700 mb-1 block">
                                       Cuerpo del Correo
                                     </label>
@@ -2583,6 +2592,15 @@ const AdminSolicitudesPage: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
+
+                                  {/* Response Attachments */}
+                                  {response.attachments && response.attachments.length > 0 && (
+                                    <ResponseAttachmentsSection
+                                      responseId={response.id}
+                                      attachments={response.attachments}
+                                      attachmentsCount={response.attachments_count}
+                                    />
+                                  )}
                                 </div>
                               );
                             })}

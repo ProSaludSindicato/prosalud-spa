@@ -1,5 +1,5 @@
-import { requestsApiService, ApiRequest, ApiRequestResponse, ApiRequestFile } from './requestsApi';
-import { Request, RequestResponse, RequestStats, RequestFile } from '@/types/requests';
+import { requestsApiService, ApiRequest, ApiRequestResponse, ApiRequestFile, ApiResponseAttachment, ApiResponseResponder } from './requestsApi';
+import { Request, RequestResponse, RequestStats, RequestFile, ResponseAttachment, ResponseResponder } from '@/types/requests';
 import { logger } from '@/utils/logger';
 
 // Map API status to frontend status
@@ -18,6 +18,26 @@ const mapApiStatusToFrontendStatus = (apiStatus: string): Request['status'] => {
   }
 };
 
+// Map API response attachment to frontend attachment
+const mapApiAttachmentToFrontendAttachment = (apiAttachment: ApiResponseAttachment): ResponseAttachment => {
+  return {
+    id: apiAttachment.id,
+    original_name: apiAttachment.original_name,
+    download_url: apiAttachment.download_url,
+    url_expires_at: apiAttachment.url_expires_at,
+    created_at: apiAttachment.created_at,
+  };
+};
+
+// Map API response responder to frontend responder
+const mapApiResponderToFrontendResponder = (apiResponder: ApiResponseResponder): ResponseResponder => {
+  return {
+    id: apiResponder.id,
+    name: apiResponder.name,
+    email: apiResponder.email,
+  };
+};
+
 // Map API response to frontend response
 const mapApiResponseToFrontendResponse = (apiResponse: ApiRequestResponse): RequestResponse => {
   return {
@@ -26,6 +46,9 @@ const mapApiResponseToFrontendResponse = (apiResponse: ApiRequestResponse): Requ
     email_subject: apiResponse.email_subject,
     email_body: apiResponse.email_body,
     created_at: apiResponse.created_at,
+    responded_by: apiResponse.responded_by ? mapApiResponderToFrontendResponder(apiResponse.responded_by) : null,
+    attachments: apiResponse.attachments?.map(mapApiAttachmentToFrontendAttachment),
+    attachments_count: apiResponse.attachments_count ?? apiResponse.attachments?.length ?? 0,
   };
 };
 
@@ -239,6 +262,10 @@ export const requestsService = {
 
   async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
     return requestsApiService.downloadFile(requestId, fileKey);
+  },
+
+  async downloadResponseAttachment(responseId: number, attachmentId: number): Promise<Blob> {
+    return requestsApiService.downloadResponseAttachment(responseId, attachmentId);
   },
 
   // Validate request (manual validation step)

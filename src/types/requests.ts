@@ -1,9 +1,26 @@
+export interface ResponseAttachment {
+  id: number;
+  original_name: string;
+  download_url: string | null;
+  url_expires_at: string | null;
+  created_at: string;
+}
+
+export interface ResponseResponder {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface RequestResponse {
   id: number;
   status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
   email_subject: string;
   email_body: string;
   created_at: string;
+  responded_by?: ResponseResponder | null;
+  attachments?: ResponseAttachment[];
+  attachments_count?: number;
 }
 
 export interface RequestFile {
