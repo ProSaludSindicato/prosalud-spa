@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { getRecaptchaToken } from '@/utils/recaptcha';
 import { handleRecaptchaError, isRecaptchaError } from '@/utils/recaptchaErrorHandler';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 // Validador de contraseñas seguras (mismo que DefinePasswordForm)
 const passwordSchema = z
@@ -87,6 +88,8 @@ const ResetPasswordForm: React.FC = () => {
   const { toast } = useToast();
   const [linkError, setLinkError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  // Security: Use centralized sanitization hook
+  const { sanitizeGeneral } = useSanitizedInput();
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -309,6 +312,11 @@ const ResetPasswordForm: React.FC = () => {
                         autoComplete="new-password"
                         disabled={isSubmitting}
                         maxLength={128}
+                        onChange={(e) => {
+                          // Security: Sanitize password input (preserve special chars for passwords)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                          field.onChange(sanitized);
+                        }}
                       />
                       <button
                         type="button"
@@ -343,6 +351,11 @@ const ResetPasswordForm: React.FC = () => {
                         autoComplete="new-password"
                         disabled={isSubmitting}
                         maxLength={128}
+                        onChange={(e) => {
+                          // Security: Sanitize password input (preserve special chars for passwords)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                          field.onChange(sanitized);
+                        }}
                       />
                       <button
                         type="button"

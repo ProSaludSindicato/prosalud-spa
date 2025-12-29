@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClipboardList, Plus, Trash } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface RequestItem {
   id: string;
@@ -40,6 +41,8 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
     priority: 'medium',
     notes: ''
   });
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const hospitals = [
     'Hospital Marco Fidel Suárez',
@@ -138,7 +141,11 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
                 <Input
                   id="coordinator"
                   value={coordinatorName}
-                  onChange={(e) => setCoordinatorName(e.target.value)}
+                  onChange={(e) => {
+                    // Security: Sanitize coordinator name input
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setCoordinatorName(sanitized);
+                  }}
                   placeholder="Nombre del coordinador"
                   className="bg-gray-50 border-gray-300"
                 />
@@ -170,7 +177,11 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
               <Textarea
                 id="generalNotes"
                 value={generalNotes}
-                onChange={(e) => setGeneralNotes(e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize general notes input
+                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 500 });
+                  setGeneralNotes(sanitized);
+                }}
                 placeholder="Información adicional sobre la solicitud..."
                 rows={3}
                 className="bg-gray-50 border-gray-300"
@@ -190,7 +201,11 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
                 <Label className="text-sm font-medium text-gray-700">Producto *</Label>
                 <Input
                   value={newItem.productName || ''}
-                  onChange={(e) => setNewItem({...newItem, productName: e.target.value})}
+                  onChange={(e) => {
+                    // Security: Sanitize product name input
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setNewItem({...newItem, productName: sanitized});
+                  }}
                   placeholder="Nombre del producto"
                   className="bg-white border-gray-300"
                 />
@@ -281,7 +296,11 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ onClose, onSuccess }) =
                 <Label className="text-sm font-medium text-gray-700">Notas del Producto</Label>
                 <Input
                   value={newItem.notes || ''}
-                  onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
+                  onChange={(e) => {
+                    // Security: Sanitize product notes input
+                    const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+                    setNewItem({...newItem, notes: sanitized});
+                  }}
                   placeholder="Notas específicas del producto"
                   className="bg-white border-gray-300"
                 />

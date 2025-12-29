@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { parentescos, tiposDocumento, tiposDocumentoCompletos } from './formOptions';
 import { toast } from 'sonner';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface BeneficiarioFormData {
   tipo_documento: string;
@@ -29,6 +30,8 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
   const { afiliado } = useAfiliadoAuth();
   const beneficiariosActuales = afiliado?.beneficiarios || [];
   const { setValue } = useFormContext();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeId } = useSanitizedInput();
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -336,10 +339,12 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                               {...field}
                               placeholder="Número"
                               onChange={(e) => {
-                                field.onChange(e);
+                                // Security: Sanitize document number input
+                                const sanitized = sanitizeId(e.target.value, { maxLength: 20 });
+                                field.onChange(sanitized);
                                 const beneficiario = beneficiariosNuevos[index];
                                 const tipoDoc = beneficiario?.tipo_documento || '';
-                                if (e.target.value && tipoDoc && isBeneficiarioDuplicado(e.target.value, tipoDoc, index)) {
+                                if (sanitized && tipoDoc && isBeneficiarioDuplicado(sanitized, tipoDoc, index)) {
                                   toast.error('Este miembro ya está registrado');
                                 }
                               }}
@@ -359,7 +364,15 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                       <FormItem>
                         <FormLabel>Nombres *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Nombres" />
+                          <Input 
+                            {...field} 
+                            placeholder="Nombres"
+                            onChange={(e) => {
+                              // Security: Sanitize names input
+                              const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                              field.onChange(sanitized);
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -374,7 +387,15 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                       <FormItem>
                         <FormLabel>Apellidos *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Apellidos" />
+                          <Input 
+                            {...field} 
+                            placeholder="Apellidos"
+                            onChange={(e) => {
+                              // Security: Sanitize last names input
+                              const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                              field.onChange(sanitized);
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

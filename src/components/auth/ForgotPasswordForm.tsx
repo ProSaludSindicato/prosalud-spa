@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { getRecaptchaToken } from '@/utils/recaptcha';
 import { handleRecaptchaError, isRecaptchaError } from '@/utils/recaptchaErrorHandler';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -28,6 +29,8 @@ const ForgotPasswordForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeEmail } = useSanitizedInput();
 
   const form = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -187,6 +190,11 @@ const ForgotPasswordForm: React.FC = () => {
                       autoComplete="email"
                       disabled={isSubmitting}
                       maxLength={100}
+                      onChange={(e) => {
+                        // Security: Sanitize email input
+                        const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                        field.onChange(sanitized);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />

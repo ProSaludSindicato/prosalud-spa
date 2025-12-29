@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { User } from 'lucide-react';
 import { estadosCiviles, municipios, tallasUniforme } from './formOptions';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface DatosPersonalesSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -19,6 +20,8 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
   initialValues,
 }: DatosPersonalesSectionProps<TFieldValues>) => {
   const watchValues = useWatch({ control });
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeEmail, sanitizePhone, sanitizeGeneral, sanitizeNumeric } = useSanitizedInput();
 
   const shouldObfuscate = (fieldName: string): boolean => {
     // Si el campo fue modificado, no ofuscar
@@ -59,8 +62,25 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
       currentValue,
       initialIsObfuscated,
       handleChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newValue = e.target.value;
-        field.onChange(newValue);
+        // Security: Sanitize input based on obfuscate type
+        let sanitized: string;
+        switch (obfuscateType) {
+          case 'email':
+            sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+            break;
+          case 'phone':
+            sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
+            break;
+          case 'address':
+            sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+            break;
+          case 'account':
+            sanitized = sanitizeNumeric(e.target.value, { maxLength: 20 });
+            break;
+          default:
+            sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+        }
+        field.onChange(sanitized);
       },
       handleFocus: () => {
         // Si está ofuscado y el usuario hace focus, preparar para edición
@@ -143,8 +163,9 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     {...field}
                       value={displayValue}
                       onChange={(e) => {
-                        const newValue = e.target.value;
-                        field.onChange(newValue);
+                        // Security: Sanitize address input
+                        const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+                        field.onChange(sanitized);
                       }}
                       onFocus={() => {
                         // Si está ofuscado y el usuario hace focus, limpiar o restaurar según corresponda
@@ -335,6 +356,11 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     type="text"
                     placeholder="Ej: 42"
                     {...field}
+                    onChange={(e) => {
+                      // Security: Sanitize shoe size input (alphanumeric)
+                      const sanitized = sanitizeNumeric(e.target.value, { maxLength: 10 });
+                      field.onChange(sanitized);
+                    }}
                     className={modifiedFields?.has('tallaCalzado') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>

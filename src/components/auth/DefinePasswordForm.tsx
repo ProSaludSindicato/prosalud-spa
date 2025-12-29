@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 // Reutilizamos un esquema de contraseña robusto similar al de ResetPasswordForm
 const passwordSchema = z
@@ -78,6 +79,8 @@ const DefinePasswordForm: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeGeneral } = useSanitizedInput();
 
   const [token, setToken] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -307,6 +310,11 @@ const DefinePasswordForm: React.FC = () => {
                         autoComplete="new-password"
                         disabled={isSubmitting}
                         maxLength={128}
+                        onChange={(e) => {
+                          // Security: Sanitize password input (preserve special chars for passwords)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                          field.onChange(sanitized);
+                        }}
                       />
                       <button
                         type="button"
@@ -341,6 +349,11 @@ const DefinePasswordForm: React.FC = () => {
                         autoComplete="new-password"
                         disabled={isSubmitting}
                         maxLength={128}
+                        onChange={(e) => {
+                          // Security: Sanitize password input (preserve special chars for passwords)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                          field.onChange(sanitized);
+                        }}
                       />
                       <button
                         type="button"

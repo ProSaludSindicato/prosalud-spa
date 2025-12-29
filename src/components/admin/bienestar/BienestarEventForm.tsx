@@ -64,6 +64,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
   const [eliminarListadoAsistencia, setEliminarListadoAsistencia] = useState(false);
   const queryClient = useQueryClient();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -462,9 +464,14 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Input
                       id="title"
-                      {...form.register("title")}
+                      value={form.watch('title') || ''}
                       className="h-10"
                       placeholder="Ej: Jornada de Vacunación 2024"
+                      onChange={(e) => {
+                        // Security: Sanitize title input (allows spaces)
+                        const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                        form.setValue('title', sanitized, { shouldValidate: true });
+                      }}
                     />
                     {form.formState.errors.title && (
                       <p className="text-destructive text-sm">{form.formState.errors.title.message}</p>
@@ -509,10 +516,15 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Textarea
                       id="description"
-                      {...form.register("description")}
+                      value={form.watch('description') || ''}
                       rows={3}
                       className="resize-none text-sm"
                       placeholder="Describe los detalles del evento..."
+                      onChange={(e) => {
+                        // Security: Sanitize description input (allows spaces)
+                        const sanitized = sanitizeGeneral(e.target.value, { maxLength: 1000 });
+                        form.setValue('description', sanitized, { shouldValidate: true });
+                      }}
                     />
                     {form.formState.errors.description && (
                       <p className="text-destructive text-sm">{form.formState.errors.description.message}</p>
@@ -541,9 +553,14 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Label>
                     <Input
                       id="location"
-                      {...form.register("location")}
+                      value={form.watch('location') || ''}
                       className="h-10"
                       placeholder="Ej: Sede Principal"
+                      onChange={(e) => {
+                        // Security: Sanitize location input (allows spaces)
+                        const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                        form.setValue('location', sanitized, { shouldValidate: true });
+                      }}
                     />
                     {form.formState.errors.location && (
                       <p className="text-destructive text-sm">{form.formState.errors.location.message}</p>
@@ -579,7 +596,17 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       <Label htmlFor="provider" className="text-sm font-medium">
                         Organizador
                       </Label>
-                      <Input id="provider" {...form.register("provider")} placeholder="ProSalud" className="h-10" />
+                      <Input 
+                        id="provider" 
+                        value={form.watch('provider') || ''}
+                        placeholder="ProSalud" 
+                        className="h-10"
+                        onChange={(e) => {
+                          // Security: Sanitize provider input (allows spaces)
+                          const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                          form.setValue('provider', sanitized, { shouldValidate: true });
+                        }}
+                      />
                       {form.formState.errors.provider && (
                         <p className="text-destructive text-sm">{form.formState.errors.provider.message}</p>
                       )}
@@ -590,7 +617,17 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     <Label htmlFor="gift" className="text-sm font-medium">
                       Obsequio
                     </Label>
-                    <Input id="gift" {...form.register("gift")} className="h-10" placeholder="Ej: Kit de bienestar" />
+                    <Input 
+                      id="gift" 
+                      value={form.watch('gift') || ''}
+                      className="h-10" 
+                      placeholder="Ej: Kit de bienestar"
+                      onChange={(e) => {
+                        // Security: Sanitize gift input (allows spaces)
+                        const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                        form.setValue('gift', sanitized, { shouldValidate: true });
+                      }}
+                    />
                     {form.formState.errors.gift && (
                       <p className="text-destructive text-sm">{form.formState.errors.gift.message}</p>
                     )}

@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RotateCcw, Plus, Trash } from 'lucide-react';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface ReturnItem {
   id: string;
@@ -40,6 +41,8 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
     condition: 'new',
     reason: ''
   });
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const hospitals = [
     'Hospital Marco Fidel Suárez',
@@ -145,7 +148,11 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
                 <Input
                   id="coordinator"
                   value={coordinatorName}
-                  onChange={(e) => setCoordinatorName(e.target.value)}
+                  onChange={(e) => {
+                    // Security: Sanitize coordinator name input
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setCoordinatorName(sanitized);
+                  }}
                   placeholder="Nombre del coordinador"
                   className="bg-gray-50 border-gray-300"
                 />
@@ -200,7 +207,11 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
                 <Label className="text-sm font-medium text-gray-700">Producto *</Label>
                 <Input
                   value={newItem.productName || ''}
-                  onChange={(e) => setNewItem({...newItem, productName: e.target.value})}
+                  onChange={(e) => {
+                    // Security: Sanitize product name input
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setNewItem({...newItem, productName: sanitized});
+                  }}
                   placeholder="Nombre del producto"
                   className="bg-white border-gray-300"
                 />
@@ -291,7 +302,11 @@ const ProcessReturnForm: React.FC<ProcessReturnFormProps> = ({ onClose, onSucces
                 <Label className="text-sm font-medium text-gray-700">Motivo Específico *</Label>
                 <Input
                   value={newItem.reason || ''}
-                  onChange={(e) => setNewItem({...newItem, reason: e.target.value})}
+                  onChange={(e) => {
+                    // Security: Sanitize reason input
+                    const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+                    setNewItem({...newItem, reason: sanitized});
+                  }}
                   placeholder="Motivo específico del producto"
                   className="bg-white border-gray-300"
                 />

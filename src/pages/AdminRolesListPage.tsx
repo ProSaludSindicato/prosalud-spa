@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 import { rolesApiAdapter } from '@/services/rolesApiAdapter';
 import { authenticatedApi } from '@/services/api';
 import type { Role, Permission } from '@/types/admin';
@@ -72,6 +73,8 @@ const AdminRolesListPage: React.FC = () => {
   const { toast } = useToast();
   const { can } = useAuth();
   const queryClient = useQueryClient();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText } = useSanitizedInput();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
@@ -442,7 +445,7 @@ const AdminRolesListPage: React.FC = () => {
             setPermissionSearchTerm('');
           }
         }}>
-          <DialogContent className="max-w-5xl max-h-[90vh] bg-white flex flex-col">
+          <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto bg-white flex flex-col p-4 sm:p-6">
             <DialogHeader className="space-y-3">
               <DialogTitle className="text-xl font-bold text-gray-900">
                 Crear Nuevo Rol
@@ -462,7 +465,11 @@ const AdminRolesListPage: React.FC = () => {
                   id="role-name"
                   placeholder="Ej: Coordinador, Supervisor, etc."
                   value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
+                  onChange={(e) => {
+                    // Security: Sanitize role name input with spaces allowed
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setNewRoleName(sanitized);
+                  }}
                   className="w-full"
                 />
               </div>

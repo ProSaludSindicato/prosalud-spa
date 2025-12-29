@@ -60,6 +60,7 @@ import { Link } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 const MOVEMENT_REASON_LABELS: Record<string, string> = {
   entry: 'Entrada de inventario',
@@ -119,6 +120,8 @@ const InventoryOverview: React.FC = () => {
   const [movementReasonFilter, setMovementReasonFilter] = useState<string>('all');
 
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const {
     categories,
@@ -2302,12 +2305,29 @@ const InventoryOverview: React.FC = () => {
 
               <div className="space-y-2">
                 <Label>Número de documento</Label>
-                <Input value={entryDocument} onChange={(event) => setEntryDocument(event.target.value)} placeholder="Ej: Factura 12345" />
+                <Input 
+                  value={entryDocument} 
+                  onChange={(event) => {
+                    // Security: Sanitize document number input (allows spaces for formats like "Factura 12345")
+                    const sanitized = sanitizeText(event.target.value, { maxLength: 100, allowSpaces: true });
+                    setEntryDocument(sanitized);
+                  }} 
+                  placeholder="Ej: Factura 12345" 
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Observaciones</Label>
-                <Textarea value={entryNotes} onChange={(event) => setEntryNotes(event.target.value)} rows={3} placeholder="Notas adicionales sobre la entrada" />
+                <Textarea 
+                  value={entryNotes} 
+                  onChange={(event) => {
+                    // Security: Sanitize notes input
+                    const sanitized = sanitizeGeneral(event.target.value, { maxLength: 500 });
+                    setEntryNotes(sanitized);
+                  }} 
+                  rows={3} 
+                  placeholder="Notas adicionales sobre la entrada" 
+                />
               </div>
             </div>
 

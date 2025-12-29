@@ -43,6 +43,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import type { Role, Permission } from '@/types/admin';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 // Mapeo de módulos con iconos
 const MODULE_ICONS: Record<string, React.ReactNode> = {
@@ -196,6 +197,8 @@ const AdminRolesPage: React.FC = () => {
   const { toast } = useToast();
   const { can } = useAuth();
   const queryClient = useQueryClient();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText } = useSanitizedInput();
   const [expandedRoles, setExpandedRoles] = useState<number[]>([]);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [creatingRole, setCreatingRole] = useState(false);
@@ -649,7 +652,7 @@ const AdminRolesPage: React.FC = () => {
               setPermissionSearchTerm('');
             }
           }}>
-            <DialogContent className="max-w-5xl max-h-[90vh] bg-white">
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
               <DialogHeader className="space-y-3">
                 <DialogTitle className="text-xl font-bold text-gray-900">
                   Crear Nuevo Rol
@@ -667,7 +670,11 @@ const AdminRolesPage: React.FC = () => {
                   id="role-name"
                   placeholder="Ej: Coordinador, Supervisor, etc."
                   value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
+                  onChange={(e) => {
+                    // Security: Sanitize role name input with spaces allowed
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setNewRoleName(sanitized);
+                  }}
                   className="w-full"
                 />
               </div>
@@ -816,7 +823,7 @@ const AdminRolesPage: React.FC = () => {
               setPermissionSearchTerm('');
             }
           }}>
-            <DialogContent className="max-w-5xl max-h-[90vh] bg-white">
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
               <DialogHeader className="space-y-3">
                 <DialogTitle className="text-xl font-bold text-gray-900">
                   Editar Permisos del Rol: {editingRole?.name}

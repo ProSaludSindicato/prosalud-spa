@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import FileUploadField from '../solicitud-certificado/FileUploadField';
 import { tiposCuenta, bancos } from './formOptions';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface InformacionBancariaSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -23,6 +24,8 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
 }: InformacionBancariaSectionProps<TFieldValues>) => {
   const watchValues = useWatch({ control });
   const numeroCuenta = watchValues?.numeroCuenta || '';
+  // Security: Use centralized sanitization hook
+  const { sanitizeNumeric } = useSanitizedInput();
 
   const shouldObfuscate = (fieldName: string): boolean => {
     if (modifiedFields?.has(fieldName)) {
@@ -64,8 +67,9 @@ const InformacionBancariaSection = <TFieldValues extends FieldValues>({
                         {...field}
                         value={displayValue}
                         onChange={(e) => {
-                          const newValue = e.target.value;
-                          field.onChange(newValue);
+                          // Security: Sanitize account number input (numeric only)
+                          const sanitized = sanitizeNumeric(e.target.value, { maxLength: 20 });
+                          field.onChange(sanitized);
                         }}
                         onFocus={() => {
                           // Si está ofuscado y el usuario hace focus, limpiar o restaurar según corresponda

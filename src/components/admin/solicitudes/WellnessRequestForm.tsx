@@ -18,6 +18,7 @@ import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessReq
 import { useAuth } from '@/context/AuthContext';
 import { useEffect } from 'react';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 // Schema de validación (las sedes se validarán dinámicamente en el onSubmit)
 const wellnessRequestSchema = z.object({
@@ -97,6 +98,8 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detalles, setDetalles] = useState<DetalleItem[]>([]);
   const isEditing = !!solicitud;
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral, sanitizeNumeric } = useSanitizedInput();
 
   // Validar que solo se puede editar si el estado es pending o in_progress
   const canEdit = !solicitud || solicitud.estado === 'pending' || solicitud.estado === 'in_progress';
@@ -357,6 +360,11 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                         <Input
                           placeholder="Ej: Taller de Mindfulness, Actividad Recreativa..."
                           {...field}
+                          onChange={(e) => {
+                            // Security: Sanitize activity name input
+                            const sanitized = sanitizeText(e.target.value, { maxLength: 200, allowSpaces: true });
+                            field.onChange(sanitized);
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
@@ -377,6 +385,11 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                             rows={4}
                             maxLength={300}
                             {...field}
+                            onChange={(e) => {
+                              // Security: Sanitize description input
+                              const sanitized = sanitizeGeneral(e.target.value, { maxLength: 300 });
+                              field.onChange(sanitized);
+                            }}
                           />
                           <div className="flex justify-end mt-1">
                             <span className={`text-xs ${(field.value?.length || 0) >= 300 ? 'text-red-600' : 'text-gray-500'}`}>
@@ -647,7 +660,11 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                             <Input
                               placeholder="Ej: agendas, loncheras, pasabocas..."
                               value={detalle.tipo}
-                              onChange={(e) => updateDetalle(detalle.id, 'tipo', e.target.value)}
+                              onChange={(e) => {
+                                // Security: Sanitize detail type input
+                                const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                                updateDetalle(detalle.id, 'tipo', sanitized);
+                              }}
                             />
                           </div>
                           <div className="space-y-2">

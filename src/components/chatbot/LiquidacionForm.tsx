@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { useSanitizedInput } from "@/hooks/useSanitizedInput";
 
 interface LiquidacionFormProps {
   onSubmit: (data: FormData) => void;
@@ -51,6 +52,8 @@ export default function LiquidacionForm({ onSubmit, isLoading, initialData }: Li
     fechaExpedicion: "",
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  // Security: Use centralized sanitization hook
+  const { sanitizeId } = useSanitizedInput();
 
   // Actualizar el formulario cuando cambien los datos iniciales
   useEffect(() => {
@@ -141,7 +144,11 @@ export default function LiquidacionForm({ onSubmit, isLoading, initialData }: Li
             <Input
               type="text"
               value={formData.numeroDocumento}
-              onChange={(e) => handleInputChange("numeroDocumento", e.target.value)}
+              onChange={(e) => {
+                // Security: Sanitize document number input
+                const sanitized = sanitizeId(e.target.value, { maxLength: 20 });
+                handleInputChange("numeroDocumento", sanitized);
+              }}
               placeholder="Ingresa tu número de documento"
               className="w-full"
             />

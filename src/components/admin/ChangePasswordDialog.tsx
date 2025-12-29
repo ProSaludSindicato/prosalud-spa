@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -30,6 +31,8 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeGeneral } = useSanitizedInput();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +122,11 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                 id="currentPassword"
                 type={showCurrentPassword ? "text" : "password"}
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize password input (preserve special chars for passwords)
+                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                  setCurrentPassword(sanitized);
+                }}
                 required
                 className="pr-10 bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
               />
@@ -146,7 +153,11 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                 id="newPassword"
                 type={showNewPassword ? "text" : "password"}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize password input (preserve special chars for passwords)
+                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                  setNewPassword(sanitized);
+                }}
                 required
                 minLength={6}
                 className="pr-10 bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
@@ -174,7 +185,11 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                 id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize password input (preserve special chars for passwords)
+                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                  setConfirmPassword(sanitized);
+                }}
                 required
                 minLength={6}
                 className="pr-10 bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"

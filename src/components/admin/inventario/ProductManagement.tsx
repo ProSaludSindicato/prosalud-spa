@@ -555,7 +555,7 @@ const ProductManagement: React.FC = () => {
       )}
 
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
           <DialogHeader className="pr-10">
             <DialogTitle>
               {viewMode === 'details'

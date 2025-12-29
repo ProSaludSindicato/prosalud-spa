@@ -15,6 +15,7 @@ import { rolesApiAdapter } from '@/services/rolesApiAdapter';
 import { nameValidation, emailValidation } from '@/hooks/useFormValidation';
 import AdminModal from '@/components/admin/common/AdminModal';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 const formSchema = z.object({
   name: nameValidation,
@@ -44,6 +45,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeEmail } = useSanitizedInput();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -192,8 +195,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
               <Label htmlFor="name">Nombre Completo</Label>
               <Input
                 id="name"
-                {...register('name')}
+                value={watch('name') || ''}
                 placeholder="Ingrese el nombre completo"
+                onChange={(e) => {
+                  // Security: Sanitize name input (allows spaces)
+                  const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                  setValue('name', sanitized, { shouldValidate: true });
+                }}
               />
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -205,8 +213,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
               <Input
                 id="email"
                 type="email"
-                {...register('email')}
+                value={watch('email') || ''}
                 placeholder="ejemplo@prosalud.com"
+                onChange={(e) => {
+                  // Security: Sanitize email input
+                  const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                  setValue('email', sanitized, { shouldValidate: true });
+                }}
               />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email.message}</p>

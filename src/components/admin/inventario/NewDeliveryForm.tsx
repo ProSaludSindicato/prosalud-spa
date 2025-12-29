@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Minus, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface DeliveryItem {
   productName: string;
@@ -30,6 +31,8 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
     { productName: '', quantity: 0, unitPrice: 0 }
   ]);
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -125,7 +128,11 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
                   id="supplierName"
                   name="supplierName"
                   value={formData.supplierName}
-                  onChange={handleInputChange}
+                  onChange={(e) => {
+                    // Security: Sanitize supplier name input
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                    setFormData(prev => ({ ...prev, supplierName: sanitized }));
+                  }}
                   placeholder="Nombre del proveedor"
                   className="bg-gray-50 border-gray-300"
                   required
@@ -157,7 +164,11 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
                   id="invoiceNumber"
                   name="invoiceNumber"
                   value={formData.invoiceNumber}
-                  onChange={handleInputChange}
+                  onChange={(e) => {
+                    // Security: Sanitize invoice number input (alphanumeric)
+                    const sanitized = sanitizeGeneral(e.target.value, { maxLength: 50 });
+                    setFormData(prev => ({ ...prev, invoiceNumber: sanitized }));
+                  }}
                   placeholder="Número de factura"
                   className="bg-gray-50 border-gray-300"
                 />
@@ -210,7 +221,11 @@ const NewDeliveryForm: React.FC<NewDeliveryFormProps> = ({ onClose, onSuccess })
                       type="text"
                       placeholder="Nombre del producto"
                       value={item.productName}
-                      onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
+                      onChange={(e) => {
+                        // Security: Sanitize product name input
+                        const sanitized = sanitizeText(e.target.value, { maxLength: 100, allowSpaces: true });
+                        handleItemChange(index, 'productName', sanitized);
+                      }}
                       className="bg-white border-gray-300"
                       required
                     />

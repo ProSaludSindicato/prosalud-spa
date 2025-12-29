@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useInventory } from '@/context/InventoryContext';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 import {
   InventoryProduct,
   InventoryVariantMode,
@@ -174,6 +175,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const { toast } = useToast();
   const { categories, colorOptions, sizeOptions, addProduct, updateProduct } = useInventory();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
 
   const sortedCategories = useMemo(
     () => [...categories].sort((a, b) => a.name.localeCompare(b.name)),
@@ -717,9 +720,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   </Label>
                   <Input
                     id="name"
-                    {...form.register('name')}
+                    value={form.watch('name')}
                     placeholder="Ej: Uniforme Quirúrgico"
                     className="bg-gray-50 border-gray-300"
+                    onChange={(e) => {
+                      // Security: Sanitize product name input
+                      const sanitized = sanitizeText(e.target.value, { maxLength: 200, allowSpaces: true });
+                      form.setValue('name', sanitized, { shouldValidate: true });
+                    }}
                   />
                   {form.formState.errors.name && (
                     <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
@@ -813,10 +821,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                 </Label>
                 <Textarea
                   id="description"
-                  {...form.register('description')}
+                  value={form.watch('description') || ''}
                   placeholder="Descripción detallada del producto..."
                   rows={3}
                   className="bg-gray-50 border-gray-300"
+                  onChange={(e) => {
+                    // Security: Sanitize description input
+                    const sanitized = sanitizeGeneral(e.target.value, { maxLength: 1000 });
+                    form.setValue('description', sanitized, { shouldValidate: true });
+                  }}
                 />
               </div>
             </CardContent>

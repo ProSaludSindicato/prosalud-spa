@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/context/AuthContext"
 import { getRecaptchaToken } from "@/utils/recaptcha"
 import { handleRecaptchaError, isRecaptchaError } from "@/utils/recaptchaErrorHandler"
+import { useSanitizedInput } from "@/hooks/useSanitizedInput"
 
 // Validation schema
 const formSchema = z.object({
@@ -41,6 +42,8 @@ const LoginForm: React.FC = () => {
   const location = useLocation()
   const { toast } = useToast()
   const { login } = useAuth()
+  // Security: Use centralized sanitization hook
+  const { sanitizeEmail, sanitizeGeneral } = useSanitizedInput()
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -163,6 +166,11 @@ const LoginForm: React.FC = () => {
                       autoComplete="email"
                       disabled={isSubmitting}
                       maxLength={100}
+                      onChange={(e) => {
+                        // Security: Sanitize email input
+                        const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                        field.onChange(sanitized);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -186,6 +194,11 @@ const LoginForm: React.FC = () => {
                         autoComplete="current-password"
                         disabled={isSubmitting}
                         maxLength={128}
+                        onChange={(e) => {
+                          // Security: Sanitize password input (preserve special chars for passwords)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 128 });
+                          field.onChange(sanitized);
+                        }}
                       />
                       <button
                         type="button"

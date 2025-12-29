@@ -5,6 +5,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User } from 'lucide-react';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface IdType {
   value: string;
@@ -20,6 +21,9 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
   control,
   idTypes,
 }: DatosPersonalesRetiroSectionProps<TFieldValues>) => {
+  // Security: Use centralized sanitization hook
+  const { sanitizeId, sanitizeText, sanitizeEmail, sanitizePhone } = useSanitizedInput();
+  
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
       <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark flex items-center">
@@ -55,7 +59,15 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Número de identificación *</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: 1234567890" {...field} />
+                <Input 
+                  placeholder="Ej: 1234567890" 
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    // Security: Sanitize ID input
+                    const sanitized = sanitizeId(e.target.value, { maxLength: 15 });
+                    field.onChange(sanitized);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -68,7 +80,15 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Nombres *</FormLabel>
               <FormControl>
-                <Input placeholder="Sus nombres completos" {...field} />
+                <Input 
+                  placeholder="Sus nombres completos" 
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    // Security: Sanitize text input (allows spaces)
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                    field.onChange(sanitized);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -81,7 +101,15 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Apellidos *</FormLabel>
               <FormControl>
-                <Input placeholder="Sus apellidos completos" {...field} />
+                <Input 
+                  placeholder="Sus apellidos completos" 
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    // Security: Sanitize text input (allows spaces)
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                    field.onChange(sanitized);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -94,7 +122,16 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Correo electrónico *</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="ejemplo@correo.com" {...field} />
+                <Input 
+                  type="email" 
+                  placeholder="ejemplo@correo.com" 
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    // Security: Sanitize email input
+                    const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                    field.onChange(sanitized);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -107,7 +144,16 @@ const DatosPersonalesRetiroSection = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Número de celular *</FormLabel>
               <FormControl>
-                <Input type="tel" placeholder="Ej: 3001234567" {...field} />
+                <Input 
+                  type="tel" 
+                  placeholder="Ej: 3001234567" 
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    // Security: Sanitize phone input
+                    const sanitized = sanitizePhone(e.target.value, { maxLength: 10 });
+                    field.onChange(sanitized);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

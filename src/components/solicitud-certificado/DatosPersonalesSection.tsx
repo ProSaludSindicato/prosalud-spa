@@ -4,6 +4,7 @@ import { Control, FieldValues, FieldPath } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface IdType {
   value: string;
@@ -15,34 +16,12 @@ interface DatosPersonalesSectionProps<TFieldValues extends FieldValues> {
   idTypes: IdType[];
 }
 
-// Security: Input validation and sanitization
-const validateInput = (value: string, maxLength: number = 100) => {
-  if (!value || typeof value !== 'string') return '';
-  // Remove potential XSS characters and limit length
-  return value.trim().slice(0, maxLength).replace(/[<>\"'&]/g, '');
-};
-
-const validateEmail = (email: string) => {
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
-};
-
-const validatePhone = (phone: string) => {
-  // Colombian phone number format validation
-  const phoneRegex = /^[3][0-9]{9}$/;
-  return phoneRegex.test(phone.replace(/\s/g, ''));
-};
-
-const validateIdNumber = (idNumber: string) => {
-  // Basic ID number validation (only numbers, reasonable length)
-  const idRegex = /^[0-9]{6,15}$/;
-  return idRegex.test(idNumber);
-};
-
 const DatosPersonalesSection = <TFieldValues extends FieldValues>({
   control,
   idTypes,
 }: DatosPersonalesSectionProps<TFieldValues>) => {
+  // Security: Use centralized sanitization hook
+  const { sanitizeId, sanitizeText, sanitizeEmail, sanitizePhone, validateId, validateEmail, validatePhone } = useSanitizedInput();
   return (
     <section className="p-6 border rounded-lg shadow-sm bg-white">
       <h2 className="text-xl font-semibold mb-6 text-primary-prosalud-dark">Datos Personales del Solicitante</h2>
@@ -81,14 +60,14 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   {...field}
                   maxLength={15}
                   onChange={(e) => {
-                    // Security: Only allow numbers for ID
-                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                    // Security: Sanitize ID input using centralized hook
+                    const sanitized = sanitizeId(e.target.value, { maxLength: 15 });
                     field.onChange(sanitized);
                   }}
                   onBlur={(e) => {
                     // Security: Validate ID number format
                     const value = e.target.value;
-                    if (value && !validateIdNumber(value)) {
+                    if (value && !validateId(value)) {
                       // You could set a custom error here if using react-hook-form validation
                     }
                   }}
@@ -110,8 +89,8 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   {...field}
                   maxLength={50}
                   onChange={(e) => {
-                    // Security: Only allow letters, spaces, and basic accents
-                    const sanitized = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+                    // Security: Sanitize text input using centralized hook
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
                     field.onChange(sanitized);
                   }}
                 />
@@ -132,8 +111,8 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   {...field}
                   maxLength={50}
                   onChange={(e) => {
-                    // Security: Only allow letters, spaces, and basic accents
-                    const sanitized = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+                    // Security: Sanitize text input using centralized hook
+                    const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
                     field.onChange(sanitized);
                   }}
                 />
@@ -156,8 +135,8 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   maxLength={100}
                   autoComplete="email"
                   onChange={(e) => {
-                    // Security: Basic email sanitization
-                    const sanitized = validateInput(e.target.value, 100);
+                    // Security: Sanitize email input using centralized hook
+                    const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
                     field.onChange(sanitized);
                   }}
                   onBlur={(e) => {
@@ -187,8 +166,8 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                   maxLength={10}
                   autoComplete="tel"
                   onChange={(e) => {
-                    // Security: Only allow numbers for phone
-                    const sanitized = e.target.value.replace(/[^0-9]/g, '');
+                    // Security: Sanitize phone input using centralized hook
+                    const sanitized = sanitizePhone(e.target.value, { maxLength: 10 });
                     field.onChange(sanitized);
                   }}
                   onBlur={(e) => {

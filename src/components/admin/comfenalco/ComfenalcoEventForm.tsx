@@ -18,6 +18,7 @@ import { CreateComfenalcoEventData, UpdateComfenalcoEventData } from '@/types/co
 import { baseNameValidation, baseTextValidation, baseUrlValidation, baseCategoryValidation } from '@/hooks/useFormValidation';
 import { optimizeImage, isImageFile } from '@/utils/imageOptimizer';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 const formSchema = z.object({
   title: baseNameValidation.min(5, 'El título debe tener al menos 5 caracteres'),
@@ -42,6 +43,8 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
   const [isOptimizing, setIsOptimizing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral, sanitizeUrl } = useSanitizedInput();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -189,16 +192,24 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
     }
 
     try {
+      // Security: Sanitize all text inputs before submission (defense in depth)
+      const sanitizedTitle = sanitizeText(data.title.trim(), { maxLength: 255, allowSpaces: true });
+      const sanitizedCategory = sanitizeText(data.category.trim(), { maxLength: 100, allowSpaces: false });
+      const sanitizedDescription = data.description 
+        ? sanitizeGeneral(data.description.trim(), { maxLength: 1000 })
+        : undefined;
+      const sanitizedRegistrationLink = sanitizeUrl(data.registrationLink.trim(), { maxLength: 500 });
+
       if (event) {
         // Para actualización, usar UpdateComfenalcoEventData (snake_case)
         const updateData: UpdateComfenalcoEventData & { banner_image?: File } = {
-          title: data.title.trim(),
-          category: data.category.trim(),
-          description: data.description?.trim() || undefined,
+          title: sanitizedTitle,
+          category: sanitizedCategory,
+          description: sanitizedDescription,
           display_size: data.displaySize,
           event_date: data.eventDate || undefined,
           registration_deadline: data.registrationDeadline || undefined,
-          registration_link: data.registrationLink.trim(),
+          registration_link: sanitizedRegistrationLink,
         };
         
         // Si hay una nueva imagen, incluirla
@@ -219,14 +230,14 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
         }
         
         const createData: CreateComfenalcoEventData = {
-          title: data.title.trim(),
+          title: sanitizedTitle,
           banner_image: bannerImage,
-          category: data.category.trim(),
-          description: data.description?.trim() || undefined,
+          category: sanitizedCategory,
+          description: sanitizedDescription,
           display_size: data.displaySize,
           event_date: data.eventDate || undefined,
           registration_deadline: data.registrationDeadline || undefined,
-          registration_link: data.registrationLink.trim(),
+          registration_link: sanitizedRegistrationLink,
         };
         
         createMutation.mutate(createData);
@@ -288,9 +299,21 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
                   </Label>
                   <Input
                     id="title"
-                    {...form.register('title')}
+                    value={form.watch('title') || ''}
                     className="h-12"
                     placeholder="Ej: Curso de Cocina Internacional"
+                    onPaste={(e) => {
+                      // Security: Handle paste events to ensure sanitization
+                      e.preventDefault();
+                      const pastedText = e.clipboardData.getData('text');
+                      const sanitized = sanitizeText(pastedText, { maxLength: 255, allowSpaces: true });
+                      form.setValue('title', sanitized, { shouldValidate: true });
+                    }}
+                    onChange={(e) => {
+                      // Security: Sanitize title input (allows spaces)
+                      const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                      form.setValue('title', sanitized, { shouldValidate: true });
+                    }}
                   />
                   {form.formState.errors.title && (
                     <p className="text-destructive text-sm">{form.formState.errors.title.message}</p>
@@ -303,10 +326,15 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
                   </Label>
                   <Textarea
                     id="description"
-                    {...form.register('description')}
+                    value={form.watch('description') || ''}
                     rows={4}
                     className="resize-none"
                     placeholder="Describe la experiencia que ofrece Comfenalco..."
+                    onChange={(e) => {
+                      // Security: Sanitize description input (allows spaces)
+                      const sanitized = sanitizeGeneral(e.target.value, { maxLength: 1000 });
+                      form.setValue('description', sanitized, { shouldValidate: true });
+                    }}
                   />
                   {form.formState.errors.description && (
                     <p className="text-destructive text-sm">{form.formState.errors.description.message}</p>
@@ -393,9 +421,14 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
                   <Input
                     id="registrationLink"
                     type="url"
-                    {...form.register('registrationLink')}
+                    value={form.watch('registrationLink') || ''}
                     placeholder="https://comfenalco.com/registro"
                     className="h-12"
+                    onChange={(e) => {
+                      // Security: Sanitize URL input
+                      const sanitized = sanitizeUrl(e.target.value, { maxLength: 500 });
+                      form.setValue('registrationLink', sanitized, { shouldValidate: true });
+                    }}
                   />
                   {form.formState.errors.registrationLink && (
                     <p className="text-destructive text-sm">{form.formState.errors.registrationLink.message}</p>

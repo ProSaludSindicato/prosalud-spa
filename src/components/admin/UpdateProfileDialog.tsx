@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface UpdateProfileDialogProps {
   open: boolean;
@@ -37,6 +38,8 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const { toast } = useToast();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeEmail } = useSanitizedInput();
 
   useEffect(() => {
     if (open) {
@@ -158,7 +161,11 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
                 id="firstName"
                 type="text"
                 value={profile.firstName}
-                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize first name input
+                  const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                  handleInputChange('firstName', sanitized);
+                }}
                 required
                 placeholder="Ingresa tu nombre"
                 className="bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
@@ -174,7 +181,11 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
                 id="lastName"
                 type="text"
                 value={profile.lastName}
-                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize last name input
+                  const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                  handleInputChange('lastName', sanitized);
+                }}
                 required
                 placeholder="Ingresa tu apellido"
                 className="bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
@@ -190,7 +201,11 @@ const UpdateProfileDialog: React.FC<UpdateProfileDialogProps> = ({
                 id="email"
                 type="email"
                 value={profile.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
+                onChange={(e) => {
+                  // Security: Sanitize email input
+                  const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                  handleInputChange('email', sanitized);
+                }}
                 required
                 placeholder="correo@ejemplo.com"
                 className="bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"

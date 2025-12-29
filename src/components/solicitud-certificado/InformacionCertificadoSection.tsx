@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText } from 'lucide-react';
 import FileUploadField from './FileUploadField'; // Assuming FormValues type is defined elsewhere or passed
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface InformacionCertificadoSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
@@ -20,6 +21,8 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
   const watchInfoCertificado = watch("infoCertificado" as any); // Use 'as any' if type inference is tricky
   const { setValue } = useFormContext<TFieldValues>();
   const { afiliado } = useAfiliadoAuth();
+  // Security: Use centralized sanitization hook
+  const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
   
   // Determinar el estado del afiliado (normalizado a minúsculas para comparación)
   const estadoAfiliado = afiliado?.estado?.toLowerCase() || null;
@@ -142,14 +145,9 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
       }
     }
     // Si se selecciona "Otros"
-    // NOTA: "Otros" SÍ se puede combinar con "Valor de compensaciones", pero NO con "Adicionar actividades"
+    // NOTA: "Otros" SÍ se puede combinar con "Valor de compensaciones" y con "Adicionar actividades"
     else if (infoCert.otros) {
-      // Deseleccionar "Adicionar actividades" (son mutuamente excluyentes)
-      if (infoCert.adicionarActividades) {
-        // @ts-ignore
-        setValue("infoCertificado.adicionarActividades" as any, false, { shouldValidate: false });
-      }
-      // Deseleccionar otras opciones excluyentes (excepto valorCompensaciones)
+      // Deseleccionar otras opciones excluyentes (excepto valorCompensaciones y adicionarActividades)
       if (infoCert.paraSubsidioVivienda) {
         // @ts-ignore
         setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
@@ -337,7 +335,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
     setValue
   ]);
 
-  // "Adicionar actividades" es independiente y solo se puede mezclar con:
+  // "Adicionar actividades" es independiente y se puede mezclar con:
   // - dirigidoAEntidad
   // - otros
   // Es excluyente con: valorCompensaciones, paraSubsidioVivienda, paraSubsidioDesempleo, dirigidoFondoPensiones, dirigidoBancolombia
@@ -356,16 +354,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         // Resetear el flag de marcado manual
         valorCompensacionesMarcadoManualmente.current = false;
       }
-      // Deseleccionar "Otros" (son mutuamente excluyentes)
-      if (infoCert.otros) {
-        // @ts-ignore
-        setValue("infoCertificado.otros" as any, false, { shouldValidate: false });
-        // También limpiar el campo de descripción
-        // @ts-ignore
-        setValue("otrosDescripcion" as any, '', { shouldValidate: false });
-        // @ts-ignore
-        setValue("adjuntarArchivoAdicional" as any, undefined, { shouldValidate: false });
-      }
+      // NO deseleccionar "Otros" (se pueden combinar)
       if (infoCert.paraSubsidioVivienda) {
         // @ts-ignore
         setValue("infoCertificado.paraSubsidioVivienda" as any, false, { shouldValidate: false });
@@ -471,7 +460,17 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
             <FormField control={control} name={"dirigidoAQuien" as any} render={({ field }) => (
                 <FormItem className="ml-7">
                     <FormLabel>Indique a quién va dirigido *</FormLabel>
-                    <FormControl><Input placeholder="Nombre de la entidad" {...field} /></FormControl>
+                    <FormControl>
+                      <Input 
+                        placeholder="Nombre de la entidad" 
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          // Security: Sanitize text input (allows spaces)
+                          const sanitized = sanitizeText(e.target.value, { maxLength: 255, allowSpaces: true });
+                          field.onChange(sanitized);
+                        }}
+                      />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )}/>
@@ -643,13 +642,12 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         )}
         <FormField control={control} name={"infoCertificado.otros" as any} render={({ field }) => {
           // Deshabilitar si otra opción del grupo excluyente está seleccionada
-          // "Valor de compensaciones" NO es excluyente con "Otros", pero "Adicionar actividades" SÍ lo es
+          // "Valor de compensaciones" y "Adicionar actividades" NO son excluyentes con "Otros"
           const otraOpcionSeleccionada = 
             watchInfoCertificado?.paraSubsidioVivienda ||
             watchInfoCertificado?.paraSubsidioDesempleo ||
             watchInfoCertificado?.dirigidoFondoPensiones ||
-            watchInfoCertificado?.dirigidoBancolombia ||
-            watchInfoCertificado?.adicionarActividades;
+            watchInfoCertificado?.dirigidoBancolombia;
           
           const isDisabled = !!otraOpcionSeleccionada && !field.value;
           
@@ -672,7 +670,17 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
             <FormField control={control} name={"otrosDescripcion" as any} render={({ field }) => (
                 <FormItem className="ml-7">
                     <FormLabel>Describa su necesidad *</FormLabel>
-                    <FormControl><Textarea placeholder="Especifique aquí su solicitud..." {...field} /></FormControl>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Especifique aquí su solicitud..." 
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          // Security: Sanitize general text input (allows line breaks)
+                          const sanitized = sanitizeGeneral(e.target.value, { maxLength: 1000 });
+                          field.onChange(sanitized);
+                        }}
+                      />
+                    </FormControl>
                     <FormMessage />
                 </FormItem>
             )}/>

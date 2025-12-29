@@ -1,6 +1,6 @@
 
 // Configuración de Google Analytics
-export const GA_MEASUREMENT_ID = 'GA_MEASUREMENT_ID'; // Reemplazar con el ID real
+export const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID || '';
 
 // Función para inicializar Google Analytics
 export const initGA = () => {
