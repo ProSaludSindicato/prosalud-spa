@@ -24,6 +24,80 @@ export interface SaveAssignmentsPayload {
 }
 
 /**
+ * Mapeo de tipos de solicitud del frontend al backend
+ * El frontend usa 'solicitud-microcredito' pero el backend espera 'microcredito'
+ */
+const mapFrontendToBackendRequestType = (frontendType: string): string => {
+  const typeMap: Record<string, string> = {
+    'solicitud-microcredito': 'microcredito',
+  };
+  return typeMap[frontendType] || frontendType;
+};
+
+/**
+ * Mapeo de tipos de solicitud del backend al frontend
+ * El backend devuelve 'microcredito' pero el frontend usa 'solicitud-microcredito'
+ */
+const mapBackendToFrontendRequestType = (backendType: string): string => {
+  const typeMap: Record<string, string> = {
+    'microcredito': 'solicitud-microcredito',
+  };
+  return typeMap[backendType] || backendType;
+};
+
+/**
+ * Convierte las claves de assignments del frontend al formato del backend
+ */
+const mapAssignmentsToBackend = (assignments: Record<string, string[]>): Record<string, string[]> => {
+  const mapped: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(assignments)) {
+    const backendKey = mapFrontendToBackendRequestType(key);
+    mapped[backendKey] = value;
+  }
+  return mapped;
+};
+
+/**
+ * Convierte las claves de assignments del backend al formato del frontend
+ */
+const mapAssignmentsToFrontend = (assignments: Record<string, string[]>): Record<string, string[]> => {
+  const mapped: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(assignments)) {
+    const frontendKey = mapBackendToFrontendRequestType(key);
+    mapped[frontendKey] = value;
+  }
+  return mapped;
+};
+
+/**
+ * Convierte las claves de subtype_assignments del frontend al formato del backend
+ */
+const mapSubtypeAssignmentsToBackend = (
+    subtypeAssignments: Record<string, Record<string, string[]>>
+): Record<string, Record<string, string[]>> => {
+  const mapped: Record<string, Record<string, string[]>> = {};
+  for (const [requestType, subtypes] of Object.entries(subtypeAssignments)) {
+    const backendRequestType = mapFrontendToBackendRequestType(requestType);
+    mapped[backendRequestType] = { ...subtypes };
+  }
+  return mapped;
+};
+
+/**
+ * Convierte las claves de subtype_assignments del backend al formato del frontend
+ */
+const mapSubtypeAssignmentsToFrontend = (
+    subtypeAssignments: Record<string, Record<string, string[]>>
+): Record<string, Record<string, string[]>> => {
+  const mapped: Record<string, Record<string, string[]>> = {};
+  for (const [requestType, subtypes] of Object.entries(subtypeAssignments)) {
+    const frontendRequestType = mapBackendToFrontendRequestType(requestType);
+    mapped[frontendRequestType] = { ...subtypes };
+  }
+  return mapped;
+};
+
+/**
  * Maneja errores de la API de asignaciones
  */
 const handleApiError = (error: any): never => {
@@ -35,12 +109,12 @@ const handleApiError = (error: any): never => {
   if (error.response?.status === 422 && error.response?.data?.errors) {
     const validationErrors = error.response.data.errors;
     const errorMessages = Object.entries(validationErrors)
-      .flatMap(([field, messages]) => 
-        Array.isArray(messages) 
-          ? messages.map((msg: string) => `${field}: ${msg}`)
-          : [`${field}: ${messages}`]
-      )
-      .join('\n');
+        .flatMap(([field, messages]) =>
+            Array.isArray(messages)
+                ? messages.map((msg: string) => `${field}: ${msg}`)
+                : [`${field}: ${messages}`]
+        )
+        .join('\n');
     throw new Error(`Errores de validación:\n${errorMessages}`);
   }
 
@@ -65,7 +139,7 @@ export const requestAssignmentsService = {
     try {
       logger.debug('Fetching request assignments from API');
       const response = await requestAssignmentsApi.get<ApiAssignmentsResponse>(
-        "/api/request-assignments"
+          "/api/request-assignments"
       );
 
       if (!response.data.success) {
@@ -77,7 +151,11 @@ export const requestAssignmentsService = {
         subtypeAssignmentsCount: Object.keys(response.data.data.subtype_assignments || {}).length,
       });
 
-      return response.data.data;
+      // Mapear las claves del backend al formato del frontend
+      return {
+        assignments: mapAssignmentsToFrontend(response.data.data.assignments || {}),
+        subtype_assignments: mapSubtypeAssignmentsToFrontend(response.data.data.subtype_assignments || {}),
+      };
     } catch (error) {
       handleApiError(error);
       throw error;
@@ -94,9 +172,15 @@ export const requestAssignmentsService = {
         subtypeAssignmentsCount: Object.keys(payload.subtype_assignments || {}).length,
       });
 
+      // Mapear las claves del frontend al formato del backend antes de enviar
+      const backendPayload = {
+        assignments: mapAssignmentsToBackend(payload.assignments || {}),
+        subtype_assignments: mapSubtypeAssignmentsToBackend(payload.subtype_assignments || {}),
+      };
+
       const response = await requestAssignmentsApi.put<ApiAssignmentsResponse>(
-        "/api/request-assignments",
-        payload
+          "/api/request-assignments",
+          backendPayload
       );
 
       if (!response.data.success) {
@@ -105,11 +189,14 @@ export const requestAssignmentsService = {
 
       logger.debug('Request assignments saved successfully');
 
-      return response.data.data;
+      // Mapear las claves del backend al formato del frontend
+      return {
+        assignments: mapAssignmentsToFrontend(response.data.data.assignments || {}),
+        subtype_assignments: mapSubtypeAssignmentsToFrontend(response.data.data.subtype_assignments || {}),
+      };
     } catch (error) {
       handleApiError(error);
       throw error;
     }
   },
 };
-

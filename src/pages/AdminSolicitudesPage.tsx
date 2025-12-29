@@ -2163,7 +2163,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 // Mapeo especial para nombres de campos comunes
                                 const fieldNameMap: Record<string, string> = {
                                   'proceso': 'Proceso',
-                                  'dondeRealizaProceso': 'Hospital / Cliente',
+                                  'dondeRealizaProceso': 'Hospital',
                                   'sedeProceso': 'Sede del Proceso',
                                   'infoCertificado': 'Información del Certificado',
                                   'dirigidoAQuien': 'Dirigido A Quien',
