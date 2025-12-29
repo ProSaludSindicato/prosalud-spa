@@ -213,13 +213,11 @@ const mapInventoryItem = (item: any): SstInventoryItem => ({
 });
 
 const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T | undefined> => {
-  // Obtener token del localStorage
-  const token = localStorage.getItem('prosalud_auth_token');
-  
+  // ✅ Ya no leemos token de localStorage - se envía automáticamente en cookies HttpOnly
   const headers: HeadersInit = {
     Accept: 'application/json',
     ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    // ✅ No agregamos Authorization header - el backend usa cookies HttpOnly
     ...(init?.headers ?? {}),
   };
 
@@ -229,6 +227,7 @@ const fetchJson = async <T>(input: RequestInfo, init?: RequestInit): Promise<T |
     response = await fetch(input, {
       ...init,
       headers,
+      credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
     });
   } catch (error) {
     const networkError = new Error(

@@ -836,27 +836,20 @@ const AdminSstPage: React.FC = () => {
       params.append('includeSignatures', 'true');
       params.append('signatureWidth', '100');
       params.append('signatureHeight', '50');
-
-      // Obtener token del localStorage
-      const token = localStorage.getItem('prosalud_auth_token');
       
       // Construir URL del endpoint
       const endpoint = `/api/dotacion-epp/reports/deliveries/excel${params.toString() ? `?${params.toString()}` : ''}`;
       const url = buildAdminApiUrl(endpoint);
 
-      // Construir headers
       const headers: HeadersInit = {
         'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
 
       // Realizar petición al backend
       const response = await fetch(url, {
         method: 'GET',
         headers,
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
       });
 
       // Manejar errores

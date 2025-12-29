@@ -60,12 +60,11 @@ const handleApiError = async (response: Response): Promise<never> => {
   );
 };
 
-// Helper para agregar token Bearer a las peticiones fetch
+// ✅ Helper simplificado - Ya no agregamos token Bearer
+// Los tokens ahora se envían automáticamente en cookies HttpOnly
 const getAuthHeaders = (additionalHeaders?: HeadersInit): HeadersInit => {
-  const token = localStorage.getItem('prosalud_auth_token');
   return {
     'Accept': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(additionalHeaders ?? {}),
   };
 };
@@ -114,6 +113,7 @@ export const comfenalcoEventsApi = {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS), {
         method: 'GET',
         headers: getAuthHeaders(),
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
       });
 
       if (!response.ok) {
@@ -157,6 +157,7 @@ export const comfenalcoEventsApi = {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
         method: 'GET',
         headers: getAuthHeaders(),
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
       });
 
       if (!response.ok) {
@@ -202,6 +203,7 @@ export const comfenalcoEventsApi = {
       const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS), {
         method: 'POST',
         headers: getAuthHeaders(), // No incluir Content-Type para FormData, el navegador lo hace automáticamente
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
         body: formData,
       });
 
@@ -268,6 +270,7 @@ export const comfenalcoEventsApi = {
         response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
           method: 'PUT',
           headers: getAuthHeaders(), // No incluir Content-Type para FormData
+          credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
           body: formData,
         });
       } else {
@@ -277,6 +280,7 @@ export const comfenalcoEventsApi = {
           headers: getAuthHeaders({
             'Content-Type': 'application/json',
           }),
+          credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
           body: JSON.stringify(data),
         });
       }
@@ -324,6 +328,7 @@ export const comfenalcoEventsApi = {
         headers: getAuthHeaders({
           'Content-Type': 'application/json',
         }),
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
         body: JSON.stringify({ is_visible: isVisible }),
       });
 
@@ -368,6 +373,7 @@ export const comfenalcoEventsApi = {
       const response = await fetch(`${buildApiUrl(API_CONFIG.ENDPOINTS.COMFENALCO_EVENTS)}/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
       });
 
       if (!response.ok) {

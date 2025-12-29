@@ -26,23 +26,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasInitialized, setHasInitialized] = useState(false);
 
   /**
-   * Cargar usuario desde el backend usando el token almacenado
+   * Cargar usuario desde el backend
+   * ✅ Ya no verificamos token en localStorage - el backend valida cookies HttpOnly automáticamente
    */
   const loadUser = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Verificar si hay token
-      const token = authService.getToken();
-      if (!token) {
-        logger.info('No token found in localStorage');
-        setUser(null);
-        setLoading(false);
-        setHasInitialized(true);
-        return;
-      }
-
-      logger.debug('Token found, attempting to load user');
+      logger.debug('Attempting to load user from backend');
 
       // Primero, intentar cargar el usuario desde localStorage para UI instantánea
       const cachedUser = authService.getUser();

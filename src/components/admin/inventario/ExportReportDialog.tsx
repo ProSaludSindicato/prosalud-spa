@@ -24,17 +24,7 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
-  /**
-   * Obtiene el token de autenticación desde localStorage
-   */
-  const getAuthToken = (): string | null => {
-    try {
-      return localStorage.getItem('prosalud_auth_token');
-    } catch (error) {
-      logger.error('Error al obtener token:', error);
-      return null;
-    }
-  };
+  // ✅ REMOVIDO: getAuthToken() - Los tokens ahora están en cookies HttpOnly
 
   /**
    * Descarga un blob como archivo
@@ -54,11 +44,6 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
     setIsGenerating(true);
     
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.');
-      }
-
       // Construir el body de la petición
       const body: {
         reportType: string;
@@ -79,12 +64,13 @@ const ExportReportDialog: React.FC<ExportReportDialogProps> = ({ open, onOpenCha
       }
 
       // Realizar la petición al backend
+      // ✅ Ya no enviamos token Bearer - se envía automáticamente en cookies HttpOnly
       const response = await fetch(`${API_CONFIG.BASE_URL}/api/inventory/reports/excel`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
         body: JSON.stringify(body),
       });
 

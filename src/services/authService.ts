@@ -4,11 +4,13 @@ import { logger } from '@/utils/logger';
 
 /**
  * Tipos de respuesta del backend
+ * NOTA: El campo 'token' puede estar presente en la respuesta, pero ya no se usa.
+ * Los tokens ahora se almacenan en cookies HttpOnly por el backend.
  */
 export interface LoginResponse {
-  token: string;
-  token_type: string;
-  expires_at: string;
+  token?: string; // ✅ Opcional - ya no se usa, el token está en cookies HttpOnly
+  token_type?: string;
+  expires_at?: string;
   user: AuthUser;
 }
 
@@ -31,8 +33,9 @@ export interface LoginCredentials {
 
 /**
  * Constantes para el storage
+ * NOTA: Los tokens ahora se almacenan en cookies HttpOnly por el backend
+ * Solo almacenamos datos del usuario en localStorage (no sensibles)
  */
-const TOKEN_KEY = 'prosalud_auth_token';
 const USER_KEY = 'prosalud_auth_user';
 
 /**
@@ -44,7 +47,7 @@ class AuthService {
   constructor() {
     this.api = axios.create({
       baseURL: API_CONFIG.BASE_URL,
-      withCredentials: false,
+      withCredentials: true, // ✅ Habilitado para enviar cookies HttpOnly automáticamente
       timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
@@ -52,20 +55,8 @@ class AuthService {
       },
     });
 
-    // Interceptor para incluir el token en todas las peticiones
-    this.api.interceptors.request.use(
-      (config) => {
-        const token = this.getToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => {
-        logger.error('Request interceptor error', error);
-        return Promise.reject(error);
-      }
-    );
+    // ✅ Ya no necesitamos interceptor para agregar token Bearer
+    // El backend envía tokens en cookies HttpOnly que se envían automáticamente
 
     // Interceptor para manejar errores de autenticación
     this.api.interceptors.response.use(
@@ -131,10 +122,11 @@ class AuthService {
 
       logger.info('Attempting login', { email: credentials.email });
 
-      const { data } = await this.api.post<LoginResponse>('/api/auth/login', payload);
+      const response = await this.api.post<LoginResponse>('/api/auth/login', payload);
+      const { data } = response;
 
-      // Guardar token y usuario
-      this.setToken(data.token);
+      // ✅ El token ahora se almacena en cookies HttpOnly por el backend
+      // Solo guardamos datos del usuario en localStorage (no sensibles)
       this.setUser(data.user);
 
       logger.info('Login successful', { userId: data.user.id });
@@ -259,37 +251,10 @@ class AuthService {
   }
 
   /**
-   * Gestión del token en localStorage
+   * ✅ REMOVIDO: Gestión del token en localStorage
+   * Los tokens ahora se almacenan en cookies HttpOnly por el backend
+   * No es necesario ni seguro leer/escribir tokens desde el frontend
    */
-  getToken(): string | null {
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      logger.debug('Getting token from localStorage', {
-        hasToken: !!token,
-      });
-      return token;
-    } catch (error) {
-      logger.error('Failed to get token from localStorage', error);
-      return null;
-    }
-  }
-
-  setToken(token: string): void {
-    try {
-      localStorage.setItem(TOKEN_KEY, token);
-      logger.debug('Token saved to localStorage');
-    } catch (error) {
-      logger.error('Failed to save token to localStorage', error);
-    }
-  }
-
-  removeToken(): void {
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-    } catch (error) {
-      logger.error('Failed to remove token', error);
-    }
-  }
 
   /**
    * Gestión del usuario en localStorage
@@ -321,18 +286,21 @@ class AuthService {
 
   /**
    * Limpiar sesión completa
+   * ✅ Ya no limpiamos token de localStorage (está en cookies HttpOnly)
    */
   clearSession(): void {
-    this.removeToken();
     this.removeUser();
+    // El backend maneja la limpieza de cookies HttpOnly en el endpoint de logout
   }
 
   /**
    * Verificar si hay una sesión activa
+   * ✅ Ya no verificamos token en localStorage, el backend valida las cookies
+   * Retornamos true si hay usuario en caché (indicador aproximado)
    */
   hasActiveSession(): boolean {
-    const token = this.getToken();
-    const hasSession = !!token;
+    const user = this.getUser();
+    const hasSession = !!user;
     logger.debug('Checking active session', {
       hasSession,
     });

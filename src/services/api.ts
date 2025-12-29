@@ -4,7 +4,7 @@ import { logger } from "@/utils/logger";
 import { authService } from "./authService";
 import { sanitizeErrorForLogging } from "@/utils/errorSanitizer";
 
-const TOKEN_KEY = 'prosalud_auth_token';
+// ✅ REMOVIDO: TOKEN_KEY - Los tokens ahora están en cookies HttpOnly
 
 // Bandera para evitar múltiples redirecciones simultáneas
 let isRedirecting = false;
@@ -26,11 +26,12 @@ const api = axios.create({
 });
 
 /**
- * Instancia de axios para peticiones autenticadas (con token Bearer)
+ * Instancia de axios para peticiones autenticadas
+ * ✅ Los tokens ahora se envían automáticamente en cookies HttpOnly
  */
 export const authenticatedApi = axios.create({
     baseURL: API_CONFIG.BASE_URL,
-    withCredentials: false,
+    withCredentials: true, // ✅ Habilitado para enviar cookies HttpOnly automáticamente
     timeout: 60000, // 60 segundos - timeout general para peticiones autenticadas
     headers: {
         'Content-Type': 'application/json',
@@ -42,22 +43,14 @@ export const authenticatedApi = axios.create({
 });
 
 /**
- * Interceptor para agregar token Bearer a peticiones autenticadas
+ * ✅ Interceptor simplificado - Ya no agregamos token Bearer
+ * El backend envía tokens en cookies HttpOnly que se envían automáticamente
  */
 authenticatedApi.interceptors.request.use(
   (config) => {
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      
-      // Si el body es FormData, eliminar Content-Type para que axios lo establezca automáticamente con boundary
-      if (config.data instanceof FormData) {
-        delete config.headers['Content-Type'];
-      }
-    } catch (error) {
-      logger.error('Failed to get token from localStorage', error);
+    // Si el body es FormData, eliminar Content-Type para que axios lo establezca automáticamente con boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },
@@ -149,14 +142,14 @@ authenticatedApi.interceptors.response.use(
     } else if (status === 401) {
       const isAuthValidation = url.includes('/api/auth/me');
       const isAdminRoute = currentPath.startsWith('/admin');
-      const hasToken = authService.getToken();
+      const hasUser = !!authService.getUser(); // ✅ Verificamos usuario en caché en lugar de token
       
       logger.warn('Unauthorized request in authenticatedApi', {
         url,
         currentPath,
         isAuthValidation,
         isAdminRoute,
-        hasToken: !!hasToken,
+        hasUser,
       });
       
       // Si es una petición de validación inicial, dejar que AuthContext lo maneje
@@ -173,7 +166,7 @@ authenticatedApi.interceptors.response.use(
           url,
           currentPath,
           isAdminRoute,
-          hadToken: !!hasToken,
+          hadUser: !!authService.getUser(),
         });
         
         // Limpiar la sesión
