@@ -258,12 +258,70 @@ class AuthService {
 
   /**
    * Gestión del usuario en localStorage
+   * ✅ Validación de integridad para prevenir manipulación de datos
    */
   getUser(): AuthUser | null {
     try {
       const userJson = localStorage.getItem(USER_KEY);
-      return userJson ? JSON.parse(userJson) : null;
-    } catch {
+      if (!userJson) return null;
+      
+      const user = JSON.parse(userJson);
+      
+      // Validar estructura básica - campos requeridos
+      if (!user || typeof user !== 'object') {
+        logger.warn('Invalid user data structure in localStorage (not an object), clearing session');
+        this.clearSession();
+        return null;
+      }
+      
+      // Validar campos requeridos
+      if (!user.id || !user.email || typeof user.name !== 'string') {
+        logger.warn('User data missing required fields (id, email, or name), clearing session', {
+          hasId: !!user.id,
+          hasEmail: !!user.email,
+          hasName: typeof user.name === 'string',
+        });
+        this.clearSession();
+        return null;
+      }
+      
+      // Validar que roles y permissions sean arrays
+      if (!Array.isArray(user.roles)) {
+        logger.warn('User roles is not an array, clearing session', {
+          rolesType: typeof user.roles,
+          rolesValue: user.roles,
+        });
+        this.clearSession();
+        return null;
+      }
+      
+      if (!Array.isArray(user.permissions)) {
+        logger.warn('User permissions is not an array, clearing session', {
+          permissionsType: typeof user.permissions,
+          permissionsValue: user.permissions,
+        });
+        this.clearSession();
+        return null;
+      }
+      
+      // Validar tipos de campos críticos
+      if (typeof user.email !== 'string' || typeof user.is_active !== 'boolean') {
+        logger.warn('User data has invalid field types, clearing session', {
+          emailType: typeof user.email,
+          isActiveType: typeof user.is_active,
+        });
+        this.clearSession();
+        return null;
+      }
+      
+      // IMPORTANTE: La validación real DEBE hacerse en el backend.
+      // El frontend nunca debe confiar en datos locales para autorización.
+      // En el backend se validan igual los permisos del usuario autenticado en cada petición.
+      // Esta validación solo previene errores de aplicación y ataques básicos.
+      return user as AuthUser;
+    } catch (error) {
+      logger.error('Error parsing user data from localStorage, clearing session', error);
+      this.clearSession();
       return null;
     }
   }
