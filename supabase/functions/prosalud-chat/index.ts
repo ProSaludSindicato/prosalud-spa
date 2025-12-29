@@ -21,11 +21,35 @@ const RATE_LIMITS = {
   cooldownMinutes: 5,
 };
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json",
-};
+// Lista de dominios permitidos para CORS
+const ALLOWED_ORIGINS = [
+  'https://sindicatoprosalud.com',
+  'https://www.sindicatoprosalud.com',
+  'https://prosalud.org.co',
+  'https://www.prosalud.org.co',
+  // 'https://192.168.1.52:8080',
+  // 'https://192.168.1.52:8081',
+  // 'https://192.168.1.119:8080',
+];
+
+// Función para generar headers CORS seguros basados en origen permitido
+function getCorsHeaders(req: Request) {
+  // Permitir override con variable de entorno si está disponible (para flexibilidad futura)
+  const envOrigins = Deno.env.get("CORS_ALLOWED_ORIGINS");
+  const allowedOrigins = envOrigins
+    ? envOrigins.split(",").map((origin) => origin.trim()).filter((origin) => origin.length > 0)
+    : ALLOWED_ORIGINS;
+
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || "";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+    "Content-Type": "application/json",
+  };
+}
 
 // Función para verificar rate limit
 async function checkRateLimit(supabase: any, userIp: string, userAgent: string) {
@@ -154,6 +178,8 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
