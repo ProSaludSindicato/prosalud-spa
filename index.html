@@ -1,20 +1,22 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ProSalud</title>
-    <meta name="description" content="Sindicato de Profesionales de la Salud" />
-    <meta name="author" content="ProSalud" />
-    <meta name="theme-color" content="#ffffff" />
+    
+    <!-- Primary Meta Tags -->
+    <title>ProSalud - Sindicato de Profesionales de la Salud</title>
+    <meta name="title" content="ProSalud - Sindicato de Profesionales de la Salud" />
+    <meta name="description" content="Portal del Sindicato de Profesionales de la Salud. Gestiona tus solicitudes, consulta convenios, eventos de bienestar y servicios sindicales. Representación y apoyo para profesionales de la salud en Antioquia." />
+    <meta name="keywords" content="ProSalud, sindicato, profesionales de la salud, salud, Colombia, Antioquia, convenios, bienestar, solicitudes sindicales, afiliados, sindicato salud" />
+    <meta name="author" content="ProSalud - Sindicato de Profesionales de la Salud" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="Spanish" />
+    <meta name="revisit-after" content="7 days" />
+    <meta name="theme-color" content="#00529B" />
+    <meta name="msapplication-TileColor" content="#00529B" />
 
-    <!-- ✅ Content Security Policy -->
-    <!-- 
-      NOTA: Si tus APIs están en dominios específicos, agrega sus URLs en connect-src.
-      Ejemplo: connect-src 'self' https://api.prosalud.com https://admin-api.prosalud.com ...
-      Actualmente permite conexiones HTTPS en general para flexibilidad con variables de entorno.
-    -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google.com https://www.gstatic.com https://cdn.gpteng.co https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: https://*.supabase.co https://vitals.vercel-insights.com https://www.google-analytics.com https://www.googletagmanager.com https://va.vercel-scripts.com; frame-src 'self' https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;">
 
     <!-- ✅ Clickjacking protection: frame-ancestors solo funciona como header HTTP, no como meta tag -->
@@ -38,15 +40,32 @@
     <!-- PWA manifest and icons -->
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-icon-180.png">
+    
+    <!-- Canonical URL (se actualizará dinámicamente) -->
+    <link rel="canonical" href="" id="canonical-url" />
 
-    <meta property="og:title" content="ProSalud" />
-    <meta property="og:description" content="Portal sindicato de profesionales de la salud" />
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/images/logo_prosalud.webp" />
+    <meta property="og:url" content="" id="og-url" />
+    <meta property="og:title" content="ProSalud - Sindicato de Profesionales de la Salud" />
+    <meta property="og:description" content="Portal del Sindicato de Profesionales de la Salud. Gestiona tus solicitudes, consulta convenios, eventos de bienestar y servicios sindicales. Representación y apoyo para profesionales de la salud en Antioquia." />
+    <meta property="og:image" content="" id="og-image" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="Logo de ProSalud - Sindicato de Profesionales de la Salud" />
+    <meta property="og:site_name" content="ProSalud" />
+    <meta property="og:locale" content="es_CO" />
 
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="" id="twitter-url" />
+    <meta name="twitter:title" content="ProSalud - Sindicato de Profesionales de la Salud" />
+    <meta name="twitter:description" content="Portal del Sindicato de Profesionales de la Salud. Gestiona tus solicitudes, consulta convenios, eventos de bienestar y servicios sindicales." />
+    <meta name="twitter:image" content="" id="twitter-image" />
+    <meta name="twitter:image:alt" content="Logo de ProSalud - Sindicato de Profesionales de la Salud" />
     <meta name="twitter:site" content="@ProSalud" />
-    <meta name="twitter:image" content="/images/logo_prosalud.webp" />
+    <meta name="twitter:creator" content="@ProSalud" />
 
     <!-- Google Analytics 4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-JYVKMFBJPP"></script>
@@ -147,10 +166,39 @@
     
     <div id="root" class="content-hidden"></div>
     
-    <!-- Script para manejar la carga inicial -->
+    <!-- Script para manejar la carga inicial y actualizar meta tags dinámicamente -->
     <script>
+      // Función para actualizar URLs absolutas en meta tags OG y Twitter
+      function updateMetaTags() {
+        const baseUrl = window.location.origin;
+        // Usar logo con fondo para mejor visibilidad en redes sociales
+        const ogImage = baseUrl + '/images/logo_prosalud_fondo.png';
+        const currentUrl = window.location.href;
+        
+        // Actualizar Open Graph
+        const ogUrlMeta = document.getElementById('og-url');
+        const ogImageMeta = document.getElementById('og-image');
+        if (ogUrlMeta) ogUrlMeta.content = currentUrl;
+        if (ogImageMeta) ogImageMeta.content = ogImage;
+        
+        // Actualizar Twitter Card
+        const twitterUrlMeta = document.getElementById('twitter-url');
+        const twitterImageMeta = document.getElementById('twitter-image');
+        if (twitterUrlMeta) twitterUrlMeta.content = currentUrl;
+        if (twitterImageMeta) twitterImageMeta.content = ogImage;
+        
+        // También actualizar el canonical URL
+        const canonicalLink = document.getElementById('canonical-url');
+        if (canonicalLink) {
+          canonicalLink.setAttribute('href', currentUrl);
+        }
+      }
+      
       // Optimización de carga inicial
       (function() {
+        // Actualizar meta tags inmediatamente
+        updateMetaTags();
+        
         // Ocultar loader cuando el DOM esté listo
         function hideLoader() {
           const loader = document.getElementById('initial-loader');
