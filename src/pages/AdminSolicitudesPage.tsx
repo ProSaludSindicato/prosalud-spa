@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -33,6 +33,7 @@ import {
   Paperclip,
   X,
   Loader2,
+  Info,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -261,6 +262,9 @@ const isRequestValidated = (solicitud: Request): boolean => {
 };
 
 // Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
+// Mensaje prediligenciado para solicitudes de microcrédito
+const MICROCREDITO_EMAIL_BODY = "Revisamos su solicitud de libranza  esta seria la propuesta, nos cuenta si esta de acuerdo, para continuar con el proceso:\n\n\n\n1. En caso de aceptar y hacer efectiva la libranza, es necesario que sepa que quedan pignoradas la Compensación Anual Diferida y Compensación de descanso y que estas serian liberadas a medida que se avance en el pago de las cuotas de la libranza.\n\n2. Debe tener en cuenta en caso de Retiro de PROSALUD, o cancelación de la libranza, las cuotas pendientes a la fecha del retiro, se descontaran  en su totalidad como fueron acordadas al inicio de la solicitud del crédito.";
+
 const requiresManualCompensaciones = (solicitud: Request): boolean => {
   // Solo para certificados de convenio
   if (solicitud.request_type !== 'certificado-convenio') {
@@ -319,6 +323,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const [isTransitioningRequest, setIsTransitioningRequest] = useState(false);
   const [showUpdateAfiliadosReminder, setShowUpdateAfiliadosReminder] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [microcreditoConfirmDialogOpen, setMicrocreditoConfirmDialogOpen] = useState(false);
+  const [pendingResponseData, setPendingResponseData] = useState<ResponseFormValues | null>(null);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -411,6 +417,30 @@ const AdminSolicitudesPage: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [selectedSolicitud]);
+
+  // Observar el campo newStatus del formulario de respuesta
+  const watchedNewStatus = useWatch({
+    control: responseForm.control,
+    name: 'newStatus',
+  });
+
+  // Efecto para actualizar el emailBody cuando cambia el estado en solicitudes de microcrédito
+  useEffect(() => {
+    // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
+    if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
+    
+    const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
+    if (!isMicrocredito) return;
+    
+    // Si el estado es "in_progress" o "resolved", prediligenciar el mensaje
+    if (watchedNewStatus === 'in_progress' || watchedNewStatus === 'resolved') {
+      responseForm.setValue('emailBody', MICROCREDITO_EMAIL_BODY, { shouldValidate: false });
+    } 
+    // Si el estado es "rejected", limpiar el campo
+    else if (watchedNewStatus === 'rejected') {
+      responseForm.setValue('emailBody', '', { shouldValidate: false });
+    }
+  }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
 
   // El backend ya filtra las solicitudes según las asignaciones del usuario
   // No es necesario filtrar en el frontend
@@ -716,10 +746,16 @@ const AdminSolicitudesPage: React.FC = () => {
       });
       // Asegurar que el valor del estado se establezca correctamente después del reset
       responseWithCompensacionesForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
-    } else {
+      } else {
       // Usar formulario normal
       let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`;
       let emailBody = "";
+      
+      // Si es microcrédito y el estado es "in_progress" o "resolved", prediligenciar mensaje
+      const isMicrocredito = solicitud.request_type === 'microcredito' || solicitud.request_type === 'solicitud-microcredito';
+      if (isMicrocredito && (defaultStatus === 'in_progress' || defaultStatus === 'resolved')) {
+        emailBody = MICROCREDITO_EMAIL_BODY;
+      }
       
       // Si es dirigido a fondo de pensiones, prediligenciar mensaje
       if (isFondoPensiones) {
@@ -805,7 +841,8 @@ const AdminSolicitudesPage: React.FC = () => {
     }
   };
 
-  const handleSubmitResponse = async (data: ResponseFormValues) => {
+  // Función auxiliar que realmente envía la respuesta (después de confirmación)
+  const doSubmitResponse = async (data: ResponseFormValues) => {
     if (!solicitudToRespond) return;
 
     // Verificar si hay actualización pendiente que requiera cambio de correo antes de responder
@@ -1022,6 +1059,33 @@ const AdminSolicitudesPage: React.FC = () => {
         }, 100);
       }
     }
+  };
+
+  // Función principal que se llama al enviar el formulario - verifica si es microcrédito y muestra confirmación
+  const handleSubmitResponse = async (data: ResponseFormValues) => {
+    if (!solicitudToRespond) return;
+
+    // Si es una solicitud de microcrédito, mostrar modal de confirmación
+    const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
+    
+    if (isMicrocredito) {
+      // Guardar los datos pendientes y mostrar el modal de confirmación
+      setPendingResponseData(data);
+      setMicrocreditoConfirmDialogOpen(true);
+      return;
+    }
+
+    // Para otros tipos de solicitudes, proceder directamente
+    await doSubmitResponse(data);
+  };
+
+  // Función para confirmar y enviar la respuesta de microcrédito
+  const handleConfirmMicrocreditoResponse = async () => {
+    if (!pendingResponseData) return;
+    
+    setMicrocreditoConfirmDialogOpen(false);
+    await doSubmitResponse(pendingResponseData);
+    setPendingResponseData(null);
   };
 
   const handleSubmitResponseWithCompensaciones = async (data: ResponseWithCompensacionesFormValues) => {
@@ -3237,6 +3301,58 @@ const AdminSolicitudesPage: React.FC = () => {
                     </Card>
                   )}
 
+                    {/* Información específica para solicitudes de microcrédito */}
+                    {solicitudToRespond && (solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito') && (
+                      <Card className="border border-blue-200 bg-blue-50">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-2 mb-3">
+                            <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <h3 className="text-sm font-semibold text-blue-900 mb-3">
+                                Información del Microcrédito
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-blue-700 font-medium mb-1">Monto Solicitado:</p>
+                                  <p className="text-blue-900 font-bold text-lg">
+                                    {(() => {
+                                      const payload = solicitudToRespond.payload || {};
+                                      const monto = payload.montoSolicitado || payload.monto_solicitado;
+                                      if (monto !== null && monto !== undefined) {
+                                        const numericValue = typeof monto === 'string' ? parseFloat(monto.replace(/\./g, '')) : Number(monto);
+                                        if (!isNaN(numericValue)) {
+                                          return new Intl.NumberFormat('es-CO', {
+                                            style: 'currency',
+                                            currency: 'COP',
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0,
+                                          }).format(numericValue);
+                                        }
+                                      }
+                                      return 'No especificado';
+                                    })()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-blue-700 font-medium mb-1">Número de Cuotas:</p>
+                                  <p className="text-blue-900 font-bold text-lg">
+                                    {(() => {
+                                      const payload = solicitudToRespond.payload || {};
+                                      const cuotas = payload.numeroCuotas || payload.numero_cuotas;
+                                      if (cuotas !== null && cuotas !== undefined) {
+                                        return `${cuotas} ${cuotas === 1 ? 'cuota' : 'cuotas'}`;
+                                      }
+                                      return 'No especificado';
+                                    })()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Nuevo Estado */}
                     <FormField
                       control={responseForm.control}
@@ -3711,6 +3827,130 @@ const AdminSolicitudesPage: React.FC = () => {
                   </form>
                 </Form>
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de Confirmación para Microcrédito */}
+          <Dialog 
+            open={microcreditoConfirmDialogOpen} 
+            onOpenChange={(open) => {
+              if (!open && !isSubmittingResponse) {
+                setMicrocreditoConfirmDialogOpen(false);
+                setPendingResponseData(null);
+              }
+            }}
+          >
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-lg bg-white p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900">
+                  Confirmar Respuesta - Microcrédito
+                </DialogTitle>
+                <DialogDescription className="text-sm">
+                  Por favor, verifique la información del microcrédito antes de enviar la respuesta.
+                </DialogDescription>
+              </DialogHeader>
+
+              {solicitudToRespond && (
+                <div className="space-y-4">
+                  <Card className="border border-blue-200 bg-blue-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-2 mb-3">
+                        <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h3 className="text-sm font-semibold text-blue-900 mb-3">
+                            Resumen del Microcrédito
+                          </h3>
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-blue-700 font-medium text-sm mb-1">Monto Solicitado:</p>
+                              <p className="text-blue-900 font-bold text-xl">
+                                {(() => {
+                                  const payload = solicitudToRespond.payload || {};
+                                  const monto = payload.montoSolicitado || payload.monto_solicitado;
+                                  if (monto !== null && monto !== undefined) {
+                                    const numericValue = typeof monto === 'string' ? parseFloat(monto.replace(/\./g, '')) : Number(monto);
+                                    if (!isNaN(numericValue)) {
+                                      return new Intl.NumberFormat('es-CO', {
+                                        style: 'currency',
+                                        currency: 'COP',
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 0,
+                                      }).format(numericValue);
+                                    }
+                                  }
+                                  return 'No especificado';
+                                })()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-blue-700 font-medium text-sm mb-1">Número de Cuotas:</p>
+                              <p className="text-blue-900 font-bold text-xl">
+                                {(() => {
+                                  const payload = solicitudToRespond.payload || {};
+                                  const cuotas = payload.numeroCuotas || payload.numero_cuotas;
+                                  if (cuotas !== null && cuotas !== undefined) {
+                                    return `${cuotas} ${cuotas === 1 ? 'cuota' : 'cuotas'}`;
+                                  }
+                                  return 'No especificado';
+                                })()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-blue-700 font-medium text-sm mb-1">Nuevo Estado:</p>
+                              {pendingResponseData?.newStatus && (
+                                <Badge className={getStatusColor(pendingResponseData.newStatus)}>
+                                  {getStatusLabel(pendingResponseData.newStatus)}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-sm font-semibold text-amber-900">Verificación importante</AlertTitle>
+                    <AlertDescription className="text-xs text-amber-800 mt-1">
+                      Por favor, confirme que la información mostrada es correcta antes de enviar la respuesta. Esta acción enviará la respuesta al afiliado por correo electrónico.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setMicrocreditoConfirmDialogOpen(false);
+                    setPendingResponseData(null);
+                  }}
+                  disabled={isSubmittingResponse}
+                  className="w-full sm:w-auto"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmMicrocreditoResponse}
+                  disabled={isSubmittingResponse}
+                  className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
+                >
+                  {isSubmittingResponse ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Confirmar y Enviar
+                    </>
+                  )}
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
 
