@@ -264,6 +264,9 @@ const isRequestValidated = (solicitud: Request): boolean => {
 // Mensaje prediligenciado para solicitudes de microcrédito
 const MICROCREDITO_EMAIL_BODY = "Hemos revisado su solicitud de libranza y esta sería la propuesta. Por favor, indíquenos si está de acuerdo para continuar con el proceso:\n\n1. En caso de aceptar y hacer efectiva la libranza, es importante tener en cuenta que la Compensación Anual Diferida y la Compensación de Descanso quedarán pignoradas. Estas serán liberadas de manera proporcional a medida que se realice el pago de las cuotas de la libranza.\n\n2. En caso de retiro de PROSALUD o cancelación de la libranza, las cuotas pendientes a la fecha del retiro serán descontadas en su totalidad, conforme a las condiciones acordadas al inicio de la solicitud del crédito.\n\nQuedamos atentos a su confirmación para continuar.";
 
+// Mensaje prediligenciado para solicitudes de microcrédito rechazadas
+const MICROCREDITO_REJECTED_EMAIL_BODY = "NO TIENE CAPACIDAD DE ENDEUDAMIENTO";
+
 // Función para convertir texto pegado de Excel a HTML de tabla
 const convertExcelPasteToHtmlTable = (text: string): string => {
   // Dividir el texto en líneas
@@ -529,9 +532,9 @@ const AdminSolicitudesPage: React.FC = () => {
     if (watchedNewStatus === 'in_progress' || watchedNewStatus === 'resolved') {
       responseForm.setValue('emailBody', MICROCREDITO_EMAIL_BODY, { shouldValidate: false });
     } 
-    // Si el estado es "rejected", limpiar el campo
+    // Si el estado es "rejected", prediligenciar el mensaje de rechazo
     else if (watchedNewStatus === 'rejected') {
-      responseForm.setValue('emailBody', '', { shouldValidate: false });
+      responseForm.setValue('emailBody', MICROCREDITO_REJECTED_EMAIL_BODY, { shouldValidate: false });
     }
   }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
 
@@ -844,10 +847,14 @@ const AdminSolicitudesPage: React.FC = () => {
       let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`;
       let emailBody = "";
       
-      // Si es microcrédito y el estado es "in_progress" o "resolved", prediligenciar mensaje
+      // Si es microcrédito, prediligenciar mensaje según el estado
       const isMicrocredito = solicitud.request_type === 'microcredito' || solicitud.request_type === 'solicitud-microcredito';
-      if (isMicrocredito && (defaultStatus === 'in_progress' || defaultStatus === 'resolved')) {
-        emailBody = MICROCREDITO_EMAIL_BODY;
+      if (isMicrocredito) {
+        if (defaultStatus === 'in_progress' || defaultStatus === 'resolved') {
+          emailBody = MICROCREDITO_EMAIL_BODY;
+        } else if (defaultStatus === 'rejected') {
+          emailBody = MICROCREDITO_REJECTED_EMAIL_BODY;
+        }
       }
       
       // Si es dirigido a fondo de pensiones, prediligenciar mensaje
