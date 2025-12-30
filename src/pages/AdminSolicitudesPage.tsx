@@ -144,7 +144,7 @@ const responseFormSchema = z.object({
     required_error: "Debe seleccionar un nuevo estado",
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
-  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
+  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -169,7 +169,7 @@ const responseWithCompensacionesFormSchema = z.object({
     required_error: "Debe seleccionar un nuevo estado",
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
-  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(1500, "El cuerpo no puede exceder 1500 caracteres"),
+  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.number({
@@ -261,10 +261,103 @@ const isRequestValidated = (solicitud: Request): boolean => {
   return !!solicitud.validated_at && !!solicitud.validated_by;
 };
 
-// Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
 // Mensaje prediligenciado para solicitudes de microcrédito
-const MICROCREDITO_EMAIL_BODY = "Revisamos su solicitud de libranza  esta seria la propuesta, nos cuenta si esta de acuerdo, para continuar con el proceso:\n\n\n\n1. En caso de aceptar y hacer efectiva la libranza, es necesario que sepa que quedan pignoradas la Compensación Anual Diferida y Compensación de descanso y que estas serian liberadas a medida que se avance en el pago de las cuotas de la libranza.\n\n2. Debe tener en cuenta en caso de Retiro de PROSALUD, o cancelación de la libranza, las cuotas pendientes a la fecha del retiro, se descontaran  en su totalidad como fueron acordadas al inicio de la solicitud del crédito.";
+const MICROCREDITO_EMAIL_BODY = "Hemos revisado su solicitud de libranza y esta sería la propuesta. Por favor, indíquenos si está de acuerdo para continuar con el proceso:\n\n1. En caso de aceptar y hacer efectiva la libranza, es importante tener en cuenta que la Compensación Anual Diferida y la Compensación de Descanso quedarán pignoradas. Estas serán liberadas de manera proporcional a medida que se realice el pago de las cuotas de la libranza.\n\n2. En caso de retiro de PROSALUD o cancelación de la libranza, las cuotas pendientes a la fecha del retiro serán descontadas en su totalidad, conforme a las condiciones acordadas al inicio de la solicitud del crédito.\n\nQuedamos atentos a su confirmación para continuar.";
 
+// Función para convertir texto pegado de Excel a HTML de tabla
+const convertExcelPasteToHtmlTable = (text: string): string => {
+  // Dividir el texto en líneas
+  const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+  
+  if (lines.length === 0) return text;
+  
+  // Detectar si el contenido parece ser tabular (contiene tabs o múltiples espacios consecutivos)
+  const hasTabularStructure = lines.some(line => line.includes('\t') || /\s{2,}/.test(line));
+  
+  if (!hasTabularStructure) return text;
+  
+  // Procesar cada línea para extraer celdas
+  const rows: string[][] = [];
+  
+  lines.forEach(line => {
+    // Dividir por tabs primero, si no hay tabs, dividir por múltiples espacios
+    let cells: string[];
+    if (line.includes('\t')) {
+      cells = line.split('\t');
+    } else {
+      // Dividir por múltiples espacios (2 o más)
+      cells = line.split(/\s{2,}/);
+    }
+    
+    // Limpiar espacios al inicio y final de cada celda
+    cells = cells.map(cell => cell.trim());
+    
+    // Solo agregar filas que tengan al menos 2 celdas (para que sea una tabla)
+    if (cells.length >= 2) {
+      rows.push(cells);
+    }
+  });
+  
+  // Si no tenemos suficientes filas, retornar el texto original
+  if (rows.length < 1) return text;
+  
+  // Encontrar el número máximo de columnas para asegurar consistencia
+  const maxCols = Math.max(...rows.map(row => row.length));
+  
+  // Encontrar el índice de la fila "Plazo" (si existe)
+  const plazoRowIndex = rows.findIndex(row => row[0]?.toLowerCase().trim() === 'plazo');
+  
+  // Crear la tabla HTML con estilo compacto similar a Excel
+  // table-layout: auto permite que las columnas se ajusten automáticamente al contenido
+  let htmlTable = '<table style="border-collapse: collapse; border: 1px solid #000; width: auto; font-family: Arial, sans-serif; font-size: 14px; table-layout: auto;">\n';
+  
+  rows.forEach((row, index) => {
+    htmlTable += '  <tr>\n';
+    
+    // Detectar si esta es la fila de "Plazo"
+    const isPlazoRow = index === plazoRowIndex && plazoRowIndex !== -1;
+    
+    // Asegurar que todas las filas tengan el mismo número de columnas
+    for (let i = 0; i < maxCols; i++) {
+      let cellValue = row[i] || '';
+      
+      // Limpiar valores monetarios: eliminar espacios múltiples entre $ y el número
+      // Ejemplo: "$       500,000" -> "$500,000"
+      if (cellValue.includes('$')) {
+        cellValue = cellValue.replace(/\$\s+/g, '$').trim();
+      }
+      
+      // Usar <td> para todas las celdas
+      const tag = 'td';
+      
+      // Estilos base para todas las celdas - padding ajustado y sin espacio extra
+      const baseStyle = 'padding: 5px 10px; border: 1px solid #000; white-space: nowrap;';
+      
+      // La primera columna siempre tiene negrilla (es la columna de títulos)
+      const firstColumnStyle = i === 0 ? 'font-weight: bold;' : '';
+      
+      // Si es la fila de "Plazo", agregar fondo amarillo y negrilla
+      const plazoRowStyle = isPlazoRow ? 'background-color: #FFE699; font-weight: bold;' : '';
+      
+      // Detectar si el contenido es numérico o monetario para alinearlo a la derecha
+      const isNumeric = /^[\$]?\s*[\d,]+\.?\d*$/.test(cellValue.trim());
+      const alignment = isNumeric ? 'text-align: right;' : 'text-align: left;';
+      
+      // Combinar todos los estilos
+      const finalStyle = `${baseStyle} ${firstColumnStyle} ${plazoRowStyle} ${alignment}`.trim();
+      
+      htmlTable += `    <${tag} style="${finalStyle}">${cellValue}</${tag}>\n`;
+    }
+    
+    htmlTable += '  </tr>\n';
+  });
+  
+  htmlTable += '</table>';
+  
+  return htmlTable;
+};
+
+// Función helper para determinar si una solicitud de certificado de convenio requiere compensaciones manuales
 const requiresManualCompensaciones = (solicitud: Request): boolean => {
   // Solo para certificados de convenio
   if (solicitud.request_type !== 'certificado-convenio') {
@@ -3003,34 +3096,180 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
-                    {/* Cuerpo del correo */}
+                    {/* Cuerpo del correo - Texto del mensaje */}
                     <FormField
                       control={responseWithCompensacionesForm.control}
                     name="emailBody"
                     render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 1500;
-                      const isNearLimit = currentLength > maxLength * 0.8;
-                      const isOverLimit = currentLength > maxLength;
+                      const [pasteError, setPasteError] = useState<string | null>(null);
+                      
+                      const maxLength = 5000;
+                      
+                      // Separar el texto normal del HTML de tablas
+                      const emailBodyValue = field.value || '';
+                      const hasTableHtml = emailBodyValue.includes('<table');
+                      let textOnly = '';
+                      let tableHtml = '';
+                      
+                      if (hasTableHtml) {
+                        // Encontrar donde empieza la tabla HTML
+                        const tableIndex = emailBodyValue.indexOf('<table');
+                        // No usar trim() para preservar espacios al final que el usuario pueda estar escribiendo
+                        textOnly = emailBodyValue.substring(0, tableIndex);
+                        tableHtml = emailBodyValue.substring(tableIndex);
+                      } else {
+                        textOnly = emailBodyValue;
+                      }
+                      
+                      // Calcular límites basándose solo en el texto (sin la tabla HTML)
+                      const textOnlyLength = textOnly.length;
+                      const isNearLimit = textOnlyLength > maxLength * 0.8;
+                      const isOverLimit = textOnlyLength > maxLength;
+                      
+                      const handleTextChange = (newText: string) => {
+                        // Si hay tabla HTML, mantenerla al final del nuevo texto
+                        if (tableHtml) {
+                          // Agregar la tabla al final con salto de línea previo
+                          // No usar trim() para permitir que el usuario escriba espacios al final
+                          const textBeforeTable = newText;
+                          // Solo agregar salto de línea si hay texto antes de la tabla
+                          field.onChange(textBeforeTable ? textBeforeTable + '\n\n' + tableHtml : tableHtml);
+                        } else {
+                          field.onChange(newText);
+                        }
+                      };
                       
                       return (
                         <FormItem>
                           <FormLabel>Cuerpo del Correo *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder={useCompensacionesForm ? "Ej: Adjunto encontrará su certificado de convenio con los valores de compensación solicitados..." : "Escriba aquí el contenido de la respuesta al afiliado..."}
-                              className="min-h-[200px]"
-                              {...field}
-                              maxLength={maxLength}
-                            />
-                          </FormControl>
-                          <div className="flex items-center justify-between">
-                            <FormDescription>
-                              El contenido del correo que se enviará al afiliado.
-                            </FormDescription>
-                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                              {currentLength}/{maxLength}
-                            </span>
+                          <div className="space-y-4">
+                            {/* Área para escribir el mensaje de texto */}
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                Mensaje de texto
+                              </Label>
+                              {hasTableHtml && (
+                                <Alert className="mb-3 bg-amber-50 border-amber-200">
+                                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                                  <AlertTitle className="text-sm font-semibold text-amber-800">Mensaje bloqueado</AlertTitle>
+                                  <AlertDescription className="text-sm text-amber-700">
+                                    No puede modificar el mensaje después de agregar la tabla de Excel. Debe terminar el mensaje de texto antes de añadir la tabla. Si necesita modificar el mensaje, elimine la tabla primero.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                              <FormControl>
+                                <Textarea
+                                  placeholder={useCompensacionesForm ? "Ej: Adjunto encontrará su certificado de convenio con los valores de compensación solicitados..." : "Escriba aquí el contenido de la respuesta al afiliado..."}
+                                  className="min-h-[150px]"
+                                  value={textOnly}
+                                  onChange={(e) => handleTextChange(e.target.value)}
+                                  maxLength={maxLength}
+                                  disabled={hasTableHtml}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between mt-2">
+                                <FormDescription className="text-xs text-gray-500">
+                                  {hasTableHtml ? "Complete el mensaje antes de agregar la tabla" : "Escriba el mensaje de texto antes de agregar la tabla"}
+                                </FormDescription>
+                                <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                  {textOnly.length}/{maxLength}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Área separada para pegar contenido de Excel - Solo para microcrédito */}
+                            {(solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito') && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                  Tabla de Excel (opcional)
+                                </Label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-md p-4 bg-gray-50">
+                                {tableHtml ? (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2 text-sm text-green-700">
+                                        <Info className="h-4 w-4" />
+                                        <span>Vista previa de la tabla (se agregará al final del mensaje)</span>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          // Eliminar la tabla HTML del emailBody
+                                          field.onChange(textOnly.trim());
+                                        }}
+                                        className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <X className="h-3 w-3 mr-1" />
+                                        Eliminar tabla
+                                      </Button>
+                                    </div>
+                                    <div 
+                                      className="bg-white p-3 rounded border border-gray-200 overflow-x-auto"
+                                      dangerouslySetInnerHTML={{ __html: tableHtml }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {pasteError && (
+                                      <Alert variant="destructive">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle className="text-sm font-semibold">Error al procesar tabla</AlertTitle>
+                                        <AlertDescription className="text-sm">
+                                          {pasteError}
+                                        </AlertDescription>
+                                      </Alert>
+                                    )}
+                                    <div
+                                      className="min-h-[100px] p-3 bg-white rounded border border-gray-200 cursor-text focus:outline-none focus:ring-2 focus:ring-primary-prosalud focus:border-transparent relative"
+                                      tabIndex={0}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        
+                                        // Limpiar error previo
+                                        setPasteError(null);
+                                        
+                                        // Obtener el texto pegado
+                                        const pastedText = e.clipboardData.getData('text/plain');
+                                        
+                                        if (!pastedText.trim()) {
+                                          setPasteError('El contenido pegado está vacío. Por favor, copie una tabla de Excel antes de pegar.');
+                                          return;
+                                        }
+                                        
+                                        // Convertir el texto pegado a HTML de tabla si es tabular
+                                        const convertedTable = convertExcelPasteToHtmlTable(pastedText);
+                                        
+                                        // Si se convirtió a tabla, agregarla al final del emailBody con salto de línea previo
+                                        if (convertedTable.includes('<table')) {
+                                          // Preservar el texto actual, solo usar trim() para verificar si hay contenido
+                                          const currentText = textOnly;
+                                          const newValue = currentText.trim()
+                                            ? currentText.trim() + '\n\n\n' + convertedTable
+                                            : convertedTable;
+                                          field.onChange(newValue);
+                                          setPasteError(null);
+                                        } else {
+                                          // Si no se pudo convertir a tabla, mostrar error y NO agregar al mensaje
+                                          setPasteError('El contenido pegado no se pudo convertir a una tabla. Por favor, asegúrese de copiar una tabla completa desde Excel (con múltiples columnas separadas por tabulaciones).');
+                                          
+                                          // Limpiar el error después de 5 segundos
+                                          setTimeout(() => {
+                                            setPasteError(null);
+                                          }, 5000);
+                                        }
+                                      }}
+                                    >
+                                      <div className="text-gray-400 italic pointer-events-none">
+                                        Haga clic aquí y pegue el contenido copiado de Excel. La tabla aparecerá automáticamente al final de su mensaje.
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <FormMessage />
                         </FormItem>
@@ -3450,34 +3689,180 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
-                    {/* Cuerpo del correo */}
+                    {/* Cuerpo del correo - Texto del mensaje */}
                     <FormField
                       control={responseForm.control}
-                      name="emailBody"
+                    name="emailBody"
                     render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 1500;
-                      const isNearLimit = currentLength > maxLength * 0.8;
-                      const isOverLimit = currentLength > maxLength;
+                      const [pasteError, setPasteError] = useState<string | null>(null);
+                      
+                      const maxLength = 5000;
+                      
+                      // Separar el texto normal del HTML de tablas
+                      const emailBodyValue = field.value || '';
+                      const hasTableHtml = emailBodyValue.includes('<table');
+                      let textOnly = '';
+                      let tableHtml = '';
+                      
+                      if (hasTableHtml) {
+                        // Encontrar donde empieza la tabla HTML
+                        const tableIndex = emailBodyValue.indexOf('<table');
+                        // No usar trim() para preservar espacios al final que el usuario pueda estar escribiendo
+                        textOnly = emailBodyValue.substring(0, tableIndex);
+                        tableHtml = emailBodyValue.substring(tableIndex);
+                      } else {
+                        textOnly = emailBodyValue;
+                      }
+                      
+                      // Calcular límites basándose solo en el texto (sin la tabla HTML)
+                      const textOnlyLength = textOnly.length;
+                      const isNearLimit = textOnlyLength > maxLength * 0.8;
+                      const isOverLimit = textOnlyLength > maxLength;
+                      
+                      const handleTextChange = (newText: string) => {
+                        // Si hay tabla HTML, mantenerla al final del nuevo texto
+                        if (tableHtml) {
+                          // Agregar la tabla al final con salto de línea previo
+                          // No usar trim() para permitir que el usuario escriba espacios al final
+                          const textBeforeTable = newText;
+                          // Solo agregar salto de línea si hay texto antes de la tabla
+                          field.onChange(textBeforeTable ? textBeforeTable + '\n\n' + tableHtml : tableHtml);
+                        } else {
+                          field.onChange(newText);
+                        }
+                      };
                       
                       return (
                         <FormItem>
                           <FormLabel>Cuerpo del Correo *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Escriba aquí el contenido de la respuesta al afiliado..."
-                              className="min-h-[200px]"
-                              {...field}
-                              maxLength={maxLength}
-                            />
-                          </FormControl>
-                          <div className="flex items-center justify-between">
-                            <FormDescription>
-                              El contenido del correo que se enviará al afiliado.
-                            </FormDescription>
-                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                              {currentLength}/{maxLength}
-                            </span>
+                          <div className="space-y-4">
+                            {/* Área para escribir el mensaje de texto */}
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                Mensaje de texto
+                              </Label>
+                              {hasTableHtml && (
+                                <Alert className="mb-3 bg-amber-50 border-amber-200">
+                                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                                  <AlertTitle className="text-sm font-semibold text-amber-800">Mensaje bloqueado</AlertTitle>
+                                  <AlertDescription className="text-sm text-amber-700">
+                                    No puede modificar el mensaje después de agregar la tabla de Excel. Debe terminar el mensaje de texto antes de añadir la tabla. Si necesita modificar el mensaje, elimine la tabla primero.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Escriba aquí el contenido de la respuesta al afiliado..."
+                                  className="min-h-[150px]"
+                                  value={textOnly}
+                                  onChange={(e) => handleTextChange(e.target.value)}
+                                  maxLength={maxLength}
+                                  disabled={hasTableHtml}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between mt-2">
+                                <FormDescription className="text-xs text-gray-500">
+                                  {hasTableHtml ? "Complete el mensaje antes de agregar la tabla" : "Escriba el mensaje de texto antes de agregar la tabla"}
+                                </FormDescription>
+                                <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                  {textOnly.length}/{maxLength}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Área separada para pegar contenido de Excel - Solo para microcrédito */}
+                            {(solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito') && (
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                  Tabla de Excel (opcional)
+                                </Label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-md p-4 bg-gray-50">
+                                {tableHtml ? (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2 text-sm text-green-700">
+                                        <Info className="h-4 w-4" />
+                                        <span>Vista previa de la tabla (se agregará al final del mensaje)</span>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          // Eliminar la tabla HTML del emailBody
+                                          field.onChange(textOnly.trim());
+                                        }}
+                                        className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <X className="h-3 w-3 mr-1" />
+                                        Eliminar tabla
+                                      </Button>
+                                    </div>
+                                    <div 
+                                      className="bg-white p-3 rounded border border-gray-200 overflow-x-auto"
+                                      dangerouslySetInnerHTML={{ __html: tableHtml }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {pasteError && (
+                                      <Alert variant="destructive">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle className="text-sm font-semibold">Error al procesar tabla</AlertTitle>
+                                        <AlertDescription className="text-sm">
+                                          {pasteError}
+                                        </AlertDescription>
+                                      </Alert>
+                                    )}
+                                    <div
+                                      className="min-h-[100px] p-3 bg-white rounded border border-gray-200 cursor-text focus:outline-none focus:ring-2 focus:ring-primary-prosalud focus:border-transparent relative"
+                                      tabIndex={0}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        
+                                        // Limpiar error previo
+                                        setPasteError(null);
+                                        
+                                        // Obtener el texto pegado
+                                        const pastedText = e.clipboardData.getData('text/plain');
+                                        
+                                        if (!pastedText.trim()) {
+                                          setPasteError('El contenido pegado está vacío. Por favor, copie una tabla de Excel antes de pegar.');
+                                          return;
+                                        }
+                                        
+                                        // Convertir el texto pegado a HTML de tabla si es tabular
+                                        const convertedTable = convertExcelPasteToHtmlTable(pastedText);
+                                        
+                                        // Si se convirtió a tabla, agregarla al final del emailBody con salto de línea previo
+                                        if (convertedTable.includes('<table')) {
+                                          // Preservar el texto actual, solo usar trim() para verificar si hay contenido
+                                          const currentText = textOnly;
+                                          const newValue = currentText.trim()
+                                            ? currentText.trim() + '\n\n\n' + convertedTable
+                                            : convertedTable;
+                                          field.onChange(newValue);
+                                          setPasteError(null);
+                                        } else {
+                                          // Si no se pudo convertir a tabla, mostrar error y NO agregar al mensaje
+                                          setPasteError('El contenido pegado no se pudo convertir a una tabla. Por favor, asegúrese de copiar una tabla completa desde Excel (con múltiples columnas separadas por tabulaciones).');
+                                          
+                                          // Limpiar el error después de 5 segundos
+                                          setTimeout(() => {
+                                            setPasteError(null);
+                                          }, 5000);
+                                        }
+                                      }}
+                                    >
+                                      <div className="text-gray-400 italic pointer-events-none">
+                                        Haga clic aquí y pegue el contenido copiado de Excel. La tabla aparecerá automáticamente al final de su mensaje.
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <FormMessage />
                         </FormItem>
