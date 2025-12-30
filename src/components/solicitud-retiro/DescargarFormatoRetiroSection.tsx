@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DownloadCloud } from 'lucide-react';
 
 const DescargarFormatoRetiroSection: React.FC = () => {
-  const formatoUrl = "http://orgs.ddns.net:8091/DocPublicos/Modelo%20de%20Plantillas/Solicitud%20de%20Retiro/Formato%20Retiro%20y%20liquidacion.pdf";
+  const formatoUrl = '/files/Formato_Retiro.pdf';
 
   const handleDownload = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault(); // Prevenir el envío del formulario
