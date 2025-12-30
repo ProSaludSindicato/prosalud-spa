@@ -1857,21 +1857,6 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
-                                    {can('requests.respond') && requiresManualValidation(solicitud) && !isRequestValidated(solicitud) && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
-                                      <DropdownMenuItem onClick={() => handleValidateRequest(solicitud)} disabled={isValidating}>
-                                        {isValidating ? (
-                                          <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            Validando...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <CheckCircle className="h-4 w-4 mr-2" />
-                                            Validar Solicitud
-                                          </>
-                                        )}
-                                      </DropdownMenuItem>
-                                    )}
                                     {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
                                       <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
@@ -1937,21 +1922,6 @@ const AdminSolicitudesPage: React.FC = () => {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
-                                    {can('requests.respond') && requiresManualValidation(solicitud) && !isRequestValidated(solicitud) && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
-                                      <DropdownMenuItem onClick={() => handleValidateRequest(solicitud)} disabled={isValidating}>
-                                        {isValidating ? (
-                                          <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            Validando...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <CheckCircle className="h-4 w-4 mr-2" />
-                                            Validar Solicitud
-                                          </>
-                                        )}
-                                      </DropdownMenuItem>
-                                    )}
                                     {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
                                       <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
