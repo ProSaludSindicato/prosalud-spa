@@ -438,10 +438,60 @@ const RequestAssignmentManager: React.FC = () => {
   const handleConfirmSave = async () => {
     setIsSaving(true);
     try {
+      const completeSubtypeAssignments: Record<string, Record<string, string[]>> = {};
+      
+      const allRequestTypesWithSubtypes = new Set([
+        ...Object.keys(REQUEST_TYPES_WITH_SUBTYPES),
+        ...Object.keys(initialSubtypeAssignmentsRef.current),
+        ...Object.keys(subtypeAssignments),
+      ]);
+      
+      allRequestTypesWithSubtypes.forEach((requestType) => {
+        completeSubtypeAssignments[requestType] = {};
+        
+        const allSubtypes = new Set<string>();
+        
+        const definedSubtypes = REQUEST_TYPES_WITH_SUBTYPES[requestType];
+        if (definedSubtypes) {
+          definedSubtypes.forEach(subtype => allSubtypes.add(subtype.value));
+        }
+        
+        if (initialSubtypeAssignmentsRef.current[requestType]) {
+          Object.keys(initialSubtypeAssignmentsRef.current[requestType]).forEach(subtype => allSubtypes.add(subtype));
+        }
+        
+        if (subtypeAssignments[requestType]) {
+          Object.keys(subtypeAssignments[requestType]).forEach(subtype => allSubtypes.add(subtype));
+        }
+        
+        allSubtypes.forEach((subtype) => {
+          const currentModifiedValue = subtypeAssignments[requestType]?.[subtype];
+          
+          let finalValue: string[];
+          
+          if (currentModifiedValue !== undefined) {
+            finalValue = currentModifiedValue;
+          } else {
+            const initialSubtypeValue = initialSubtypeAssignmentsRef.current[requestType]?.[subtype];
+
+            if (initialSubtypeValue !== undefined && initialSubtypeValue.length > 0) {
+              finalValue = initialSubtypeValue;
+            } else {
+              const currentGeneralValue = assignments[requestType];
+              const initialGeneralValue = initialAssignmentsRef.current[requestType];
+              
+              finalValue = currentGeneralValue || initialGeneralValue || [];
+            }
+          }
+          
+          completeSubtypeAssignments[requestType][subtype] = finalValue;
+        });
+      });
+      
       // Preparar payload para el API
       const payload = {
         assignments: { ...assignments },
-        subtype_assignments: { ...subtypeAssignments },
+        subtype_assignments: completeSubtypeAssignments,
       };
 
       // Guardar en el backend
