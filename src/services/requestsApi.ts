@@ -722,6 +722,30 @@ export const requestsApiService = {
         }
       }
 
+      // Handle unprocessable entity errors (422) - reglas de negocio
+      if (error.response?.status === 422) {
+        const errorData = error.response.data;
+        
+        // Try to parse error message from blob if it's JSON
+        if (errorData instanceof Blob) {
+          try {
+            const text = await errorData.text();
+            const jsonError = JSON.parse(text);
+            if (jsonError.message) {
+              throw new Error(jsonError.message);
+            }
+          } catch (parseError) {
+            // If parsing fails, use default error
+            throw new Error('No hay solicitudes disponibles para generar la plantilla.');
+          }
+        } else if (errorData?.message) {
+          // El mensaje del API es claro y específico, usarlo directamente
+          throw new Error(errorData.message);
+        } else {
+          throw new Error('No hay solicitudes disponibles para generar la plantilla.');
+        }
+      }
+
       // Handle other errors
       if (error.response?.status === 401) {
         throw new Error('No autorizado. Por favor, inicie sesión nuevamente.');

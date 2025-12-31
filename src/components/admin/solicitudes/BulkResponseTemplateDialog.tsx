@@ -129,10 +129,20 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
     } catch (error) {
       logger.error('Error al descargar plantilla de respuesta masiva', error instanceof Error ? error.message : error);
       const errorMessage = getErrorMessage(error);
-      toast.error('Error al descargar plantilla', {
-        description: errorMessage,
-        duration: 5000,
-      });
+      
+      // Determinar si es un error de regla de negocio (422) o un error técnico
+      const isBusinessRuleError = error instanceof Error && 
+        (errorMessage.includes('No hay solicitudes') || 
+         errorMessage.includes('pendientes') || 
+         errorMessage.includes('en revisión'));
+      
+      toast.error(
+        isBusinessRuleError ? 'No se puede generar la plantilla' : 'Error al descargar plantilla',
+        {
+          description: errorMessage,
+          duration: 5000,
+        }
+      );
     } finally {
       setIsDownloading(false);
     }

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, X, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Upload, X, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { requestsApiService } from '@/services/requestsApi';
 import { logger } from '@/utils/logger';
@@ -56,6 +56,8 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processResult, setProcessResult] = useState<ProcessResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,6 +122,10 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
       logger.debug('Procesamiento de respuestas masivas completado', result);
 
       setProcessResult(result.data);
+      
+      // Establecer estado inicial de los collapsibles
+      setIsSuccessOpen(result.data.failed === 0);
+      setIsErrorsOpen(result.data.failed > 0);
 
       if (result.data.failed === 0) {
         toast.success('Procesamiento completado', {
@@ -155,16 +161,53 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
+  const getStatusBadgeClasses = (status: string | undefined): string => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
+    const statusLower = status.toLowerCase();
+    
+    if (statusLower.includes('completada') || statusLower.includes('completed')) {
+      return 'bg-green-100 text-green-800';
+    }
+    if (statusLower.includes('rechazada') || statusLower.includes('rejected')) {
+      return 'bg-red-100 text-red-800';
+    }
+    if (statusLower.includes('revisión') || statusLower.includes('review')) {
+      return 'bg-blue-100 text-blue-800';
+    }
+    if (statusLower.includes('pendiente') || statusLower.includes('pending')) {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+    
+    // Default
+    return 'bg-gray-100 text-gray-800';
+  };
+
   const handleClose = () => {
     if (!isProcessing) {
-      handleRemoveFile();
-      onOpenChange(false);
+      // Si hay resultados de procesamiento, recargar la página para reflejar los cambios
+      if (processResult) {
+        handleRemoveFile();
+        onOpenChange(false);
+        // Recargar la página después de un pequeño delay para que el modal se cierre primero
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      } else {
+        handleRemoveFile();
+        onOpenChange(false);
+      }
     }
   };
 
+  // Determinar el ancho del modal basado en si hay resultados
+  const modalWidth = processResult 
+    ? "max-sm:inset-x-4 sm:w-full sm:max-w-5xl lg:max-w-6xl" 
+    : "max-sm:inset-x-4 sm:w-full sm:max-w-2xl";
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className={`${modalWidth} bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6`}>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-gray-900">
             Procesar Respuestas Masivas
@@ -281,11 +324,23 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
 
                 {/* Successful Requests */}
                 {processResult.successful_requests && processResult.successful_requests.length > 0 && (
-                  <Collapsible defaultOpen={processResult.failed === 0}>
+                  <Collapsible 
+                    open={isSuccessOpen} 
+                    onOpenChange={setIsSuccessOpen}
+                    defaultOpen={processResult.failed === 0}
+                  >
                     <CollapsibleTrigger asChild>
-                      <Button variant="outline" className="w-full border-green-200 bg-green-50 hover:bg-green-100">
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-green-200 bg-green-50 hover:bg-green-100 hover:text-green-900 hover:underline"
+                      >
                         <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                        Ver registros exitosos ({processResult.successful_requests.length})
+                        <span className="flex-1 text-left">Ver registros exitosos ({processResult.successful_requests.length})</span>
+                        {isSuccessOpen ? (
+                          <ChevronUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-green-600" />
+                        )}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-4">
@@ -296,10 +351,9 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
                               <TableRow className="bg-green-100/50">
                                 <TableHead className="w-16">Fila</TableHead>
                                 <TableHead className="w-32">ID Solicitud</TableHead>
-                                <TableHead className="w-24">Tipo Doc.</TableHead>
-                                <TableHead className="w-32">Número Doc.</TableHead>
+                                <TableHead className="w-40">Documento</TableHead>
                                 <TableHead>Afiliado</TableHead>
-                                <TableHead className="w-40">Tipo Solicitud</TableHead>
+                                <TableHead className="w-48">Tipo Solicitud</TableHead>
                                 <TableHead className="w-32">Nuevo Estado</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -308,12 +362,16 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
                                 <TableRow key={index} className="hover:bg-green-50/50">
                                   <TableCell className="font-medium">{request.row}</TableCell>
                                   <TableCell className="font-mono text-xs">{request.request_id}</TableCell>
-                                  <TableCell className="text-xs">{request.document_type || '-'}</TableCell>
-                                  <TableCell className="font-mono text-xs">{request.document_number || '-'}</TableCell>
+                                  <TableCell className="text-xs">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{request.document_type || '-'}</span>
+                                      <span className="font-mono text-xs text-gray-600">{request.document_number || '-'}</span>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-sm">{request.full_name || '-'}</TableCell>
                                   <TableCell className="text-xs">{request.request_type || '-'}</TableCell>
                                   <TableCell>
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClasses(request.new_status)}`}>
                                       {request.new_status || '-'}
                                     </span>
                                   </TableCell>
@@ -329,11 +387,23 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
 
                 {/* Errors */}
                 {processResult.errors && processResult.errors.length > 0 && (
-                  <Collapsible defaultOpen={processResult.failed > 0}>
+                  <Collapsible 
+                    open={isErrorsOpen} 
+                    onOpenChange={setIsErrorsOpen}
+                    defaultOpen={processResult.failed > 0}
+                  >
                     <CollapsibleTrigger asChild>
-                      <Button variant="outline" className="w-full border-red-200 bg-red-50 hover:bg-red-100">
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-900 hover:underline"
+                      >
                         <AlertCircle className="h-4 w-4 mr-2 text-red-600" />
-                        Ver detalles de errores ({processResult.errors.length})
+                        <span className="flex-1 text-left">Ver detalles de errores ({processResult.errors.length})</span>
+                        {isErrorsOpen ? (
+                          <ChevronUp className="h-4 w-4 text-red-600" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-red-600" />
+                        )}
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-4">
@@ -344,10 +414,9 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
                               <TableRow className="bg-red-100/50">
                                 <TableHead className="w-16">Fila</TableHead>
                                 <TableHead className="w-32">ID Solicitud</TableHead>
-                                <TableHead className="w-24">Tipo Doc.</TableHead>
-                                <TableHead className="w-32">Número Doc.</TableHead>
+                                <TableHead className="w-40">Documento</TableHead>
                                 <TableHead>Afiliado</TableHead>
-                                <TableHead className="w-40">Tipo Solicitud</TableHead>
+                                <TableHead className="w-48">Tipo Solicitud</TableHead>
                                 <TableHead>Error</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -356,8 +425,12 @@ const BulkResponseProcessDialog: React.FC<BulkResponseProcessDialogProps> = ({
                                 <TableRow key={index} className="hover:bg-red-50/50">
                                   <TableCell className="font-medium">{error.row}</TableCell>
                                   <TableCell className="font-mono text-xs">{error.request_id}</TableCell>
-                                  <TableCell className="text-xs">{error.document_type || '-'}</TableCell>
-                                  <TableCell className="font-mono text-xs">{error.document_number || '-'}</TableCell>
+                                  <TableCell className="text-xs">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{error.document_type || '-'}</span>
+                                      <span className="font-mono text-xs text-gray-600">{error.document_number || '-'}</span>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-sm">{error.full_name || '-'}</TableCell>
                                   <TableCell className="text-xs">{error.request_type || '-'}</TableCell>
                                   <TableCell className="text-sm text-red-600">{error.error}</TableCell>
