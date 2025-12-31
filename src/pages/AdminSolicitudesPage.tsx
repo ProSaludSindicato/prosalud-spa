@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import ExportRequestsDialog from "@/components/admin/solicitudes/ExportRequestsDialog";
 import VerificarCertificadoModal from "@/components/admin/solicitudes/VerificarCertificadoModal";
+import BulkResponseTemplateDialog from "@/components/admin/solicitudes/BulkResponseTemplateDialog";
+import BulkResponseProcessDialog from "@/components/admin/solicitudes/BulkResponseProcessDialog";
 import {
   FileText,
   Download,
@@ -34,6 +36,8 @@ import {
   X,
   Loader2,
   Info,
+  Upload,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -405,6 +409,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
   const [solicitudToRespond, setSolicitudToRespond] = useState<Request | null>(null);
   const [verificarCertificadoOpen, setVerificarCertificadoOpen] = useState(false);
+  const [bulkTemplateDialogOpen, setBulkTemplateDialogOpen] = useState(false);
+  const [bulkProcessDialogOpen, setBulkProcessDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -1434,7 +1440,8 @@ const AdminSolicitudesPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                    {/* Botón principal: Exportar Reporte */}
                     <Button
                       variant="outline"
                       onClick={() => setExportDialogOpen(true)}
@@ -1444,15 +1451,57 @@ const AdminSolicitudesPage: React.FC = () => {
                       <span className="hidden sm:inline">Exportar Reporte</span>
                       <span className="sm:hidden">Exportar</span>
                     </Button>
-                    {can('requests.view') && (
-                      <button
-                        type="button"
-                        onClick={() => setVerificarCertificadoOpen(true)}
-                        className="text-xs sm:text-sm text-primary-prosalud hover:text-primary-prosalud-dark underline underline-offset-2 font-medium cursor-pointer text-center sm:text-right"
-                      >
-                        Verificar certificado de convenio
-                      </button>
+                    
+                    {/* Menú desplegable para Respuestas Masivas */}
+                    {can('requests.respond') && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full sm:w-auto">
+                            <Send className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Respuestas Masivas</span>
+                            <span className="sm:hidden">Masivas</span>
+                            <ArrowDown className="h-3 w-3 ml-2 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onClick={() => setBulkTemplateDialogOpen(true)}
+                            className="cursor-pointer"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            <span>Descargar Plantilla</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setBulkProcessDialogOpen(true)}
+                            className="cursor-pointer"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            <span>Procesar Respuestas</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
+                    
+                    {/* Menú desplegable para Acciones Adicionales */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="w-full sm:w-auto">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Más acciones</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        {can('requests.view') && (
+                          <DropdownMenuItem
+                            onClick={() => setVerificarCertificadoOpen(true)}
+                            className="cursor-pointer"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            <span>Verificar Certificado</span>
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardHeader>
@@ -2082,6 +2131,29 @@ const AdminSolicitudesPage: React.FC = () => {
             existingRequestTypes={existingRequestTypes}
             getRequestTypeLabel={getRequestTypeLabel}
           />
+
+          {/* Bulk Response Template Dialog */}
+          {can('requests.respond') && (
+            <BulkResponseTemplateDialog
+              open={bulkTemplateDialogOpen}
+              onOpenChange={setBulkTemplateDialogOpen}
+              existingRequestTypes={existingRequestTypes}
+              getRequestTypeLabel={getRequestTypeLabel}
+            />
+          )}
+
+          {/* Bulk Response Process Dialog */}
+          {can('requests.respond') && (
+            <BulkResponseProcessDialog
+              open={bulkProcessDialogOpen}
+              onOpenChange={setBulkProcessDialogOpen}
+              onSuccess={() => {
+                // Refrescar los datos después de procesar respuestas masivas
+                refetch();
+                refetchPendingUpdates();
+              }}
+            />
+          )}
 
           {/* Request Details Dialog */}
           {selectedSolicitud && (

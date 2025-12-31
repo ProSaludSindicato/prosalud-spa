@@ -647,4 +647,238 @@ export const requestsApiService = {
       throw error;
     }
   },
+
+  // Export bulk response template
+  async exportBulkResponseTemplate(filters?: {
+    request_type?: string;
+    date_range?: {
+      include_all?: boolean;
+      start_date?: string;
+      end_date?: string;
+    };
+  }): Promise<{ blob: Blob; filename: string }> {
+    try {
+      // Construir parámetros de consulta usando params de axios para manejar arrays anidados correctamente
+      const params: Record<string, any> = {};
+      
+      if (filters?.request_type) {
+        params.request_type = filters.request_type;
+      }
+      
+      // Construir date_range con el formato que Laravel espera
+      // Laravel acepta "1" o "0" para campos booleanos en query parameters
+      const includeAll = filters?.date_range?.include_all ?? true;
+      params['date_range[include_all]'] = includeAll ? 1 : 0;
+      
+      if (filters?.date_range?.start_date) {
+        params['date_range[start_date]'] = filters.date_range.start_date;
+      }
+      
+      if (filters?.date_range?.end_date) {
+        params['date_range[end_date]'] = filters.date_range.end_date;
+      }
+      
+      const response = await requestsApi.get('/api/requests/bulk-response-template', {
+        params,
+        responseType: 'blob',
+        headers: {
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      });
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Plantilla_Respuestas_Masivas_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      return {
+        blob: response.data,
+        filename,
+      };
+    } catch (error: any) {
+      // Handle validation errors (400)
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        
+        // Try to parse error message from blob if it's JSON
+        if (errorData instanceof Blob) {
+          try {
+            const text = await errorData.text();
+            const jsonError = JSON.parse(text);
+            if (jsonError.message) {
+              throw new Error(jsonError.message);
+            }
+          } catch (parseError) {
+            // If parsing fails, use default error
+          }
+        } else if (errorData?.message) {
+          throw new Error(errorData.message);
+        }
+      }
+
+      // Handle other errors
+      if (error.response?.status === 401) {
+        throw new Error('No autorizado. Por favor, inicie sesión nuevamente.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('No tiene permisos para exportar plantillas de respuesta masiva.');
+      }
+
+      if (error.response?.status === 500) {
+        throw new Error('Error al generar la plantilla. Por favor, intente nuevamente.');
+      }
+
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  // Process bulk response file
+  async processBulkResponse(file: File): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      total: number;
+      successful: number;
+      failed: number;
+      successful_requests?: Array<{
+        row: number;
+        request_id: string;
+        document_type?: string;
+        document_number?: string;
+        full_name?: string;
+        request_type?: string;
+        new_status?: string;
+      }>;
+      errors?: Array<{
+        row: number;
+        request_id: string;
+        error: string;
+        document_type?: string;
+        document_number?: string;
+        full_name?: string;
+        request_type?: string;
+      }>;
+    };
+  }> {
+    try {
+      // Validate file
+      if (!file || !(file instanceof File)) {
+        throw new Error('El archivo proporcionado no es válido');
+      }
+
+      // Validate file extension
+      const fileName = file.name.toLowerCase();
+      const isValidExtension = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+      if (!isValidExtension) {
+        throw new Error('El archivo debe ser un Excel (.xlsx o .xls)');
+      }
+
+      // Validate file size (10MB max)
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error('El archivo no debe ser mayor a 10MB');
+      }
+
+      // Determine correct MIME type based on extension
+      const correctMimeType = fileName.endsWith('.xlsx')
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'application/vnd.ms-excel';
+
+      // Create FormData
+      const formData = new FormData();
+      
+      // Ensure correct MIME type
+      let fileToUpload: File = file;
+      if (!file.type || file.type !== correctMimeType || file.type === 'application/zip') {
+        const arrayBuffer = await file.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: correctMimeType });
+        fileToUpload = new File([blob], file.name, {
+          type: correctMimeType,
+          lastModified: file.lastModified,
+        });
+      }
+      
+      formData.append('file', fileToUpload, fileToUpload.name);
+
+      const response = await requestsApi.post<{
+        success: boolean;
+        message: string;
+        data: {
+          total: number;
+          successful: number;
+          failed: number;
+          errors?: Array<{
+            row: number;
+            request_id: string;
+            error: string;
+          }>;
+        };
+      }>(
+        '/api/requests/bulk-response',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 300000, // 5 minutes - processing can take a while
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al procesar el archivo');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // Handle validation errors (400)
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        if (errorData?.message) {
+          throw new Error(errorData.message);
+        }
+        throw new Error('El archivo Excel es requerido o tiene un formato incorrecto.');
+      }
+
+      // Handle other errors
+      if (error.response?.status === 401) {
+        throw new Error('No autorizado. Por favor, inicie sesión nuevamente.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('No tiene permisos para procesar respuestas masivas.');
+      }
+
+      if (error.response?.status === 422) {
+        const errorData = error.response.data;
+        if (errorData?.message) {
+          throw new Error(errorData.message);
+        }
+        throw new Error('El archivo debe ser un archivo Excel válido (.xlsx o .xls).');
+      }
+
+      if (error.response?.status === 500) {
+        const errorData = error.response.data;
+        if (errorData?.message) {
+          throw new Error(errorData.message);
+        }
+        throw new Error('Error al procesar el archivo. Por favor, verifique el formato y vuelva a intentar.');
+      }
+
+      // If error already has a message (from our validation), throw it
+      if (error.message) {
+        throw error;
+      }
+
+      handleApiError(error);
+      throw error;
+    }
+  },
 };

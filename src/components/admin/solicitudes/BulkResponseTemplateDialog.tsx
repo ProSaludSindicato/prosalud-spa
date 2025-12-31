@@ -1,0 +1,292 @@
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, Calendar, Filter, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { requestsApiService } from '@/services/requestsApi';
+import { logger } from '@/utils/logger';
+import { getErrorMessage } from '@/utils/errorSanitizer';
+
+interface BulkResponseTemplateDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  existingRequestTypes?: string[];
+  getRequestTypeLabel?: (type: string) => string;
+}
+
+interface DateRangeFilter {
+  includeAll: boolean;
+  start?: Date;
+  end?: Date;
+}
+
+const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({ 
+  open, 
+  onOpenChange,
+  existingRequestTypes = [],
+  getRequestTypeLabel
+}) => {
+  const [requestType, setRequestType] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<DateRangeFilter>({
+    includeAll: true
+  });
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleIncludeAllChange = (includeAll: boolean) => {
+    setDateRange({
+      ...dateRange,
+      includeAll,
+      start: includeAll ? undefined : dateRange.start,
+      end: includeAll ? undefined : dateRange.end
+    });
+  };
+
+  const handleStartDateChange = (dateString: string) => {
+    const start = dateString ? new Date(dateString) : undefined;
+    setDateRange({
+      ...dateRange,
+      start
+    });
+  };
+
+  const handleEndDateChange = (dateString: string) => {
+    const end = dateString ? new Date(dateString) : undefined;
+    setDateRange({
+      ...dateRange,
+      end
+    });
+  };
+
+  const formatDateForInput = (date: Date | undefined): string => {
+    if (!date) return '';
+    return date.toISOString().split('T')[0];
+  };
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    
+    try {
+      logger.debug('Iniciando descarga de plantilla de respuesta masiva');
+      
+      // Build filters
+      const filters: {
+        request_type?: string;
+        date_range?: {
+          include_all?: boolean;
+          start_date?: string;
+          end_date?: string;
+        };
+      } = {};
+
+      if (requestType !== 'all') {
+        filters.request_type = requestType;
+      }
+
+      if (!dateRange.includeAll) {
+        filters.date_range = {
+          include_all: false,
+        };
+        if (dateRange.start) {
+          filters.date_range.start_date = formatDateForInput(dateRange.start);
+        }
+        if (dateRange.end) {
+          filters.date_range.end_date = formatDateForInput(dateRange.end);
+        }
+      } else {
+        filters.date_range = {
+          include_all: true,
+        };
+      }
+
+      // Call backend API to download template
+      const { blob, filename } = await requestsApiService.exportBulkResponseTemplate(filters);
+
+      logger.debug('Plantilla Excel recibida del backend', { filename, size: blob.size });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      toast.success('Plantilla descargada', {
+        description: 'La plantilla Excel se ha descargado exitosamente. Complete las columnas editables y vuelva a subir el archivo.',
+        duration: 5000,
+      });
+
+      logger.debug('Descarga de plantilla completada');
+      onOpenChange(false);
+    } catch (error) {
+      logger.error('Error al descargar plantilla de respuesta masiva', error instanceof Error ? error.message : error);
+      const errorMessage = getErrorMessage(error);
+      toast.error('Error al descargar plantilla', {
+        description: errorMessage,
+        duration: 5000,
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold text-gray-900">
+            Exportar Plantilla de Respuestas Masivas
+          </DialogTitle>
+          <DialogDescription>
+            Descarga una plantilla Excel con las solicitudes pendientes o en revisión. Complete las columnas editables y procese el archivo para responder masivamente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Request Type Filter */}
+          <Card className="border border-gray-200">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center space-x-3">
+                <Filter className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Tipo de Solicitud</h4>
+                  <p className="text-sm text-gray-600">
+                    Filtra las solicitudes por tipo específico (opcional)
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
+                <Select value={requestType} onValueChange={setRequestType}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos los tipos de solicitudes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos de solicitudes</SelectItem>
+                    {existingRequestTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {getRequestTypeLabel ? getRequestTypeLabel(type) : type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Date Range Selector */}
+          <Card className="border border-gray-200">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center space-x-3">
+                <Calendar className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Rango de Fechas</h4>
+                  <p className="text-sm text-gray-600">
+                    Filtra las solicitudes por período específico (opcional)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">
+                  Incluir todas las solicitudes disponibles
+                </label>
+                <Switch
+                  checked={dateRange.includeAll}
+                  onCheckedChange={handleIncludeAllChange}
+                />
+              </div>
+
+              {!dateRange.includeAll && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Fecha Desde</label>
+                    <Input
+                      type="date"
+                      value={formatDateForInput(dateRange.start)}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                      max={dateRange.end ? formatDateForInput(dateRange.end) : today}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Fecha Hasta</label>
+                    <Input
+                      type="date"
+                      value={formatDateForInput(dateRange.end)}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                      min={dateRange.start ? formatDateForInput(dateRange.start) : undefined}
+                      max={today}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Template Info */}
+          <Card className="border border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <h4 className="font-medium text-blue-900 mb-3">INSTRUCCIONES:</h4>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                <li>
+                  Complete las columnas <strong>"Nuevo Estado"</strong>, <strong>"Asunto Correo"</strong> y <strong>"Cuerpo Correo"</strong> para cada solicitud.
+                </li>
+                <li>
+                  Los estados válidos son: <strong>Pendiente</strong>, <strong>En Revisión</strong>, <strong>Completada</strong>, <strong>Rechazada</strong>
+                </li>
+                <li>
+                  No modifique las columnas de identificación (<strong>ID Solicitud</strong>, <strong>Tipo Documento</strong>, etc.)
+                </li>
+                <li>
+                  Puede dejar filas vacías si no desea procesarlas
+                </li>
+                <li className="font-semibold text-blue-900">
+                  IMPORTANTE: Las respuestas masivas NO permiten agregar archivos como anexos del correo. Si requiere anexos en la respuesta, debe hacerlo manualmente desde el panel de administración.
+                </li>
+              </ol>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end space-x-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDownloading}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDownload}
+              disabled={isDownloading || (!dateRange.includeAll && (!dateRange.start || !dateRange.end))}
+              className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Descargando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Descargar Plantilla
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default BulkResponseTemplateDialog;
+

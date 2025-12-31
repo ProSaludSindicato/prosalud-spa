@@ -479,126 +479,130 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
               ) : estadisticasData?.success ? (
                 <div className="space-y-6">
                   {/* Resumen General */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Resumen General
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Con Compensaciones</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.con_compensaciones.toLocaleString()}
+                  {estadisticasData.data.resumen && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          Resumen General
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Con Compensaciones</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.con_compensaciones || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Con Actividades</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.con_actividades || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Dirigidos a AFP</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.dirigidos_afp || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Subsidio Vivienda</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.subsidio_vivienda || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Bancolombia</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.bancolombia || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Subsidio Desempleo</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.subsidio_desempleo || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Básicos</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.basicos || 0).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="text-sm text-gray-600 mb-1">Otros</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(estadisticasData.data.resumen.otros || 0).toLocaleString()}
+                            </div>
                           </div>
                         </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Con Actividades</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.con_actividades.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Dirigidos a AFP</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.dirigidos_afp.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Subsidio Vivienda</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.subsidio_vivienda.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Bancolombia</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.bancolombia.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Subsidio Desempleo</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.subsidio_desempleo.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Básicos</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.basicos.toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="text-sm text-gray-600 mb-1">Otros</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {estadisticasData.data.resumen.otros.toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Distribución por Tipo */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <PieChart className="h-5 w-5" />
-                        Distribución por Tipo
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {Object.entries(estadisticasData.data.por_tipo).map(([tipo, cantidad]) => {
-                          const total = estadisticasData.data.resumen.total_certificados;
-                          const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : '0';
-                          const porcentajeNum = parseFloat(porcentaje);
-                          const tipoLabels: Record<string, string> = {
-                            basico: 'Básico',
-                            bancolombia: 'Bancolombia',
-                            subsidio_vivienda: 'Subsidio Vivienda',
-                            subsidio_desempleo: 'Subsidio Desempleo',
-                            con_actividades: 'Con Actividades',
-                            dirigido_afp: 'Dirigido a AFP',
-                            otros: 'Otros'
-                          };
-                          return (
-                            <div key={tipo} className="space-y-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-700">
-                                  {tipoLabels[tipo] || tipo}
-                                </span>
-                                <span className="text-sm font-semibold text-gray-900">
-                                  {cantidad.toLocaleString()} certificados
-                                </span>
-                              </div>
-                              <div className="relative w-full bg-gray-200 rounded-full h-4">
-                                <div
-                                  className="bg-primary-prosalud h-4 rounded-full transition-all flex items-center justify-end pr-2"
-                                  style={{ width: `${porcentajeNum}%`, minWidth: porcentajeNum > 0 ? '40px' : '0' }}
-                                >
-                                  {porcentajeNum > 5 && (
-                                    <span className="text-xs font-medium text-white">
+                  {estadisticasData.data.por_tipo && Object.keys(estadisticasData.data.por_tipo).length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <PieChart className="h-5 w-5" />
+                          Distribución por Tipo
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {Object.entries(estadisticasData.data.por_tipo).map(([tipo, cantidad]) => {
+                            const total = estadisticasData.data.resumen?.total_certificados || 0;
+                            const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : '0';
+                            const porcentajeNum = parseFloat(porcentaje);
+                            const tipoLabels: Record<string, string> = {
+                              basico: 'Básico',
+                              bancolombia: 'Bancolombia',
+                              subsidio_vivienda: 'Subsidio Vivienda',
+                              subsidio_desempleo: 'Subsidio Desempleo',
+                              con_actividades: 'Con Actividades',
+                              dirigido_afp: 'Dirigido a AFP',
+                              otros: 'Otros'
+                            };
+                            return (
+                              <div key={tipo} className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {tipoLabels[tipo] || tipo}
+                                  </span>
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {cantidad.toLocaleString()} certificados
+                                  </span>
+                                </div>
+                                <div className="relative w-full bg-gray-200 rounded-full h-4">
+                                  <div
+                                    className="bg-primary-prosalud h-4 rounded-full transition-all flex items-center justify-end pr-2"
+                                    style={{ width: `${porcentajeNum}%`, minWidth: porcentajeNum > 0 ? '40px' : '0' }}
+                                  >
+                                    {porcentajeNum > 5 && (
+                                      <span className="text-xs font-medium text-white">
+                                        {porcentaje}%
+                                      </span>
+                                    )}
+                                  </div>
+                                  {porcentajeNum <= 5 && porcentajeNum > 0 && (
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-700">
                                       {porcentaje}%
                                     </span>
                                   )}
                                 </div>
-                                {porcentajeNum <= 5 && porcentajeNum > 0 && (
-                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-700">
-                                    {porcentaje}%
-                                  </span>
-                                )}
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Top Entidades */}
-                  {estadisticasData.data.top_entidades.length > 0 && (
+                  {estadisticasData.data.top_entidades && estadisticasData.data.top_entidades.length > 0 && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -634,7 +638,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
                   )}
 
                   {/* Distribución Mensual */}
-                  {estadisticasData.data.distribucion_mensual.length > 0 && (
+                  {estadisticasData.data.distribucion_mensual && estadisticasData.data.distribucion_mensual.length > 0 && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -676,7 +680,7 @@ const VerificarCertificadoModal: React.FC<VerificarCertificadoModalProps> = ({
                   )}
 
                   {/* Filtros Aplicados */}
-                  {(estadisticasData.data.filtros_aplicados.fecha_desde || estadisticasData.data.filtros_aplicados.fecha_hasta) && (
+                  {estadisticasData.data.filtros_aplicados && (estadisticasData.data.filtros_aplicados.fecha_desde || estadisticasData.data.filtros_aplicados.fecha_hasta) && (
                     <Alert>
                       <Calendar className="h-4 w-4" />
                       <AlertTitle>Filtros Aplicados</AlertTitle>
