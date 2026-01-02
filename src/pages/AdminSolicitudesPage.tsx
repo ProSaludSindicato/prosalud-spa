@@ -1452,7 +1452,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       <span className="sm:hidden">Exportar</span>
                     </Button>
                     
-                    {/* Menú desplegable para Respuestas Masivas */}
+                    {/* Menú desplegable para Respuestas Masivas
                     {can('requests.respond') && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1480,7 +1480,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )}
+                    )} */}
                     
                     {/* Menú desplegable para Acciones Adicionales */}
                     <DropdownMenu>
