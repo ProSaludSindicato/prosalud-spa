@@ -166,36 +166,61 @@ const beneficiarioSchema = z.object({
   sexo: z.string().min(1, 'El sexo es requerido'),
 });
 
-const formSchemaActualizarDatosPersonales = z.object({
-  // Datos personales (todos opcionales)
-  estadoCivil: z.string().optional(),
-  direccion: z.string().optional(),
-  municipio: z.string().optional(),
-  telefonoFijo: z.string().optional(),
-  celular: z.string().optional(),
-  correo: z.string()
-    .optional()
-    .or(z.literal(''))
-    .refine(
-      (val) => {
-        // Si está vacío o undefined, es válido (es opcional)
-        if (!val || val.trim() === '') {
-          return true;
+// Función para crear el schema dinámico basado en los valores iniciales del afiliado
+const createFormSchema = (initialValues: {
+  estadoCivil?: string;
+  celular?: string;
+  tallaUniforme?: string;
+  tallaCalzado?: string;
+}) => {
+  // Determinar qué campos son requeridos (están vacíos en los datos iniciales)
+  const estadoCivilVacio = !initialValues.estadoCivil || initialValues.estadoCivil.trim() === '';
+  const celularVacio = !initialValues.celular || initialValues.celular.trim() === '';
+  const tallaUniformeVacio = !initialValues.tallaUniforme || initialValues.tallaUniforme.trim() === '';
+  const tallaCalzadoVacio = !initialValues.tallaCalzado || initialValues.tallaCalzado.trim() === '';
+
+  return z.object({
+    // Datos personales
+    // Estado Civil: requerido si está vacío en los datos iniciales
+    estadoCivil: estadoCivilVacio 
+      ? z.string().min(1, 'El estado civil es requerido')
+      : z.string().optional(),
+    direccion: z.string().optional(),
+    municipio: z.string().optional(),
+    telefonoFijo: z.string().optional(),
+    // Celular: requerido si está vacío en los datos iniciales
+    celular: celularVacio
+      ? z.string().min(1, 'El celular es requerido')
+      : z.string().optional(),
+    correo: z.string()
+      .optional()
+      .or(z.literal(''))
+      .refine(
+        (val) => {
+          // Si está vacío o undefined, es válido (es opcional)
+          if (!val || val.trim() === '') {
+            return true;
+          }
+          // Si el valor está ofuscado (contiene asteriscos), no validar formato de email
+          // porque el usuario no lo ha modificado
+          if (isObfuscated(val)) {
+            return true;
+          }
+          // Si no está ofuscado, validar que sea un email válido
+          return z.string().email().safeParse(val).success;
+        },
+        {
+          message: "El correo electrónico debe ser válido.",
         }
-        // Si el valor está ofuscado (contiene asteriscos), no validar formato de email
-        // porque el usuario no lo ha modificado
-        if (isObfuscated(val)) {
-          return true;
-        }
-        // Si no está ofuscado, validar que sea un email válido
-        return z.string().email().safeParse(val).success;
-      },
-      {
-        message: "El correo electrónico debe ser válido.",
-      }
-    ),
-  tallaUniforme: z.string().optional(),
-  tallaCalzado: z.string().optional(),
+      ),
+    // Talla de Uniforme: requerido si está vacío en los datos iniciales
+    tallaUniforme: tallaUniformeVacio
+      ? z.string().min(1, 'La talla de uniforme es requerida')
+      : z.string().optional(),
+    // Talla de Calzado: requerido si está vacío en los datos iniciales
+    tallaCalzado: tallaCalzadoVacio
+      ? z.string().min(1, 'La talla de calzado es requerida')
+      : z.string().optional(),
   
   // Nivel educativo (opcional - solo si se quiere actualizar)
   nivelEducativo: z.string().optional(),
@@ -229,11 +254,20 @@ const formSchemaActualizarDatosPersonales = z.object({
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
     .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   
-  // Beneficiarios nuevos (opcionales)
-  beneficiariosNuevos: z.array(beneficiarioSchema).optional().default([]),
+    // Beneficiarios nuevos (opcionales)
+    beneficiariosNuevos: z.array(beneficiarioSchema).optional().default([]),
+  });
+};
+
+// Schema por defecto (se actualizará dinámicamente)
+const formSchemaActualizarDatosPersonales = createFormSchema({
+  estadoCivil: '',
+  celular: '',
+  tallaUniforme: '',
+  tallaCalzado: '',
 });
 
-type FormValuesActualizarDatosPersonales = z.infer<typeof formSchemaActualizarDatosPersonales>;
+type FormValuesActualizarDatosPersonales = z.infer<ReturnType<typeof createFormSchema>>;
 
 const ActualizarDatosPersonalesPageContent: React.FC = () => {
   const navigate = useNavigate();
@@ -268,10 +302,27 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     beneficiariosNuevos: [],
   }), [afiliado]);
 
+  // Crear schema dinámico basado en los valores iniciales
+  const dynamicSchema = React.useMemo(() => {
+    return createFormSchema({
+      estadoCivil: initialValues.estadoCivil,
+      celular: initialValues.celular,
+      tallaUniforme: initialValues.tallaUniforme,
+      tallaCalzado: initialValues.tallaCalzado,
+    });
+  }, [initialValues]);
+
   const form = useForm<FormValuesActualizarDatosPersonales>({
-    resolver: zodResolver(formSchemaActualizarDatosPersonales),
+    resolver: zodResolver(dynamicSchema),
     defaultValues: initialValues,
   });
+
+  // Actualizar el resolver cuando cambie el schema dinámico
+  React.useEffect(() => {
+    form.clearErrors();
+    // El resolver se actualiza automáticamente cuando se re-renderiza el componente
+    // pero necesitamos asegurarnos de que el form esté sincronizado
+  }, [dynamicSchema, form]);
 
   // Actualizar el formulario cuando cambien los datos del afiliado
   const [isInitializing, setIsInitializing] = React.useState(true);
@@ -289,6 +340,24 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     }
   }, [initialValues, form, afiliado]);
 
+  // Determinar qué campos estaban vacíos inicialmente y deben ser diligenciados
+  const camposRequeridosPorVacios = React.useMemo(() => {
+    const requeridos = new Set<string>();
+    if (!initialValues.estadoCivil || initialValues.estadoCivil.trim() === '') {
+      requeridos.add('estadoCivil');
+    }
+    if (!initialValues.celular || initialValues.celular.trim() === '') {
+      requeridos.add('celular');
+    }
+    if (!initialValues.tallaUniforme || initialValues.tallaUniforme.trim() === '') {
+      requeridos.add('tallaUniforme');
+    }
+    if (!initialValues.tallaCalzado || initialValues.tallaCalzado.trim() === '') {
+      requeridos.add('tallaCalzado');
+    }
+    return requeridos;
+  }, [initialValues]);
+
   // Trackear campos modificados comparando valores actuales vs iniciales
   const watchValues = form.watch();
   const modifiedFields = React.useMemo(() => {
@@ -302,6 +371,14 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     Object.keys(initialValues).forEach((key) => {
       const currentValue = watchValues[key as keyof typeof watchValues];
       const initialValue = initialValues[key as keyof typeof initialValues];
+      
+      // Si el campo estaba vacío inicialmente y ahora tiene valor, considerarlo modificado
+      if (camposRequeridosPorVacios.has(key)) {
+        const currentStr = String(currentValue || '').trim();
+        if (currentStr !== '') {
+          modified.add(key);
+        }
+      }
       
       // Comparar valores (ignorar archivos y valores undefined/empty)
       if (key.includes('Educativo') && !key.includes('diploma') && !key.includes('acta')) {
@@ -336,7 +413,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     });
     
     return modified;
-  }, [watchValues, initialValues, isInitializing]);
+  }, [watchValues, initialValues, isInitializing, camposRequeridosPorVacios]);
 
   // Calcular campos modificados sin archivos para deshabilitar el botón
   const camposModificadosSinArchivos = React.useMemo(() => {
@@ -356,11 +433,18 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     if (!afiliado) return;
     
     // Validar que haya al menos un campo modificado (excluyendo archivos) o beneficiarios nuevos
+    // O que se hayan diligenciado los campos requeridos que estaban vacíos
     const tieneBeneficiariosNuevos = data.beneficiariosNuevos && data.beneficiariosNuevos.length > 0;
+    const tieneCamposRequeridosDiligenciados = Array.from(camposRequeridosPorVacios).some(
+      campo => {
+        const valor = data[campo as keyof typeof data];
+        return valor && String(valor).trim() !== '';
+      }
+    );
     
-    if (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos) {
+    if (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneCamposRequeridosDiligenciados) {
       toast.error('No hay cambios para actualizar', {
-        description: 'Debe modificar al menos un campo o agregar miembros al grupo familiar para enviar la solicitud de actualización.',
+        description: 'Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado) para enviar la solicitud de actualización.',
         duration: 5000,
         icon: <AlertCircle className="h-5 w-5 text-red-600" />,
       });
@@ -551,8 +635,8 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
         dondeRealizaProceso: activeConvenio?.cliente || '',
       };
 
-      // Solo agregar campos que fueron modificados
-      if (modifiedFields.has('estadoCivil') && data.estadoCivil) {
+      // Agregar campos que fueron modificados O que estaban vacíos y ahora tienen valor
+      if ((modifiedFields.has('estadoCivil') || camposRequeridosPorVacios.has('estadoCivil')) && data.estadoCivil) {
         payload.estadoCivil = data.estadoCivil;
       }
       if (modifiedFields.has('direccion') && data.direccion) {
@@ -564,16 +648,16 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       if (modifiedFields.has('telefonoFijo') && data.telefonoFijo) {
         payload.telefonoFijo = data.telefonoFijo;
       }
-      if (modifiedFields.has('celular') && data.celular) {
+      if ((modifiedFields.has('celular') || camposRequeridosPorVacios.has('celular')) && data.celular) {
         payload.celular = data.celular;
       }
       if (modifiedFields.has('correo') && data.correo) {
         payload.correo = data.correo;
       }
-      if (modifiedFields.has('tallaUniforme') && data.tallaUniforme) {
+      if ((modifiedFields.has('tallaUniforme') || camposRequeridosPorVacios.has('tallaUniforme')) && data.tallaUniforme) {
         payload.tallaUniforme = data.tallaUniforme;
       }
-      if (modifiedFields.has('tallaCalzado') && data.tallaCalzado) {
+      if ((modifiedFields.has('tallaCalzado') || camposRequeridosPorVacios.has('tallaCalzado')) && data.tallaCalzado) {
         payload.tallaCalzado = data.tallaCalzado;
       }
       if (modifiedFields.has('nivelEducativo') && data.nivelEducativo) {
@@ -750,13 +834,14 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
         <ActualizarDatosPersonalesHeader />
         <InformacionImportanteDatosAlert />
 
-        <Form {...form}>
+        <Form {...form} key={`form-${initialValues.estadoCivil}-${initialValues.celular}-${initialValues.tallaUniforme}-${initialValues.tallaCalzado}`}>
           <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
             <DatosPersonalesReadOnly />
             <DatosPersonalesSection 
               control={form.control} 
               modifiedFields={modifiedFields}
               initialValues={initialValues}
+              camposRequeridosPorVacios={camposRequeridosPorVacios}
             />
             <NivelEducativoSection 
               control={form.control} 
@@ -810,7 +895,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
                       <Button 
                         type="submit" 
                         size="lg" 
-                        disabled={isSubmitting || isInitializing || (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos)}
+                        disabled={isSubmitting || isInitializing || (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && camposRequeridosPorVacios.size === 0)}
                         className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
@@ -827,10 +912,10 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {!isSubmitting && !isInitializing && camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && (
+                  {!isSubmitting && !isInitializing && camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && camposRequeridosPorVacios.size === 0 && (
                     <TooltipContent side="top" className="max-w-xs bg-gray-800 text-white border-gray-700">
                       <p className="text-sm text-white">
-                        Debe modificar al menos un campo o agregar miembros al grupo familiar para enviar la solicitud de actualización.
+                        Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado) para enviar la solicitud de actualización.
                       </p>
                     </TooltipContent>
                   )}

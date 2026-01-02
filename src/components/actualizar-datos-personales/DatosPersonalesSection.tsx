@@ -12,12 +12,14 @@ interface DatosPersonalesSectionProps<TFieldValues extends FieldValues> {
   control: Control<TFieldValues>;
   modifiedFields?: Set<string>;
   initialValues?: Partial<TFieldValues>;
+  camposRequeridosPorVacios?: Set<string>;
 }
 
 const DatosPersonalesSection = <TFieldValues extends FieldValues>({
   control,
   modifiedFields,
   initialValues,
+  camposRequeridosPorVacios,
 }: DatosPersonalesSectionProps<TFieldValues>) => {
   const watchValues = useWatch({ control });
   // Security: Use centralized sanitization hook
@@ -117,7 +119,10 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             name={"estadoCivil" as any}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Estado Civil</FormLabel>
+                <FormLabel>
+                  Estado Civil
+                  {camposRequeridosPorVacios?.has('estadoCivil') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className={modifiedFields?.has('estadoCivil') ? 'border-green-500 bg-green-50' : ''}>
@@ -268,7 +273,10 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
 
               return (
               <FormItem>
-                <FormLabel>Celular</FormLabel>
+                <FormLabel>
+                  Celular
+                  {camposRequeridosPorVacios?.has('celular') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="tel"
@@ -325,7 +333,10 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             name={"tallaUniforme" as any}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Talla de Uniforme</FormLabel>
+                <FormLabel>
+                  Talla de Uniforme
+                  {camposRequeridosPorVacios?.has('tallaUniforme') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger className={modifiedFields?.has('tallaUniforme') ? 'border-green-500 bg-green-50' : ''}>
@@ -350,7 +361,10 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             name={"tallaCalzado" as any}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Talla de Calzado</FormLabel>
+                <FormLabel>
+                  Talla de Calzado
+                  {camposRequeridosPorVacios?.has('tallaCalzado') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="text"
