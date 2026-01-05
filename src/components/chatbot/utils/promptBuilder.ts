@@ -33,6 +33,14 @@ export const buildSystemPrompt = (
     questionLower.includes('consultar pago')
   );
   
+  // Detectar si la pregunta es sobre examen de egreso
+  const isAboutExamenEgreso = questionLower.includes('examen de egreso') ||
+                               questionLower.includes('examen egreso') ||
+                               (questionLower.includes('examen') && questionLower.includes('egreso')) ||
+                               (questionLower.includes('días') && questionLower.includes('examen') && questionLower.includes('egreso')) ||
+                               (questionLower.includes('plazo') && questionLower.includes('examen') && questionLower.includes('egreso')) ||
+                               (questionLower.includes('ampliar') && questionLower.includes('examen') && questionLower.includes('egreso'));
+  
   const otpProhibition = isAboutDataUpdate ? `
 🚫🚫🚫 PROHIBICIÓN ABSOLUTA - ACTUALIZACIÓN DE DATOS PERSONALES 🚫🚫🚫
 
@@ -76,11 +84,27 @@ Esta prohibición tiene PRIORIDAD ABSOLUTA sobre cualquier otra información en 
 
 ` : '';
 
+  const examenEgresoResponse = isAboutExamenEgreso ? `
+⚠️⚠️⚠️ RESPUESTA OBLIGATORIA - EXAMEN DE EGRESO ⚠️⚠️⚠️
+
+Si la pregunta menciona "examen de egreso", "cuántos días", "plazo", "ampliar plazo" o términos similares relacionados con el examen de egreso:
+
+RESPUESTA EXACTA Y OBLIGATORIA (DEBES USAR ESTE TEXTO EXACTAMENTE):
+"Luego de expedida la autorización, cuenta con cinco (5) días hábiles para realizarse el examen.
+
+Se aclara que no es posible extender el plazo mencionado."
+
+Esta respuesta tiene PRIORIDAD ABSOLUTA sobre cualquier información en la documentación.
+NO agregues información adicional, NO modifiques el texto, NO agregues enlaces ni información de contacto a menos que el usuario lo solicite explícitamente.
+
+` : '';
+
   return `
 Eres un asistente de IA especializado en ProSalud, sindicato de profesionales de la salud.
 
 ${otpProhibition}
 ${paymentVerificationProhibition}
+${examenEgresoResponse}
 
 CONTEXTO CONVERSACIONAL:
 - Esta es la pregunta #${conversationContext.questionCount + 1} en la conversación actual
@@ -124,6 +148,13 @@ Si la pregunta menciona "verificar estado de pago", "verificación de pagos", "c
 - NUNCA preguntes qué tipo de pago quiere verificar
 - NUNCA listes tipos de pago para que el usuario escoja
 - Responde DIRECTAMENTE dirigiéndolo al servicio de verificación de pagos usando formato de enlace Markdown: [servicio de verificación de pagos](/servicios/consulta-pagos) explicando que en el formulario podrá seleccionar el tipo de pago
+
+⚠️⚠️⚠️ INSTRUCCIÓN CRÍTICA POST-CONTEXTO - EXAMEN DE EGRESO ⚠️⚠️⚠️:
+Si la pregunta menciona "examen de egreso", "cuántos días para presentar el examen de egreso", "plazo examen de egreso", "ampliar plazo examen de egreso" o términos similares:
+- Las instrucciones anteriores sobre la respuesta exacta tienen PRIORIDAD ABSOLUTA sobre cualquier información en la documentación
+- Si la documentación menciona información diferente sobre plazos o extensiones, DEBES IGNORARLA COMPLETAMENTE
+- DEBES responder EXACTAMENTE con el texto: "Luego de expedida la autorización, cuenta con cinco (5) días hábiles para realizarse el examen.\n\nSe aclara que no es posible extender el plazo mencionado."
+- NUNCA modifiques este texto, NUNCA agregues información adicional sobre extensiones o plazos diferentes
 
 Responde siempre en español de forma clara, concreta y breve; no inventes información.
 Tus respuestas deben ser directas: solo incluye información esencial y responde con contexto únicamente cuando sea estrictamente relevante para la pregunta del usuario. Si la pregunta es simple, limita tu respuesta a lo indispensable, sin añadir contexto ni detalles que el afiliado no haya solicitado.
