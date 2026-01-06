@@ -134,7 +134,40 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
 
 // Schema para el formulario de respuesta
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
+const MAX_COMPRESSED_FILE_SIZE = 20 * 1024 * 1024; // 20MB en bytes para archivos comprimidos
 const MAX_FILES = 4;
+
+// Tipos MIME de archivos comprimidos
+const COMPRESSED_FILE_TYPES = [
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-rar-compressed',
+  'application/vnd.rar',
+  'application/x-rar',
+];
+
+// Tipos de archivo permitidos para respuestas a solicitudes (incluyendo archivos comprimidos)
+const ALLOWED_RESPONSE_FILE_TYPES = [
+  // PDF
+  'application/pdf',
+  // Word
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // Excel
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // Imágenes
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  // Archivos comprimidos
+  ...COMPRESSED_FILE_TYPES,
+];
+
+// Función helper para detectar si un archivo es comprimido
+const isCompressedFile = (file: File): boolean => {
+  return COMPRESSED_FILE_TYPES.includes(file.type);
+};
 
 const getParentescoLabel = (parentesco?: string) => {
   if (!parentesco) return '';
@@ -153,15 +186,34 @@ const responseFormSchema = z.object({
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
     
-    // Validar cantidad de archivos
-    if (files.length > MAX_FILES) {
+    const fileList = Array.from(files as FileList);
+    
+    // Validar tipos de archivo permitidos
+    const allValidTypes = fileList.every(file => ALLOWED_RESPONSE_FILE_TYPES.includes(file.type));
+    if (!allValidTypes) return false;
+    
+    // Separar archivos comprimidos de no comprimidos
+    const compressedFiles = fileList.filter(file => isCompressedFile(file));
+    const nonCompressedFiles = fileList.filter(file => !isCompressedFile(file));
+    
+    // Si hay archivos comprimidos, solo se permite 1 archivo en total
+    if (compressedFiles.length > 0) {
+      if (fileList.length > 1) return false; // No se puede mezclar comprimidos con otros archivos
+      if (compressedFiles.length > 1) return false; // Solo un archivo comprimido
+      // Validar tamaño del archivo comprimido (20 MB)
+      return compressedFiles[0].size <= MAX_COMPRESSED_FILE_SIZE;
+    }
+    
+    // Si no hay comprimidos, validar archivos normales
+    if (nonCompressedFiles.length > MAX_FILES) {
       return false;
     }
     
-    // Validar tamaño de cada archivo
-    return Array.from(files as FileList).every(file => file.size <= MAX_FILE_SIZE);
+    // Validar tamaño de archivos normales (4 MB)
+    const allValidSize = nonCompressedFiles.every(file => file.size <= MAX_FILE_SIZE);
+    return allValidSize;
   }, {
-    message: `Puede adjuntar máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
+    message: `Archivos comprimidos (ZIP, RAR): máximo 1 archivo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB (no se pueden mezclar con otros archivos). Otros archivos: máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
   }),
 });
 
@@ -191,15 +243,34 @@ const responseWithCompensacionesFormSchema = z.object({
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
     
-    // Validar cantidad de archivos
-    if (files.length > MAX_FILES) {
+    const fileList = Array.from(files as FileList);
+    
+    // Validar tipos de archivo permitidos
+    const allValidTypes = fileList.every(file => ALLOWED_RESPONSE_FILE_TYPES.includes(file.type));
+    if (!allValidTypes) return false;
+    
+    // Separar archivos comprimidos de no comprimidos
+    const compressedFiles = fileList.filter(file => isCompressedFile(file));
+    const nonCompressedFiles = fileList.filter(file => !isCompressedFile(file));
+    
+    // Si hay archivos comprimidos, solo se permite 1 archivo en total
+    if (compressedFiles.length > 0) {
+      if (fileList.length > 1) return false; // No se puede mezclar comprimidos con otros archivos
+      if (compressedFiles.length > 1) return false; // Solo un archivo comprimido
+      // Validar tamaño del archivo comprimido (20 MB)
+      return compressedFiles[0].size <= MAX_COMPRESSED_FILE_SIZE;
+    }
+    
+    // Si no hay comprimidos, validar archivos normales
+    if (nonCompressedFiles.length > MAX_FILES) {
       return false;
     }
     
-    // Validar tamaño de cada archivo
-    return Array.from(files as FileList).every(file => file.size <= MAX_FILE_SIZE);
+    // Validar tamaño de archivos normales (4 MB)
+    const allValidSize = nonCompressedFiles.every(file => file.size <= MAX_FILE_SIZE);
+    return allValidSize;
   }, {
-    message: `Puede adjuntar máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
+    message: `Archivos comprimidos (ZIP, RAR): máximo 1 archivo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB (no se pueden mezclar con otros archivos). Otros archivos: máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
   }),
 });
 
@@ -3342,28 +3413,80 @@ const AdminSolicitudesPage: React.FC = () => {
 
                         const selectedFiles = Array.from(e.target.files);
                         const currentFiles = files; // Archivos ya existentes
-                        const totalFilesCount = currentFiles.length + selectedFiles.length;
                         
-                        // Validar que no exceda el máximo total de archivos
-                        if (totalFilesCount > MAX_FILES) {
-                          const availableSlots = MAX_FILES - currentFiles.length;
+                        // Validar tipos de archivo permitidos
+                        const invalidTypeFiles = selectedFiles.filter(file => !ALLOWED_RESPONSE_FILE_TYPES.includes(file.type));
+                        if (invalidTypeFiles.length > 0) {
                           toast.error("Error al seleccionar archivos", {
-                            description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
-                            duration: 4000,
-                          });
-                          e.target.value = '';
-                          return;
-                        }
-
-                        // Validar tamaño de cada archivo nuevo (antes de optimizar)
-                        const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
-                        if (oversizedFiles.length > 0) {
-                          toast.error("Error al seleccionar archivos", {
-                            description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                            description: `Los siguientes archivos no son de un tipo permitido (PDF, Word, Excel, imágenes JPG/PNG, ZIP, RAR): ${invalidTypeFiles.map(f => f.name).join(', ')}`,
                             duration: 5000,
                           });
                           e.target.value = '';
                           return;
+                        }
+                        
+                        // Separar archivos comprimidos de no comprimidos
+                        const selectedCompressed = selectedFiles.filter(file => isCompressedFile(file));
+                        const selectedNonCompressed = selectedFiles.filter(file => !isCompressedFile(file));
+                        const currentCompressed = currentFiles.filter(file => isCompressedFile(file));
+                        const currentNonCompressed = currentFiles.filter(file => !isCompressedFile(file));
+                        
+                        // Si hay archivos comprimidos seleccionados o actuales
+                        if (selectedCompressed.length > 0 || currentCompressed.length > 0) {
+                          // No se puede mezclar comprimidos con otros archivos
+                          if (selectedNonCompressed.length > 0 || currentNonCompressed.length > 0) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: "No se pueden mezclar archivos comprimidos con otros tipos de archivos. Si adjunta un archivo comprimido, debe ser el único archivo.",
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Solo se permite 1 archivo comprimido en total
+                          const totalCompressedCount = selectedCompressed.length + currentCompressed.length;
+                          if (totalCompressedCount > 1) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: "Solo se permite adjuntar un archivo comprimido (ZIP o RAR).",
+                              duration: 4000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Validar tamaño del archivo comprimido (20 MB)
+                          const compressedFileToCheck = selectedCompressed.length > 0 ? selectedCompressed[0] : currentCompressed[0];
+                          if (compressedFileToCheck && compressedFileToCheck.size > MAX_COMPRESSED_FILE_SIZE) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: `El archivo comprimido "${compressedFileToCheck.name}" excede el tamaño máximo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB.`,
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                        } else {
+                          // Si no hay comprimidos, validar archivos normales
+                          const totalFilesCount = currentFiles.length + selectedFiles.length;
+                          if (totalFilesCount > MAX_FILES) {
+                            const availableSlots = MAX_FILES - currentFiles.length;
+                            toast.error("Error al seleccionar archivos", {
+                              description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
+                              duration: 4000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Validar tamaño de archivos normales (4 MB)
+                          const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+                          if (oversizedFiles.length > 0) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
                         }
 
                         // Verificar si hay imágenes para optimizar
@@ -3443,8 +3566,9 @@ const AdminSolicitudesPage: React.FC = () => {
                                   <Input
                                     type="file"
                                     multiple
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.rar"
                                     onChange={handleFileChange}
-                                    disabled={isOptimizing || files.length >= MAX_FILES}
+                                    disabled={isOptimizing || files.length >= MAX_FILES || files.some(file => isCompressedFile(file))}
                                     className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
                                   />
                                   {hasFiles && (
@@ -3457,19 +3581,35 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                           </FormControl>
                           <FormDescription>
-                            Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
-                            Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG).
-                            {files.length >= MAX_FILES && (
-                              <span className="block mt-1 text-amber-600 font-medium">
-                                Límite alcanzado. Elimine archivos para agregar más.
-                              </span>
-                            )}
+                            {(() => {
+                              const hasCompressed = files.some(file => isCompressedFile(file));
+                              if (hasCompressed) {
+                                return (
+                                  <>
+                                    Archivos comprimidos (ZIP, RAR): máximo 1 archivo de {MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB. No se pueden mezclar con otros tipos de archivos.
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
+                                  Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG), archivos comprimidos (ZIP, RAR).
+                                  {files.length >= MAX_FILES && (
+                                    <span className="block mt-1 text-amber-600 font-medium">
+                                      Límite alcanzado. Elimine archivos para agregar más.
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </FormDescription>
                           {hasFiles && (
                             <div className="mt-2 space-y-2">
                               {files.map((file, index) => {
                                 const fileSizeMB = file.size / (1024 * 1024);
-                                const isOversized = file.size > MAX_FILE_SIZE;
+                                const isCompressed = isCompressedFile(file);
+                                const maxSizeForFile = isCompressed ? MAX_COMPRESSED_FILE_SIZE : MAX_FILE_SIZE;
+                                const isOversized = file.size > maxSizeForFile;
                                 
                                 return (
                                   <div
@@ -4062,26 +4202,80 @@ const AdminSolicitudesPage: React.FC = () => {
 
                         const selectedFiles = Array.from(e.target.files);
                         const currentFiles = files;
-                        const totalFilesCount = currentFiles.length + selectedFiles.length;
                         
-                        if (totalFilesCount > MAX_FILES) {
-                          const availableSlots = MAX_FILES - currentFiles.length;
+                        // Validar tipos de archivo permitidos
+                        const invalidTypeFiles = selectedFiles.filter(file => !ALLOWED_RESPONSE_FILE_TYPES.includes(file.type));
+                        if (invalidTypeFiles.length > 0) {
                           toast.error("Error al seleccionar archivos", {
-                            description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
-                            duration: 4000,
-                          });
-                          e.target.value = '';
-                          return;
-                        }
-
-                        const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
-                        if (oversizedFiles.length > 0) {
-                          toast.error("Error al seleccionar archivos", {
-                            description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                            description: `Los siguientes archivos no son de un tipo permitido (PDF, Word, Excel, imágenes JPG/PNG, ZIP, RAR): ${invalidTypeFiles.map(f => f.name).join(', ')}`,
                             duration: 5000,
                           });
                           e.target.value = '';
                           return;
+                        }
+                        
+                        // Separar archivos comprimidos de no comprimidos
+                        const selectedCompressed = selectedFiles.filter(file => isCompressedFile(file));
+                        const selectedNonCompressed = selectedFiles.filter(file => !isCompressedFile(file));
+                        const currentCompressed = currentFiles.filter(file => isCompressedFile(file));
+                        const currentNonCompressed = currentFiles.filter(file => !isCompressedFile(file));
+                        
+                        // Si hay archivos comprimidos seleccionados o actuales
+                        if (selectedCompressed.length > 0 || currentCompressed.length > 0) {
+                          // No se puede mezclar comprimidos con otros archivos
+                          if (selectedNonCompressed.length > 0 || currentNonCompressed.length > 0) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: "No se pueden mezclar archivos comprimidos con otros tipos de archivos. Si adjunta un archivo comprimido, debe ser el único archivo.",
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Solo se permite 1 archivo comprimido en total
+                          const totalCompressedCount = selectedCompressed.length + currentCompressed.length;
+                          if (totalCompressedCount > 1) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: "Solo se permite adjuntar un archivo comprimido (ZIP o RAR).",
+                              duration: 4000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Validar tamaño del archivo comprimido (20 MB)
+                          const compressedFileToCheck = selectedCompressed.length > 0 ? selectedCompressed[0] : currentCompressed[0];
+                          if (compressedFileToCheck && compressedFileToCheck.size > MAX_COMPRESSED_FILE_SIZE) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: `El archivo comprimido "${compressedFileToCheck.name}" excede el tamaño máximo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB.`,
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                        } else {
+                          // Si no hay comprimidos, validar archivos normales
+                          const totalFilesCount = currentFiles.length + selectedFiles.length;
+                          if (totalFilesCount > MAX_FILES) {
+                            const availableSlots = MAX_FILES - currentFiles.length;
+                            toast.error("Error al seleccionar archivos", {
+                              description: `Solo puede adjuntar ${availableSlots} archivo(s) más. Máximo ${MAX_FILES} archivos permitidos.`,
+                              duration: 4000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
+                          
+                          // Validar tamaño de archivos normales (4 MB)
+                          const oversizedFiles = selectedFiles.filter(file => file.size > MAX_FILE_SIZE);
+                          if (oversizedFiles.length > 0) {
+                            toast.error("Error al seleccionar archivos", {
+                              description: `Los siguientes archivos exceden el tamaño máximo de ${MAX_FILE_SIZE / (1024 * 1024)}MB: ${oversizedFiles.map(f => f.name).join(', ')}`,
+                              duration: 5000,
+                            });
+                            e.target.value = '';
+                            return;
+                          }
                         }
 
                         const hasImages = selectedFiles.some(file => isImageFile(file));
@@ -4147,8 +4341,9 @@ const AdminSolicitudesPage: React.FC = () => {
                                   <Input
                                     type="file"
                                     multiple
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.rar"
                                     onChange={handleFileChange}
-                                    disabled={isOptimizing || files.length >= MAX_FILES}
+                                    disabled={isOptimizing || files.length >= MAX_FILES || files.some(file => isCompressedFile(file))}
                                     className="cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-prosalud file:text-white hover:file:bg-primary-prosalud-dark disabled:cursor-not-allowed disabled:opacity-50"
                                   />
                                   {hasFiles && (
@@ -4161,19 +4356,35 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                           </FormControl>
                           <FormDescription>
-                            Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
-                            Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG).
-                            {files.length >= MAX_FILES && (
-                              <span className="block mt-1 text-amber-600 font-medium">
-                                Límite alcanzado. Elimine archivos para agregar más.
-                              </span>
-                            )}
+                            {(() => {
+                              const hasCompressed = files.some(file => isCompressedFile(file));
+                              if (hasCompressed) {
+                                return (
+                                  <>
+                                    Archivos comprimidos (ZIP, RAR): máximo 1 archivo de {MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB. No se pueden mezclar con otros tipos de archivos.
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  Puede adjuntar máximo {MAX_FILES} archivos {files.length > 0 && `(${files.length}/${MAX_FILES} adjuntados)`}. Cada archivo no debe exceder {MAX_FILE_SIZE / (1024 * 1024)}MB.
+                                  Tipos permitidos: PDF, Word, Excel, imágenes (JPG, PNG), archivos comprimidos (ZIP, RAR).
+                                  {files.length >= MAX_FILES && (
+                                    <span className="block mt-1 text-amber-600 font-medium">
+                                      Límite alcanzado. Elimine archivos para agregar más.
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </FormDescription>
                           {hasFiles && (
                             <div className="mt-2 space-y-2">
                               {files.map((file, index) => {
                                 const fileSizeMB = file.size / (1024 * 1024);
-                                const isOversized = file.size > MAX_FILE_SIZE;
+                                const isCompressed = isCompressedFile(file);
+                                const maxSizeForFile = isCompressed ? MAX_COMPRESSED_FILE_SIZE : MAX_FILE_SIZE;
+                                const isOversized = file.size > maxSizeForFile;
                                 
                                 return (
                                   <div
