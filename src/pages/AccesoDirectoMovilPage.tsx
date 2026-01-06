@@ -266,7 +266,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => openVideo(`https://www.youtube.com/embed/${videoIds.android}`)}
+                            onClick={() => openVideo(`https://www.youtube-nocookie.com/embed/${videoIds.android}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`)}
                             className="w-full sm:w-auto"
                           >
                             <PlayCircle className="h-4 w-4 mr-1" />
@@ -375,7 +375,7 @@ const AccesoDirectoMovilPage: React.FC = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => openVideo(`https://www.youtube.com/embed/${videoIds.ios}`)}
+                            onClick={() => openVideo(`https://www.youtube-nocookie.com/embed/${videoIds.ios}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`)}
                             className="w-full sm:w-auto"
                           >
                             <PlayCircle className="h-4 w-4 mr-1" />
@@ -426,25 +426,42 @@ const AccesoDirectoMovilPage: React.FC = () => {
                       <div className="aspect-[9/15] w-full max-w-[300px] mx-auto mt-6 rounded-lg overflow-hidden bg-gray-900 shadow-lg">
                         {activeTab === 'android' ? (
                           <iframe
-                            src={`https://www.youtube.com/embed/${videoIds.android}?rel=0&modestbranding=1`}
+                            src={`https://www.youtube-nocookie.com/embed/${videoIds.android}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`}
                             title="Video instructivo Android"
-                            className="w-full h-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                             allowFullScreen
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
                           />
                         ) : (
                           <iframe
-                            src={`https://www.youtube.com/embed/${videoIds.ios}?rel=0&modestbranding=1`}
+                            src={`https://www.youtube-nocookie.com/embed/${videoIds.ios}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`}
                             title="Video instructivo iOS"
-                            className="w-full h-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                             allowFullScreen
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
                           />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-2 text-center">
-                        {activeTab === 'android' ? 'Instrucciones para Android' : 'Instrucciones para iPhone (iOS)'}
-                      </p>
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-gray-500 text-center">
+                          {activeTab === 'android' ? 'Instrucciones para Android' : 'Instrucciones para iPhone (iOS)'}
+                        </p>
+                        <p className="text-xs text-gray-400 text-center">
+                          Si el video no se muestra,{' '}
+                          <a 
+                            href={activeTab === 'android' ? `https://www.youtube.com/watch?v=${videoIds.android}` : `https://www.youtube.com/watch?v=${videoIds.ios}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700 underline"
+                          >
+                            ábrelo directamente en YouTube
+                          </a>
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -464,9 +481,11 @@ const AccesoDirectoMovilPage: React.FC = () => {
               <iframe
                 src={videoUrl}
                 title="Video instructivo"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
               />
             </div>
           </div>
