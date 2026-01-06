@@ -466,6 +466,11 @@ const requiresManualCompensaciones = (solicitud: Request): boolean => {
   const adicionarActividades = checkFlag(infoCertificado.adicionarActividades);
   if (adicionarActividades) return false;
 
+  // Certificados con "Otros" NO deben manejar compensaciones manuales
+  // porque en la mayoría de los casos se genera el archivo manualmente por el usuario
+  const otros = checkFlag(infoCertificado.otros);
+  if (otros) return false;
+
   // Si tiene valor de compensaciones, subsidio de vivienda o subsidio de desempleo, requiere compensaciones manuales
   return tieneValorCompensaciones || paraSubsidioVivienda || paraSubsidioDesempleo;
 };
