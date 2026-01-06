@@ -212,6 +212,19 @@ export const parentescos = [
   { value: 'HIJA_CONYUGUE', label: 'Hija cónyuge' },
 ];
 
+export const relacionesContactoEmergencia = [
+  { value: 'conyuge', label: 'Cónyuge' },
+  { value: 'padre', label: 'Padre' },
+  { value: 'madre', label: 'Madre' },
+  { value: 'hijo', label: 'Hijo/a' },
+  { value: 'hermano', label: 'Hermano/a' },
+  { value: 'abuelo', label: 'Abuelo/a' },
+  { value: 'tio', label: 'Tío/a' },
+  { value: 'primo', label: 'Primo/a' },
+  { value: 'amigo', label: 'Amigo/a' },
+  { value: 'otro', label: 'Otro' },
+];
+
 export const tiposDocumento = [
   { value: 'CC', label: 'CC' },
   { value: 'TI', label: 'TI' },

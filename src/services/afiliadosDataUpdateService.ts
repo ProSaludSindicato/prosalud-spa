@@ -42,6 +42,10 @@ export interface AfiliadoDataForUpdate {
   banco?: string | null;
   eps?: string | null;
   afp?: string | null;
+  nombre_contacto_emergencia?: string | null;
+  relacion_contacto_emergencia?: string | null;
+  telefono_contacto_emergencia?: string | null;
+  contacto_emergencia?: string | null; // Campo combinado del backend: "telefono - nombre - relacion"
 }
 
 export interface ConvenioDataForUpdate {

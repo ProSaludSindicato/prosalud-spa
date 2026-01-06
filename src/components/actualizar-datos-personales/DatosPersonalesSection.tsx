@@ -4,7 +4,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User } from 'lucide-react';
-import { estadosCiviles, municipios, tallasUniforme } from './formOptions';
+import { estadosCiviles, municipios, tallasUniforme, relacionesContactoEmergencia } from './formOptions';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
@@ -381,6 +381,103 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                 <FormMessage />
               </FormItem>
             )}
+          />
+        </div>
+      </div>
+
+      {/* Sección de Contacto de Emergencia */}
+      <div className="mt-8 pt-6 border-t">
+        <h3 className="text-lg font-semibold mb-4 text-primary-prosalud-dark">Persona de Contacto de Emergencia</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <FormField
+            control={control}
+            name={"nombreContactoEmergencia" as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Nombre
+                  {camposRequeridosPorVacios?.has('nombreContactoEmergencia') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="Ej: Juan Pérez"
+                    {...field}
+                    onChange={(e) => {
+                      // Security: Sanitize name input
+                      const sanitized = sanitizeText(e.target.value, { maxLength: 100 });
+                      field.onChange(sanitized);
+                    }}
+                    className={modifiedFields?.has('nombreContactoEmergencia') ? 'border-green-500 bg-green-50' : ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name={"relacionContactoEmergencia" as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Relación
+                  {camposRequeridosPorVacios?.has('relacionContactoEmergencia') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className={modifiedFields?.has('relacionContactoEmergencia') ? 'border-green-500 bg-green-50' : ''}>
+                      <SelectValue placeholder="Seleccione la relación" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {relacionesContactoEmergencia.map((relacion) => (
+                      <SelectItem key={relacion.value} value={relacion.value}>
+                        {relacion.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name={"telefonoContactoEmergencia" as any}
+            render={({ field }) => {
+              const fieldProps = createObfuscatedField(
+                'telefonoContactoEmergencia',
+                field,
+                initialValues?.telefonoContactoEmergencia,
+                'phone',
+                'Ej: 3001234567'
+              );
+
+              return (
+              <FormItem>
+                <FormLabel>
+                  Número Telefónico
+                  {camposRequeridosPorVacios?.has('telefonoContactoEmergencia') && <span className="text-red-500 ml-1">*</span>}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="tel"
+                    placeholder="Ej: 3001234567"
+                    {...field}
+                      value={fieldProps.displayValue}
+                      onChange={fieldProps.handleChange}
+                      onFocus={fieldProps.handleFocus}
+                      onBlur={fieldProps.handleBlur}
+                    className={modifiedFields?.has('telefonoContactoEmergencia') ? 'border-green-500 bg-green-50' : ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+              );
+            }}
           />
         </div>
       </div>

@@ -154,6 +154,120 @@ const normalizeAfp = (value: string | null | undefined): string => {
   return found?.value || 'otros';
 };
 
+// Función para parsear el campo de contacto de emergencia
+// Formato esperado: "telefono - nombre - relacion" o "telefono - nombre"
+const parseContactoEmergencia = (value: string | null | undefined): {
+  telefono: string;
+  nombre: string;
+  relacion: string;
+} => {
+  if (!value || !value.trim()) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Dividir por " - " (espacio, guion, espacio)
+  const parts = value.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
+  
+  if (parts.length === 0) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Si hay 3 partes: telefono, nombre, relacion
+  if (parts.length >= 3) {
+    return {
+      telefono: parts[0] || '',
+      nombre: parts[1] || '',
+      relacion: parts[2] || '',
+    };
+  }
+
+  // Si hay 2 partes: puede ser telefono - nombre (sin relacion)
+  if (parts.length === 2) {
+    // Intentar determinar cuál es teléfono (solo números) y cuál es nombre
+    const firstIsPhone = /^\d+$/.test(parts[0]);
+    if (firstIsPhone) {
+      return {
+        telefono: parts[0] || '',
+        nombre: parts[1] || '',
+        relacion: '',
+      };
+    } else {
+      // Si el primero no es solo números, asumir que es nombre y el segundo teléfono
+      const secondIsPhone = /^\d+$/.test(parts[1]);
+      if (secondIsPhone) {
+        return {
+          telefono: parts[1] || '',
+          nombre: parts[0] || '',
+          relacion: '',
+        };
+      }
+      // Si ninguno es solo números, asumir formato: telefono - nombre
+      return {
+        telefono: parts[0] || '',
+        nombre: parts[1] || '',
+        relacion: '',
+      };
+    }
+  }
+
+  // Si solo hay 1 parte, intentar determinar si es teléfono o nombre
+  if (parts.length === 1) {
+    const isPhone = /^\d+$/.test(parts[0]);
+    if (isPhone) {
+      return {
+        telefono: parts[0] || '',
+        nombre: '',
+        relacion: '',
+      };
+    } else {
+      return {
+        telefono: '',
+        nombre: parts[0] || '',
+        relacion: '',
+      };
+    }
+  }
+
+  return { telefono: '', nombre: '', relacion: '' };
+};
+
+// Función para normalizar la relación de contacto de emergencia
+const normalizeRelacionContactoEmergencia = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  
+  // Mapear valores comunes a los valores del select
+  const mapping: Record<string, string> = {
+    'conyuge': 'conyuge',
+    'cónyuge': 'conyuge',
+    'esposo': 'conyuge',
+    'esposa': 'conyuge',
+    'padre': 'padre',
+    'papá': 'padre',
+    'papa': 'padre',
+    'madre': 'madre',
+    'mamá': 'madre',
+    'mama': 'madre',
+    'hijo': 'hijo',
+    'hija': 'hijo', // Ambos mapean a 'hijo' porque el select usa 'Hijo/a'
+    'hermano': 'hermano',
+    'hermana': 'hermano', // Ambos mapean a 'hermano' porque el select usa 'Hermano/a'
+    'abuelo': 'abuelo',
+    'abuela': 'abuelo', // Ambos mapean a 'abuelo' porque el select usa 'Abuelo/a'
+    'tio': 'tio',
+    'tío': 'tio',
+    'tia': 'tio', // Ambos mapean a 'tio' porque el select usa 'Tío/a'
+    'tía': 'tio',
+    'primo': 'primo',
+    'prima': 'primo', // Ambos mapean a 'primo' porque el select usa 'Primo/a'
+    'amigo': 'amigo',
+    'amiga': 'amigo', // Ambos mapean a 'amigo' porque el select usa 'Amigo/a'
+    'otro': 'otro',
+  };
+  
+  return mapping[normalized] || normalized.replace(/\s+/g, '_');
+};
+
 const ALLOWED_FILE_TYPES_CERTIFICADO = ALLOWED_FILE_TYPES_ALL;
 
 const beneficiarioSchema = z.object({
@@ -172,12 +286,18 @@ const createFormSchema = (initialValues: {
   celular?: string;
   tallaUniforme?: string;
   tallaCalzado?: string;
+  nombreContactoEmergencia?: string;
+  relacionContactoEmergencia?: string;
+  telefonoContactoEmergencia?: string;
 }) => {
   // Determinar qué campos son requeridos (están vacíos en los datos iniciales)
   const estadoCivilVacio = !initialValues.estadoCivil || initialValues.estadoCivil.trim() === '';
   const celularVacio = !initialValues.celular || initialValues.celular.trim() === '';
   const tallaUniformeVacio = !initialValues.tallaUniforme || initialValues.tallaUniforme.trim() === '';
   const tallaCalzadoVacio = !initialValues.tallaCalzado || initialValues.tallaCalzado.trim() === '';
+  const nombreContactoEmergenciaVacio = !initialValues.nombreContactoEmergencia || initialValues.nombreContactoEmergencia.trim() === '';
+  const relacionContactoEmergenciaVacio = !initialValues.relacionContactoEmergencia || initialValues.relacionContactoEmergencia.trim() === '';
+  const telefonoContactoEmergenciaVacio = !initialValues.telefonoContactoEmergencia || initialValues.telefonoContactoEmergencia.trim() === '';
 
   return z.object({
     // Datos personales
@@ -220,6 +340,17 @@ const createFormSchema = (initialValues: {
     // Talla de Calzado: requerido si está vacío en los datos iniciales
     tallaCalzado: tallaCalzadoVacio
       ? z.string().min(1, 'La talla de calzado es requerida')
+      : z.string().optional(),
+  
+    // Contacto de emergencia: requerido si está vacío en los datos iniciales
+    nombreContactoEmergencia: nombreContactoEmergenciaVacio
+      ? z.string().min(1, 'El nombre del contacto de emergencia es requerido')
+      : z.string().optional(),
+    relacionContactoEmergencia: relacionContactoEmergenciaVacio
+      ? z.string().min(1, 'La relación del contacto de emergencia es requerida')
+      : z.string().optional(),
+    telefonoContactoEmergencia: telefonoContactoEmergenciaVacio
+      ? z.string().min(1, 'El teléfono del contacto de emergencia es requerido')
       : z.string().optional(),
   
   // Nivel educativo (opcional - solo si se quiere actualizar)
@@ -265,6 +396,9 @@ const formSchemaActualizarDatosPersonales = createFormSchema({
   celular: '',
   tallaUniforme: '',
   tallaCalzado: '',
+  nombreContactoEmergencia: '',
+  relacionContactoEmergencia: '',
+  telefonoContactoEmergencia: '',
 });
 
 type FormValuesActualizarDatosPersonales = z.infer<ReturnType<typeof createFormSchema>>;
@@ -288,6 +422,19 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     correo: afiliado?.correo_personal || '',
     tallaUniforme: afiliado?.talla_uniforme ? afiliado.talla_uniforme.toLowerCase() : '',
     tallaCalzado: afiliado?.talla_calzado || '',
+    // Parsear contacto de emergencia: si viene separado, usarlo; si viene combinado, parsearlo
+    ...(afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia ? (() => {
+      const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+      return {
+        nombreContactoEmergencia: parsed.nombre,
+        relacionContactoEmergencia: normalizeRelacionContactoEmergencia(parsed.relacion),
+        telefonoContactoEmergencia: parsed.telefono,
+      };
+    })() : {
+      nombreContactoEmergencia: afiliado?.nombre_contacto_emergencia || '',
+      relacionContactoEmergencia: normalizeRelacionContactoEmergencia(afiliado?.relacion_contacto_emergencia),
+      telefonoContactoEmergencia: afiliado?.telefono_contacto_emergencia || '',
+    }),
     nivelEducativo: normalizeNivelEducacion(afiliado?.nivel_educacion),
     diplomaEducativo: undefined,
     actaGrado: undefined,
@@ -309,6 +456,9 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       celular: initialValues.celular,
       tallaUniforme: initialValues.tallaUniforme,
       tallaCalzado: initialValues.tallaCalzado,
+      nombreContactoEmergencia: initialValues.nombreContactoEmergencia,
+      relacionContactoEmergencia: initialValues.relacionContactoEmergencia,
+      telefonoContactoEmergencia: initialValues.telefonoContactoEmergencia,
     });
   }, [initialValues]);
 
@@ -354,6 +504,15 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     }
     if (!initialValues.tallaCalzado || initialValues.tallaCalzado.trim() === '') {
       requeridos.add('tallaCalzado');
+    }
+    if (!initialValues.nombreContactoEmergencia || initialValues.nombreContactoEmergencia.trim() === '') {
+      requeridos.add('nombreContactoEmergencia');
+    }
+    if (!initialValues.relacionContactoEmergencia || initialValues.relacionContactoEmergencia.trim() === '') {
+      requeridos.add('relacionContactoEmergencia');
+    }
+    if (!initialValues.telefonoContactoEmergencia || initialValues.telefonoContactoEmergencia.trim() === '') {
+      requeridos.add('telefonoContactoEmergencia');
     }
     return requeridos;
   }, [initialValues]);
@@ -444,7 +603,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     
     if (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneCamposRequeridosDiligenciados) {
       toast.error('No hay cambios para actualizar', {
-        description: 'Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado) para enviar la solicitud de actualización.',
+        description: 'Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.',
         duration: 5000,
         icon: <AlertCircle className="h-5 w-5 text-red-600" />,
       });
@@ -660,6 +819,16 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       if ((modifiedFields.has('tallaCalzado') || camposRequeridosPorVacios.has('tallaCalzado')) && data.tallaCalzado) {
         payload.tallaCalzado = data.tallaCalzado;
       }
+      // Campos de contacto de emergencia: incluir si fueron modificados O si estaban vacíos y ahora tienen valor
+      if ((modifiedFields.has('nombreContactoEmergencia') || camposRequeridosPorVacios.has('nombreContactoEmergencia')) && data.nombreContactoEmergencia) {
+        payload.nombreContactoEmergencia = data.nombreContactoEmergencia;
+      }
+      if ((modifiedFields.has('relacionContactoEmergencia') || camposRequeridosPorVacios.has('relacionContactoEmergencia')) && data.relacionContactoEmergencia) {
+        payload.relacionContactoEmergencia = data.relacionContactoEmergencia;
+      }
+      if ((modifiedFields.has('telefonoContactoEmergencia') || camposRequeridosPorVacios.has('telefonoContactoEmergencia')) && data.telefonoContactoEmergencia) {
+        payload.telefonoContactoEmergencia = data.telefonoContactoEmergencia;
+      }
       if (modifiedFields.has('nivelEducativo') && data.nivelEducativo) {
         payload.nivelEducativo = data.nivelEducativo;
       }
@@ -794,6 +963,9 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       'payload.celular': 'Celular',
       'payload.correo': 'Correo electrónico',
       'payload.tallaUniforme': 'Talla de uniforme',
+      'payload.nombreContactoEmergencia': 'Nombre contacto de emergencia',
+      'payload.relacionContactoEmergencia': 'Relación contacto de emergencia',
+      'payload.telefonoContactoEmergencia': 'Teléfono contacto de emergencia',
       'payload.nivelEducativo': 'Nivel educativo',
       'payload.numeroCuenta': 'Número de cuenta',
       'payload.tipoCuenta': 'Tipo de cuenta',
@@ -915,7 +1087,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
                   {!isSubmitting && !isInitializing && camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && camposRequeridosPorVacios.size === 0 && (
                     <TooltipContent side="top" className="max-w-xs bg-gray-800 text-white border-gray-700">
                       <p className="text-sm text-white">
-                        Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado) para enviar la solicitud de actualización.
+                        Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.
                       </p>
                     </TooltipContent>
                   )}

@@ -47,6 +47,10 @@ export interface AfiliadoData {
   banco?: string | null;
   eps?: string | null;
   afp?: string | null;
+  nombre_contacto_emergencia?: string | null;
+  relacion_contacto_emergencia?: string | null;
+  telefono_contacto_emergencia?: string | null;
+  contacto_emergencia?: string | null; // Campo combinado del backend: "telefono - nombre - relacion"
 }
 
 interface AfiliadoAuthContextType {
@@ -389,6 +393,27 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         banco: response.data.afiliado.banco || null,
         eps: response.data.afiliado.eps || null,
         afp: response.data.afiliado.afp || null,
+        // Parsear contacto_emergencia si viene del backend (para OTP también)
+        contacto_emergencia: (response.data.afiliado as any).contacto_emergencia || null,
+        // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
+        ...((response.data.afiliado as any).contacto_emergencia && !(response.data.afiliado as any).telefono_contacto_emergencia ? (() => {
+          // Parsear el campo combinado: "telefono - nombre - relacion"
+          const contacto = (response.data.afiliado as any).contacto_emergencia;
+          const parts = contacto.split(' - ').map((part: string) => part.trim()).filter((part: string) => part.length > 0);
+          if (parts.length >= 2) {
+            const firstIsPhone = /^\d+$/.test(parts[0]);
+            return {
+              telefono_contacto_emergencia: firstIsPhone ? parts[0] : (parts.length >= 3 ? parts[0] : ''),
+              nombre_contacto_emergencia: firstIsPhone ? parts[1] : parts[0],
+              relacion_contacto_emergencia: parts.length >= 3 ? parts[2] : '',
+            };
+          }
+          return {};
+        })() : {
+          telefono_contacto_emergencia: (response.data.afiliado as any).telefono_contacto_emergencia || null,
+          nombre_contacto_emergencia: (response.data.afiliado as any).nombre_contacto_emergencia || null,
+          relacion_contacto_emergencia: (response.data.afiliado as any).relacion_contacto_emergencia || null,
+        }),
       };
 
       const newExpiresAt = Date.now() + SESSION_DURATION;
@@ -499,6 +524,27 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         banco: response.data.afiliado.banco || null,
         eps: response.data.afiliado.eps || null,
         afp: response.data.afiliado.afp || null,
+        // Parsear contacto_emergencia si viene del backend
+        contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
+        // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
+        ...(response.data.afiliado.contacto_emergencia && !response.data.afiliado.telefono_contacto_emergencia ? (() => {
+          // Parsear el campo combinado: "telefono - nombre - relacion"
+          const contacto = response.data.afiliado.contacto_emergencia;
+          const parts = contacto.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
+          if (parts.length >= 2) {
+            const firstIsPhone = /^\d+$/.test(parts[0]);
+            return {
+              telefono_contacto_emergencia: firstIsPhone ? parts[0] : (parts.length >= 3 ? parts[0] : ''),
+              nombre_contacto_emergencia: firstIsPhone ? parts[1] : parts[0],
+              relacion_contacto_emergencia: parts.length >= 3 ? parts[2] : '',
+            };
+          }
+          return {};
+        })() : {
+          telefono_contacto_emergencia: response.data.afiliado.telefono_contacto_emergencia || null,
+          nombre_contacto_emergencia: response.data.afiliado.nombre_contacto_emergencia || null,
+          relacion_contacto_emergencia: response.data.afiliado.relacion_contacto_emergencia || null,
+        }),
       };
 
       const newExpiresAt = Date.now() + SESSION_DURATION;
