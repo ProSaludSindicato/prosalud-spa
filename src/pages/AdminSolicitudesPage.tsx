@@ -60,7 +60,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { requestsService } from "@/services/requestsServiceApi";
 import { Request } from "@/types/requests";
-import { ApiRequest } from "@/services/requestsApi";
+import { ApiRequest, requestsApiService } from "@/services/requestsApi";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
 import ResponseAttachmentsSection from "@/components/admin/solicitudes/ResponseAttachmentsSection";
@@ -70,6 +70,23 @@ import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpd
 import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
 import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/UpdateAfiliadosReminderDialog";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+// Subtipos válidos para verificación de pagos
+// Estos valores deben coincidir exactamente con los valores del backend (case-sensitive)
+const VERIFICACION_PAGOS_SUBTIPOS = [
+  { value: 'COMPENSACIÓN. FINAL (LIQUIDACIÓN)', label: 'Compensación Final' },
+  { value: 'COMPENSACIÓN ANUAL DIFERIDA Y/O DESCANSO', label: 'Compensación Anual Diferida' },
+  { value: 'COMPENSACIÓN POR DESCANSO', label: 'Compensación por Descanso' },
+  { value: 'DESCUENTOS SEGURIDAD SOCIAL', label: 'Descuentos Seguridad Social' },
+  { value: 'DUPLICADO COLILLAS', label: 'Duplicado Colillas' },
+  { value: 'VIATICOS', label: 'Viáticos' },
+  { value: 'Ceiisas', label: 'Ceiisas' },
+  { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
+  { value: 'COMPENSACIÓN SEMESTRAL', label: 'Compensación Semestral' },
+  { value: 'INCAPACIDADES', label: 'Incapacidades' },
+];
 
 // Map backend request type to frontend request type
 const mapBackendRequestTypeToFrontend = (backendType: string): Request['request_type'] => {
@@ -503,6 +520,9 @@ const AdminSolicitudesPage: React.FC = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [microcreditoConfirmDialogOpen, setMicrocreditoConfirmDialogOpen] = useState(false);
   const [pendingResponseData, setPendingResponseData] = useState<ResponseFormValues | null>(null);
+  const [selectedSubtype, setSelectedSubtype] = useState<string>("");
+  const [isRedirectingSubtype, setIsRedirectingSubtype] = useState(false);
+  const [isSubtypeRedirectOpen, setIsSubtypeRedirectOpen] = useState(false);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -523,6 +543,25 @@ const AdminSolicitudesPage: React.FC = () => {
     // Si hay correo nuevo y es diferente del actual, hay cambio
     return nuevoEmailRaw && nuevoEmailRaw.trim() !== '' && nuevoEmailRaw !== pendingUpdate.email;
   };
+
+  // Mostrar toast de éxito después de recargar la página (si existe en sessionStorage)
+  useEffect(() => {
+    const savedToast = sessionStorage.getItem('subtypeRedirectSuccess');
+    if (savedToast) {
+      try {
+        const { message, description } = JSON.parse(savedToast);
+        toast.success(message, {
+          description,
+          duration: 8000, // 8 segundos para que el usuario pueda leer el mensaje
+        });
+        // Limpiar el mensaje guardado después de mostrarlo
+        sessionStorage.removeItem('subtypeRedirectSuccess');
+      } catch (error) {
+        // Si hay error al parsear, simplemente limpiar
+        sessionStorage.removeItem('subtypeRedirectSuccess');
+      }
+    }
+  }, []); // Solo se ejecuta una vez al montar el componente
 
   // Form para la respuesta normal
   const responseForm = useForm<ResponseFormValues>({
@@ -619,6 +658,61 @@ const AdminSolicitudesPage: React.FC = () => {
       responseForm.setValue('emailBody', MICROCREDITO_REJECTED_EMAIL_BODY, { shouldValidate: false });
     }
   }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
+
+  // Función para redirigir el subtipo de una solicitud
+  const handleRedirectSubtype = async () => {
+    if (!selectedSolicitud || !selectedSubtype) {
+      toast.error("Por favor seleccione un subtipo");
+      return;
+    }
+
+    // Validar que el tipo de solicitud es verificacion-pagos
+    if (selectedSolicitud.request_type !== 'verificacion-pagos') {
+      toast.error("La redirección de subtipos solo está disponible para solicitudes de verificación de pagos");
+      return;
+    }
+
+    // Validar que el subtipo seleccionado es diferente al actual
+    const currentSubtype = selectedSolicitud.payload?.solicitudRelacionadaCon;
+    if (currentSubtype === selectedSubtype) {
+      toast.error("El subtipo seleccionado es el mismo que el actual");
+      return;
+    }
+
+    setIsRedirectingSubtype(true);
+    try {
+      const result = await requestsApiService.redirectSubtype(selectedSolicitud.id, selectedSubtype);
+
+      // Construir nombres de usuarios asignados para el toast
+      const assignedNames = Array.isArray(result.data?.assigned_users)
+        ? result.data.assigned_users
+            .map((u: any) => u?.name)
+            .filter((n: any) => typeof n === 'string' && n.trim() !== '')
+            .join(', ')
+        : '';
+
+      const toastMessage = result.message || "Solicitud redirigida exitosamente";
+      const toastDescription = result.data.assigned_users.length > 0
+        ? `Usuarios asignados: ${assignedNames}`
+        : 'No hay usuarios asignados al nuevo subtipo.';
+
+      // Guardar el mensaje del toast en sessionStorage para mostrarlo después de recargar
+      sessionStorage.setItem('subtypeRedirectSuccess', JSON.stringify({
+        message: toastMessage,
+        description: toastDescription,
+      }));
+
+      // Recargar la página inmediatamente
+      window.location.reload();
+    } catch (error: any) {
+      const errorMessage = getErrorMessage(error);
+      toast.error("Error al redirigir el subtipo", {
+        description: errorMessage,
+      });
+    } finally {
+      setIsRedirectingSubtype(false);
+    }
+  };
 
   // El backend ya filtra las solicitudes según las asignaciones del usuario
   // No es necesario filtrar en el frontend
@@ -778,6 +872,10 @@ const AdminSolicitudesPage: React.FC = () => {
       id: solicitud.id,
       estado: solicitud.status,
     });
+    
+    // Resetear subtipo seleccionado y colapsar sección al cambiar de solicitud
+    setSelectedSubtype("");
+    setIsSubtypeRedirectOpen(false);
     
     // Si ya hay una solicitud seleccionada y es diferente, mostrar transición
     if (selectedSolicitud && selectedSolicitud.id !== solicitud.id) {
@@ -2239,6 +2337,9 @@ const AdminSolicitudesPage: React.FC = () => {
                 setIsTransitioningRequest(false);
                 // Resetear campos expandidos al cerrar el diálogo
                 setExpandedFields({});
+                // Resetear subtipo seleccionado y colapsar sección
+                setSelectedSubtype("");
+                setIsSubtypeRedirectOpen(false);
               }
             }}>
               <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
@@ -2271,6 +2372,106 @@ const AdminSolicitudesPage: React.FC = () => {
                   </div>
 
                   <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
+                    {/* Redirección de Subtipo (compacta) - Visible al inicio para fácil acceso */}
+                    {selectedSolicitud.request_type === 'verificacion-pagos' && (
+                      <Collapsible 
+                        open={isSubtypeRedirectOpen} 
+                        onOpenChange={setIsSubtypeRedirectOpen}
+                        className="border border-blue-200 rounded-lg bg-blue-50"
+                      >
+                        <CollapsibleTrigger className="flex w-full items-center justify-between p-3 hover:bg-blue-100 transition-colors rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <ArrowRight className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">
+                              Redirección de Subtipo
+                            </span>
+                            <span className="text-xs text-blue-700/80">(Corrección)</span>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 text-blue-600 transition-transform duration-200 ${isSubtypeRedirectOpen ? 'rotate-180' : ''}`} />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="px-3 pb-3 space-y-3">
+                          <p className="mt-2 text-xs text-blue-800/90">
+                            Use esta opción cuando el afiliado eligió un subtipo incorrecto.
+                          </p>
+                          
+                          {/* Subtipo Actual */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-blue-900">Subtipo Actual</label>
+                            <div className="bg-white p-2 rounded-md border border-blue-200">
+                              {selectedSolicitud.payload?.solicitudRelacionadaCon ? (
+                                <p className="text-sm text-gray-900 break-words">
+                                  {(() => {
+                                    const currentSubtype = selectedSolicitud.payload.solicitudRelacionadaCon;
+                                    const subtypeOption = VERIFICACION_PAGOS_SUBTIPOS.find(
+                                      (st) => st.value === currentSubtype
+                                    );
+                                    return subtypeOption ? subtypeOption.label : currentSubtype;
+                                  })()}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-blue-800/80 italic">No especificado</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Selector de Nuevo Subtipo */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-blue-900">
+                              Nuevo Subtipo <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                              value={selectedSubtype}
+                              onValueChange={setSelectedSubtype}
+                              disabled={isRedirectingSubtype}
+                            >
+                              <SelectTrigger className="w-full h-9 text-sm bg-white border-blue-200">
+                                <SelectValue placeholder="Seleccione el subtipo correcto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {VERIFICACION_PAGOS_SUBTIPOS.map((subtype) => {
+                                  const isCurrentSubtype = 
+                                    selectedSolicitud.payload?.solicitudRelacionadaCon === subtype.value;
+                                  return (
+                                    <SelectItem
+                                      key={subtype.value}
+                                      value={subtype.value}
+                                      disabled={isCurrentSubtype}
+                                    >
+                                      {subtype.label}
+                                      {isCurrentSubtype && (
+                                        <span className="ml-2 text-xs text-gray-500">(Actual)</span>
+                                      )}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Botón de Redirección */}
+                          <div className="flex justify-end pt-1">
+                            <Button
+                              onClick={handleRedirectSubtype}
+                              disabled={!selectedSubtype || isRedirectingSubtype || selectedSubtype === selectedSolicitud.payload?.solicitudRelacionadaCon}
+                              size="sm"
+                              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              {isRedirectingSubtype ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                  Redirigiendo...
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowRight className="h-3 w-3 mr-1.5" />
+                                  Redirigir
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                     {/* Alerta de actualización pendiente */}
                     {selectedSolicitud && 
                      hasPendingUpdate(selectedSolicitud.id_number) &&
@@ -2427,6 +2628,8 @@ const AdminSolicitudesPage: React.FC = () => {
                         </div>
                       </CardContent>
                     </Card>
+
+                    {/* Sección de redirección de subtipo duplicada fue movida al inicio del contenido */}
 
                     {/* Detalles Específicos */}
                     <Card className="border border-gray-200 shadow-sm w-full overflow-x-hidden">

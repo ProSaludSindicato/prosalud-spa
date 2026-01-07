@@ -764,6 +764,73 @@ export const requestsApiService = {
     }
   },
 
+  // Redirect request subtype
+  async redirectSubtype(
+    id: string,
+    subtype: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      request_id: string;
+      old_subtype: string;
+      new_subtype: string;
+      assigned_users: Array<{
+        id: string;
+        name: string;
+        email: string;
+      }>;
+    };
+  }> {
+    try {
+      // Validar que el ID es un string válido (10 dígitos)
+      if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
+        throw new Error('ID inválido - debe ser un string de 10 dígitos');
+      }
+
+      // Validar que el subtipo no esté vacío
+      if (!subtype || typeof subtype !== 'string' || subtype.trim() === '') {
+        throw new Error('El subtipo es requerido');
+      }
+
+      const response = await requestsApi.patch<ApiResponse<{
+        request_id: string;
+        old_subtype: string;
+        new_subtype: string;
+        assigned_users: Array<{
+          id: string;
+          name: string;
+          email: string;
+        }>;
+      }>>(`/api/requests/${id}/redirect-subtype`, {
+        subtype: subtype.trim(),
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Error al redirigir el subtipo");
+      }
+
+      return {
+        success: response.data.success,
+        message: response.data.message || "Solicitud redirigida exitosamente",
+        data: response.data.data,
+      };
+    } catch (error: any) {
+      // Sanitizar el error para evitar exponer información técnica al usuario
+      const sanitizedMessage = getErrorMessage(error);
+      
+      // Crear un nuevo error con el mensaje sanitizado
+      const sanitizedError = new Error(sanitizedMessage);
+      // Preservar información del error original para logging en consola (solo para desarrollo)
+      if (error.response) {
+        (sanitizedError as any).originalStatus = error.response.status;
+        (sanitizedError as any).originalData = error.response.data;
+      }
+      
+      throw sanitizedError;
+    }
+  },
+
   // Process bulk response file
   async processBulkResponse(file: File): Promise<{
     success: boolean;
