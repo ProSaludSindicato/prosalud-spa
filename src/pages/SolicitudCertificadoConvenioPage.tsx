@@ -10,7 +10,7 @@ import { Send, CheckCircle2, AlertCircle, Home, FileText } from 'lucide-react';
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES_ALL, ALLOWED_FILE_TYPES_PDF } from '@/components/solicitud-certificado/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { submitRequest } from '@/services/requestsService';
+import { submitRequest, saveRequestSuccessData } from '@/services/requestsService';
 import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
@@ -272,7 +272,10 @@ const SolicitudCertificadoConvenioPageContent: React.FC = () => {
         ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
-      await submitRequest(requestData);
+      const response = await submitRequest(requestData);
+      
+      // Save success data for the modal
+      saveRequestSuccessData(response);
       
       // Reset reCAPTCHA after successful submission
       recaptchaRef.current?.reset();

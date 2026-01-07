@@ -46,6 +46,24 @@ export interface SuccessResponse {
   };
 }
 
+/**
+ * Helper function to save request success data to localStorage
+ * This data will be displayed in the RequestSuccessModal on the Index page
+ */
+export const saveRequestSuccessData = (response: SuccessResponse): void => {
+  try {
+    const successData = {
+      id: response.data?.id || response.request?.id || '',
+      request_type: response.data?.request_type || response.request?.request_type || '',
+      message: response.message,
+      created_at: response.data?.created_at || response.request?.created_at || '',
+    };
+    localStorage.setItem('prosalud-request-success', JSON.stringify(successData));
+  } catch (error) {
+    console.error('Error saving request success data:', error);
+  }
+};
+
 export const submitRequest = async (requestData: RequestData): Promise<SuccessResponse> => {
   try {
     const formData = new FormData();

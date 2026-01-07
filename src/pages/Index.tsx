@@ -6,11 +6,13 @@ import ConveniosSection from "@/components/home/ConveniosSection";
 import GaleriaBienestarIntroSection from "@/components/home/GaleriaBienestarIntroSection";
 import QuickLinksSection from "@/components/home/QuickLinksSection";
 import WelcomeModal from "@/components/home/WelcomeModal";
+import RequestSuccessModal from "@/components/home/RequestSuccessModal";
 
 const Index: React.FC = () => {
   return (
     <MainLayout>
       <WelcomeModal />
+      <RequestSuccessModal />
       <HeroSection />
       <ComfenalcoSection />
       <QuickLinksSection />

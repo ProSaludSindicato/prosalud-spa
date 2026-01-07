@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, CreditCard, Info, Mail, Clock, Send, CheckCircle2, AlertCircle, DollarSign } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { submitRequest } from "@/services/requestsService";
+import { submitRequest, saveRequestSuccessData } from "@/services/requestsService";
 import RequireActiveAfiliadoAuth from "@/components/auth/RequireActiveAfiliadoAuth";
 import { useAfiliadoAuth } from "@/context/AfiliadoAuthContext";
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from "@/components/shared/InvisibleRecaptcha";
@@ -106,7 +106,10 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
         ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
-      await submitRequest(requestData);
+      const response = await submitRequest(requestData);
+      
+      // Save success data for the modal
+      saveRequestSuccessData(response);
       
       // Reset reCAPTCHA after successful submission
       recaptchaRef.current?.reset();

@@ -2373,7 +2373,8 @@ const AdminSolicitudesPage: React.FC = () => {
 
                   <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
                     {/* Redirección de Subtipo (compacta) - Visible al inicio para fácil acceso */}
-                    {selectedSolicitud.request_type === 'verificacion-pagos' && (
+                    {selectedSolicitud.request_type === 'verificacion-pagos' && 
+                     (selectedSolicitud.status === 'pending' || selectedSolicitud.status === 'in_progress') && (
                       <Collapsible 
                         open={isSubtypeRedirectOpen} 
                         onOpenChange={setIsSubtypeRedirectOpen}
