@@ -53,6 +53,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import {
   SstAffiliate,
@@ -170,6 +171,10 @@ const AdminSstPage: React.FC = () => {
   const [exportDeliveredBy, setExportDeliveredBy] = useState<string>('__all__');
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [includeSignatures, setIncludeSignatures] = useState(false);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportStatus, setExportStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [deliveredByUsers, setDeliveredByUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoadingDeliveredByUsers, setIsLoadingDeliveredByUsers] = useState(false);
 
@@ -698,9 +703,27 @@ const AdminSstPage: React.FC = () => {
   }, [isExportDialogOpen]);
 
   const handleCloseExportDialog = () => {
+    // Clean up polling if active
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
     setIsExportDialogOpen(false);
     setExportError(null);
+    setExportJobId(null);
+    setExportStatus('idle');
+    setIncludeSignatures(false);
+    setIsExporting(false);
   };
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleOpenConfirmationModal = (record: SstDeliveryDraft) => {
     setPendingRecord(record);
@@ -798,11 +821,196 @@ const AdminSstPage: React.FC = () => {
     }
   };
 
+  // Helper function to check report status
+  const checkReportStatus = async (jobId: string): Promise<{
+    success: boolean;
+    status: 'processing' | 'completed' | 'failed';
+    download_url?: string;
+    file_name?: string;
+    error?: string;
+    message?: string;
+  }> => {
+    const url = buildAdminApiUrl(`/api/dotacion-epp/reports/deliveries/status/${jobId}`);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return {
+          success: false,
+          status: 'failed',
+          message: 'Job no encontrado o expirado',
+        };
+      }
+      throw new Error(`Error al verificar estado: ${response.status}`);
+    }
+
+    return await response.json();
+  };
+
+  // Helper function to download completed report
+  const downloadReport = async (jobId: string): Promise<void> => {
+    const url = buildAdminApiUrl(`/api/dotacion-epp/reports/deliveries/download/${jobId}`);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Job no encontrado o expirado');
+      }
+      if (response.status === 400) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'El reporte aún no está listo');
+      }
+      throw new Error(`Error al descargar reporte: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `reporte-dotacion-epp-${format(new Date(), 'yyyyMMdd-HHmmss')}.xlsx`;
+    
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  };
+
+  // Polling function for async report generation
+  const startPolling = (jobId: string, maxAttempts: number = 60): void => {
+    let attempts = 0;
+    
+    const poll = async () => {
+      attempts++;
+      
+      try {
+        const statusResult = await checkReportStatus(jobId);
+        
+        if (!statusResult.success && statusResult.message) {
+          // Job not found or expired
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setExportError(statusResult.message);
+          setIsExporting(false);
+          toast({
+            title: 'Error al generar reporte',
+            description: statusResult.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (statusResult.status === 'completed' && statusResult.download_url) {
+          // Report is ready, download it
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          
+          try {
+            await downloadReport(jobId);
+            setExportStatus('completed');
+            setIsExporting(false);
+            toast({
+              title: 'Reporte exportado',
+              description: 'El reporte se ha descargado exitosamente.',
+            });
+            handleCloseExportDialog();
+          } catch (error) {
+            setExportStatus('failed');
+            setIsExporting(false);
+            const message = error instanceof Error ? error.message : 'Error al descargar el reporte';
+            setExportError(message);
+            toast({
+              title: 'Error al descargar',
+              description: message,
+              variant: 'destructive',
+            });
+          }
+        } else if (statusResult.status === 'failed') {
+          // Report generation failed
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setIsExporting(false);
+          const errorMessage = statusResult.error || 'Error al generar el reporte';
+          setExportError(errorMessage);
+          toast({
+            title: 'Error al generar reporte',
+            description: errorMessage,
+            variant: 'destructive',
+          });
+        } else if (statusResult.status === 'processing') {
+          // Still processing, continue polling
+          setExportStatus('processing');
+          if (attempts >= maxAttempts) {
+            // Max attempts reached
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            setExportStatus('failed');
+            setIsExporting(false);
+            setExportError('El reporte está tardando más de lo esperado. Por favor, intenta nuevamente.');
+            toast({
+              title: 'Timeout',
+              description: 'El reporte está tardando más de lo esperado. Por favor, intenta nuevamente.',
+              variant: 'destructive',
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('Error al verificar estado del reporte', error instanceof Error ? error.message : error);
+        // Continue polling on error (might be temporary network issue)
+        if (attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setIsExporting(false);
+          const message = error instanceof Error ? error.message : 'Error al verificar el estado del reporte';
+          setExportError(message);
+          toast({
+            title: 'Error',
+            description: message,
+            variant: 'destructive',
+          });
+        }
+      }
+    };
+
+    // Start polling immediately, then every 6 seconds
+    poll();
+    const interval = setInterval(poll, 6000);
+    pollingIntervalRef.current = interval;
+  };
+
   const handleExportDeliveries = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isExporting) return;
 
     setExportError(null);
+    setExportStatus('idle');
 
     // Validación de fechas
     if (exportStartDate && exportEndDate && new Date(exportStartDate) > new Date(exportEndDate)) {
@@ -816,7 +1024,7 @@ const AdminSstPage: React.FC = () => {
       // Construir parámetros de consulta
       const params = new URLSearchParams();
       
-      if (exportHospital) {
+      if (exportHospital && exportHospital !== 'all') {
         params.append('hospital', exportHospital);
       }
       if (exportStartDate) {
@@ -832,27 +1040,48 @@ const AdminSstPage: React.FC = () => {
         params.append('deliveredBy', exportDeliveredBy.trim());
       }
       
-      // Opciones de firmas (valores por defecto según la documentación)
-      params.append('includeSignatures', 'true');
-      params.append('signatureWidth', '100');
-      params.append('signatureHeight', '50');
+      // Opciones de firmas (solo si el usuario lo solicita)
+      if (includeSignatures) {
+        params.append('includeSignatures', 'true');
+        params.append('signatureWidth', '100');
+        params.append('signatureHeight', '50');
+      }
       
       // Construir URL del endpoint
       const endpoint = `/api/dotacion-epp/reports/deliveries/excel${params.toString() ? `?${params.toString()}` : ''}`;
       const url = buildAdminApiUrl(endpoint);
 
       const headers: HeadersInit = {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Accept': includeSignatures 
+          ? 'application/json' // Para respuestas asíncronas (202)
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // Para respuestas síncronas (200)
       };
 
       // Realizar petición al backend
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        credentials: 'include', // ✅ Habilitado para enviar cookies HttpOnly automáticamente
+        credentials: 'include',
       });
 
-      // Manejar errores
+      // Manejar respuesta asíncrona (202 Accepted)
+      if (response.status === 202) {
+        const data = await response.json();
+        if (data.success && data.job_id) {
+          setExportJobId(data.job_id);
+          setExportStatus('processing');
+          startPolling(data.job_id);
+          toast({
+            title: 'Generando reporte',
+            description: 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo.',
+          });
+          return; // Don't close dialog, keep it open to show progress
+        } else {
+          throw new Error(data.message || 'Error al iniciar la generación del reporte');
+        }
+      }
+
+      // Manejar errores (excepto 202 que ya se maneja arriba)
       if (!response.ok) {
         let errorMessage = 'Error al generar el reporte';
         
@@ -870,7 +1099,7 @@ const AdminSstPage: React.FC = () => {
         throw new Error(errorMessage);
       }
 
-      // Obtener el blob del archivo
+      // Respuesta síncrona (200 OK) - descarga directa
       const blob = await response.blob();
 
       // Obtener nombre del archivo del header Content-Disposition si está disponible
@@ -894,6 +1123,8 @@ const AdminSstPage: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
+      setExportStatus('completed');
+      setIsExporting(false);
       toast({
         title: 'Reporte exportado',
         description: 'El reporte se ha descargado exitosamente.',
@@ -904,13 +1135,13 @@ const AdminSstPage: React.FC = () => {
       const message =
         error instanceof Error ? error.message : 'No fue posible generar el reporte en Excel.';
       setExportError(message);
+      setExportStatus('failed');
+      setIsExporting(false);
       toast({
         title: 'Error al exportar',
         description: message,
         variant: 'destructive',
       });
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -1849,10 +2080,44 @@ const AdminSstPage: React.FC = () => {
                 />
               </div>
 
+              <div className="flex items-center space-x-2 p-4 border border-slate-200 rounded-lg bg-slate-50">
+                <Checkbox
+                  id="include-signatures"
+                  checked={includeSignatures}
+                  onCheckedChange={(checked) => setIncludeSignatures(checked === true)}
+                  disabled={isExporting}
+                />
+                <Label
+                  htmlFor="include-signatures"
+                  className="text-sm font-normal cursor-pointer flex-1"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">Incluir firmas de los afiliados</span>
+                    <span className="text-xs text-slate-500">
+                      El reporte se generará en segundo plano y puede tardar varios minutos. 
+                      Sin esta opción, el reporte se genera instantáneamente.
+                    </span>
+                  </div>
+                </Label>
+              </div>
+
+              {exportStatus === 'processing' && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <AlertTitle className="text-blue-900">Generando reporte</AlertTitle>
+                  <AlertDescription className="text-blue-800">
+                    El reporte se está generando en segundo plano. Por favor, mantén esta ventana abierta. 
+                    Te notificaremos cuando esté listo para descargar.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {exportError && (
-                <p className="text-sm font-medium text-red-600">
-                  {exportError}
-                </p>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{exportError}</AlertDescription>
+                </Alert>
               )}
 
               <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
@@ -1865,11 +2130,20 @@ const AdminSstPage: React.FC = () => {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto" disabled={isExporting}>
-                  {isExporting ? (
+                <Button 
+                  type="submit" 
+                  className="gap-2 bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto" 
+                  disabled={isExporting || exportStatus === 'processing'}
+                >
+                  {exportStatus === 'processing' ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Generando...
+                    </>
+                  ) : isExporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Iniciando...
                     </>
                   ) : (
                     <>
