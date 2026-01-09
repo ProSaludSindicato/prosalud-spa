@@ -357,8 +357,8 @@ export const requestsApiService = {
       status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED";
       email_subject: string;
       email_body: string;
-      t_basicos: number;
-      t_auxilios: number;
+      t_basicos?: number;
+      t_auxilios?: number;
       attachments?: FileList;
     }
   ): Promise<ApiRequest> {
@@ -368,11 +368,11 @@ export const requestsApiService = {
         throw new Error('ID inválido - debe ser un string de 10 dígitos');
       }
 
-      // Validar que t_basicos y t_auxilios son números enteros no negativos
-      if (typeof data.t_basicos !== 'number' || data.t_basicos < 0 || !Number.isInteger(data.t_basicos)) {
+      // Validar que t_basicos y t_auxilios son números enteros no negativos si están presentes
+      if (data.t_basicos !== undefined && (typeof data.t_basicos !== 'number' || data.t_basicos < 0 || !Number.isInteger(data.t_basicos))) {
         throw new Error('t_basicos debe ser un número entero no negativo');
       }
-      if (typeof data.t_auxilios !== 'number' || data.t_auxilios < 0 || !Number.isInteger(data.t_auxilios)) {
+      if (data.t_auxilios !== undefined && (typeof data.t_auxilios !== 'number' || data.t_auxilios < 0 || !Number.isInteger(data.t_auxilios))) {
         throw new Error('t_auxilios debe ser un número entero no negativo');
       }
 
@@ -382,8 +382,14 @@ export const requestsApiService = {
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
-        formData.append('t_basicos', data.t_basicos.toString());
-        formData.append('t_auxilios', data.t_auxilios.toString());
+        
+        // Solo agregar t_basicos y t_auxilios si están definidos
+        if (data.t_basicos !== undefined) {
+          formData.append('t_basicos', data.t_basicos.toString());
+        }
+        if (data.t_auxilios !== undefined) {
+          formData.append('t_auxilios', data.t_auxilios.toString());
+        }
         
         // Agregar archivos como attachments[0], attachments[1], etc.
         Array.from(data.attachments).forEach((file, index) => {
@@ -419,15 +425,23 @@ export const requestsApiService = {
         return response.data.data;
       } else {
         // Sin archivos, usar JSON
+        const requestBody: any = {
+          status: data.status,
+          email_subject: data.email_subject,
+          email_body: data.email_body,
+        };
+        
+        // Solo incluir t_basicos y t_auxilios si están definidos
+        if (data.t_basicos !== undefined) {
+          requestBody.t_basicos = data.t_basicos;
+        }
+        if (data.t_auxilios !== undefined) {
+          requestBody.t_auxilios = data.t_auxilios;
+        }
+        
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond-with-compensaciones`,
-          {
-            status: data.status,
-            email_subject: data.email_subject,
-            email_body: data.email_body,
-            t_basicos: data.t_basicos,
-            t_auxilios: data.t_auxilios,
-          },
+          requestBody,
           {
             timeout: 150000, // 150 segundos - proceso largo que genera certificado y envía email
           }

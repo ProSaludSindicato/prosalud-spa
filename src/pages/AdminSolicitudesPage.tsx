@@ -245,17 +245,21 @@ const responseWithCompensacionesFormSchema = z.object({
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
-    z.number({
-      required_error: "El valor de Total Basicos es obligatorio",
-      invalid_type_error: "El valor de Total Basicos debe ser un número entero",
-    }).int("El valor de Total Basicos debe ser un número entero").min(0, "El valor de Total Basicos debe ser mayor o igual a 0")
+    z.union([
+      z.number({
+        invalid_type_error: "El valor de Total Basicos debe ser un número entero",
+      }).int("El valor de Total Basicos debe ser un número entero").min(0, "El valor de Total Basicos debe ser mayor o igual a 0"),
+      z.undefined()
+    ])
   ),
   t_auxilios: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
-    z.number({
-      required_error: "El valor de Total Auxilios es obligatorio",
-      invalid_type_error: "El valor de Total Auxilios debe ser un número entero",
-    }).int("El valor de Total Auxilios debe ser un número entero").min(0, "El valor de Total Auxilios debe ser mayor o igual a 0")
+    z.union([
+      z.number({
+        invalid_type_error: "El valor de Total Auxilios debe ser un número entero",
+      }).int("El valor de Total Auxilios debe ser un número entero").min(0, "El valor de Total Auxilios debe ser mayor o igual a 0"),
+      z.undefined()
+    ])
   ),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -1423,8 +1427,8 @@ const AdminSolicitudesPage: React.FC = () => {
       // Verificar si se completó una solicitud de actualización de datos personales
       const isActualizacionCompletada = solicitudToRespond?.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
 
-      // Calcular Total Ingresos para el mensaje
-      const t_ingresos = data.t_basicos + data.t_auxilios;
+      // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
+      const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
 
       // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
       toast.success("Certificado generado y respuesta enviada exitosamente", {
@@ -1484,11 +1488,36 @@ const AdminSolicitudesPage: React.FC = () => {
       // Siempre resetear el estado primero
       setIsSubmittingResponse(false);
       
-      // Obtener mensaje sanitizado y amigable para el usuario
-      const errorMessage = getErrorMessage(error);
+      // Detectar error específico de compensaciones
+      let errorMessage = getErrorMessage(error);
+      let errorTitle = "Error al generar certificado con compensaciones";
       
-      // Mostrar toast de error SIN cerrar el modal para que el usuario pueda ver el error
-      toast.error("Error al generar certificado con compensaciones", {
+      // Verificar si es el error específico de compensaciones
+      if (error && typeof error === 'object' && 'originalData' in error) {
+        const originalData = (error as any).originalData;
+        
+        // Verificar si hay errores de compensaciones
+        if (originalData?.errors?.compensaciones && Array.isArray(originalData.errors.compensaciones)) {
+          // Usar el mensaje principal del error si está disponible
+          errorTitle = originalData.message || "Este certificado requiere valores de compensaciones";
+          
+          // Construir descripción con los mensajes de error de compensaciones
+          const compensacionesMessages = originalData.errors.compensaciones;
+          const description = compensacionesMessages.length > 0 
+            ? compensacionesMessages.join('\n\n')
+            : originalData.sugerencia || errorMessage;
+          
+          // Mostrar toast de error con mensaje detallado
+          toast.error(errorTitle, {
+            description: description,
+            duration: 8000, // Más tiempo para leer el mensaje detallado
+          });
+          return; // Salir temprano para no mostrar el toast genérico
+        }
+      }
+      
+      // Mostrar toast de error genérico si no es el error específico de compensaciones
+      toast.error(errorTitle, {
         description: errorMessage,
         duration: 6000,
       });
@@ -3277,7 +3306,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           name="t_basicos"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Total Basicos *</FormLabel>
+                              <FormLabel>Total Basicos</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
@@ -3293,7 +3322,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 />
                               </FormControl>
                               <FormDescription>
-                                Valor de compensación básica (número entero).
+                                Valor de compensación básica (número entero). Si no se ingresa, el sistema consultará si tiene el dato disponible.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -3306,7 +3335,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           name="t_auxilios"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Total Auxilios *</FormLabel>
+                              <FormLabel>Total Auxilios</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
@@ -3322,7 +3351,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 />
                               </FormControl>
                               <FormDescription>
-                                Valor de auxilios (número entero).
+                                Valor de auxilios (número entero). Si no se ingresa, el sistema consultará si tiene el dato disponible.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -3335,7 +3364,16 @@ const AdminSolicitudesPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-700">Total Ingresos (calculado automáticamente):</span>
                           <span className="text-lg font-bold text-primary-prosalud">
-                            ${((responseWithCompensacionesForm.watch('t_basicos') ?? 0) + (responseWithCompensacionesForm.watch('t_auxilios') ?? 0)).toLocaleString('es-CO')}
+                            {(() => {
+                              const t_basicos = responseWithCompensacionesForm.watch('t_basicos');
+                              const t_auxilios = responseWithCompensacionesForm.watch('t_auxilios');
+                              // Si ambos están vacíos, no mostrar $0
+                              if ((t_basicos === undefined || t_basicos === null) && (t_auxilios === undefined || t_auxilios === null)) {
+                                return <span className="text-gray-500">—</span>;
+                              }
+                              const total = (t_basicos ?? 0) + (t_auxilios ?? 0);
+                              return `$${total.toLocaleString('es-CO')}`;
+                            })()}
                           </span>
                         </div>
                         <p className="text-xs text-gray-600 mt-1">

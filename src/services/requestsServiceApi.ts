@@ -197,8 +197,8 @@ export const requestsService = {
       newStatus: Request['status'];
       emailSubject: string;
       emailBody: string;
-      t_basicos: number;
-      t_auxilios: number;
+      t_basicos?: number;
+      t_auxilios?: number;
       attachments?: FileList;
     }
   ): Promise<Request> {
