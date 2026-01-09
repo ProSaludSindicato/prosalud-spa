@@ -200,14 +200,13 @@ const RequestSuccessModal: React.FC = () => {
             </div>
 
             {/* Important Information */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div className="rounded-lg p-3">
               <div className="flex gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 space-y-1">
-                  <p className="text-xs font-semibold text-amber-900">
+                  <p className="text-xs font-semibold text-gray-900 underline">
                     Información Importante
                   </p>
-                  <ul className="text-xs text-amber-800 space-y-1 list-disc list-inside leading-relaxed">
+                  <ul className="text-xs text-gray-700 space-y-1 list-disc list-inside leading-relaxed">
                     <li>
                       <strong>Guarde este número de radicado</strong> para futuras consultas sobre su solicitud.
                     </li>

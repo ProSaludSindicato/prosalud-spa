@@ -1,0 +1,1666 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Form } from '@/components/ui/form';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import MainLayout from '@/components/layout/MainLayout';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { submitRequest, saveRequestSuccessData } from '@/services/requestsService';
+import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
+import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase } from 'lucide-react';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, X } from 'lucide-react';
+import { relacionesContactoEmergencia, tiposDocumentoCompletos } from '@/components/actualizar-datos-personales/formOptions';
+
+// Función para obtener el nombre completo del tipo de documento
+const getTipoDocumentoDisplayName = (tipoDocumento: string | null | undefined): string => {
+  if (!tipoDocumento) return '';
+  const tipo = tiposDocumentoCompletos.find(t => t.value === tipoDocumento);
+  return tipo?.label || tipoDocumento;
+};
+
+// Función para parsear el campo de contacto de emergencia
+// Formato esperado: "telefono - nombre - relacion" o "telefono - nombre"
+const parseContactoEmergencia = (value: string | null | undefined): {
+  telefono: string;
+  nombre: string;
+  relacion: string;
+} => {
+  if (!value || !value.trim()) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Dividir por " - " (espacio, guion, espacio)
+  const parts = value.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
+  
+  if (parts.length === 0) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Si hay 3 partes: telefono, nombre, relacion
+  if (parts.length >= 3) {
+    return {
+      telefono: parts[0] || '',
+      nombre: parts[1] || '',
+      relacion: parts[2] || '',
+    };
+  }
+
+  // Si hay 2 partes: puede ser telefono - nombre (sin relacion)
+  if (parts.length === 2) {
+    // Intentar determinar cuál es teléfono (solo números) y cuál es nombre
+    const firstIsPhone = /^\d+$/.test(parts[0]);
+    if (firstIsPhone) {
+      return {
+        telefono: parts[0] || '',
+        nombre: parts[1] || '',
+        relacion: '',
+      };
+    } else {
+      // Si el primero no es solo números, asumir que es nombre y el segundo teléfono
+      const secondIsPhone = /^\d+$/.test(parts[1]);
+      if (secondIsPhone) {
+        return {
+          telefono: parts[1] || '',
+          nombre: parts[0] || '',
+          relacion: '',
+        };
+      }
+      // Si ninguno es solo números, asumir formato: telefono - nombre
+      return {
+        telefono: parts[0] || '',
+        nombre: parts[1] || '',
+        relacion: '',
+      };
+    }
+  }
+
+  // Si solo hay 1 parte, intentar determinar si es teléfono o nombre
+  if (parts.length === 1) {
+    const isPhone = /^\d+$/.test(parts[0]);
+    if (isPhone) {
+      return {
+        telefono: parts[0] || '',
+        nombre: '',
+        relacion: '',
+      };
+    } else {
+      return {
+        telefono: '',
+        nombre: parts[0] || '',
+        relacion: '',
+      };
+    }
+  }
+
+  return { telefono: '', nombre: '', relacion: '' };
+};
+
+// Función para normalizar la relación de contacto de emergencia
+const normalizeRelacionContactoEmergencia = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  
+  // Mapear valores comunes a los valores del select
+  const mapping: Record<string, string> = {
+    'conyuge': 'conyuge',
+    'cónyuge': 'conyuge',
+    'esposo': 'conyuge',
+    'esposa': 'conyuge',
+    'padre': 'padre',
+    'papá': 'padre',
+    'papa': 'padre',
+    'madre': 'madre',
+    'mamá': 'madre',
+    'mama': 'madre',
+    'hijo': 'hijo',
+    'hija': 'hijo',
+    'hermano': 'hermano',
+    'hermana': 'hermano',
+    'abuelo': 'abuelo',
+    'abuela': 'abuelo',
+    'tio': 'tio',
+    'tío': 'tio',
+    'tia': 'tio',
+    'tía': 'tio',
+    'primo': 'primo',
+    'prima': 'primo',
+    'amigo': 'amigo',
+    'amiga': 'amigo',
+    'otro': 'otro',
+  };
+  
+  return mapping[normalized] || normalized.replace(/\s+/g, '_');
+};
+
+// Mapa de hospitales: valor interno => nombre legible para el afiliado
+const hospitalMap: Record<string, string> = {
+  'ABEJORRAL': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ABEJORRAL - ADMON': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ABEJORRAL - ADMON ': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ABEJORRAL - ASIST': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ABEJORRAL - BUEN COMIENZO': 'E.S.E. Hospital San Juan de Dios Abejorral - Programa Buen Comienzo',
+  'ABEJORRAL - CBA': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ABEJORRAL - SALUD P': 'E.S.E. Hospital San Juan de Dios Abejorral - Programa Salud Pública',
+  'ABEJORRAL SP': 'E.S.E. Hospital San Juan de Dios - Abejorral',
+  'ADMON': 'Sede Administrativa',
+  'ADMON-HSJDRionegro': 'E.S.E. Hospital San Juan de Dios - Rionegro',
+  'BARBOSA': 'E.S.E. Hospital San Vicente de Paul de Barbosa (Ant)',
+  'BELLO': 'E.S.E. Hospital Marco Fidel Suarez de Bello',
+  'BETANIA': 'E.S.E. Hospital San Antonio de Betania',
+  'CALDAS': 'E.S.E. Hospital San Vicente de Paúl de Caldas',
+  'CENTRO NEUROLOGICO': 'Centro Neurológico',
+  'CISNEROS': 'E.S.E. Hospital San Antonio - Cisneros (Ant)',
+  'CIUDAD BOLIVAR': 'E.S.E. Hospital La Merced - Ciudad Bolivar (Ant)',
+  'CIUDADBOLIVAR': 'E.S.E. Hospital La Merced - Ciudad Bolivar (Ant)',
+  'COPACABANA': 'E.S.E. Hospital Santa Margarita',
+  'COPACABANA ': 'E.S.E. Hospital Santa Margarita',
+  'E.S.E CARISMA ADMON ': 'E.S.E. Hospital Carisma',
+  'E.S.E CARISMA ASISTENCIAL': 'E.S.E. Hospital Carisma',
+  'E.S.ECARISMA': 'E.S.E. Hospital Carisma',
+  'FREDONIA': 'E.S.E. Hospital Santa Lucia - Fredonia (Ant)',
+  'HGM SEDE 80 ADMON': 'E.S.E. Hospital General de Medellín - Sede 80',
+  'HGM SEDE 80 ASISTENCIAL': 'E.S.E. Hospital General de Medellín - Sede 80',
+  'HGM SEDE 80 ASISTENCIAL ': 'E.S.E. Hospital General de Medellín - Sede 80',
+  'HLM - GRUPO 1': 'E.S.E. Hospital La María',
+  'HLM - GRUPO 2': 'E.S.E. Hospital La María',
+  'HLM - GRUPO 3': 'E.S.E. Hospital La María',
+  'HMFS - BELLO': 'E.S.E. Hospital Marco Fidel Suarez de Bello',
+  'HSJD Rionegro - ADMON': 'E.S.E. Hospital San Juan de Dios - Rionegro',
+  'HSJD Rionegro - ASISTENCIAL': 'Centro Neurológico',
+  'HSJD Rionegro - PIC ': 'E.S.E. Hospital San Antonio - Cisneros (Ant)',
+  'HSJDRionegro': 'E.S.E. Hospital San Juan de Dios - Rionegro',
+  'HSRI': 'E.S.E. Hospital San Rafael de Itagüí',
+  'HSRI ': 'E.S.E. Hospital San Rafael de Itagüí',
+  'JARDIN': 'E.S.E. Hospital Gabriel Peláez Montoya',
+  'LA MARIA': 'E.S.E. Hospital La María',
+  'LA MARIA - 000065-2021': 'E.S.E. Hospital La María',
+  'LA MARIA - 262-2021': 'E.S.E. Hospital La María',
+  'LA MARIA - COOSALUD': 'E.S.E. Hospital La María',
+  'LA MARIA - ENTERRITORIO': 'E.S.E. Hospital La María',
+  'LA MARIA - ENTERRITORIO 1 - 044': 'E.S.E. Hospital La María',
+  'LA MARIA - ENTERRITORIO 2': 'E.S.E. Hospital La María',
+  'LA MARIA - ENTERRITORIO 2 - 045': 'E.S.E. Hospital La María',
+  'LA MARIA - INFECCIOSA PS 268': 'E.S.E. Hospital La María',
+  'LA MARIA - ITS 257': 'E.S.E. Hospital La María',
+  'LA MARIA - PROGRAMA ESPECIAL SAVIA SALUD EPS - VIH-SIDA': 'E.S.E. Hospital La María',
+  'LA MARIA - TRANSMISIBLES': 'E.S.E. Hospital La María',
+  'LA MARIA - TRANSMISIBLES - 122 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA - TRANSMISIBLES 176': 'E.S.E. Hospital La María',
+  'LA MARIA - UNION TEMPORAL': 'E.S.E. Hospital La María',
+  'LA MARIA - UNION TEMPORAL 020 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA - VIH': 'E.S.E. Hospital La María',
+  'LA MARIA - VIH - 1': 'E.S.E. Hospital La María',
+  'LA MARIA 216 - 2021': 'E.S.E. Hospital La María',
+  'LA MARIA 317 COOSALUD': 'E.S.E. Hospital La María',
+  'LA MARIA COOSALUD - 046': 'E.S.E. Hospital La María',
+  'LA MARIA COOSALUD 191': 'E.S.E. Hospital La María',
+  'LA MARIA COOSALUD 36-2022': 'E.S.E. Hospital La María',
+  'LA MARIA ENTERRITORIO - 287': 'E.S.E. Hospital La María',
+  'LA MARIA ENTERRITORIO 038': 'E.S.E. Hospital La María',
+  'LA MARIA ENTERRITORIO 238': 'E.S.E. Hospital La María',
+  'LA MARIA- INFECCIOSA PS 268': 'E.S.E. Hospital La María',
+  'LA MARIA ITS ': 'E.S.E. Hospital La María',
+  'LA MARIA ITS 127': 'E.S.E. Hospital La María',
+  'LA MARIA ITS- 376': 'E.S.E. Hospital La María',
+  'LA MARIA PAI ': 'E.S.E. Hospital La María',
+  'LA MARIA TB 137': 'E.S.E. Hospital La María',
+  'LA MARIA TB Y LEPRA  319-2021': 'E.S.E. Hospital La María',
+  'LA MARIA TBC': 'E.S.E. Hospital La María',
+  'LA MARIA TRANSMISIBLES - 122': 'E.S.E. Hospital La María',
+  'LA MARIA TRANSMISIBLES - 275': 'E.S.E. Hospital La María',
+  'LA MARIA TRANSMISIBLES 234': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI - 0028 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI - 140 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI - 271': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI 0028 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI 245': 'E.S.E. Hospital La María',
+  'LA MARIA UPAI 35': 'E.S.E. Hospital La María',
+  'LA MARIA VIH - 158': 'E.S.E. Hospital La María',
+  'LA MARIA VIH 037': 'E.S.E. Hospital La María',
+  'LA MARIA VIH 131': 'E.S.E. Hospital La María',
+  'LA MARIA VIH 131 - 2023': 'E.S.E. Hospital La María',
+  'LA MARIA VIH 158': 'E.S.E. Hospital La María',
+  'LA MARIA VIH 188': 'E.S.E. Hospital La María',
+  'LA MARIA VIH N°043': 'E.S.E. Hospital La María',
+  'LA MARIA VIH UT ': 'E.S.E. Hospital La María',
+  'LAMARIACOOSALUD36': 'E.S.E. Hospital La María',
+  'LAMARIAENTERRITORIO038': 'E.S.E. Hospital La María',
+  'LAMARIAITS127': 'E.S.E. Hospital La María',
+  'LAMARIATB2022': 'E.S.E. Hospital La María',
+  'LAMARIAUPAI35': 'E.S.E. Hospital La María',
+  'LAMARIAVIH037': 'E.S.E. Hospital La María',
+  'POLICLINICO': 'POLICLINICO',
+  'PROMOTORA MEDICA Y ODONTOLOGICA DE ANTIOQUIA S.A.': 'PROMOTORA MEDICA Y ODONTOLOGICA DE ANTIOQUIA S.A.',
+  'PUERTO BERRIO': 'E.S.E. Hospital La Cruz',
+  'SOMER': 'SOMER',
+  'STA GERTRUDIS': 'E.S.E. Santa Gertrudis',
+  'UNION TEMPORAL - 020 - 2023': 'E.S.E. Hospital La María',
+  'VENANCIO': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO -  SALUD MENTAL ': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - ADMON': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - ASIST': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - ASIST ': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - PIC ': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - SALUD MENTAL ': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - SALUD P.': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO - UCI': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENANCIO ADMON - APH': 'E.S.E. Hospital Venancio Diaz Diaz (Sabaneta)',
+  'VENECIA': 'ESE Hospital San Rafael de Venecia',
+};
+
+// Función para obtener el nombre legible del hospital
+const getHospitalDisplayName = (hospitalValue: string | null | undefined): string => {
+  if (!hospitalValue) return '';
+  let displayName = '';
+  // Buscar coincidencia exacta primero
+  if (hospitalMap[hospitalValue]) {
+    displayName = hospitalMap[hospitalValue];
+  } else {
+    // Buscar coincidencia sin espacios al final
+    const trimmedValue = hospitalValue.trim();
+    if (hospitalMap[trimmedValue]) {
+      displayName = hospitalMap[trimmedValue];
+    } else {
+      // Si no hay coincidencia, devolver el valor original
+      displayName = hospitalValue;
+    }
+  }
+  // Convertir a mayúsculas
+  return displayName.toUpperCase();
+};
+
+// Esquema de validación completo
+const hijoSchema = z.object({
+  tipoDocumento: z.string({ required_error: 'Tipo de documento es requerido' }).min(1, 'Tipo de documento es requerido'),
+  numeroDocumento: z.string({ required_error: 'Número de documento es requerido' }).min(1, 'Número de documento es requerido'),
+  nombre: z.string({ required_error: 'Nombre es requerido' }).min(1, 'Nombre es requerido'),
+  genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
+  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida'),
+});
+
+const encuestaSchema = z.object({
+  // Autocompletados
+  correo: z.string().email('Correo inválido').min(1, 'Correo es requerido'),
+  tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
+  numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
+  hospital: z.string().min(1, 'Hospital es requerido'),
+  profesion: z.string().min(1, 'Profesión es requerida'),
+  
+  // Sección sociodemográfica
+  tienePersonasACargo: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
+  estadoCivil: z.string({ required_error: 'Estado civil es requerido' }).min(1, 'Estado civil es requerido'),
+  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida'),
+  genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
+  raza: z.string({ required_error: 'Grupo étnico es requerido' }).min(1, 'Grupo étnico es requerido'),
+  numeroHijos: z.string().optional(),
+  hijos: z.array(hijoSchema).optional(),
+  numeroPersonasDependientes: z.string().optional(),
+  vivienda: z.string({ required_error: 'Vivienda es requerida' }).min(1, 'Vivienda es requerida'),
+  serviciosPublicos: z.object({
+    agua: z.boolean().optional(),
+    luz: z.boolean().optional(),
+    telefono: z.boolean().optional(),
+    internet: z.boolean().optional(),
+    gas: z.boolean().optional(),
+  }),
+  estratoSocioeconomico: z.string({ required_error: 'Estrato es requerido' }).min(1, 'Estrato es requerido'),
+  conviveCon: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
+  transporte: z.string({ required_error: 'Transporte es requerido' }).min(1, 'Transporte es requerido'),
+  manejoTiempoLibre: z.object({
+    recreativas: z.boolean().optional(),
+    deportivas: z.boolean().optional(),
+    educativas: z.boolean().optional(),
+    descanso: z.boolean().optional(),
+    artisticas: z.boolean().optional(),
+    religiosas: z.boolean().optional(),
+    otras: z.boolean().optional(),
+  }),
+  tiempoLibreCon: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
+  
+  // Consumo
+  consumoLicor: z.string().min(1, 'Campo requerido'),
+  frecuenciaLicor: z.string().optional(),
+  consumoCigarrillo: z.string().min(1, 'Campo requerido'),
+  frecuenciaCigarrillo: z.string().optional(),
+  
+  // Salud - Si/No/Otro
+  sobrepesoObesidad: z.string().min(1, 'Campo requerido'),
+  hipertensionArterial: z.string().min(1, 'Campo requerido'),
+  enfermedadesCorazon: z.string().min(1, 'Campo requerido'),
+  diabetes: z.string().min(1, 'Campo requerido'),
+  problemasRenales: z.string().min(1, 'Campo requerido'),
+  depresionBipolaridad: z.string().min(1, 'Campo requerido'),
+  antecedentesMedicosMentales: z.string().min(1, 'Campo requerido'),
+  epilepsiaConvulsiones: z.string().min(1, 'Campo requerido'),
+  trasplante: z.string().min(1, 'Campo requerido'),
+  tipoTrasplante: z.string().optional(),
+  cancer: z.string().min(1, 'Campo requerido'),
+  problemasPulmonares: z.string().min(1, 'Campo requerido'),
+  tipoProblemaPulmonar: z.string().optional(),
+  alergias: z.string().min(1, 'Campo requerido'),
+  tipoAlergia: z.string().optional(),
+  tuberculosis: z.string().min(1, 'Campo requerido'),
+  problemasVisuales: z.string().min(1, 'Campo requerido'),
+  tipoProblemaVisual: z.string().optional(),
+  doloresArticulares: z.string().min(1, 'Campo requerido'),
+  tipoDolorArticular: z.string().optional(),
+  problemasSangre: z.string().min(1, 'Campo requerido'),
+  otraEnfermedad: z.string().min(1, 'Campo requerido'),
+  tipoOtraEnfermedad: z.string().optional(),
+  protesisArticular: z.string().min(1, 'Campo requerido'),
+  medicamentoPermanente: z.string().min(1, 'Campo requerido'),
+  tipoMedicamento: z.string().optional(),
+  tratamientoMedico: z.string().min(1, 'Campo requerido'),
+  cirugias: z.string().min(1, 'Campo requerido'),
+  tipoCirugia: z.string().optional(),
+  tiempoCirugia: z.string().optional(),
+  estatura: z.string().min(1, 'Estatura es requerida'),
+  peso: z.string().min(1, 'Peso es requerido'),
+  accidenteLaboral: z.string().min(1, 'Campo requerido'),
+  tipoAccidenteLaboral: z.string().optional(),
+  tiempoAccidenteLaboral: z.string().optional(),
+  accidenteTransitoCasero: z.string().min(1, 'Campo requerido'),
+  tipoAccidenteTransito: z.string().optional(),
+  tiempoAccidenteTransito: z.string().optional(),
+  vacunadoCovid: z.string().min(1, 'Campo requerido'),
+  
+  // Limitaciones
+  esfuerzosIntensos: z.string().min(1, 'Campo requerido'),
+  esfuerzosModerados: z.string().min(1, 'Campo requerido'),
+  subirPisos: z.string().min(1, 'Campo requerido'),
+  agacharseArrodillarse: z.string().min(1, 'Campo requerido'),
+  
+  // Recomendaciones
+  recomendacionRestriccionLaboral: z.string().min(1, 'Campo requerido'),
+  detalleRecomendacionLaboral: z.string().optional(),
+  
+  // Contacto de emergencia
+  nombreContactoEmergencia: z.string().optional(),
+  relacionContactoEmergencia: z.string().optional(),
+  telefonoContactoEmergencia: z.string().optional(),
+  
+  // Firma
+  firma: z.string().min(1, 'Firma es requerida'),
+  numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
+});
+
+type EncuestaFormValues = z.infer<typeof encuestaSchema>;
+
+const EncuestaBienestarPageContent: React.FC = () => {
+  const navigate = useNavigate();
+  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const signaturePadRef = useRef<SignaturePadRef>(null);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  const activeConvenio = getActiveConvenio();
+  const hospitalValue = activeConvenio?.cliente || '';
+  const profesionValue = activeConvenio?.proceso || '';
+
+  const form = useForm<EncuestaFormValues>({
+    resolver: zodResolver(encuestaSchema),
+    defaultValues: {
+      correo: afiliado?.correo_personal || '',
+      tipoDocumento: afiliado?.tipo_documento || '',
+      numeroDocumento: afiliado?.documento || '',
+      hospital: hospitalValue,
+      profesion: profesionValue,
+      fechaNacimiento: '',
+      numeroPersonasDependientes: '0',
+      serviciosPublicos: {
+        agua: false,
+        luz: false,
+        telefono: false,
+        internet: false,
+        gas: false,
+      },
+      manejoTiempoLibre: {
+        recreativas: false,
+        deportivas: false,
+        educativas: false,
+        descanso: false,
+        artisticas: false,
+        religiosas: false,
+        otras: false,
+      },
+      hijos: [],
+      numeroHijos: '0',
+      consumoLicor: '',
+      consumoCigarrillo: '',
+      sobrepesoObesidad: '',
+      hipertensionArterial: '',
+      enfermedadesCorazon: '',
+      diabetes: '',
+      problemasRenales: '',
+      depresionBipolaridad: '',
+      antecedentesMedicosMentales: '',
+      epilepsiaConvulsiones: '',
+      trasplante: '',
+      cancer: '',
+      problemasPulmonares: '',
+      tipoProblemaPulmonar: '',
+      alergias: '',
+      tuberculosis: '',
+      problemasVisuales: '',
+      doloresArticulares: '',
+      problemasSangre: '',
+      otraEnfermedad: '',
+      protesisArticular: '',
+      medicamentoPermanente: '',
+      tratamientoMedico: '',
+      cirugias: '',
+      estatura: '',
+      peso: '',
+      accidenteLaboral: '',
+      accidenteTransitoCasero: '',
+      vacunadoCovid: '',
+      esfuerzosIntensos: '',
+      esfuerzosModerados: '',
+      subirPisos: '',
+      agacharseArrodillarse: '',
+      recomendacionRestriccionLaboral: '',
+      detalleRecomendacionLaboral: '',
+      numeroPersonasDependientes: '0',
+      nombreContactoEmergencia: '',
+      relacionContactoEmergencia: '',
+      telefonoContactoEmergencia: '',
+      firma: '',
+      numeroDocumentoFirma: '',
+    },
+  });
+
+  // Actualizar valores cuando cambian los datos del afiliado
+  useEffect(() => {
+    if (afiliado) {
+      form.setValue('correo', afiliado.correo_personal || '');
+      form.setValue('tipoDocumento', afiliado.tipo_documento || '');
+      form.setValue('numeroDocumento', afiliado.documento || '');
+      
+      // Prellenar contacto de emergencia
+      if (afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia) {
+        // Si viene en formato combinado, parsearlo
+        const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+        form.setValue('nombreContactoEmergencia', parsed.nombre);
+        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(parsed.relacion));
+        form.setValue('telefonoContactoEmergencia', parsed.telefono);
+      } else {
+        // Si viene separado, usarlo directamente
+        form.setValue('nombreContactoEmergencia', afiliado.nombre_contacto_emergencia || '');
+        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliado.relacion_contacto_emergencia));
+        form.setValue('telefonoContactoEmergencia', afiliado.telefono_contacto_emergencia || '');
+      }
+    }
+    if (activeConvenio) {
+      form.setValue('hospital', activeConvenio.cliente || '');
+      form.setValue('profesion', activeConvenio.proceso || '');
+    }
+    if (afiliado?.documento) {
+      form.setValue('numeroDocumentoFirma', afiliado.documento);
+    }
+  }, [afiliado, activeConvenio, form]);
+
+  const numeroHijos = form.watch('numeroHijos');
+  const hijos = form.watch('hijos') || [];
+
+  useEffect(() => {
+    const num = parseInt(numeroHijos || '0', 10);
+    const currentHijos = form.getValues('hijos') || [];
+    if (num > currentHijos.length) {
+      // Agregar hijos faltantes
+      const nuevosHijos = Array.from({ length: num - currentHijos.length }, () => ({
+        tipoDocumento: '',
+        numeroDocumento: '',
+        nombre: '',
+        genero: '',
+        fechaNacimiento: '',
+      }));
+      form.setValue('hijos', [...currentHijos, ...nuevosHijos]);
+    } else if (num < currentHijos.length) {
+      // Eliminar hijos sobrantes
+      form.setValue('hijos', currentHijos.slice(0, num));
+    }
+  }, [numeroHijos, form]);
+
+  const handleSignatureChange = (dataUrl: string | null) => {
+    setHasSignature(Boolean(dataUrl));
+    form.setValue('firma', dataUrl || '');
+  };
+
+  // Convertir data URL a Blob para enviar como archivo
+  const dataURItoBlob = (dataURI: string): File => {
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([ab], { type: mimeString });
+    return new File([blob], 'firma.png', { type: mimeString });
+  };
+
+  const onSubmit = async (data: EncuestaFormValues) => {
+    if (!afiliado) return;
+
+    if (!hasSignature) {
+      toast.error('Debe firmar la encuesta antes de enviarla');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const requestData = {
+        request_type: 'encuesta-bienestar',
+        id_type: afiliado.tipo_documento || '',
+        id_number: afiliado.documento || '',
+        name: afiliado.nombres || '',
+        last_name: afiliado.apellidos || '',
+        email: afiliado.correo_personal || '',
+        phone_number: afiliado.celular || '',
+        payload: {
+          ...data,
+          firma: data.firma, // Base64 de la firma
+        },
+        files: {
+          firma: dataURItoBlob(data.firma), // Convertir a File para enviar
+        },
+      };
+
+      const response = await submitRequest(requestData);
+      saveRequestSuccessData(response);
+
+      form.reset();
+      toast.success('Encuesta enviada correctamente', {
+        description: 'Gracias por participar en la encuesta de bienestar.',
+      });
+
+      setTimeout(() => {
+        navigate('/');
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error submitting survey:', error);
+      toast.error('Error al enviar la encuesta', {
+        description: error.message || 'Por favor, intenta nuevamente.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <MainLayout>
+      <div className="min-h-screen bg-slate-50 py-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Breadcrumb className="mb-6">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/" className="flex items-center gap-1">
+                  <Home className="h-4 w-4" />
+                  Inicio
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Encuesta de Bienestar</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              Encuesta Sociodemográfica y Diagnóstico de Condiciones de Salud
+            </h1>
+            <p className="text-slate-600">
+              Yo, {afiliado?.nombres} {afiliado?.apellidos}, con {afiliado?.tipo_documento} {afiliado?.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.
+            </p>
+          </div>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              {/* Sección 1: Datos Básicos (Autocompletados) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary-prosalud" />
+                    Datos Básicos
+                  </CardTitle>
+                  <CardDescription>Esta información se ha autocompletado con sus datos personales</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="tipoDocumento"
+                      render={({ field }) => {
+                        const displayValue = getTipoDocumentoDisplayName(field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">1. Tipo de documento</FormLabel>
+                            <FormControl>
+                              <Input value={displayValue} readOnly className="bg-slate-100" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="numeroDocumento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">2. Número de documento</FormLabel>
+                          <FormControl>
+                            <Input {...field} readOnly className="bg-slate-100" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="hospital"
+                      render={({ field }) => {
+                        const displayValue = getHospitalDisplayName(field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">3. Hospital</FormLabel>
+                            <FormControl>
+                              <Input 
+                                value={displayValue} 
+                                readOnly 
+                                className="bg-slate-100" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="profesion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">4. Profesión</FormLabel>
+                          <FormControl>
+                            <Input {...field} readOnly className="bg-slate-100" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="correo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">5. Dirección de correo electrónico</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sección 1.5: Contacto de Emergencia */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PhoneCall className="h-5 w-5 text-primary-prosalud" />
+                    Contacto de Emergencia
+                  </CardTitle>
+                  <CardDescription>Información de la persona a contactar en caso de emergencia</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="nombreContactoEmergencia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">Nombre completo</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="Ej: Juan Pérez"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="relacionContactoEmergencia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">Relación</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione la relación" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {relacionesContactoEmergencia.map((relacion) => (
+                                <SelectItem key={relacion.value} value={relacion.value}>
+                                  {relacion.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="telefonoContactoEmergencia"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">Número telefónico</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="tel"
+                              placeholder="Ej: 3001234567"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sección 2: Información Sociodemográfica */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary-prosalud" />
+                    Información Sociodemográfica
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="tienePersonasACargo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">6. ¿Tiene personas a cargo?</FormLabel>
+                          <FormControl>
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="si" id="personas-si" />
+                                <label htmlFor="personas-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id="personas-no" />
+                                <label htmlFor="personas-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                              </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="estadoCivil"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">7. Estado civil</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione estado civil" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="soltero">Soltero(a)</SelectItem>
+                            <SelectItem value="casado">Casado(a)</SelectItem>
+                            <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                            <SelectItem value="viudo">Viudo(a)</SelectItem>
+                            <SelectItem value="union_libre">Unión libre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="fechaNacimiento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">8. Fecha de nacimiento</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="estatura"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">9. ¿Cuál es su estatura? (cm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} placeholder="Ej: 170" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="peso"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">10. ¿Cuál es su peso? (kg)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} placeholder="Ej: 70" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="genero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">11. Género</FormLabel>
+                        <FormControl>
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="masculino" id="genero-m" />
+                              <label htmlFor="genero-m" className="text-base font-normal text-slate-600 cursor-pointer">Masculino</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="femenino" id="genero-f" />
+                              <label htmlFor="genero-f" className="text-base font-normal text-slate-600 cursor-pointer">Femenino</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="otro" id="genero-o" />
+                              <label htmlFor="genero-o" className="text-base font-normal text-slate-600 cursor-pointer">Otro</label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="raza"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">12. Grupo étnico</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione su grupo étnico" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="ninguno">Ninguno</SelectItem>
+                            <SelectItem value="afro">Afrocolombiano</SelectItem>
+                            <SelectItem value="indigena">Indígena</SelectItem>
+                            <SelectItem value="otro">Otro</SelectItem>
+                            <SelectItem value="no_responde">Prefiere no responder</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="numeroHijos"
+                    render={({ field }) => (
+                      <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">13. Número de hijos</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="0" {...field} onChange={(e) => {
+                            field.onChange(e);
+                            form.setValue('numeroHijos', e.target.value);
+                          }} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Registro de hijos dinámico */}
+                  {hijos.length > 0 && (
+                      <div className="space-y-6 border-t pt-6">
+                      <FormLabel className="text-base font-semibold text-slate-900">14. Registro de información de los hijos</FormLabel>
+                      {hijos.map((_, index) => (
+                        <Card key={index} className="p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-semibold">Hijo {index + 1}</h4>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`hijos.${index}.tipoDocumento`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">Tipo de documento</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
+                                      <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
+                                      <SelectItem value="RC">Registro Civil</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`hijos.${index}.numeroDocumento`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">Número de documento</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`hijos.${index}.nombre`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">Nombre completo</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`hijos.${index}.genero`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">Género</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="masculino">Masculino</SelectItem>
+                                      <SelectItem value="femenino">Femenino</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`hijos.${index}.fechaNacimiento`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">Fecha de nacimiento</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="numeroPersonasDependientes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">15. Número de personas que dependen económicamente de usted</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="0" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="vivienda"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">16. Vivienda</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione tipo de vivienda" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="propia">Propia</SelectItem>
+                            <SelectItem value="arrendada">Arrendada</SelectItem>
+                            <SelectItem value="familiar">Familiar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-3">
+                    <FormLabel className="text-base font-semibold text-slate-900">17. La vivienda cuenta con servicios públicos:</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {['agua', 'luz', 'telefono', 'internet', 'gas'].map((servicio) => (
+                        <FormField
+                          key={servicio}
+                          control={form.control}
+                          name={`serviciosPublicos.${servicio}` as any}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-base font-normal capitalize">{servicio}</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="estratoSocioeconomico"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">18. Estrato socioeconómico</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione estrato" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5, 6].map((estrato) => (
+                              <SelectItem key={estrato} value={estrato.toString()}>
+                                Estrato {estrato}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="conviveCon"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">19. ¿Con quién convive?</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione opción" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="familia_origen">Familia de origen</SelectItem>
+                            <SelectItem value="nueva_familia">Nueva familia (cónyuge e hijos)</SelectItem>
+                            <SelectItem value="ambas">Las dos anteriores</SelectItem>
+                            <SelectItem value="amigos">Amigos</SelectItem>
+                            <SelectItem value="otros_familiares">Otros familiares</SelectItem>
+                            <SelectItem value="solo">Vive solo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="transporte"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">20. Para el desplazamiento a la empresa utiliza:</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione medio de transporte" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="carro">Carro</SelectItem>
+                            <SelectItem value="motocicleta">Motocicleta</SelectItem>
+                            <SelectItem value="bicicleta">Bicicleta</SelectItem>
+                            <SelectItem value="transporte_publico">Transporte público</SelectItem>
+                            <SelectItem value="caminando">Caminando</SelectItem>
+                            <SelectItem value="otra">Otra</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-3">
+                    <FormLabel className="text-base font-semibold text-slate-900">21. En su tiempo libre (fuera de la jornada laboral) usted realiza actividades como:</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {[
+                        { key: 'recreativas', label: 'Actividades recreativas' },
+                        { key: 'deportivas', label: 'Actividades deportivas' },
+                        { key: 'educativas', label: 'Actividades educativas' },
+                        { key: 'descanso', label: 'Actividades de descanso' },
+                        { key: 'artisticas', label: 'Actividades artísticas' },
+                        { key: 'religiosas', label: 'Actividades religiosas' },
+                        { key: 'otras', label: 'Otras' },
+                      ].map((actividad) => (
+                        <FormField
+                          key={actividad.key}
+                          control={form.control}
+                          name={`manejoTiempoLibre.${actividad.key}` as any}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-base font-normal">{actividad.label}</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="tiempoLibreCon"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">22. En su tiempo libre, las actividades las realiza:</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione opción" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="familia">Con la familia</SelectItem>
+                            <SelectItem value="pareja">Con la pareja</SelectItem>
+                            <SelectItem value="amigos">Con amigos</SelectItem>
+                            <SelectItem value="solo">Solo</SelectItem>
+                            <SelectItem value="otros">Otros</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Sección 3: Consumo */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wine className="h-5 w-5 text-primary-prosalud" />
+                    Consumo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="consumoLicor"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">1. ¿Consume licor?</FormLabel>
+                            <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="si" id="licor-si" />
+                                    <label htmlFor="licor-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="no" id="licor-no" />
+                                  <label htmlFor="licor-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                                  </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch('consumoLicor') === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name="frecuenciaLicor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de licor:</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione frecuencia" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="diario">Diario</SelectItem>
+                                  <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
+                                  <SelectItem value="fines_semana">Fines de semana</SelectItem>
+                                  <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
+                                  <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="consumoCigarrillo"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">2. ¿Consume cigarrillo?</FormLabel>
+                            <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="si" id="cigarrillo-si" />
+                                    <label htmlFor="cigarrillo-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="no" id="cigarrillo-no" />
+                                  <label htmlFor="cigarrillo-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                                  </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch('consumoCigarrillo') === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name="frecuenciaCigarrillo"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de cigarrillo:</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione frecuencia" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="diario">Diario</SelectItem>
+                                  <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
+                                  <SelectItem value="fines_semana">Fines de semana</SelectItem>
+                                  <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
+                                  <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sección 4: Condiciones de Salud - Conteste Si, No u Otro */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <HeartPulse className="h-5 w-5 text-primary-prosalud" />
+                    Condiciones de Salud
+                  </CardTitle>
+                  <CardDescription>Conteste Si o No para las siguientes preguntas y especifique de ser necesario</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Helper function para crear campos Si/No/Otro */}
+                  {[
+                    { name: 'sobrepesoObesidad', label: '3. ¿Ha tenido o tiene sobrepeso u obesidad?', showOther: false },
+                    { name: 'hipertensionArterial', label: '4. ¿Sufre o ha sufrido hipertensión arterial?', showOther: false },
+                    { name: 'enfermedadesCorazon', label: '5. ¿Sufre o ha sufrido enfermedades del corazón (arritmias, infartos, soplos, trombosis, derrames, ataques, etc.)?', showOther: false },
+                    { name: 'diabetes', label: '6. ¿Sufre o ha sufrido de diabetes?', showOther: false },
+                    { name: 'problemasRenales', label: '7. ¿Sufre o ha sufrido de problemas renales (Insuficiencia renal, cálculos, infecciones, diálisis, falta de un riñón)?', showOther: false },
+                    { name: 'depresionBipolaridad', label: '8. ¿Sufre o ha sufrido de depresión, bipolaridad, crisis de pánico, esquizofrenia?', showOther: false },
+                    { name: 'antecedentesMedicosMentales', label: '9. ¿Ha tenido antecedentes médicos mentales?', showOther: false },
+                    { name: 'epilepsiaConvulsiones', label: '10. ¿Ha tenido ataques de epilepsia, pérdida del conocimiento, convulsiones u otros problemas neurológicos?', showOther: false },
+                    { name: 'trasplante', label: '11. ¿Ha recibido o requiere algún trasplante?', showOther: false, otherField: 'tipoTrasplante', otherLabel: '12. ¿Cuál trasplante ha recibido o requiere?' },
+                    { name: 'cancer', label: '13. ¿Sufre o ha sufrido cáncer?', showOther: false },
+                    { name: 'problemasPulmonares', label: '14. ¿Tiene o ha tenido problemas pulmonares (Asma, bronquitis, EPOC, asfixia)?', showOther: false, otherField: 'tipoProblemaPulmonar', otherLabel: '¿Cuál problema pulmonar tiene o ha tenido?' },
+                    { name: 'alergias', label: '15. ¿Sufre de alergias (rinitis, sinusitis, en la piel, etc.)?', showOther: false, otherField: 'tipoAlergia', otherLabel: '16. ¿De qué alergia sufre?' },
+                    { name: 'tuberculosis', label: '17. ¿Ha tenido tuberculosis o tos con expectoración por más de 15 días en los últimos meses?', showOther: false },
+                    { name: 'problemasVisuales', label: '18. ¿Sufre de problemas visuales?', showOther: false, otherField: 'tipoProblemaVisual', otherLabel: '19. ¿Cuál problema visual sufre?' },
+                    { name: 'doloresArticulares', label: '20. ¿Sufre de dolores articulares?', showOther: false, otherField: 'tipoDolorArticular', otherLabel: '21. ¿Cuál dolor articular sufre?' },
+                    { name: 'problemasSangre', label: '22. ¿Sufre o ha sufrido de problemas en la sangre (plaquetas, coagulación, etc.)?', showOther: false },
+                    { name: 'otraEnfermedad', label: '23. ¿Sufre de alguna enfermedad que no se haya mencionado anteriormente?', showOther: false, otherField: 'tipoOtraEnfermedad', otherLabel: 'Especifique la enfermedad' },
+                    { name: 'protesisArticular', label: '24. ¿Requiere de alguna prótesis articular o cirugías de rodilla, cadera, etc.?', showOther: false },
+                    { name: 'medicamentoPermanente', label: '25. ¿Consume algún medicamento de forma permanente o crónica?', showOther: false, otherField: 'tipoMedicamento', otherLabel: '26. ¿Cuál medicamento debe consumir de forma permanente o crónica?' },
+                    { name: 'tratamientoMedico', label: '27. ¿Está o ha estado en algún tratamiento médico importante en los últimos 4 meses?', showOther: false },
+                    { name: 'cirugias', label: '28. ¿Tiene cirugías?', showOther: false, otherField: 'tipoCirugia', otherLabel: '29. ¿Cuál cirugía tiene?', additionalField: 'tiempoCirugia', additionalLabel: '30. ¿Hace cuánto se realizó esa cirugía?' },
+                    { name: 'accidenteLaboral', label: '33. ¿Ha tenido algún accidente laboral?', showOther: false, otherField: 'tipoAccidenteLaboral', otherLabel: '34. ¿Qué accidente laboral ha tenido?', additionalField: 'tiempoAccidenteLaboral', additionalLabel: '35. ¿Hace cuánto tuvo el accidente laboral?' },
+                    { name: 'accidenteTransitoCasero', label: '36. ¿Ha tenido algún tipo de accidente de tránsito o casero?', showOther: false, otherField: 'tipoAccidenteTransito', otherLabel: '37. ¿Cuál fue el accidente de tránsito o casero?', additionalField: 'tiempoAccidenteTransito', additionalLabel: '38. ¿Hace cuánto tuvo el accidente de tránsito?' },
+                    { name: 'vacunadoCovid', label: '39. ¿Se encuentra vacunado contra el COVID-19?', showOther: false },
+                  ].map((question, idx) => {
+                    return (
+                    <div key={question.name} className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name={question.name as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">{question.label}</FormLabel>
+                            <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="si" id={`${question.name}-si`} />
+                                  <label htmlFor={`${question.name}-si`} className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="no" id={`${question.name}-no`} />
+                                  <label htmlFor={`${question.name}-no`} className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                                </div>
+                                {question.showOther && (
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="otro" id={`${question.name}-otro`} />
+                                    <label htmlFor={`${question.name}-otro`} className="text-base font-normal text-slate-600 cursor-pointer">Otro</label>
+                                  </div>
+                                )}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {form.watch(question.name as any) === 'si' && question.otherField && (
+                        <FormField
+                          control={form.control}
+                          name={question.otherField as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">{question.otherLabel}</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Especifique..." />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                      {question.additionalField && form.watch(question.name as any) === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name={question.additionalField as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">{question.additionalLabel}</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Especifique tiempo..." />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  );
+                  })}
+
+                </CardContent>
+              </Card>
+
+              {/* Sección 5: Limitaciones Físicas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary-prosalud" />
+                    Limitaciones Físicas
+                  </CardTitle>
+                  <CardDescription>Responda las siguientes preguntas con: Si, me limita mucho. Si, me limita un poco. No, no me limita nada.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {[
+                    { name: 'esfuerzosIntensos', label: '40. Esfuerzos intensos, tales como correr, levantar objetos pesados, o participar en deportes agotadores.' },
+                    { name: 'esfuerzosModerados', label: '41. Esfuerzos moderados, como mover una mesa, pasar la aspiradora, jugar a los bolos o caminar más de 1 hora.' },
+                    { name: 'subirPisos', label: '42. Subir varios pisos por la escalera.' },
+                    { name: 'agacharseArrodillarse', label: '43. Agacharse o arrodillarse.' },
+                  ].map((question) => {
+                    return (
+                    <div key={question.name} className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name={question.name as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">{question.label}</FormLabel>
+                            <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col gap-2">
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroupItem value="limita_mucho" id={`${question.name}-mucho`} />
+                                  <label htmlFor={`${question.name}-mucho`} className="text-base font-normal text-slate-600 cursor-pointer">Sí, me limita mucho</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="limita_poco" id={`${question.name}-poco`} />
+                                <label htmlFor={`${question.name}-poco`} className="text-base font-normal text-slate-600 cursor-pointer">Sí, me limita un poco</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no_limita" id={`${question.name}-no`} />
+                                <label htmlFor={`${question.name}-no`} className="text-base font-normal text-slate-600 cursor-pointer">No, no me limita nada</label>
+                                </div>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  );
+                  })}
+                </CardContent>
+              </Card>
+
+              {/* Sección 6: Recomendaciones Laborales */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5 text-primary-prosalud" />
+                    Recomendaciones Laborales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="recomendacionRestriccionLaboral"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold text-slate-900">¿Tiene usted alguna recomendación o restricción laboral emitida por un médico o especialista?</FormLabel>
+                        <FormControl>
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="si" id="recomendacion-si" />
+                              <label htmlFor="recomendacion-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="no" id="recomendacion-no" />
+                              <label htmlFor="recomendacion-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.watch('recomendacionRestriccionLaboral') === 'si' && (
+                    <FormField
+                      control={form.control}
+                      name="detalleRecomendacionLaboral"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">Especifique la recomendación o restricción laboral:</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Describa la recomendación o restricción..." rows={4} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Sección 7: Autorización y Firma */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileSignature className="h-5 w-5 text-primary-prosalud" />
+                    Autorización y Firma Digital
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="rounded-lg border border-primary-prosalud/40 bg-primary-prosalud/5 p-4 text-sm text-slate-700">
+                    <p className="mb-2">
+                      De acuerdo a la ley 1581 de 2012, que aplica para el tratamiento de datos personales, con el diligenciamiento de esta encuesta, usted autoriza a la empresa, al acceso de esta información personal para efectos del área de Recursos Humanos y SST.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="numeroDocumentoFirma"
+                      render={({ field }) => {
+                        const tipoDocumento = form.watch('tipoDocumento');
+                        const tipoDocumentoLabel = getTipoDocumentoDisplayName(tipoDocumento);
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">Número de documento {tipoDocumentoLabel ? `(${tipoDocumentoLabel})` : ''}</FormLabel>
+                            <FormControl>
+                              <Input {...field} readOnly className="bg-slate-100" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <div className="space-y-3">
+                      <FormLabel className="text-base font-semibold text-slate-900">Firma digital</FormLabel>
+                      <FormDescription>Por favor, firme en el recuadro de abajo para autorizar la encuesta</FormDescription>
+                      <SignaturePad
+                        ref={signaturePadRef}
+                        onChange={handleSignatureChange}
+                        height={200}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="firma"
+                        render={() => (
+                          <FormItem>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Botones de acción */}
+              <div className="flex gap-4 justify-end">
+                <Button type="button" variant="outline" onClick={() => navigate('/')}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting} className="bg-primary-prosalud">
+                  {isSubmitting ? 'Enviando...' : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Enviar Encuesta
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
+      </div>
+    </MainLayout>
+  );
+};
+
+const EncuestaBienestarPage: React.FC = () => {
+  return (
+    <RequireAfiliadoAuth>
+      <EncuestaBienestarPageContent />
+    </RequireAfiliadoAuth>
+  );
+};
+
+export default EncuestaBienestarPage;
+

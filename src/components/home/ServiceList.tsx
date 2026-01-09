@@ -112,11 +112,11 @@ const newServices: Service[] = [
   },
   { 
     icon: Poll, 
-    title: 'Encuesta de bienestar', 
-    description: 'Participa en encuestas para mejorar tu entorno y condiciones.', 
-    linkTo: 'https://forms.gle/2YnLMixdN6EnZ7Qq6', 
+    title: 'Encuesta sociodemográfica y salud', 
+    description: 'Completa la encuesta de diagnóstico de condiciones de salud y actualiza tu información de contacto de emergencia.', 
+    linkTo: '/servicios/encuesta-bienestar', 
     category: 'Bienestar y SST',
-    keywords: ['encuesta', 'bienestar', 'participar', 'mejorar', 'entorno', 'condiciones', 'feedback']
+    keywords: ['encuesta', 'sociodemografica', 'salud', 'diagnostico', 'condiciones', 'contacto', 'emergencia', 'actualizar', 'informacion']
   },
   { 
     icon: Image, 

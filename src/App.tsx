@@ -49,6 +49,7 @@ import SolicitudMicrocreditoPage from '@/pages/SolicitudMicrocreditoPage';
 import SolicitudRetiroSindicalPage from '@/pages/SolicitudRetiroSindicalPage';
 import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
+import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
 
 // Legal Pages
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
@@ -105,6 +106,7 @@ const AppRoutes = () => {
             <Route path="/servicios/incapacidades-licencias" element={<IncapacidadesLicenciasPage />} />
             <Route path="/servicios/incapacidad-maternidad" element={<Navigate to="/servicios/incapacidades-licencias" replace />} /> {/* Redirect legacy URL */}
             <Route path="/servicios/sst" element={<SstPage />} />
+            <Route path="/servicios/encuesta-bienestar" element={<EncuestaBienestarPage />} />
             <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />
             <Route path="/servicios/galeria-bienestar/:eventId" element={<EventoDetallePage />} />
             <Route path="/servicios/permisos-turnos" element={<SolicitudPermisosCambioTurnosPage />} />
