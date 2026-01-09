@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Control, UseFormWatch, FieldValues, useFormContext } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,14 +20,51 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
 }: InformacionCertificadoSectionProps<TFieldValues>) => {
   const watchInfoCertificado = watch("infoCertificado" as any); // Use 'as any' if type inference is tricky
   const { setValue } = useFormContext<TFieldValues>();
-  const { afiliado } = useAfiliadoAuth();
+  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   // Security: Use centralized sanitization hook
   const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
   
-  // Determinar el estado del afiliado (normalizado a minúsculas para comparación)
-  const estadoAfiliado = afiliado?.estado?.toLowerCase() || null;
-  const isActivo = estadoAfiliado === 'activo';
-  const isRetirado = estadoAfiliado === 'retirado';
+  // Determinar el estado del afiliado basado en convenios activos
+  // El campo afiliado.estado es el estado civil (Soltero, Casado, etc.), no el estado laboral
+  // El estado laboral se determina por si tiene un convenio con estado "activo"
+  const { estadoAfiliado, isActivo, isRetirado } = useMemo(() => {
+    if (!afiliado) {
+      return {
+        estadoAfiliado: null,
+        isActivo: false,
+        isRetirado: false
+      };
+    }
+    
+    // Determinar estado basado en convenios activos
+    // Si tiene al menos un convenio con estado "activo", está activo
+    // Si no tiene convenio activo (pero tiene convenios), está retirado
+    const tieneConvenioActivo = afiliado.convenios?.some(
+      convenio => convenio.estado?.toLowerCase()?.trim() === 'activo'
+    ) ?? false;
+    
+    const activo = tieneConvenioActivo;
+    
+    // Si no está activo pero tiene convenios, está retirado
+    const retirado = !activo && (afiliado.convenios?.length ?? 0) > 0;
+    
+    const estadoNormalizado = activo ? 'activo' : (retirado ? 'retirado' : null);
+    
+    // Debug temporal - remover después de verificar
+    console.log('[Debug] Estado del afiliado (laboral):', {
+      convenios: afiliado.convenios,
+      tieneConvenioActivo,
+      estadoNormalizado,
+      isActivo: activo,
+      isRetirado: retirado
+    });
+    
+    return {
+      estadoAfiliado: estadoNormalizado,
+      isActivo: activo,
+      isRetirado: retirado
+    };
+  }, [afiliado]);
 
   // Rastrear si "Valor de compensaciones" fue marcado manualmente por el usuario
   const valorCompensacionesMarcadoManualmente = useRef(false);
@@ -67,7 +104,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
     }
   }, [watchInfoCertificado?.otros, setValue]);
 
-  // Limpiar "Para subsidio de desempleo" si el afiliado está activo
+  // Limpiar "Para subsidio de desempleo" si el afiliado está activo (no debe estar disponible)
   useEffect(() => {
     if (isActivo && watchInfoCertificado?.paraSubsidioDesempleo) {
       // @ts-ignore
@@ -75,7 +112,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
     }
   }, [isActivo, watchInfoCertificado?.paraSubsidioDesempleo, setValue]);
 
-  // Limpiar "Para subsidio de vivienda" si el afiliado está retirado
+  // Limpiar "Para subsidio de vivienda" si el afiliado está retirado (no debe estar disponible)
   useEffect(() => {
     if (isRetirado && watchInfoCertificado?.paraSubsidioVivienda) {
       // @ts-ignore
@@ -389,7 +426,12 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
         <FormField control={control} name={"infoCertificado.fechaIngresoRetiro" as any} render={({ field }) => (
             <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                 <FormControl><Checkbox checked={true} disabled={true} /></FormControl>
-                <FormLabel className="font-normal">Fecha de ingreso y retiro</FormLabel>
+                <div className="leading-none">
+                    <FormLabel className="font-normal">Fecha de ingreso y retiro</FormLabel>
+                    <FormDescription className="text-xs">
+                        Información básica de fechas que siempre se incluye en el certificado. Se genera automáticamente.
+                    </FormDescription>
+                </div>
             </FormItem>
         )}/>
         <FormField control={control} name={"infoCertificado.valorCompensaciones" as any} render={({ field }) => {
@@ -423,9 +465,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                     disabled={isDisabled}
                   />
                 </FormControl>
-                <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  Valor de compensaciones
-                </FormLabel>
+                <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                    <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Valor de compensaciones
+                    </FormLabel>
+                    <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                        Incluye el detalle de la compensación básica mensual variable + auxilios. Lo que coloquialmente se conoce como "salario" o "ingreso mensual" se denomina oficialmente compensación.
+                    </FormDescription>
+                </div>
             </FormItem>
           );
         }}/>
@@ -450,9 +497,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                     disabled={isDisabled}
                   />
                 </FormControl>
-                <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  Dirigido a una entidad en particular
-                </FormLabel>
+                <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                    <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Dirigido a una entidad en particular
+                    </FormLabel>
+                    <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                        Use esta opción cuando el certificado debe dirigirse a una entidad específica (empresa, institución, etc.). Se genera automáticamente.
+                    </FormDescription>
+                </div>
             </FormItem>
           );
         }}/>
@@ -476,11 +528,13 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
             )}/>
         )}
         {/* Ocultar "Para subsidio de desempleo" si el afiliado está activo */}
-        {!isActivo && (
+        {/* Solo mostrar si el afiliado está retirado (no activo) */}
+        {isRetirado && (
           <FormField control={control} name={"infoCertificado.paraSubsidioDesempleo" as any} render={({ field }) => {
             // Deshabilitar si otra opción del grupo excluyente está seleccionada O si "Adicionar actividades" está seleccionado
             // O si "Dirigido a una entidad en particular" está seleccionado
             // NOTA: "Valor de compensaciones" NO es excluyente con los subsidios (es obligatorio cuando se seleccionan)
+            // IMPORTANTE: También deshabilitar si el afiliado está activo (medida de seguridad)
             const otraOpcionSeleccionada = 
               watchInfoCertificado?.paraSubsidioVivienda ||
               watchInfoCertificado?.dirigidoFondoPensiones ||
@@ -489,7 +543,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
               watchInfoCertificado?.adicionarActividades ||
               watchInfoCertificado?.dirigidoAEntidad;
             
-            const isDisabled = !!otraOpcionSeleccionada && !field.value;
+            const isDisabled = isActivo || (!!otraOpcionSeleccionada && !field.value);
             
             return (
               <FormItem className={`flex flex-row items-start space-x-3 space-y-0 ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
@@ -500,19 +554,26 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                       disabled={isDisabled}
                     />
                   </FormControl>
-                  <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                    Para subsidio de desempleo
-                  </FormLabel>
+                  <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                      <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        Para subsidio de desempleo
+                      </FormLabel>
+                      <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                          Solo para afiliados retirados. Incluye automáticamente el valor de compensaciones. Se genera automáticamente.
+                      </FormDescription>
+                  </div>
               </FormItem>
             );
           }}/>
         )}
         {/* Ocultar "Para subsidio de vivienda" si el afiliado está retirado */}
-        {!isRetirado && (
+        {/* Solo mostrar si el afiliado está activo (no retirado) */}
+        {isActivo && (
           <FormField control={control} name={"infoCertificado.paraSubsidioVivienda" as any} render={({ field }) => {
             // Deshabilitar si otra opción del grupo excluyente está seleccionada O si "Adicionar actividades" está seleccionado
             // O si "Dirigido a una entidad en particular" está seleccionado
             // NOTA: "Valor de compensaciones" NO es excluyente con los subsidios (es obligatorio cuando se seleccionan)
+            // IMPORTANTE: También deshabilitar si el afiliado está retirado (medida de seguridad)
             const otraOpcionSeleccionada = 
               watchInfoCertificado?.paraSubsidioDesempleo ||
               watchInfoCertificado?.dirigidoFondoPensiones ||
@@ -521,7 +582,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
               watchInfoCertificado?.adicionarActividades ||
               watchInfoCertificado?.dirigidoAEntidad;
             
-            const isDisabled = !!otraOpcionSeleccionada && !field.value;
+            const isDisabled = isRetirado || (!!otraOpcionSeleccionada && !field.value);
             
             return (
               <FormItem className={`flex flex-row items-start space-x-3 space-y-0 ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
@@ -532,9 +593,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                       disabled={isDisabled}
                     />
                   </FormControl>
-                  <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                    Para subsidio de vivienda
-                  </FormLabel>
+                  <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                      <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        Para subsidio de vivienda
+                      </FormLabel>
+                      <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                          Solo para afiliados activos. Incluye automáticamente el valor de compensaciones. Se genera automáticamente.
+                      </FormDescription>
+                  </div>
               </FormItem>
             );
           }}/>
@@ -560,9 +626,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                     disabled={isDisabled}
                   />
                 </FormControl>
-                <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  Dirigido al Fondo de Pensiones para corrección de historia
-                </FormLabel>
+                <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                    <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Dirigido al Fondo de Pensiones para corrección de historia
+                    </FormLabel>
+                    <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                        Para corrección de historial en el Fondo de Pensiones. Se genera automáticamente con el formato requerido.
+                    </FormDescription>
+                </div>
             </FormItem>
           );
         }}/>
@@ -591,9 +662,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                       disabled={isDisabled}
                     />
                   </FormControl>
-                  <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                    Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud
-                  </FormLabel>
+                  <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                      <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        Dirigido a Bancolombia para apertura de cuenta bajo convenio con ProSalud
+                      </FormLabel>
+                      <FormDescription className={`text-xs ${isDisabled ? 'text-gray-400' : ''}`}>
+                          Solo para afiliados activos. Se genera automáticamente con el formato requerido por Bancolombia.
+                      </FormDescription>
+                  </div>
               </FormItem>
             );
           }}/>
@@ -619,7 +695,7 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                     disabled={isDisabled}
                   />
                 </FormControl>
-                 <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
                     <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       Adicionar actividades
                     </FormLabel>
@@ -660,9 +736,14 @@ const InformacionCertificadoSection = <TFieldValues extends FieldValues>({
                     disabled={isDisabled}
                   />
                 </FormControl>
-                <FormLabel className={`font-normal ${isDisabled ? 'text-gray-500 cursor-not-allowed' : 'cursor-pointer'}`}>
-                  Otros
-                </FormLabel>
+                <div className={`leading-none ${isDisabled ? 'text-gray-500 cursor-not-allowed' : ''}`}>
+                    <FormLabel className={`font-normal ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                      Otros
+                    </FormLabel>
+                    <FormDescription className={`text-xs font-medium ${isDisabled ? 'text-gray-400' : 'text-amber-900 dark:text-amber-600'}`}>
+                        <strong>Solo para necesidades específicas que no están cubiertas por las opciones anteriores.</strong> Esta opción siempre requiere revisión humana y no puede ser generada automáticamente. Por favor, revise primero las otras opciones antes de usar esta.
+                    </FormDescription>
+                </div>
             </FormItem>
           );
         }}/>
