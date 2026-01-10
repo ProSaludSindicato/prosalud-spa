@@ -5,7 +5,7 @@
 
 import {
   Users, GraduationCap, BarChart3, Settings, Heart,
-  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck
+  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText
 } from 'lucide-react';
 
 export interface ModulePermissions {
@@ -168,6 +168,14 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
         audit: ['votes.audit.view'],
         manage: ['votes.manage'],
       },
+    },
+  },
+  socioDemographicSurveys: {
+    name: 'Encuestas Sociodemográficas',
+    href: '/admin/encuestas-sociodemograficas',
+    icon: FileText,
+    permissions: {
+      view: ['socio_demographic_surveys.view'],
     },
   },
 };

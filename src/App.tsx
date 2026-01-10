@@ -33,6 +33,7 @@ import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
 import AdminChatbotPage from '@/pages/AdminChatbotPage';
 import AdminVotacionesPage from '@/pages/AdminVotacionesPage';
 import AdminSstPage from '@/pages/AdminSstPage';
+import AdminEncuestasSociodemograficasPage from '@/pages/AdminEncuestasSociodemograficasPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -228,6 +229,24 @@ const AppRoutes = () => {
               element={
                 <ProtectedRoute requiredPermissions={['dotacion.view']}>
                   <AdminSstPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/encuestas-sociodemograficas" 
+              element={
+                <ProtectedRoute requiredPermissions={['socio_demographic_surveys.view']}>
+                  <AdminEncuestasSociodemograficasPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/encuestas-sociodemograficas/:id" 
+              element={
+                <ProtectedRoute requiredPermissions={['socio_demographic_surveys.view']}>
+                  <AdminEncuestasSociodemograficasPage />
                 </ProtectedRoute>
               } 
             />

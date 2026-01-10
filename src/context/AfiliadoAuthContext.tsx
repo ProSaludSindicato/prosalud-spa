@@ -41,6 +41,7 @@ export interface AfiliadoData {
   telefono?: string | null;
   talla_uniforme?: string | null;
   talla_calzado?: string | null;
+  talla_vestimenta?: string | null; // Talla de pijama/vestimenta
   nivel_educacion?: string | null;
   numero_cuenta?: string | null;
   tipo_cuenta?: string | null;
@@ -51,6 +52,11 @@ export interface AfiliadoData {
   relacion_contacto_emergencia?: string | null;
   telefono_contacto_emergencia?: string | null;
   contacto_emergencia?: string | null; // Campo combinado del backend: "telefono - nombre - relacion"
+  rh?: string | null;
+  fecha_expedicion?: string | null;
+  lugar_nacimiento?: string | null;
+  departamento?: string | null;
+  pais_nacimiento?: string | null;
 }
 
 interface AfiliadoAuthContextType {
@@ -380,19 +386,29 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
             estado: b.estado || null,
           };
         }) || [],
-        // Campos adicionales del OTP
+        // Campos adicionales del OTP - según lista oficial de keys esperadas
+        fecha_expedicion: response.data.afiliado.fecha_expedicion || fechaExp || null,
+        lugar_nacimiento: response.data.afiliado.lugar_nacimiento || null,
+        rh: response.data.afiliado.rh || null,
         estado_civil: response.data.afiliado.estado_civil || null,
         direccion: response.data.afiliado.direccion || null,
+        departamento: response.data.afiliado.departamento || null,
         municipio: response.data.afiliado.municipio || null,
         telefono: response.data.afiliado.telefono || null,
+        // celular ya está mapeado arriba
+        // correo_personal ya está mapeado arriba
+        contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         talla_uniforme: response.data.afiliado.talla_uniforme || null,
         talla_calzado: response.data.afiliado.talla_calzado || null,
-        nivel_educacion: response.data.afiliado.nivel_educacion || null,
-        numero_cuenta: response.data.afiliado.numero_cuenta || null,
-        tipo_cuenta: response.data.afiliado.tipo_cuenta || null,
-        banco: response.data.afiliado.banco || null,
-        eps: response.data.afiliado.eps || null,
-        afp: response.data.afiliado.afp || null,
+        // Campos adicionales que pueden venir pero no están en la lista oficial
+        talla_vestimenta: (response.data.afiliado as any).talla_vestimenta || (response.data.afiliado as any).talla_pijama || response.data.afiliado.talla_uniforme || null,
+        nivel_educacion: (response.data.afiliado as any).nivel_educacion || null,
+        numero_cuenta: (response.data.afiliado as any).numero_cuenta || null,
+        tipo_cuenta: (response.data.afiliado as any).tipo_cuenta || null,
+        banco: (response.data.afiliado as any).banco || null,
+        eps: (response.data.afiliado as any).eps || null,
+        afp: (response.data.afiliado as any).afp || null,
+        pais_nacimiento: (response.data.afiliado as any).pais_nacimiento || null,
         // Parsear contacto_emergencia si viene del backend (para OTP también)
         contacto_emergencia: (response.data.afiliado as any).contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
@@ -511,19 +527,29 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
             estado: b.estado || null,
           };
         }) || [],
-        // Campos adicionales
+        // Campos adicionales - según lista oficial de keys esperadas
+        fecha_expedicion: response.data.afiliado.fecha_expedicion || fechaExp || null,
+        lugar_nacimiento: response.data.afiliado.lugar_nacimiento || null,
+        rh: response.data.afiliado.rh || null,
         estado_civil: response.data.afiliado.estado_civil || null,
         direccion: response.data.afiliado.direccion || null,
+        departamento: response.data.afiliado.departamento || null,
         municipio: response.data.afiliado.municipio || null,
         telefono: response.data.afiliado.telefono || null,
+        // celular ya está mapeado arriba
+        // correo_personal ya está mapeado arriba
+        contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         talla_uniforme: response.data.afiliado.talla_uniforme || null,
         talla_calzado: response.data.afiliado.talla_calzado || null,
-        nivel_educacion: response.data.afiliado.nivel_educacion || null,
-        numero_cuenta: response.data.afiliado.numero_cuenta || null,
-        tipo_cuenta: response.data.afiliado.tipo_cuenta || null,
-        banco: response.data.afiliado.banco || null,
-        eps: response.data.afiliado.eps || null,
-        afp: response.data.afiliado.afp || null,
+        // Campos adicionales que pueden venir pero no están en la lista oficial
+        talla_vestimenta: (response.data.afiliado as any).talla_vestimenta || (response.data.afiliado as any).talla_pijama || response.data.afiliado.talla_uniforme || null,
+        nivel_educacion: (response.data.afiliado as any).nivel_educacion || null,
+        numero_cuenta: (response.data.afiliado as any).numero_cuenta || null,
+        tipo_cuenta: (response.data.afiliado as any).tipo_cuenta || null,
+        banco: (response.data.afiliado as any).banco || null,
+        eps: (response.data.afiliado as any).eps || null,
+        afp: (response.data.afiliado as any).afp || null,
+        pais_nacimiento: (response.data.afiliado as any).pais_nacimiento || null,
         // Parsear contacto_emergencia si viene del backend
         contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia

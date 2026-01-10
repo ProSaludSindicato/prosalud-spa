@@ -9,11 +9,14 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { submitRequest, saveRequestSuccessData } from '@/services/requestsService';
-import RequireAfiliadoAuth from '@/components/auth/RequireAfiliadoAuth';
+import { submitSurvey } from '@/services/socioDemographicSurveyService';
+import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoDataUpdateAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase } from 'lucide-react';
+import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
+import { RECAPTCHA_CONFIG } from '@/config/api';
+import { logger } from '@/utils/logger';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,13 +24,43 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, X } from 'lucide-react';
-import { relacionesContactoEmergencia, tiposDocumentoCompletos } from '@/components/actualizar-datos-personales/formOptions';
+import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
+import { paises, getDefaultPais, normalizePais } from '@/components/actualizar-datos-personales/paises';
+import { departamentos, normalizeDepartamento } from '@/components/actualizar-datos-personales/departamentos';
+import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
+import { useSanitizedInput } from '@/hooks/useSanitizedInput';
+import { sanitizePhone, sanitizeEmail, sanitizeGeneral } from '@/utils/inputSanitizer';
+import { useWatch } from 'react-hook-form';
 
 // Función para obtener el nombre completo del tipo de documento
 const getTipoDocumentoDisplayName = (tipoDocumento: string | null | undefined): string => {
   if (!tipoDocumento) return '';
   const tipo = tiposDocumentoCompletos.find(t => t.value === tipoDocumento);
   return tipo?.label || tipoDocumento;
+};
+
+// Función para normalizar el municipio
+const normalizeMunicipio = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  const found = municipios.find(m => 
+    m.value === normalized || 
+    m.label.toLowerCase() === normalized ||
+    m.label.toLowerCase().includes(normalized) ||
+    normalized.includes(m.value)
+  );
+  return found?.value || normalized.replace(/\s+/g, '_');
+};
+
+// Función para normalizar la talla de uniforme/vestimenta
+const normalizeTallaUniforme = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  const found = tallasUniforme.find(t => 
+    t.value === normalized || 
+    t.label.toLowerCase().includes(normalized)
+  );
+  return found?.value || normalized;
 };
 
 // Función para parsear el campo de contacto de emergencia
@@ -297,6 +330,17 @@ const encuestaSchema = z.object({
   numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
   hospital: z.string().min(1, 'Hospital es requerido'),
   profesion: z.string().min(1, 'Profesión es requerida'),
+  // Campos adicionales de datos básicos
+  rh: z.string().optional(),
+  fechaExpedicion: z.string().optional(),
+  lugarNacimiento: z.string().optional(),
+  departamento: z.string().optional(),
+  celular: z.string().optional(),
+  direccion: z.string().optional(),
+  municipio: z.string().optional(),
+  tallaCalzado: z.string().optional(),
+  tallaVestimenta: z.string().optional(),
+  paisNacimiento: z.string().optional(),
   
   // Sección sociodemográfica
   tienePersonasACargo: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
@@ -400,9 +444,10 @@ type EncuestaFormValues = z.infer<typeof encuestaSchema>;
 
 const EncuestaBienestarPageContent: React.FC = () => {
   const navigate = useNavigate();
-  const { afiliado, getActiveConvenio } = useAfiliadoAuth();
+  const { afiliado, getActiveConvenio, fechaExpedicion } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const signaturePadRef = useRef<SignaturePadRef>(null);
+  const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
   const [hasSignature, setHasSignature] = useState(false);
 
   const activeConvenio = getActiveConvenio();
@@ -415,8 +460,18 @@ const EncuestaBienestarPageContent: React.FC = () => {
       correo: afiliado?.correo_personal || '',
       tipoDocumento: afiliado?.tipo_documento || '',
       numeroDocumento: afiliado?.documento || '',
-      hospital: hospitalValue,
-      profesion: profesionValue,
+      hospital: hospitalValue || '',
+      profesion: profesionValue || '',
+      rh: '',
+      fechaExpedicion: '',
+      lugarNacimiento: '',
+      departamento: '',
+      celular: '',
+      direccion: '',
+      municipio: '',
+      tallaCalzado: '',
+      tallaVestimenta: '',
+      paisNacimiento: getDefaultPais(),
       fechaNacimiento: '',
       numeroPersonasDependientes: '0',
       serviciosPublicos: {
@@ -438,7 +493,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
       hijos: [],
       numeroHijos: '0',
       consumoLicor: '',
+      frecuenciaLicor: '',
       consumoCigarrillo: '',
+      frecuenciaCigarrillo: '',
       sobrepesoObesidad: '',
       hipertensionArterial: '',
       enfermedadesCorazon: '',
@@ -448,23 +505,35 @@ const EncuestaBienestarPageContent: React.FC = () => {
       antecedentesMedicosMentales: '',
       epilepsiaConvulsiones: '',
       trasplante: '',
+      tipoTrasplante: '',
       cancer: '',
       problemasPulmonares: '',
       tipoProblemaPulmonar: '',
       alergias: '',
+      tipoAlergia: '',
       tuberculosis: '',
       problemasVisuales: '',
+      tipoProblemaVisual: '',
       doloresArticulares: '',
+      tipoDolorArticular: '',
       problemasSangre: '',
       otraEnfermedad: '',
+      tipoOtraEnfermedad: '',
       protesisArticular: '',
       medicamentoPermanente: '',
+      tipoMedicamento: '',
       tratamientoMedico: '',
       cirugias: '',
+      tipoCirugia: '',
+      tiempoCirugia: '',
       estatura: '',
       peso: '',
       accidenteLaboral: '',
+      tipoAccidenteLaboral: '',
+      tiempoAccidenteLaboral: '',
       accidenteTransitoCasero: '',
+      tipoAccidenteTransito: '',
+      tiempoAccidenteTransito: '',
       vacunadoCovid: '',
       esfuerzosIntensos: '',
       esfuerzosModerados: '',
@@ -472,7 +541,15 @@ const EncuestaBienestarPageContent: React.FC = () => {
       agacharseArrodillarse: '',
       recomendacionRestriccionLaboral: '',
       detalleRecomendacionLaboral: '',
-      numeroPersonasDependientes: '0',
+      tienePersonasACargo: '',
+      estadoCivil: '',
+      genero: '',
+      raza: '',
+      vivienda: '',
+      estratoSocioeconomico: '',
+      conviveCon: '',
+      transporte: '',
+      tiempoLibreCon: '',
       nombreContactoEmergencia: '',
       relacionContactoEmergencia: '',
       telefonoContactoEmergencia: '',
@@ -487,6 +564,41 @@ const EncuestaBienestarPageContent: React.FC = () => {
       form.setValue('correo', afiliado.correo_personal || '');
       form.setValue('tipoDocumento', afiliado.tipo_documento || '');
       form.setValue('numeroDocumento', afiliado.documento || '');
+      
+      // Prellenar campos adicionales de datos básicos - establecer siempre, incluso si están vacíos
+      // Usar fecha_expedicion del contexto si está disponible, sino del objeto afiliado
+      const fechaExp = fechaExpedicion || afiliado.fecha_expedicion || '';
+      form.setValue('fechaExpedicion', fechaExp);
+      form.setValue('rh', afiliado.rh || '');
+      form.setValue('lugarNacimiento', afiliado.lugar_nacimiento || '');
+      // Normalizar departamento solo si tiene valor
+      if (afiliado.departamento) {
+        form.setValue('departamento', normalizeDepartamento(afiliado.departamento));
+      } else {
+        form.setValue('departamento', '');
+      }
+      form.setValue('celular', afiliado.celular || '');
+      form.setValue('direccion', afiliado.direccion || '');
+      // Normalizar municipio solo si tiene valor
+      if (afiliado.municipio) {
+        form.setValue('municipio', normalizeMunicipio(afiliado.municipio));
+      } else {
+        form.setValue('municipio', '');
+      }
+      form.setValue('tallaCalzado', afiliado.talla_calzado || '');
+      // Normalizar talla de vestimenta - usar talla_vestimenta si existe, sino talla_uniforme
+      const tallaVest = afiliado.talla_vestimenta || afiliado.talla_uniforme || '';
+      if (tallaVest) {
+        form.setValue('tallaVestimenta', normalizeTallaUniforme(tallaVest));
+      } else {
+        form.setValue('tallaVestimenta', '');
+      }
+      // Normalizar país de nacimiento, usar Colombia por defecto si no viene
+      if (afiliado.pais_nacimiento) {
+        form.setValue('paisNacimiento', normalizePais(afiliado.pais_nacimiento));
+      } else {
+        form.setValue('paisNacimiento', getDefaultPais());
+      }
       
       // Prellenar contacto de emergencia
       if (afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia) {
@@ -509,7 +621,36 @@ const EncuestaBienestarPageContent: React.FC = () => {
     if (afiliado?.documento) {
       form.setValue('numeroDocumentoFirma', afiliado.documento);
     }
-  }, [afiliado, activeConvenio, form]);
+  }, [afiliado, activeConvenio, form, fechaExpedicion]);
+
+  // Watch values para ofuscación
+  const watchValues = useWatch({ control: form.control });
+  
+  // Obtener teléfono de contacto de emergencia (puede venir parseado)
+  const getTelefonoContactoEmergencia = (): string => {
+    if (afiliado?.telefono_contacto_emergencia) {
+      return afiliado.telefono_contacto_emergencia;
+    }
+    if (afiliado?.contacto_emergencia) {
+      const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+      return parsed.telefono || '';
+    }
+    return '';
+  };
+  
+  // Valores iniciales para ofuscación
+  const initialValues = {
+    correo: afiliado?.correo_personal || '',
+    direccion: afiliado?.direccion || '',
+    celular: afiliado?.celular || '',
+    telefonoContactoEmergencia: getTelefonoContactoEmergencia(),
+  };
+
+  // Función para determinar si un campo debe estar ofuscado
+  const shouldObfuscate = (fieldName: keyof typeof initialValues): boolean => {
+    const initialValue = initialValues[fieldName];
+    return !!initialValue && String(initialValue).trim() !== '';
+  };
 
   const numeroHijos = form.watch('numeroHijos');
   const hijos = form.watch('hijos') || [];
@@ -538,48 +679,63 @@ const EncuestaBienestarPageContent: React.FC = () => {
     form.setValue('firma', dataUrl || '');
   };
 
-  // Convertir data URL a Blob para enviar como archivo
-  const dataURItoBlob = (dataURI: string): File => {
-    const byteString = atob(dataURI.split(',')[1]);
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
-    }
-    const blob = new Blob([ab], { type: mimeString });
-    return new File([blob], 'firma.png', { type: mimeString });
-  };
-
   const onSubmit = async (data: EncuestaFormValues) => {
-    if (!afiliado) return;
+    console.log('onSubmit llamado', { 
+      hasAfiliado: !!afiliado,
+      hasSignature,
+      firmaLength: data.firma?.length || 0,
+    });
+
+    if (!afiliado) {
+      toast.error('No se encontró información del afiliado');
+      return;
+    }
 
     if (!hasSignature) {
       toast.error('Debe firmar la encuesta antes de enviarla');
       return;
     }
 
+    if (!data.firma || data.firma.trim() === '') {
+      toast.error('La firma digital es requerida');
+      return;
+    }
+
+    console.log('Pasando validaciones básicas, iniciando envío...');
     setIsSubmitting(true);
     try {
-      const requestData = {
-        request_type: 'encuesta-bienestar',
-        id_type: afiliado.tipo_documento || '',
-        id_number: afiliado.documento || '',
-        name: afiliado.nombres || '',
-        last_name: afiliado.apellidos || '',
-        email: afiliado.correo_personal || '',
-        phone_number: afiliado.celular || '',
-        payload: {
-          ...data,
-          firma: data.firma, // Base64 de la firma
-        },
-        files: {
-          firma: dataURItoBlob(data.firma), // Convertir a File para enviar
-        },
-      };
+      console.log('Enviando encuesta...', { 
+        tieneFirma: !!data.firma, 
+        camposRequeridos: {
+          correo: !!data.correo,
+          tipoDocumento: !!data.tipoDocumento,
+          numeroDocumento: !!data.numeroDocumento,
+          hospital: !!data.hospital,
+          profesion: !!data.profesion,
+        }
+      });
 
-      const response = await submitRequest(requestData);
-      saveRequestSuccessData(response);
+      // Ejecutar reCAPTCHA - si falla, continuar sin token (fail-open)
+      let recaptchaToken: string | null = null;
+      try {
+        recaptchaToken = await recaptchaRef.current?.execute() ?? null;
+        console.log('reCAPTCHA token obtenido:', !!recaptchaToken);
+      } catch (error) {
+        logger.warn('Error al ejecutar reCAPTCHA, continuando sin token:', error);
+        // No bloquear al usuario - permitir continuar
+      }
+
+      console.log('Llamando a submitSurvey...');
+      const response = await submitSurvey(
+        data,
+        data.firma, // Base64 de la firma
+        recaptchaToken || undefined
+      );
+
+      console.log('Respuesta recibida:', response);
+
+      // Reset reCAPTCHA después del envío exitoso
+      recaptchaRef.current?.reset();
 
       form.reset();
       toast.success('Encuesta enviada correctamente', {
@@ -591,9 +747,25 @@ const EncuestaBienestarPageContent: React.FC = () => {
       }, 2000);
     } catch (error: any) {
       console.error('Error submitting survey:', error);
-      toast.error('Error al enviar la encuesta', {
-        description: error.message || 'Por favor, intenta nuevamente.',
+      console.error('Error details:', {
+        message: error.message,
+        isValidationError: error.isValidationError,
+        errors: error.errors,
+        status: error.status,
+        response: error.response,
       });
+      
+      // Manejar errores de validación
+      if (error.isValidationError && error.errors) {
+        const errorMessages = Object.values(error.errors).flat().join(', ');
+        toast.error('Error de validación', {
+          description: errorMessages || 'Por favor, revisa los datos ingresados.',
+        });
+      } else {
+        toast.error('Error al enviar la encuesta', {
+          description: error.message || 'Por favor, intenta nuevamente.',
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -628,7 +800,19 @@ const EncuestaBienestarPageContent: React.FC = () => {
           </div>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form 
+              onSubmit={form.handleSubmit(
+                onSubmit,
+                (errors) => {
+                  console.error('Errores de validación del formulario:', errors);
+                  const errorCount = Object.keys(errors).length;
+                  toast.error(`El formulario tiene ${errorCount} error(es) de validación`, {
+                    description: 'Por favor, revisa los campos marcados en rojo y completa todos los campos requeridos.',
+                  });
+                }
+              )} 
+              className="space-y-8"
+            >
               {/* Sección 1: Datos Básicos (Autocompletados) */}
               <Card>
                 <CardHeader>
@@ -709,12 +893,320 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <FormField
                       control={form.control}
                       name="correo"
+                      render={({ field }) => {
+                        const currentValue = watchValues?.correo || '';
+                        const initialValue = initialValues.correo;
+                        const isObfuscated = shouldObfuscate('correo');
+                        const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                        const displayValue = isObfuscated && currentValue === initialValue
+                          ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'email'))
+                          : currentValue;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">5. Dirección de correo electrónico</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="email"
+                                value={displayValue}
+                                onChange={(e) => {
+                                  const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
+                                  field.onChange(sanitized);
+                                }}
+                                onFocus={() => {
+                                  if (isObfuscated && currentValue === displayValue) {
+                                    if (initialIsObfuscated) {
+                                      field.onChange('');
+                                    } else {
+                                      field.onChange(initialValue);
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const currentVal = e.target.value || '';
+                                  if (isObfuscated && !currentVal.trim() && initialValue) {
+                                    field.onChange(initialValue);
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="rh"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">5. Dirección de correo electrónico</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">6. RH</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} />
+                            <Select onValueChange={field.onChange} value={field.value} disabled={!!afiliado?.rh}>
+                              <SelectTrigger className={afiliado?.rh ? 'bg-slate-100' : ''}>
+                                <SelectValue placeholder="Seleccione el tipo de sangre" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="A+">A+</SelectItem>
+                                <SelectItem value="A-">A-</SelectItem>
+                                <SelectItem value="B+">B+</SelectItem>
+                                <SelectItem value="B-">B-</SelectItem>
+                                <SelectItem value="AB+">AB+</SelectItem>
+                                <SelectItem value="AB-">AB-</SelectItem>
+                                <SelectItem value="O+">O+</SelectItem>
+                                <SelectItem value="O-">O-</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fechaExpedicion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">7. Fecha de expedición</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} value={field.value || ''} readOnly={!!afiliado?.fecha_expedicion} className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="lugarNacimiento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">8. Lugar de nacimiento</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} readOnly={!!afiliado?.lugar_nacimiento} className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} placeholder="Ej: Medellín" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="departamento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">9. Departamento</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione el departamento" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {departamentos.map((departamento) => (
+                                <SelectItem key={departamento.value} value={departamento.value}>
+                                  {departamento.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="paisNacimiento"
+                      render={({ field }) => {
+                        const selectedPais = paises.find(p => p.value === field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">10. País de nacimiento</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione el país">
+                                    {selectedPais && (
+                                      <span className="flex items-center gap-2">
+                                        <span>{selectedPais.flag}</span>
+                                        <span>{selectedPais.label}</span>
+                                      </span>
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="max-h-[300px]">
+                                {paises.map((pais) => (
+                                  <SelectItem key={pais.value} value={pais.value}>
+                                    <span className="flex items-center gap-2">
+                                      <span className="text-lg">{pais.flag}</span>
+                                      <span>{pais.label}</span>
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="celular"
+                      render={({ field }) => {
+                        const currentValue = watchValues?.celular || '';
+                        const initialValue = initialValues.celular;
+                        const isObfuscated = shouldObfuscate('celular');
+                        const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                        const displayValue = isObfuscated && currentValue === initialValue
+                          ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'phone'))
+                          : currentValue;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">11. Celular</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="tel"
+                                value={displayValue}
+                                onChange={(e) => {
+                                  const sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
+                                  field.onChange(sanitized);
+                                }}
+                                onFocus={() => {
+                                  if (isObfuscated && currentValue === displayValue) {
+                                    if (initialIsObfuscated) {
+                                      field.onChange('');
+                                    } else {
+                                      field.onChange(initialValue);
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const currentVal = e.target.value || '';
+                                  if (isObfuscated && !currentVal.trim() && initialValue) {
+                                    field.onChange(initialValue);
+                                  }
+                                }}
+                                placeholder="Ej: 3001234567"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="direccion"
+                      render={({ field }) => {
+                        const currentValue = watchValues?.direccion || '';
+                        const initialValue = initialValues.direccion;
+                        const isObfuscated = shouldObfuscate('direccion');
+                        const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                        const displayValue = isObfuscated && currentValue === initialValue
+                          ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'address'))
+                          : currentValue;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">12. Dirección</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={displayValue}
+                                onChange={(e) => {
+                                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+                                  field.onChange(sanitized);
+                                }}
+                                onFocus={() => {
+                                  if (isObfuscated && currentValue === displayValue) {
+                                    if (initialIsObfuscated) {
+                                      field.onChange('');
+                                    } else {
+                                      field.onChange(initialValue);
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const currentVal = e.target.value || '';
+                                  if (isObfuscated && !currentVal.trim() && initialValue) {
+                                    field.onChange(initialValue);
+                                  }
+                                }}
+                                placeholder="Ej: Calle 50 # 45-23"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="municipio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">13. Municipio</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione el municipio" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {municipios.map((municipio) => (
+                                <SelectItem key={municipio.value} value={municipio.value}>
+                                  {municipio.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tallaCalzado"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">14. Talla de calzado</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="Ej: 40" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tallaVestimenta"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">15. Talla de vestimenta (Pijama)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione la talla" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {tallasUniforme.map((talla) => (
+                                <SelectItem key={talla.value} value={talla.value}>
+                                  {talla.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -780,19 +1272,56 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <FormField
                       control={form.control}
                       name="telefonoContactoEmergencia"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">Número telefónico</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="tel"
-                              placeholder="Ej: 3001234567"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const currentValue = field.value || '';
+                        const initialValue = initialValues.telefonoContactoEmergencia;
+                        const isObfuscated = shouldObfuscate('telefonoContactoEmergencia');
+                        const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                        
+                        // Si el campo está vacío o es igual al valor inicial ofuscado, mostrar valor ofuscado
+                        // Si el usuario ha modificado el valor, mostrar el valor actual
+                        const hasBeenModified = currentValue !== '' && currentValue !== initialValue;
+                        const displayValue = !hasBeenModified && isObfuscated && (currentValue === '' || currentValue === initialValue)
+                          ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'phone'))
+                          : currentValue;
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">Número telefónico</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="tel"
+                                value={displayValue}
+                                onChange={(e) => {
+                                  const sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
+                                  field.onChange(sanitized);
+                                }}
+                                onFocus={() => {
+                                  // Si el valor mostrado es ofuscado, limpiar el campo para permitir edición
+                                  if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
+                                    if (initialIsObfuscated) {
+                                      field.onChange('');
+                                    } else if (initialValue) {
+                                      field.onChange(initialValue);
+                                    } else {
+                                      field.onChange('');
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  // Si el usuario no ingresó nada y había un valor inicial, restaurar
+                                  const currentVal = e.target.value || '';
+                                  if (isObfuscated && !currentVal.trim() && initialValue && !initialIsObfuscated) {
+                                    field.onChange(initialValue);
+                                  }
+                                }}
+                                placeholder="Ej: 3001234567"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
                 </CardContent>
@@ -812,7 +1341,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="tienePersonasACargo"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">6. ¿Tiene personas a cargo?</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">16. ¿Tiene personas a cargo?</FormLabel>
                           <FormControl>
                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                               <div className="flex items-center space-x-2">
@@ -835,7 +1364,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="estadoCivil"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">7. Estado civil</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">17. Estado civil</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -860,9 +1389,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="fechaNacimiento"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">8. Fecha de nacimiento</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">18. Fecha de nacimiento</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input type="date" {...field} value={field.value || ''} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -874,9 +1403,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="estatura"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">9. ¿Cuál es su estatura? (cm)</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">19. ¿Cuál es su estatura? (cm)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} placeholder="Ej: 170" />
+                          <Input type="number" {...field} value={field.value || ''} placeholder="Ej: 170" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -888,9 +1417,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="peso"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">10. ¿Cuál es su peso? (kg)</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">20. ¿Cuál es su peso? (kg)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} placeholder="Ej: 70" />
+                          <Input type="number" {...field} value={field.value || ''} placeholder="Ej: 70" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -902,7 +1431,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="genero"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">11. Género</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">21. Género</FormLabel>
                         <FormControl>
                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                             <div className="flex items-center space-x-2">
@@ -929,7 +1458,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="raza"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">12. Grupo étnico</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">22. Grupo étnico</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -954,7 +1483,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="numeroHijos"
                     render={({ field }) => (
                       <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">13. Número de hijos</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">23. Número de hijos</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" {...field} onChange={(e) => {
                             field.onChange(e);
@@ -969,7 +1498,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   {/* Registro de hijos dinámico */}
                   {hijos.length > 0 && (
                       <div className="space-y-6 border-t pt-6">
-                      <FormLabel className="text-base font-semibold text-slate-900">14. Registro de información de los hijos</FormLabel>
+                      <FormLabel className="text-base font-semibold text-slate-900">24. Registro de información de los hijos</FormLabel>
                       {hijos.map((_, index) => (
                         <Card key={index} className="p-4">
                           <div className="flex justify-between items-center mb-4">
@@ -1069,7 +1598,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="numeroPersonasDependientes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">15. Número de personas que dependen económicamente de usted</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">25. Número de personas que dependen económicamente de usted</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" {...field} />
                         </FormControl>
@@ -1083,7 +1612,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="vivienda"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">16. Vivienda</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">26. Vivienda</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1102,7 +1631,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   />
 
                   <div className="space-y-3">
-                    <FormLabel className="text-base font-semibold text-slate-900">17. La vivienda cuenta con servicios públicos:</FormLabel>
+                    <FormLabel className="text-base font-semibold text-slate-900">27. La vivienda cuenta con servicios públicos:</FormLabel>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {['agua', 'luz', 'telefono', 'internet', 'gas'].map((servicio) => (
                         <FormField
@@ -1127,7 +1656,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="estratoSocioeconomico"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">18. Estrato socioeconómico</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">28. Estrato socioeconómico</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1152,7 +1681,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="conviveCon"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">19. ¿Con quién convive?</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">29. ¿Con quién convive?</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1178,7 +1707,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="transporte"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">20. Para el desplazamiento a la empresa utiliza:</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">30. Para el desplazamiento a la empresa utiliza:</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1200,7 +1729,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   />
 
                   <div className="space-y-3">
-                    <FormLabel className="text-base font-semibold text-slate-900">21. En su tiempo libre (fuera de la jornada laboral) usted realiza actividades como:</FormLabel>
+                    <FormLabel className="text-base font-semibold text-slate-900">31. En su tiempo libre (fuera de la jornada laboral) usted realiza actividades como:</FormLabel>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {[
                         { key: 'recreativas', label: 'Actividades recreativas' },
@@ -1233,7 +1762,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="tiempoLibreCon"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">22. En su tiempo libre, las actividades las realiza:</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">32. En su tiempo libre, las actividades las realiza:</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1271,7 +1800,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         name="consumoLicor"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">1. ¿Consume licor?</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">33. ¿Consume licor?</FormLabel>
                             <FormControl>
                               <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                                   <div className="flex items-center space-x-2">
@@ -1323,7 +1852,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         name="consumoCigarrillo"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">2. ¿Consume cigarrillo?</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">34. ¿Consume cigarrillo?</FormLabel>
                             <FormControl>
                               <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                                   <div className="flex items-center space-x-2">
@@ -1384,30 +1913,30 @@ const EncuestaBienestarPageContent: React.FC = () => {
                 <CardContent className="space-y-6">
                   {/* Helper function para crear campos Si/No/Otro */}
                   {[
-                    { name: 'sobrepesoObesidad', label: '3. ¿Ha tenido o tiene sobrepeso u obesidad?', showOther: false },
-                    { name: 'hipertensionArterial', label: '4. ¿Sufre o ha sufrido hipertensión arterial?', showOther: false },
-                    { name: 'enfermedadesCorazon', label: '5. ¿Sufre o ha sufrido enfermedades del corazón (arritmias, infartos, soplos, trombosis, derrames, ataques, etc.)?', showOther: false },
-                    { name: 'diabetes', label: '6. ¿Sufre o ha sufrido de diabetes?', showOther: false },
-                    { name: 'problemasRenales', label: '7. ¿Sufre o ha sufrido de problemas renales (Insuficiencia renal, cálculos, infecciones, diálisis, falta de un riñón)?', showOther: false },
-                    { name: 'depresionBipolaridad', label: '8. ¿Sufre o ha sufrido de depresión, bipolaridad, crisis de pánico, esquizofrenia?', showOther: false },
-                    { name: 'antecedentesMedicosMentales', label: '9. ¿Ha tenido antecedentes médicos mentales?', showOther: false },
-                    { name: 'epilepsiaConvulsiones', label: '10. ¿Ha tenido ataques de epilepsia, pérdida del conocimiento, convulsiones u otros problemas neurológicos?', showOther: false },
-                    { name: 'trasplante', label: '11. ¿Ha recibido o requiere algún trasplante?', showOther: false, otherField: 'tipoTrasplante', otherLabel: '12. ¿Cuál trasplante ha recibido o requiere?' },
-                    { name: 'cancer', label: '13. ¿Sufre o ha sufrido cáncer?', showOther: false },
-                    { name: 'problemasPulmonares', label: '14. ¿Tiene o ha tenido problemas pulmonares (Asma, bronquitis, EPOC, asfixia)?', showOther: false, otherField: 'tipoProblemaPulmonar', otherLabel: '¿Cuál problema pulmonar tiene o ha tenido?' },
-                    { name: 'alergias', label: '15. ¿Sufre de alergias (rinitis, sinusitis, en la piel, etc.)?', showOther: false, otherField: 'tipoAlergia', otherLabel: '16. ¿De qué alergia sufre?' },
-                    { name: 'tuberculosis', label: '17. ¿Ha tenido tuberculosis o tos con expectoración por más de 15 días en los últimos meses?', showOther: false },
-                    { name: 'problemasVisuales', label: '18. ¿Sufre de problemas visuales?', showOther: false, otherField: 'tipoProblemaVisual', otherLabel: '19. ¿Cuál problema visual sufre?' },
-                    { name: 'doloresArticulares', label: '20. ¿Sufre de dolores articulares?', showOther: false, otherField: 'tipoDolorArticular', otherLabel: '21. ¿Cuál dolor articular sufre?' },
-                    { name: 'problemasSangre', label: '22. ¿Sufre o ha sufrido de problemas en la sangre (plaquetas, coagulación, etc.)?', showOther: false },
-                    { name: 'otraEnfermedad', label: '23. ¿Sufre de alguna enfermedad que no se haya mencionado anteriormente?', showOther: false, otherField: 'tipoOtraEnfermedad', otherLabel: 'Especifique la enfermedad' },
-                    { name: 'protesisArticular', label: '24. ¿Requiere de alguna prótesis articular o cirugías de rodilla, cadera, etc.?', showOther: false },
-                    { name: 'medicamentoPermanente', label: '25. ¿Consume algún medicamento de forma permanente o crónica?', showOther: false, otherField: 'tipoMedicamento', otherLabel: '26. ¿Cuál medicamento debe consumir de forma permanente o crónica?' },
-                    { name: 'tratamientoMedico', label: '27. ¿Está o ha estado en algún tratamiento médico importante en los últimos 4 meses?', showOther: false },
-                    { name: 'cirugias', label: '28. ¿Tiene cirugías?', showOther: false, otherField: 'tipoCirugia', otherLabel: '29. ¿Cuál cirugía tiene?', additionalField: 'tiempoCirugia', additionalLabel: '30. ¿Hace cuánto se realizó esa cirugía?' },
-                    { name: 'accidenteLaboral', label: '33. ¿Ha tenido algún accidente laboral?', showOther: false, otherField: 'tipoAccidenteLaboral', otherLabel: '34. ¿Qué accidente laboral ha tenido?', additionalField: 'tiempoAccidenteLaboral', additionalLabel: '35. ¿Hace cuánto tuvo el accidente laboral?' },
-                    { name: 'accidenteTransitoCasero', label: '36. ¿Ha tenido algún tipo de accidente de tránsito o casero?', showOther: false, otherField: 'tipoAccidenteTransito', otherLabel: '37. ¿Cuál fue el accidente de tránsito o casero?', additionalField: 'tiempoAccidenteTransito', additionalLabel: '38. ¿Hace cuánto tuvo el accidente de tránsito?' },
-                    { name: 'vacunadoCovid', label: '39. ¿Se encuentra vacunado contra el COVID-19?', showOther: false },
+                    { name: 'sobrepesoObesidad', label: '35. ¿Ha tenido o tiene sobrepeso u obesidad?', showOther: false },
+                    { name: 'hipertensionArterial', label: '36. ¿Sufre o ha sufrido hipertensión arterial?', showOther: false },
+                    { name: 'enfermedadesCorazon', label: '37. ¿Sufre o ha sufrido enfermedades del corazón (arritmias, infartos, soplos, trombosis, derrames, ataques, etc.)?', showOther: false },
+                    { name: 'diabetes', label: '38. ¿Sufre o ha sufrido de diabetes?', showOther: false },
+                    { name: 'problemasRenales', label: '39. ¿Sufre o ha sufrido de problemas renales (Insuficiencia renal, cálculos, infecciones, diálisis, falta de un riñón)?', showOther: false },
+                    { name: 'depresionBipolaridad', label: '40. ¿Sufre o ha sufrido de depresión, bipolaridad, crisis de pánico, esquizofrenia?', showOther: false },
+                    { name: 'antecedentesMedicosMentales', label: '41. ¿Ha tenido antecedentes médicos mentales?', showOther: false },
+                    { name: 'epilepsiaConvulsiones', label: '42. ¿Ha tenido ataques de epilepsia, pérdida del conocimiento, convulsiones u otros problemas neurológicos?', showOther: false },
+                    { name: 'trasplante', label: '43. ¿Ha recibido o requiere algún trasplante?', showOther: false, otherField: 'tipoTrasplante', otherLabel: '44. ¿Cuál trasplante ha recibido o requiere?' },
+                    { name: 'cancer', label: '45. ¿Sufre o ha sufrido cáncer?', showOther: false },
+                    { name: 'problemasPulmonares', label: '46. ¿Tiene o ha tenido problemas pulmonares (Asma, bronquitis, EPOC, asfixia)?', showOther: false, otherField: 'tipoProblemaPulmonar', otherLabel: '¿Cuál problema pulmonar tiene o ha tenido?' },
+                    { name: 'alergias', label: '47. ¿Sufre de alergias (rinitis, sinusitis, en la piel, etc.)?', showOther: false, otherField: 'tipoAlergia', otherLabel: '48. ¿De qué alergia sufre?' },
+                    { name: 'tuberculosis', label: '49. ¿Ha tenido tuberculosis o tos con expectoración por más de 15 días en los últimos meses?', showOther: false },
+                    { name: 'problemasVisuales', label: '50. ¿Sufre de problemas visuales?', showOther: false, otherField: 'tipoProblemaVisual', otherLabel: '51. ¿Cuál problema visual sufre?' },
+                    { name: 'doloresArticulares', label: '52. ¿Sufre de dolores articulares?', showOther: false, otherField: 'tipoDolorArticular', otherLabel: '53. ¿Cuál dolor articular sufre?' },
+                    { name: 'problemasSangre', label: '54. ¿Sufre o ha sufrido de problemas en la sangre (plaquetas, coagulación, etc.)?', showOther: false },
+                    { name: 'otraEnfermedad', label: '55. ¿Sufre de alguna enfermedad que no se haya mencionado anteriormente?', showOther: false, otherField: 'tipoOtraEnfermedad', otherLabel: 'Especifique la enfermedad' },
+                    { name: 'protesisArticular', label: '56. ¿Requiere de alguna prótesis articular o cirugías de rodilla, cadera, etc.?', showOther: false },
+                    { name: 'medicamentoPermanente', label: '57. ¿Consume algún medicamento de forma permanente o crónica?', showOther: false, otherField: 'tipoMedicamento', otherLabel: '58. ¿Cuál medicamento debe consumir de forma permanente o crónica?' },
+                    { name: 'tratamientoMedico', label: '59. ¿Está o ha estado en algún tratamiento médico importante en los últimos 4 meses?', showOther: false },
+                    { name: 'cirugias', label: '60. ¿Tiene cirugías?', showOther: false, otherField: 'tipoCirugia', otherLabel: '61. ¿Cuál cirugía tiene?', additionalField: 'tiempoCirugia', additionalLabel: '62. ¿Hace cuánto se realizó esa cirugía?' },
+                    { name: 'accidenteLaboral', label: '63. ¿Ha tenido algún accidente laboral?', showOther: false, otherField: 'tipoAccidenteLaboral', otherLabel: '64. ¿Qué accidente laboral ha tenido?', additionalField: 'tiempoAccidenteLaboral', additionalLabel: '65. ¿Hace cuánto tuvo el accidente laboral?' },
+                    { name: 'accidenteTransitoCasero', label: '66. ¿Ha tenido algún tipo de accidente de tránsito o casero?', showOther: false, otherField: 'tipoAccidenteTransito', otherLabel: '67. ¿Cuál fue el accidente de tránsito o casero?', additionalField: 'tiempoAccidenteTransito', additionalLabel: '68. ¿Hace cuánto tuvo el accidente de tránsito?' },
+                    { name: 'vacunadoCovid', label: '69. ¿Se encuentra vacunado contra el COVID-19?', showOther: false },
                   ].map((question, idx) => {
                     return (
                     <div key={question.name} className="space-y-3">
@@ -1487,10 +2016,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {[
-                    { name: 'esfuerzosIntensos', label: '40. Esfuerzos intensos, tales como correr, levantar objetos pesados, o participar en deportes agotadores.' },
-                    { name: 'esfuerzosModerados', label: '41. Esfuerzos moderados, como mover una mesa, pasar la aspiradora, jugar a los bolos o caminar más de 1 hora.' },
-                    { name: 'subirPisos', label: '42. Subir varios pisos por la escalera.' },
-                    { name: 'agacharseArrodillarse', label: '43. Agacharse o arrodillarse.' },
+                    { name: 'esfuerzosIntensos', label: '70. Esfuerzos intensos, tales como correr, levantar objetos pesados, o participar en deportes agotadores.' },
+                    { name: 'esfuerzosModerados', label: '71. Esfuerzos moderados, como mover una mesa, pasar la aspiradora, jugar a los bolos o caminar más de 1 hora.' },
+                    { name: 'subirPisos', label: '72. Subir varios pisos por la escalera.' },
+                    { name: 'agacharseArrodillarse', label: '73. Agacharse o arrodillarse.' },
                   ].map((question) => {
                     return (
                     <div key={question.name} className="space-y-3">
@@ -1540,7 +2069,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     name="recomendacionRestriccionLaboral"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">¿Tiene usted alguna recomendación o restricción laboral emitida por un médico o especialista?</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">74. ¿Tiene usted alguna recomendación o restricción laboral emitida por un médico o especialista?</FormLabel>
                         <FormControl>
                           <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                             <div className="flex items-center space-x-2">
@@ -1637,7 +2166,15 @@ const EncuestaBienestarPageContent: React.FC = () => {
                 <Button type="button" variant="outline" onClick={() => navigate('/')}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isSubmitting} className="bg-primary-prosalud">
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="bg-primary-prosalud"
+                  onClick={(e) => {
+                    console.log('Botón de submit clickeado');
+                    // No prevenir el comportamiento por defecto - dejar que el formulario maneje el submit
+                  }}
+                >
                   {isSubmitting ? 'Enviando...' : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
@@ -1646,6 +2183,19 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   )}
                 </Button>
               </div>
+              
+              {/* reCAPTCHA invisible */}
+              <InvisibleRecaptcha
+                ref={recaptchaRef}
+                siteKey={RECAPTCHA_CONFIG.SITE_KEY}
+                onVerify={() => {}}
+                onError={() => {
+                  logger.warn('Error en reCAPTCHA');
+                }}
+                onExpire={() => {
+                  logger.warn('Token de reCAPTCHA expirado');
+                }}
+              />
             </form>
           </Form>
         </div>
@@ -1656,9 +2206,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
 const EncuestaBienestarPage: React.FC = () => {
   return (
-    <RequireAfiliadoAuth>
+    <RequireAfiliadoDataUpdateAuth>
       <EncuestaBienestarPageContent />
-    </RequireAfiliadoAuth>
+    </RequireAfiliadoDataUpdateAuth>
   );
 };
 
