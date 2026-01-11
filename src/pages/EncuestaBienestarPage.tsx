@@ -26,7 +26,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, X } from 'lucide-react';
 import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, getDefaultPais, normalizePais } from '@/components/actualizar-datos-personales/paises';
-import { departamentos, normalizeDepartamento } from '@/components/actualizar-datos-personales/departamentos';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 import { sanitizePhone, sanitizeEmail, sanitizeGeneral } from '@/utils/inputSanitizer';
@@ -325,6 +324,8 @@ const hijoSchema = z.object({
 
 const encuestaSchema = z.object({
   // Autocompletados
+  nombres: z.string().optional(),
+  apellidos: z.string().optional(),
   correo: z.string().email('Correo inválido').min(1, 'Correo es requerido'),
   tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
   numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
@@ -335,7 +336,14 @@ const encuestaSchema = z.object({
   fechaExpedicion: z.string().optional(),
   lugarNacimiento: z.string().optional(),
   departamento: z.string().optional(),
-  celular: z.string().optional(),
+  celular: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      // Validar formato colombiano: 10 dígitos comenzando con 3
+      const phoneRegex = /^[3][0-9]{9}$/;
+      return phoneRegex.test(val.replace(/\s/g, ''));
+    }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
   direccion: z.string().optional(),
   municipio: z.string().optional(),
   tallaCalzado: z.string().optional(),
@@ -410,8 +418,18 @@ const encuestaSchema = z.object({
   cirugias: z.string().min(1, 'Campo requerido'),
   tipoCirugia: z.string().optional(),
   tiempoCirugia: z.string().optional(),
-  estatura: z.string().min(1, 'Estatura es requerida'),
-  peso: z.string().min(1, 'Peso es requerido'),
+  estatura: z.string()
+    .min(1, 'Estatura es requerida')
+    .refine((val) => {
+      const num = parseInt(val, 10);
+      return !isNaN(num) && num >= 120 && num <= 230;
+    }, { message: 'La estatura debe estar entre 120 y 230 cm' }),
+  peso: z.string()
+    .min(1, 'Peso es requerido')
+    .refine((val) => {
+      const num = parseInt(val, 10);
+      return !isNaN(num) && num >= 30 && num <= 250;
+    }, { message: 'El peso debe estar entre 30 y 250 kg' }),
   accidenteLaboral: z.string().min(1, 'Campo requerido'),
   tipoAccidenteLaboral: z.string().optional(),
   tiempoAccidenteLaboral: z.string().optional(),
@@ -433,7 +451,14 @@ const encuestaSchema = z.object({
   // Contacto de emergencia
   nombreContactoEmergencia: z.string().optional(),
   relacionContactoEmergencia: z.string().optional(),
-  telefonoContactoEmergencia: z.string().optional(),
+  telefonoContactoEmergencia: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      // Validar formato colombiano: 10 dígitos comenzando con 3
+      const phoneRegex = /^[3][0-9]{9}$/;
+      return phoneRegex.test(val.replace(/\s/g, ''));
+    }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
   
   // Firma
   firma: z.string().min(1, 'Firma es requerida'),
@@ -457,6 +482,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const form = useForm<EncuestaFormValues>({
     resolver: zodResolver(encuestaSchema),
     defaultValues: {
+      nombres: afiliado?.nombres || '',
+      apellidos: afiliado?.apellidos || '',
       correo: afiliado?.correo_personal || '',
       tipoDocumento: afiliado?.tipo_documento || '',
       numeroDocumento: afiliado?.documento || '',
@@ -465,7 +492,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       rh: '',
       fechaExpedicion: '',
       lugarNacimiento: '',
-      departamento: '',
+      departamento: 'antioquia',
       celular: '',
       direccion: '',
       municipio: '',
@@ -561,6 +588,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
   // Actualizar valores cuando cambian los datos del afiliado
   useEffect(() => {
     if (afiliado) {
+      form.setValue('nombres', afiliado.nombres || '');
+      form.setValue('apellidos', afiliado.apellidos || '');
       form.setValue('correo', afiliado.correo_personal || '');
       form.setValue('tipoDocumento', afiliado.tipo_documento || '');
       form.setValue('numeroDocumento', afiliado.documento || '');
@@ -571,12 +600,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
       form.setValue('fechaExpedicion', fechaExp);
       form.setValue('rh', afiliado.rh || '');
       form.setValue('lugarNacimiento', afiliado.lugar_nacimiento || '');
-      // Normalizar departamento solo si tiene valor
-      if (afiliado.departamento) {
-        form.setValue('departamento', normalizeDepartamento(afiliado.departamento));
-      } else {
-        form.setValue('departamento', '');
-      }
+      // Departamento siempre es Antioquia
+      form.setValue('departamento', 'antioquia');
       form.setValue('celular', afiliado.celular || '');
       form.setValue('direccion', afiliado.direccion || '');
       // Normalizar municipio solo si tiene valor
@@ -826,12 +851,29 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
+                      name="nombres"
+                      render={({ field }) => {
+                        const nombreCompleto = [field.value, form.watch('apellidos')].filter(Boolean).join(' ');
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">1. Nombre completo</FormLabel>
+                            <FormControl>
+                              <Input value={nombreCompleto || ''} readOnly className="bg-slate-100" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="tipoDocumento"
                       render={({ field }) => {
                         const displayValue = getTipoDocumentoDisplayName(field.value);
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">1. Tipo de documento</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">2. Tipo de documento</FormLabel>
                             <FormControl>
                               <Input value={displayValue} readOnly className="bg-slate-100" />
                             </FormControl>
@@ -846,7 +888,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="numeroDocumento"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">2. Número de documento</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">3. Número de documento</FormLabel>
                           <FormControl>
                             <Input {...field} readOnly className="bg-slate-100" />
                           </FormControl>
@@ -862,7 +904,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         const displayValue = getHospitalDisplayName(field.value);
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">3. Hospital</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">4. Hospital</FormLabel>
                             <FormControl>
                               <Input 
                                 value={displayValue} 
@@ -881,7 +923,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="profesion"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">4. Profesión</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">5. Profesión</FormLabel>
                           <FormControl>
                             <Input {...field} readOnly className="bg-slate-100" />
                           </FormControl>
@@ -904,7 +946,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">5. Dirección de correo electrónico</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">6. Dirección de correo electrónico</FormLabel>
                             <FormControl>
                               <Input
                                 type="email"
@@ -941,7 +983,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="rh"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">6. RH</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">7. RH</FormLabel>
                           <FormControl>
                             <Select onValueChange={field.onChange} value={field.value} disabled={!!afiliado?.rh}>
                               <SelectTrigger className={afiliado?.rh ? 'bg-slate-100' : ''}>
@@ -969,7 +1011,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="fechaExpedicion"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">7. Fecha de expedición</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">8. Fecha de expedición</FormLabel>
                           <FormControl>
                             <Input type="date" {...field} value={field.value || ''} readOnly={!!afiliado?.fecha_expedicion} className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} />
                           </FormControl>
@@ -995,26 +1037,26 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <FormField
                       control={form.control}
                       name="departamento"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">9. Departamento</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                      render={({ field }) => {
+                        // Asegurar que el valor del campo siempre sea 'antioquia'
+                        if (field.value !== 'antioquia') {
+                          field.onChange('antioquia');
+                        }
+                        
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">9. Departamento</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccione el departamento" />
-                              </SelectTrigger>
+                              <Input
+                                value="Antioquia"
+                                readOnly
+                                className="bg-slate-100 cursor-not-allowed"
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {departamentos.map((departamento) => (
-                                <SelectItem key={departamento.value} value={departamento.value}>
-                                  {departamento.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
@@ -1405,8 +1447,18 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">19. ¿Cuál es su estatura? (cm)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} value={field.value || ''} placeholder="Ej: 170" />
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || ''} 
+                            placeholder="Ej: 170"
+                            min={120}
+                            max={230}
+                          />
                         </FormControl>
+                        <FormDescription className="text-xs text-slate-500">
+                          Rango válido: 120-230 cm
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1419,8 +1471,18 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">20. ¿Cuál es su peso? (kg)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} value={field.value || ''} placeholder="Ej: 70" />
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || ''} 
+                            placeholder="Ej: 70"
+                            min={30}
+                            max={250}
+                          />
                         </FormControl>
+                        <FormDescription className="text-xs text-slate-500">
+                          Rango válido: 30-250 kg
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1911,6 +1973,13 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   <CardDescription>Conteste Si o No para las siguientes preguntas y especifique de ser necesario</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Microcopy sobre confidencialidad */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-blue-800">
+                      <strong>Nota importante:</strong> Esta información es confidencial y se usa únicamente para fines de salud ocupacional.
+                    </p>
+                  </div>
+                  
                   {/* Helper function para crear campos Si/No/Otro */}
                   {[
                     { name: 'sobrepesoObesidad', label: '35. ¿Ha tenido o tiene sobrepeso u obesidad?', showOther: false },

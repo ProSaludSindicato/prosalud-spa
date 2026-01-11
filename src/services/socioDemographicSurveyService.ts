@@ -3,6 +3,8 @@ import axios, { AxiosError } from 'axios';
 
 export interface SocioDemographicSurveyData {
   // Datos Básicos
+  nombres?: string;
+  apellidos?: string;
   correo: string;
   tipoDocumento: string;
   numeroDocumento: string;

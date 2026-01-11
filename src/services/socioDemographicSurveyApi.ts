@@ -8,6 +8,8 @@ export interface SocioDemographicSurveyListItem {
   hospital: string;
   profesion: string;
   created_at: string;
+  nombres?: string | null;
+  apellidos?: string | null;
 }
 
 export interface PaginationData {
@@ -130,6 +132,8 @@ export interface SocioDemographicSurveyDetail {
   numero_documento: string;
   hospital: string;
   profesion: string;
+  nombres?: string | null;
+  apellidos?: string | null;
   rh?: string;
   fecha_expedicion?: string;
   lugar_nacimiento?: string;

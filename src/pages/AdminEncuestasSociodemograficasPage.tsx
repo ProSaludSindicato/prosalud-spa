@@ -28,6 +28,7 @@ import {
   Home,
   Baby,
   UserCheck,
+  ClipboardList,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -538,7 +539,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <TableLoadingSkeleton columns={7} rows={5} />
+              <TableLoadingSkeleton columns={6} rows={5} />
             ) : error ? (
               <div className="text-center py-8">
                 <p className="text-red-600">Error al cargar las encuestas</p>
@@ -557,50 +558,55 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ID</TableHead>
                         <TableHead>Afiliado</TableHead>
                         <TableHead>Documento</TableHead>
-                        <TableHead>Profesión y Hospital</TableHead>
+                        <TableHead>Proceso y Hospital</TableHead>
                         <TableHead>Fecha</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {surveys.map((survey) => (
+                      {surveys.map((survey) => {
+                        const nombreCompleto = [survey.nombres, survey.apellidos].filter(Boolean).join(' ');
+                        return (
                         <motion.tr
                           key={survey.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           className="border-b transition-colors hover:bg-slate-50"
                         >
-                          <TableCell className="font-mono text-sm">{survey.id}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-slate-400" />
-                              <span>{survey.correo}</span>
+                            <div className="flex items-start gap-2">
+                              <ClipboardList className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0">
+                                {nombreCompleto ? (
+                                  <p className="text-sm font-medium text-slate-900">{nombreCompleto}</p>
+                                ) : null}
+                                <p className="text-sm text-slate-600 mt-0.5">{survey.correo}</p>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
-                              <p className="text-sm font-medium text-slate-900">
-                                {getTipoDocumentoDisplayName(survey.tipo_documento)}
-                              </p>
-                              <p className="text-xs text-slate-600 font-mono mt-0.5">
+                              <p className="text-sm font-medium text-slate-900 font-mono">
                                 {survey.numero_documento}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                {getTipoDocumentoDisplayName(survey.tipo_documento)}
                               </p>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
                               {survey.profesion ? (
-                                <p className="text-sm font-medium text-slate-900 truncate max-w-[200px]" title={survey.profesion}>
+                                <p className="text-sm font-medium text-slate-900" title={survey.profesion}>
                                   {survey.profesion}
                                 </p>
                               ) : (
                                 <p className="text-sm text-slate-400 italic">No disponible</p>
                               )}
                               {survey.hospital && (
-                                <p className="text-xs text-slate-600 truncate max-w-[200px] mt-1" title={survey.hospital}>
+                                <p className="text-xs text-slate-600 mt-1" title={survey.hospital}>
                                   {survey.hospital}
                                 </p>
                               )}
@@ -621,7 +627,8 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                             </Button>
                           </TableCell>
                         </motion.tr>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -838,6 +845,67 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
     }
   };
 
+  if (!can('socio_demographic_surveys.view')) {
+    return (
+      <AdminLayout>
+        <div className="min-h-screen bg-slate-50">
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <div className="flex justify-center items-center min-h-[60vh]">
+              <Card className="max-w-md">
+                <CardHeader>
+                  <CardTitle>Acceso denegado</CardTitle>
+                  <CardDescription>
+                    No tienes permisos para acceder a esta sección.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="min-h-screen bg-slate-50">
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <div className="flex justify-center items-center min-h-[60vh]">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-prosalud" />
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !survey) {
+    return (
+      <AdminLayout>
+        <div className="min-h-screen bg-slate-50">
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <div className="flex justify-center items-center min-h-[60vh]">
+              <Card className="max-w-md">
+                <CardHeader>
+                  <CardTitle>Error</CardTitle>
+                  <CardDescription>
+                    No se pudo cargar la encuesta. Puede que no exista o no tengas permisos para verla.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={() => navigate('/admin/encuestas-sociodemograficas')}>
+                    Volver a la lista
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
@@ -859,13 +927,24 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                     >
                       ← Volver
                     </Button>
-                    <div>
+                    <div className="flex-1">
                       <CardTitle className="text-3xl font-bold text-primary-prosalud">
                         Encuesta Sociodemográfica
                       </CardTitle>
                       <CardDescription className="text-base mt-2">
                         ID: <span className="font-mono">{survey.id}</span>
                       </CardDescription>
+                    </div>
+                  </div>
+                  <div className="mt-4 sm:mt-0">
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-slate-500" />
+                        <div>
+                          <p className="text-xs text-slate-500 font-medium">Fecha de Registro</p>
+                          <p className="text-sm text-slate-900 font-medium">{formatDateTime(survey.created_at)}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -883,6 +962,12 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                 </CardTitle>
               </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(survey.nombres || survey.apellidos) && (
+              <div>
+                <label className="text-sm font-medium text-slate-600">Nombre Completo</label>
+                <p className="text-base">{[survey.nombres, survey.apellidos].filter(Boolean).join(' ')}</p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-slate-600">Correo</label>
               <p className="text-base">{survey.correo}</p>
@@ -906,10 +991,6 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
             <div>
               <label className="text-sm font-medium text-slate-600">Profesión</label>
               <p className="text-base">{survey.profesion}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600">Fecha de Registro</label>
-              <p className="text-base">{formatDateTime(survey.created_at)}</p>
             </div>
           </CardContent>
             </Card>
