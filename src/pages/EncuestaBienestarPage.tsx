@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { submitSurvey } from '@/services/socioDemographicSurveyService';
 import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoDataUpdateAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
@@ -319,7 +320,15 @@ const hijoSchema = z.object({
   numeroDocumento: z.string({ required_error: 'Número de documento es requerido' }).min(1, 'Número de documento es requerido'),
   nombre: z.string({ required_error: 'Nombre es requerido' }).min(1, 'Nombre es requerido'),
   genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
-  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida'),
+  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' })
+    .min(1, 'Fecha de nacimiento es requerida')
+    .refine((val) => {
+      if (!val) return false;
+      const fecha = new Date(val);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      return fecha <= hoy;
+    }, { message: 'La fecha de nacimiento no puede ser futura' }),
 });
 
 const encuestaSchema = z.object({
@@ -346,7 +355,13 @@ const encuestaSchema = z.object({
     }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
   direccion: z.string().optional(),
   municipio: z.string().optional(),
-  tallaCalzado: z.string().optional(),
+  tallaCalzado: z.string()
+    .optional()
+    .refine((val) => {
+      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      const num = parseInt(val, 10);
+      return !isNaN(num) && num >= 20 && num <= 50;
+    }, { message: 'La talla de calzado debe ser un número entre 20 y 50' }),
   tallaVestimenta: z.string().optional(),
   paisNacimiento: z.string().optional(),
   
@@ -460,8 +475,8 @@ const encuestaSchema = z.object({
       return phoneRegex.test(val.replace(/\s/g, ''));
     }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
   
-  // Firma
-  firma: z.string().min(1, 'Firma es requerida'),
+  // Firma - solo se valida al enviar, no en validación de pasos
+  firma: z.string().optional(),
   numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
 });
 
@@ -474,6 +489,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const signaturePadRef = useRef<SignaturePadRef>(null);
   const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
   const [hasSignature, setHasSignature] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const TOTAL_STEPS = 5;
 
   const activeConvenio = getActiveConvenio();
   const hospitalValue = activeConvenio?.cliente || '';
@@ -585,68 +602,84 @@ const EncuestaBienestarPageContent: React.FC = () => {
     },
   });
 
-  // Actualizar valores cuando cambian los datos del afiliado
+  // Actualizar valores cuando cambian los datos del afiliado (solo si están vacíos)
   useEffect(() => {
     if (afiliado) {
-      form.setValue('nombres', afiliado.nombres || '');
-      form.setValue('apellidos', afiliado.apellidos || '');
-      form.setValue('correo', afiliado.correo_personal || '');
-      form.setValue('tipoDocumento', afiliado.tipo_documento || '');
-      form.setValue('numeroDocumento', afiliado.documento || '');
+      const currentValues = form.getValues();
       
-      // Prellenar campos adicionales de datos básicos - establecer siempre, incluso si están vacíos
-      // Usar fecha_expedicion del contexto si está disponible, sino del objeto afiliado
-      const fechaExp = fechaExpedicion || afiliado.fecha_expedicion || '';
-      form.setValue('fechaExpedicion', fechaExp);
-      form.setValue('rh', afiliado.rh || '');
-      form.setValue('lugarNacimiento', afiliado.lugar_nacimiento || '');
+      // Solo establecer valores si están vacíos para no sobrescribir cambios del usuario
+      if (!currentValues.nombres) form.setValue('nombres', afiliado.nombres || '');
+      if (!currentValues.apellidos) form.setValue('apellidos', afiliado.apellidos || '');
+      if (!currentValues.correo) form.setValue('correo', afiliado.correo_personal || '');
+      if (!currentValues.tipoDocumento) form.setValue('tipoDocumento', afiliado.tipo_documento || '');
+      if (!currentValues.numeroDocumento) form.setValue('numeroDocumento', afiliado.documento || '');
+      
+      // Prellenar campos adicionales solo si están vacíos
+      if (!currentValues.fechaExpedicion) {
+        const fechaExp = fechaExpedicion || afiliado.fecha_expedicion || '';
+        form.setValue('fechaExpedicion', fechaExp);
+      }
+      if (!currentValues.rh) form.setValue('rh', afiliado.rh || '');
+      if (!currentValues.lugarNacimiento) form.setValue('lugarNacimiento', afiliado.lugar_nacimiento || '');
       // Departamento siempre es Antioquia
       form.setValue('departamento', 'antioquia');
-      form.setValue('celular', afiliado.celular || '');
-      form.setValue('direccion', afiliado.direccion || '');
-      // Normalizar municipio solo si tiene valor
-      if (afiliado.municipio) {
+      if (!currentValues.celular) form.setValue('celular', afiliado.celular || '');
+      if (!currentValues.direccion) form.setValue('direccion', afiliado.direccion || '');
+      if (!currentValues.municipio && afiliado.municipio) {
         form.setValue('municipio', normalizeMunicipio(afiliado.municipio));
-      } else {
-        form.setValue('municipio', '');
       }
-      form.setValue('tallaCalzado', afiliado.talla_calzado || '');
-      // Normalizar talla de vestimenta - usar talla_vestimenta si existe, sino talla_uniforme
-      const tallaVest = afiliado.talla_vestimenta || afiliado.talla_uniforme || '';
-      if (tallaVest) {
-        form.setValue('tallaVestimenta', normalizeTallaUniforme(tallaVest));
-      } else {
-        form.setValue('tallaVestimenta', '');
+      if (!currentValues.tallaCalzado) form.setValue('tallaCalzado', afiliado.talla_calzado || '');
+      if (!currentValues.tallaVestimenta) {
+        const tallaVest = afiliado.talla_vestimenta || afiliado.talla_uniforme || '';
+        if (tallaVest) {
+          form.setValue('tallaVestimenta', normalizeTallaUniforme(tallaVest));
+        }
       }
-      // Normalizar país de nacimiento, usar Colombia por defecto si no viene
-      if (afiliado.pais_nacimiento) {
-        form.setValue('paisNacimiento', normalizePais(afiliado.pais_nacimiento));
-      } else {
-        form.setValue('paisNacimiento', getDefaultPais());
+      if (!currentValues.paisNacimiento) {
+        if (afiliado.pais_nacimiento) {
+          form.setValue('paisNacimiento', normalizePais(afiliado.pais_nacimiento));
+        } else {
+          form.setValue('paisNacimiento', getDefaultPais());
+        }
       }
       
-      // Prellenar contacto de emergencia
-      if (afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia) {
-        // Si viene en formato combinado, parsearlo
-        const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
-        form.setValue('nombreContactoEmergencia', parsed.nombre);
-        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(parsed.relacion));
-        form.setValue('telefonoContactoEmergencia', parsed.telefono);
-      } else {
-        // Si viene separado, usarlo directamente
-        form.setValue('nombreContactoEmergencia', afiliado.nombre_contacto_emergencia || '');
-        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliado.relacion_contacto_emergencia));
-        form.setValue('telefonoContactoEmergencia', afiliado.telefono_contacto_emergencia || '');
+      // Prellenar contacto de emergencia solo si están vacíos
+      if (!currentValues.nombreContactoEmergencia || !currentValues.telefonoContactoEmergencia) {
+        if (afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia) {
+          // Si viene en formato combinado, parsearlo
+          const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', parsed.nombre);
+          if (!currentValues.relacionContactoEmergencia) form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(parsed.relacion));
+          if (!currentValues.telefonoContactoEmergencia) form.setValue('telefonoContactoEmergencia', parsed.telefono);
+        } else {
+          // Si viene separado, usarlo directamente
+          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', afiliado.nombre_contacto_emergencia || '');
+          if (!currentValues.relacionContactoEmergencia) form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliado.relacion_contacto_emergencia));
+          if (!currentValues.telefonoContactoEmergencia) form.setValue('telefonoContactoEmergencia', afiliado.telefono_contacto_emergencia || '');
+        }
       }
     }
     if (activeConvenio) {
-      form.setValue('hospital', activeConvenio.cliente || '');
-      form.setValue('profesion', activeConvenio.proceso || '');
+      const currentValues = form.getValues();
+      if (!currentValues.hospital) form.setValue('hospital', activeConvenio.cliente || '');
+      if (!currentValues.profesion) form.setValue('profesion', activeConvenio.proceso || '');
     }
     if (afiliado?.documento) {
-      form.setValue('numeroDocumentoFirma', afiliado.documento);
+      const currentValues = form.getValues();
+      if (!currentValues.numeroDocumentoFirma) form.setValue('numeroDocumentoFirma', afiliado.documento);
     }
   }, [afiliado, activeConvenio, form, fechaExpedicion]);
+
+  // Asegurar que numeroDocumentoFirma siempre tenga valor cuando se está en el paso 5
+  useEffect(() => {
+    if (currentStep === 5) {
+      const currentValue = form.getValues('numeroDocumentoFirma');
+      const numeroDocumento = form.getValues('numeroDocumento');
+      if (!currentValue && numeroDocumento) {
+        form.setValue('numeroDocumentoFirma', numeroDocumento);
+      }
+    }
+  }, [currentStep, form]);
 
   // Watch values para ofuscación
   const watchValues = useWatch({ control: form.control });
@@ -703,6 +736,106 @@ const EncuestaBienestarPageContent: React.FC = () => {
     setHasSignature(Boolean(dataUrl));
     form.setValue('firma', dataUrl || '');
   };
+
+  // Campos por paso para validación
+  const stepFields: Record<number, (keyof EncuestaFormValues)[]> = {
+    1: [
+      'correo',
+      'tipoDocumento',
+      'numeroDocumento',
+      'hospital',
+      'profesion',
+      'celular',
+      'telefonoContactoEmergencia',
+    ],
+    2: [
+      'tienePersonasACargo',
+      'estadoCivil',
+      'fechaNacimiento',
+      'estatura',
+      'peso',
+      'genero',
+      'raza',
+      'vivienda',
+      'estratoSocioeconomico',
+      'conviveCon',
+      'transporte',
+      'tiempoLibreCon',
+    ],
+    3: [
+      'consumoLicor',
+      'consumoCigarrillo',
+      'frecuenciaLicor',
+      'frecuenciaCigarrillo',
+      'sobrepesoObesidad',
+      'hipertensionArterial',
+      'enfermedadesCorazon',
+      'diabetes',
+      'problemasRenales',
+      'depresionBipolaridad',
+      'antecedentesMedicosMentales',
+      'epilepsiaConvulsiones',
+      'trasplante',
+      'cancer',
+      'problemasPulmonares',
+      'alergias',
+      'tuberculosis',
+      'problemasVisuales',
+      'doloresArticulares',
+      'problemasSangre',
+      'otraEnfermedad',
+      'protesisArticular',
+      'medicamentoPermanente',
+      'tratamientoMedico',
+      'cirugias',
+      'accidenteLaboral',
+      'accidenteTransitoCasero',
+      'vacunadoCovid',
+    ],
+    4: [
+      'esfuerzosIntensos',
+      'esfuerzosModerados',
+      'subirPisos',
+      'agacharseArrodillarse',
+      'recomendacionRestriccionLaboral',
+    ],
+    5: [
+      'numeroDocumentoFirma',
+    ],
+  };
+
+  // Validar paso actual antes de avanzar
+  const validateStep = async (step: number): Promise<boolean> => {
+    const fields = stepFields[step] || [];
+    const result = await form.trigger(fields as any);
+    return result;
+  };
+
+  // Navegar al siguiente paso
+  const handleNext = async () => {
+    const isValid = await validateStep(currentStep);
+    if (isValid) {
+      if (currentStep < TOTAL_STEPS) {
+        setCurrentStep(currentStep + 1);
+        // Scroll al inicio del formulario
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else {
+      toast.error('Por favor, completa todos los campos requeridos antes de continuar');
+    }
+  };
+
+  // Navegar al paso anterior
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      // Scroll al inicio del formulario
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Calcular progreso
+  const progress = (currentStep / TOTAL_STEPS) * 100;
 
   const onSubmit = async (data: EncuestaFormValues) => {
     console.log('onSubmit llamado', { 
@@ -819,9 +952,22 @@ const EncuestaBienestarPageContent: React.FC = () => {
             <h1 className="text-3xl font-bold text-slate-900 mb-2">
               Encuesta Sociodemográfica y Diagnóstico de Condiciones de Salud
             </h1>
-            <p className="text-slate-600">
+            <p className="text-slate-600 mb-4">
               Yo, {afiliado?.nombres} {afiliado?.apellidos}, con {afiliado?.tipo_documento} {afiliado?.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.
             </p>
+            
+            {/* Barra de progreso y contador de secciones */}
+            <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">
+                  Sección {currentStep} de {TOTAL_STEPS}
+                </span>
+                <span className="text-sm font-medium text-slate-700">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
           </div>
 
           <Form {...form}>
@@ -838,6 +984,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
               )} 
               className="space-y-8"
             >
+              {/* Paso 1: Datos Básicos y Contacto de Emergencia */}
+              {currentStep === 1 && (
+                <>
               {/* Sección 1: Datos Básicos (Autocompletados) */}
               <Card>
                 <CardHeader>
@@ -956,11 +1105,16 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                   field.onChange(sanitized);
                                 }}
                                 onFocus={() => {
-                                  if (isObfuscated && currentValue === displayValue) {
+                                  // Si el valor mostrado es ofuscado, preparar el campo para edición
+                                  if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
                                     if (initialIsObfuscated) {
+                                      // Si viene ofuscado del backend, limpiar para que escriba el valor real
                                       field.onChange('');
-                                    } else {
+                                    } else if (initialValue) {
+                                      // Si no viene ofuscado, restaurar el valor real para edición
                                       field.onChange(initialValue);
+                                    } else {
+                                      field.onChange('');
                                     }
                                   }
                                 }}
@@ -1121,11 +1275,16 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                   field.onChange(sanitized);
                                 }}
                                 onFocus={() => {
-                                  if (isObfuscated && currentValue === displayValue) {
+                                  // Si el valor mostrado es ofuscado, preparar el campo para edición
+                                  if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
                                     if (initialIsObfuscated) {
+                                      // Si viene ofuscado del backend, limpiar para que escriba el valor real
                                       field.onChange('');
-                                    } else {
+                                    } else if (initialValue) {
+                                      // Si no viene ofuscado, restaurar el valor real para edición
                                       field.onChange(initialValue);
+                                    } else {
+                                      field.onChange('');
                                     }
                                   }
                                 }}
@@ -1167,11 +1326,16 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                   field.onChange(sanitized);
                                 }}
                                 onFocus={() => {
-                                  if (isObfuscated && currentValue === displayValue) {
+                                  // Si el valor mostrado es ofuscado, preparar el campo para edición
+                                  if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
                                     if (initialIsObfuscated) {
+                                      // Si viene ofuscado del backend, limpiar para que escriba el valor real
                                       field.onChange('');
-                                    } else {
+                                    } else if (initialValue) {
+                                      // Si no viene ofuscado, restaurar el valor real para edición
                                       field.onChange(initialValue);
+                                    } else {
+                                      field.onChange('');
                                     }
                                   }
                                 }}
@@ -1222,8 +1386,23 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">14. Talla de calzado</FormLabel>
                           <FormControl>
-                            <Input {...field} value={field.value || ''} placeholder="Ej: 40" />
+                            <Input 
+                              {...field} 
+                              value={field.value || ''} 
+                              placeholder="Ej: 40"
+                              type="number"
+                              min={20}
+                              max={50}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Solo permitir números
+                                if (value === '' || /^\d+$/.test(value)) {
+                                  field.onChange(value);
+                                }
+                              }}
+                            />
                           </FormControl>
+                          <FormDescription>Ingrese un número entre 20 y 50</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1368,7 +1547,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+                </>
+              )}
 
+              {/* Paso 2: Información Sociodemográfica */}
+              {currentStep === 2 && (
+                <>
               {/* Sección 2: Información Sociodemográfica */}
               <Card>
                 <CardHeader>
@@ -1845,7 +2029,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   />
                 </CardContent>
               </Card>
+                </>
+              )}
 
+              {/* Paso 3: Consumo y Condiciones de Salud */}
+              {currentStep === 3 && (
+                <>
               {/* Sección 3: Consumo */}
               <Card>
                 <CardHeader>
@@ -1855,110 +2044,126 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="consumoLicor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">33. Consumo de licor</FormLabel>
+                          <FormControl>
+                            <RadioGroup onValueChange={(value) => {
+                              field.onChange(value);
+                              form.clearErrors('consumoLicor');
+                              if (value !== 'si') {
+                                form.setValue('frecuenciaLicor', '');
+                                form.clearErrors('frecuenciaLicor');
+                              }
+                            }} value={field.value} className="flex gap-6">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="si" id="consumo-licor-si" />
+                                <label htmlFor="consumo-licor-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id="consumo-licor-no" />
+                                <label htmlFor="consumo-licor-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch('consumoLicor') === 'si' && (
                       <FormField
                         control={form.control}
-                        name="consumoLicor"
+                        name="frecuenciaLicor"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">33. ¿Consume licor?</FormLabel>
-                            <FormControl>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                                  <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="si" id="licor-si" />
-                                    <label htmlFor="licor-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value="no" id="licor-no" />
-                                  <label htmlFor="licor-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
-                                  </div>
-                              </RadioGroup>
-                            </FormControl>
+                            <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de licor</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(value);
+                              form.clearErrors('frecuenciaLicor');
+                            }} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione la frecuencia" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="diario">Diario</SelectItem>
+                                <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
+                                <SelectItem value="fines_semana">Fines de semana</SelectItem>
+                                <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
+                                <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                    )}
 
-                      {form.watch('consumoLicor') === 'si' && (
-                        <FormField
-                          control={form.control}
-                          name="frecuenciaLicor"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de licor:</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione frecuencia" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="diario">Diario</SelectItem>
-                                  <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
-                                  <SelectItem value="fines_semana">Fines de semana</SelectItem>
-                                  <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
-                                  <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                    <FormField
+                      control={form.control}
+                      name="consumoCigarrillo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">34. Consumo de cigarrillo</FormLabel>
+                          <FormControl>
+                            <RadioGroup onValueChange={(value) => {
+                              field.onChange(value);
+                              form.clearErrors('consumoCigarrillo');
+                              if (value !== 'si') {
+                                form.setValue('frecuenciaCigarrillo', '');
+                                form.clearErrors('frecuenciaCigarrillo');
+                              }
+                            }} value={field.value} className="flex gap-6">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="si" id="consumo-cigarrillo-si" />
+                                <label htmlFor="consumo-cigarrillo-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id="consumo-cigarrillo-no" />
+                                <label htmlFor="consumo-cigarrillo-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
+                              </div>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                    </div>
+                    />
 
-                    <div className="space-y-6">
+                    {form.watch('consumoCigarrillo') === 'si' && (
                       <FormField
                         control={form.control}
-                        name="consumoCigarrillo"
+                        name="frecuenciaCigarrillo"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">34. ¿Consume cigarrillo?</FormLabel>
-                            <FormControl>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                                  <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="si" id="cigarrillo-si" />
-                                    <label htmlFor="cigarrillo-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value="no" id="cigarrillo-no" />
-                                  <label htmlFor="cigarrillo-no" className="text-base font-normal text-slate-600 cursor-pointer">No</label>
-                                  </div>
-                              </RadioGroup>
-                            </FormControl>
+                            <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de cigarrillo</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(value);
+                              form.clearErrors('frecuenciaCigarrillo');
+                            }} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione la frecuencia" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="diario">Diario</SelectItem>
+                                <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
+                                <SelectItem value="fines_semana">Fines de semana</SelectItem>
+                                <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
+                                <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-
-                      {form.watch('consumoCigarrillo') === 'si' && (
-                        <FormField
-                          control={form.control}
-                          name="frecuenciaCigarrillo"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">Frecuencia de consumo de cigarrillo:</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione frecuencia" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="diario">Diario</SelectItem>
-                                  <SelectItem value="varias_veces_semana">Varias veces en la semana</SelectItem>
-                                  <SelectItem value="fines_semana">Fines de semana</SelectItem>
-                                  <SelectItem value="cada_quince_dias">Cada quince días</SelectItem>
-                                  <SelectItem value="ocasionalmente">Ocasionalmente</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -2073,7 +2278,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                 </CardContent>
               </Card>
+                </>
+              )}
 
+              {/* Paso 4: Limitaciones Físicas y Recomendaciones Laborales */}
+              {currentStep === 4 && (
+                <>
               {/* Sección 5: Limitaciones Físicas */}
               <Card>
                 <CardHeader>
@@ -2173,7 +2383,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   )}
                 </CardContent>
               </Card>
+                </>
+              )}
 
+              {/* Paso 5: Autorización y Firma Digital */}
+              {currentStep === 5 && (
+                <>
               {/* Sección 7: Autorización y Firma */}
               <Card>
                 <CardHeader>
@@ -2196,11 +2411,13 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       render={({ field }) => {
                         const tipoDocumento = form.watch('tipoDocumento');
                         const tipoDocumentoLabel = getTipoDocumentoDisplayName(tipoDocumento);
+                        // Asegurar que el campo tenga valor (usar numeroDocumento si numeroDocumentoFirma está vacío)
+                        const displayValue = field.value || form.watch('numeroDocumento') || '';
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">Número de documento {tipoDocumentoLabel ? `(${tipoDocumentoLabel})` : ''}</FormLabel>
                             <FormControl>
-                              <Input {...field} readOnly className="bg-slate-100" />
+                              <Input {...field} value={displayValue} readOnly className="bg-slate-100" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -2229,28 +2446,39 @@ const EncuestaBienestarPageContent: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+                </>
+              )}
 
-              {/* Botones de acción */}
-              <div className="flex gap-4 justify-end">
+              {/* Botones de navegación */}
+              <div className="flex gap-4 justify-between pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => navigate('/')}>
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting} 
-                  className="bg-primary-prosalud"
-                  onClick={(e) => {
-                    console.log('Botón de submit clickeado');
-                    // No prevenir el comportamiento por defecto - dejar que el formulario maneje el submit
-                  }}
-                >
-                  {isSubmitting ? 'Enviando...' : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Enviar Encuesta
-                    </>
+                <div className="flex gap-4">
+                  {currentStep > 1 && (
+                    <Button type="button" variant="outline" onClick={handlePrevious}>
+                      ← Anterior
+                    </Button>
                   )}
-                </Button>
+                  {currentStep < TOTAL_STEPS ? (
+                    <Button type="button" onClick={handleNext} className="bg-primary-prosalud">
+                      Siguiente →
+                    </Button>
+                  ) : (
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting} 
+                      className="bg-primary-prosalud"
+                    >
+                      {isSubmitting ? 'Enviando...' : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Enviar Encuesta
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
               
               {/* reCAPTCHA invisible */}
