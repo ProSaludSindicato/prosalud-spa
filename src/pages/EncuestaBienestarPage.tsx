@@ -355,14 +355,14 @@ const encuestaSchema = z.object({
     }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
   direccion: z.string().optional(),
   municipio: z.string().optional(),
-  tallaCalzado: z.string()
-    .optional()
+  tallaCalzado: z.string({ required_error: 'Talla de calzado es requerida' })
+    .min(1, 'Talla de calzado es requerida')
     .refine((val) => {
-      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      if (!val || val.trim() === '') return false; // Requerido, no puede estar vacío
       const num = parseInt(val, 10);
       return !isNaN(num) && num >= 20 && num <= 50;
     }, { message: 'La talla de calzado debe ser un número entre 20 y 50' }),
-  tallaVestimenta: z.string().optional(),
+  tallaVestimenta: z.string({ required_error: 'Talla de vestimenta es requerida' }).min(1, 'Talla de vestimenta es requerida'),
   paisNacimiento: z.string().optional(),
   
   // Sección sociodemográfica
@@ -464,12 +464,12 @@ const encuestaSchema = z.object({
   detalleRecomendacionLaboral: z.string().optional(),
   
   // Contacto de emergencia
-  nombreContactoEmergencia: z.string().optional(),
-  relacionContactoEmergencia: z.string().optional(),
-  telefonoContactoEmergencia: z.string()
-    .optional()
+  nombreContactoEmergencia: z.string({ required_error: 'Nombre de contacto de emergencia es requerido' }).min(1, 'Nombre de contacto de emergencia es requerido'),
+  relacionContactoEmergencia: z.string({ required_error: 'Relación de contacto de emergencia es requerida' }).min(1, 'Relación de contacto de emergencia es requerida'),
+  telefonoContactoEmergencia: z.string({ required_error: 'Teléfono de contacto de emergencia es requerido' })
+    .min(1, 'Teléfono de contacto de emergencia es requerido')
     .refine((val) => {
-      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      if (!val || val.trim() === '') return false; // Requerido, no puede estar vacío
       // Validar formato colombiano: 10 dígitos comenzando con 3
       const phoneRegex = /^[3][0-9]{9}$/;
       return phoneRegex.test(val.replace(/\s/g, ''));
@@ -746,6 +746,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
       'hospital',
       'profesion',
       'celular',
+      'tallaCalzado',
+      'tallaVestimenta',
+      'nombreContactoEmergencia',
+      'relacionContactoEmergencia',
       'telefonoContactoEmergencia',
     ],
     2: [
@@ -1001,18 +1005,29 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <FormField
                       control={form.control}
                       name="nombres"
-                      render={({ field }) => {
-                        const nombreCompleto = [field.value, form.watch('apellidos')].filter(Boolean).join(' ');
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">1. Nombre completo</FormLabel>
-                            <FormControl>
-                              <Input value={nombreCompleto || ''} readOnly className="bg-slate-100" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">1. Nombres</FormLabel>
+                          <FormControl>
+                            <Input value={field.value || ''} readOnly className="bg-slate-100" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="apellidos"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">2. Apellidos</FormLabel>
+                          <FormControl>
+                            <Input value={field.value || ''} readOnly className="bg-slate-100" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
 
                     <FormField
@@ -1022,7 +1037,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         const displayValue = getTipoDocumentoDisplayName(field.value);
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">2. Tipo de documento</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">3. Tipo de documento</FormLabel>
                             <FormControl>
                               <Input value={displayValue} readOnly className="bg-slate-100" />
                             </FormControl>
@@ -1037,7 +1052,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="numeroDocumento"
                       render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">3. Número de documento</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">4. Número de documento</FormLabel>
                           <FormControl>
                             <Input {...field} readOnly className="bg-slate-100" />
                           </FormControl>
@@ -1053,7 +1068,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         const displayValue = getHospitalDisplayName(field.value);
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">4. Hospital</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">5. Hospital</FormLabel>
                             <FormControl>
                               <Input 
                                 value={displayValue} 
@@ -1072,7 +1087,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="profesion"
                       render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">5. Profesión</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">6. Profesión</FormLabel>
                           <FormControl>
                             <Input {...field} readOnly className="bg-slate-100" />
                           </FormControl>
@@ -1095,7 +1110,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">6. Dirección de correo electrónico</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">7. Dirección de correo electrónico</FormLabel>
                             <FormControl>
                               <Input
                                 type="email"
@@ -1103,6 +1118,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 onChange={(e) => {
                                   const sanitized = sanitizeEmail(e.target.value, { maxLength: 100 });
                                   field.onChange(sanitized);
+                                  form.clearErrors('correo');
                                 }}
                                 onFocus={() => {
                                   // Si el valor mostrado es ofuscado, preparar el campo para edición
@@ -1133,31 +1149,55 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     />
 
                     <FormField
-                      control={form.control}
-                      name="rh"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">7. RH</FormLabel>
-                          <FormControl>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={!!afiliado?.rh}>
-                              <SelectTrigger className={afiliado?.rh ? 'bg-slate-100' : ''}>
-                                <SelectValue placeholder="Seleccione el tipo de sangre" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="A+">A+</SelectItem>
-                                <SelectItem value="A-">A-</SelectItem>
-                                <SelectItem value="B+">B+</SelectItem>
-                                <SelectItem value="B-">B-</SelectItem>
-                                <SelectItem value="AB+">AB+</SelectItem>
-                                <SelectItem value="AB-">AB-</SelectItem>
-                                <SelectItem value="O+">O+</SelectItem>
-                                <SelectItem value="O-">O-</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                        control={form.control}
+                        name="celular"
+                        render={({ field }) => {
+                          const currentValue = watchValues?.celular || '';
+                          const initialValue = initialValues.celular;
+                          const isObfuscated = shouldObfuscate('celular');
+                          const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
+                          const displayValue = isObfuscated && currentValue === initialValue
+                              ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'phone'))
+                              : currentValue;
+
+                          return (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-slate-900">8. Celular</FormLabel>
+                                <FormControl>
+                                  <Input
+                                      type="tel"
+                                      value={displayValue}
+                                      onChange={(e) => {
+                                        const sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
+                                        field.onChange(sanitized);
+                                      }}
+                                      onFocus={() => {
+                                        // Si el valor mostrado es ofuscado, preparar el campo para edición
+                                        if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
+                                          if (initialIsObfuscated) {
+                                            // Si viene ofuscado del backend, limpiar para que escriba el valor real
+                                            field.onChange('');
+                                          } else if (initialValue) {
+                                            // Si no viene ofuscado, restaurar el valor real para edición
+                                            field.onChange(initialValue);
+                                          } else {
+                                            field.onChange('');
+                                          }
+                                        }
+                                      }}
+                                      onBlur={(e) => {
+                                        const currentVal = e.target.value || '';
+                                        if (isObfuscated && !currentVal.trim() && initialValue) {
+                                          field.onChange(initialValue);
+                                        }
+                                      }}
+                                      placeholder="Ej: 3001234567"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                          );
+                        }}
                     />
 
                     <FormField
@@ -1165,52 +1205,13 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="fechaExpedicion"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">8. Fecha de expedición</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">9. Fecha de expedición</FormLabel>
                           <FormControl>
                             <Input type="date" {...field} value={field.value || ''} readOnly={!!afiliado?.fecha_expedicion} className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="lugarNacimiento"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">8. Lugar de nacimiento</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ''} readOnly={!!afiliado?.lugar_nacimiento} className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} placeholder="Ej: Medellín" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="departamento"
-                      render={({ field }) => {
-                        // Asegurar que el valor del campo siempre sea 'antioquia'
-                        if (field.value !== 'antioquia') {
-                          field.onChange('antioquia');
-                        }
-                        
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">9. Departamento</FormLabel>
-                            <FormControl>
-                              <Input
-                                value="Antioquia"
-                                readOnly
-                                className="bg-slate-100 cursor-not-allowed"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
                     />
 
                     <FormField
@@ -1252,55 +1253,67 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     />
 
                     <FormField
-                      control={form.control}
-                      name="celular"
-                      render={({ field }) => {
-                        const currentValue = watchValues?.celular || '';
-                        const initialValue = initialValues.celular;
-                        const isObfuscated = shouldObfuscate('celular');
-                        const initialIsObfuscated = initialValue ? isObfuscatedValue(String(initialValue)) : false;
-                        const displayValue = isObfuscated && currentValue === initialValue
-                          ? (initialIsObfuscated ? initialValue : obfuscateValue(String(initialValue), 'phone'))
-                          : currentValue;
+                        control={form.control}
+                        name="lugarNacimiento"
+                        render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">11. Lugar de nacimiento</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value || ''} readOnly={!!afiliado?.lugar_nacimiento} className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} placeholder="Ej: Medellín" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">11. Celular</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="tel"
-                                value={displayValue}
-                                onChange={(e) => {
-                                  const sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
-                                  field.onChange(sanitized);
-                                }}
-                                onFocus={() => {
-                                  // Si el valor mostrado es ofuscado, preparar el campo para edición
-                                  if (isObfuscated && displayValue !== currentValue && displayValue.includes('*')) {
-                                    if (initialIsObfuscated) {
-                                      // Si viene ofuscado del backend, limpiar para que escriba el valor real
-                                      field.onChange('');
-                                    } else if (initialValue) {
-                                      // Si no viene ofuscado, restaurar el valor real para edición
-                                      field.onChange(initialValue);
-                                    } else {
-                                      field.onChange('');
-                                    }
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const currentVal = e.target.value || '';
-                                  if (isObfuscated && !currentVal.trim() && initialValue) {
-                                    field.onChange(initialValue);
-                                  }
-                                }}
-                                placeholder="Ej: 3001234567"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
+                    <FormField
+                        control={form.control}
+                        name="departamento"
+                        render={({ field }) => {
+                          // Asegurar que el valor del campo siempre sea 'antioquia'
+                          if (field.value !== 'antioquia') {
+                            field.onChange('antioquia');
+                          }
+
+                          return (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-slate-900">12. Departamento de residencia</FormLabel>
+                                <FormControl>
+                                  <Input
+                                      value="Antioquia"
+                                      readOnly
+                                      className="bg-slate-100 cursor-not-allowed"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                          );
+                        }}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="municipio"
+                        render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">13. Municipio de residencia</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione el municipio" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {municipios.map((municipio) => (
+                                      <SelectItem key={municipio.value} value={municipio.value}>
+                                        {municipio.label}
+                                      </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                        )}
                     />
 
                     <FormField
@@ -1317,13 +1330,14 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">12. Dirección</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">14. Dirección de residencia</FormLabel>
                             <FormControl>
                               <Input
                                 value={displayValue}
                                 onChange={(e) => {
                                   const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
                                   field.onChange(sanitized);
+                                  form.clearErrors('direccion');
                                 }}
                                 onFocus={() => {
                                   // Si el valor mostrado es ofuscado, preparar el campo para edición
@@ -1355,21 +1369,52 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     />
 
                     <FormField
+                        control={form.control}
+                        name="rh"
+                        render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">15 RH</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={!!afiliado?.rh}>
+                                  <SelectTrigger className={afiliado?.rh ? 'bg-slate-100' : ''}>
+                                    <SelectValue placeholder="Seleccione el tipo de sangre" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="A+">A+</SelectItem>
+                                    <SelectItem value="A-">A-</SelectItem>
+                                    <SelectItem value="B+">B+</SelectItem>
+                                    <SelectItem value="B-">B-</SelectItem>
+                                    <SelectItem value="AB+">AB+</SelectItem>
+                                    <SelectItem value="AB-">AB-</SelectItem>
+                                    <SelectItem value="O+">O+</SelectItem>
+                                    <SelectItem value="O-">O-</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
                       control={form.control}
-                      name="municipio"
+                      name="tallaVestimenta"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">13. Municipio</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <FormLabel className="text-base font-semibold text-slate-900">16. Talla de vestimenta (Pijama)</FormLabel>
+                          <Select onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors('tallaVestimenta');
+                          }} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Seleccione el municipio" />
+                                <SelectValue placeholder="Seleccione la talla" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {municipios.map((municipio) => (
-                                <SelectItem key={municipio.value} value={municipio.value}>
-                                  {municipio.label}
+                              {tallasUniforme.map((talla) => (
+                                <SelectItem key={talla.value} value={talla.value}>
+                                  {talla.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1384,11 +1429,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="tallaCalzado"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">14. Talla de calzado</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">17. Talla de calzado</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              value={field.value || ''} 
+                            <Input
+                              {...field}
+                              value={field.value || ''}
                               placeholder="Ej: 40"
                               type="number"
                               min={20}
@@ -1398,36 +1443,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 // Solo permitir números
                                 if (value === '' || /^\d+$/.test(value)) {
                                   field.onChange(value);
+                                  form.clearErrors('tallaCalzado');
                                 }
                               }}
                             />
                           </FormControl>
                           <FormDescription>Ingrese un número entre 20 y 50</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="tallaVestimenta"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">15. Talla de vestimenta (Pijama)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccione la talla" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {tallasUniforme.map((talla) => (
-                                <SelectItem key={talla.value} value={talla.value}>
-                                  {talla.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1458,6 +1479,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               type="text"
                               placeholder="Ej: Juan Pérez"
                               {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                form.clearErrors('nombreContactoEmergencia');
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
@@ -1471,7 +1496,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">Relación</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors('relacionContactoEmergencia');
+                          }} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Seleccione la relación" />
@@ -1516,6 +1544,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 onChange={(e) => {
                                   const sanitized = sanitizePhone(e.target.value, { maxLength: 15 });
                                   field.onChange(sanitized);
+                                  form.clearErrors('celular');
                                 }}
                                 onFocus={() => {
                                   // Si el valor mostrado es ofuscado, limpiar el campo para permitir edición
@@ -1569,7 +1598,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">16. ¿Tiene personas a cargo?</FormLabel>
                           <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                          <RadioGroup onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors('tienePersonasACargo');
+                          }} value={field.value} className="flex gap-6">
                               <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="si" id="personas-si" />
                                 <label htmlFor="personas-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
@@ -1591,7 +1623,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">17. Estado civil</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('estadoCivil');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione estado civil" />
@@ -1617,7 +1652,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">18. Fecha de nacimiento</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} />
+                          <Input type="date" {...field} value={field.value || ''} onChange={(e) => {
+                            field.onChange(e);
+                            form.clearErrors('fechaNacimiento');
+                          }} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1638,6 +1676,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                             placeholder="Ej: 170"
                             min={120}
                             max={230}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              form.clearErrors('estatura');
+                            }}
                           />
                         </FormControl>
                         <FormDescription className="text-xs text-slate-500">
@@ -1662,6 +1704,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                             placeholder="Ej: 70"
                             min={30}
                             max={250}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              form.clearErrors('peso');
+                            }}
                           />
                         </FormControl>
                         <FormDescription className="text-xs text-slate-500">
@@ -1679,7 +1725,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">21. Género</FormLabel>
                         <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                          <RadioGroup onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors('genero');
+                          }} value={field.value} className="flex gap-6">
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="masculino" id="genero-m" />
                               <label htmlFor="genero-m" className="text-base font-normal text-slate-600 cursor-pointer">Masculino</label>
@@ -1705,7 +1754,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">22. Grupo étnico</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('raza');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione su grupo étnico" />
@@ -1757,7 +1809,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Tipo de documento</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
+                                  <Select onValueChange={(value) => {
+                                    field.onChange(value);
+                                    form.clearErrors(`hijos.${index}.tipoDocumento` as any);
+                                  }} value={field.value}>
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccione" />
@@ -1780,7 +1835,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Número de documento</FormLabel>
                                   <FormControl>
-                                    <Input {...field} />
+                                    <Input {...field} onChange={(e) => {
+                                      field.onChange(e);
+                                      form.clearErrors(`hijos.${index}.numeroDocumento` as any);
+                                    }} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1793,7 +1851,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Nombre completo</FormLabel>
                                   <FormControl>
-                                    <Input {...field} />
+                                    <Input {...field} onChange={(e) => {
+                                      field.onChange(e);
+                                      form.clearErrors(`hijos.${index}.nombre` as any);
+                                    }} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1805,7 +1866,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Género</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
+                                  <Select onValueChange={(value) => {
+                                    field.onChange(value);
+                                    form.clearErrors(`hijos.${index}.genero` as any);
+                                  }} value={field.value}>
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Seleccione" />
@@ -1827,7 +1891,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Fecha de nacimiento</FormLabel>
                                   <FormControl>
-                                    <Input type="date" {...field} />
+                                    <Input type="date" {...field} onChange={(e) => {
+                                      field.onChange(e);
+                                      form.clearErrors(`hijos.${index}.fechaNacimiento` as any);
+                                    }} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1859,7 +1926,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">26. Vivienda</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('vivienda');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione tipo de vivienda" />
@@ -1928,7 +1998,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">29. ¿Con quién convive?</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('conviveCon');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione opción" />
@@ -1954,7 +2027,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">30. Para el desplazamiento a la empresa utiliza:</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('transporte');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione medio de transporte" />
@@ -2009,7 +2085,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">32. En su tiempo libre, las actividades las realiza:</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('tiempoLibreCon');
+                        }} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccione opción" />
@@ -2221,7 +2300,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">{question.label}</FormLabel>
                             <FormControl>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                              <RadioGroup onValueChange={(value) => {
+                                field.onChange(value);
+                                form.clearErrors(question.name as any);
+                              }} value={field.value} className="flex gap-6">
                                 <div className="flex items-center space-x-2">
                                   <RadioGroupItem value="si" id={`${question.name}-si`} />
                                   <label htmlFor={`${question.name}-si`} className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>
@@ -2309,7 +2391,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">{question.label}</FormLabel>
                             <FormControl>
-                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col gap-2">
+                              <RadioGroup onValueChange={(value) => {
+                                field.onChange(value);
+                                form.clearErrors(question.name as any);
+                              }} value={field.value} className="flex flex-col gap-2">
                                 <div className="flex items-center space-x-2">
                                   <RadioGroupItem value="limita_mucho" id={`${question.name}-mucho`} />
                                   <label htmlFor={`${question.name}-mucho`} className="text-base font-normal text-slate-600 cursor-pointer">Sí, me limita mucho</label>
@@ -2350,7 +2435,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">74. ¿Tiene usted alguna recomendación o restricción laboral emitida por un médico o especialista?</FormLabel>
                         <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                          <RadioGroup onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors('recomendacionRestriccionLaboral');
+                          }} value={field.value} className="flex gap-6">
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="si" id="recomendacion-si" />
                               <label htmlFor="recomendacion-si" className="text-base font-normal text-slate-600 cursor-pointer">Sí</label>

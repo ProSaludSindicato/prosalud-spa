@@ -143,6 +143,18 @@ const getRelacionContactoEmergenciaDisplayName = (value: string | null | undefin
   return map[value.toLowerCase()] || value;
 };
 
+const getFrecuenciaDisplayName = (value: string | null | undefined): string => {
+  if (!value) return 'No especificado';
+  const map: Record<string, string> = {
+    'diario': 'Diario',
+    'varias_veces_semana': 'Varias veces en la semana',
+    'fines_semana': 'Fines de semana',
+    'cada_quince_dias': 'Cada quince días',
+    'ocasionalmente': 'Ocasionalmente',
+  };
+  return map[value.toLowerCase()] || value;
+};
+
 const getRazaDisplayName = (value: string | null | undefined): string => {
   if (!value) return 'No especificado';
   const map: Record<string, string> = {
@@ -1304,14 +1316,14 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                 <label className="text-sm font-medium text-slate-600">Consumo de Licor</label>
                 <p className="text-base">{formatSiNo(survey.datos_consumo.consumoLicor)}</p>
                 {survey.datos_consumo.consumoLicor === 'si' && survey.datos_consumo.frecuenciaLicor && (
-                  <p className="text-sm text-slate-500 mt-1">Frecuencia: {survey.datos_consumo.frecuenciaLicor}</p>
+                  <p className="text-sm text-slate-500 mt-1">Frecuencia: {getFrecuenciaDisplayName(survey.datos_consumo.frecuenciaLicor)}</p>
                 )}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-600">Consumo de Cigarrillo</label>
                 <p className="text-base">{formatSiNo(survey.datos_consumo.consumoCigarrillo)}</p>
                 {survey.datos_consumo.consumoCigarrillo === 'si' && survey.datos_consumo.frecuenciaCigarrillo && (
-                  <p className="text-sm text-slate-500 mt-1">Frecuencia: {survey.datos_consumo.frecuenciaCigarrillo}</p>
+                  <p className="text-sm text-slate-500 mt-1">Frecuencia: {getFrecuenciaDisplayName(survey.datos_consumo.frecuenciaCigarrillo)}</p>
                 )}
               </div>
             </CardContent>
@@ -1481,18 +1493,23 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                 </CardTitle>
               </CardHeader>
               <CardContent>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-600">¿Tiene recomendación o restricción laboral?</label>
-                <p className="text-base">{formatSiNo(survey.recomendacion_restriccion_laboral)}</p>
-              </div>
-              {survey.recomendacion_restriccion_laboral === 'si' && survey.detalle_recomendacion_laboral && (
+            {survey.recomendacion_restriccion_laboral === 'si' && survey.detalle_recomendacion_laboral ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-600">¿Tiene recomendación o restricción laboral?</label>
+                  <p className="text-base">{formatSiNo(survey.recomendacion_restriccion_laboral)}</p>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-slate-600">Detalle de la Recomendación</label>
                   <p className="text-base whitespace-pre-wrap">{survey.detalle_recomendacion_laboral}</p>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-sm font-medium text-slate-600">¿Tiene recomendación o restricción laboral?</label>
+                <p className="text-base">{formatSiNo(survey.recomendacion_restriccion_laboral)}</p>
+              </div>
+            )}
           </CardContent>
             </Card>
           </motion.div>
