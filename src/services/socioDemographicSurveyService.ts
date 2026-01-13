@@ -2,6 +2,9 @@ import publicApi from './publicApi';
 import axios, { AxiosError } from 'axios';
 
 export interface SocioDemographicSurveyData {
+  // Tipo de encuesta
+  survey_type?: 'active_affiliate' | 'bulk_entry';
+  
   // Datos Básicos
   nombres?: string;
   apellidos?: string;

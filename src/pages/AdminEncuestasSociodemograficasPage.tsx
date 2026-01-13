@@ -29,6 +29,7 @@ import {
   Baby,
   UserCheck,
   ClipboardList,
+  Settings,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +53,12 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { tiposDocumentoCompletos, tiposDocumento, estadosCiviles, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, normalizePais } from '@/components/actualizar-datos-personales/paises';
+import { surveyConfigApi } from '@/services/surveyConfigApi';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import ExportSurveysDialog from '@/components/admin/encuestas-sociodemograficas/ExportSurveysDialog';
 
 // Función para obtener el nombre completo del tipo de documento
 const getTipoDocumentoDisplayName = (tipoDocumento: string | null | undefined): string => {
@@ -217,18 +224,39 @@ const getGeneroIcon = (genero: string | null | undefined) => {
   return null;
 };
 
+// Función para obtener el nombre de visualización del tipo de encuesta
+const getSurveyTypeDisplayName = (surveyType: string | null | undefined): string => {
+  if (!surveyType) return 'Afiliados Activos';
+  const map: Record<string, string> = {
+    'active_affiliate': 'Afiliados Activos',
+    'bulk_entry': 'Ingreso Masivo',
+  };
+  return map[surveyType] || surveyType;
+};
+
+// Función para obtener las clases CSS del badge según el tipo de encuesta
+const getSurveyTypeBadgeClasses = (surveyType: string | null | undefined): string => {
+  const normalizedType = surveyType || 'active_affiliate';
+  if (normalizedType === 'bulk_entry') {
+    return 'text-xs bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200';
+  }
+  // active_affiliate por defecto
+  return 'text-xs bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+};
+
 const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   // Estado para filtros
   const [hospitalFilter, setHospitalFilter] = useState<string>(
     searchParams.get('hospital') || ''
   );
-  const [tipoDocumentoFilter, setTipoDocumentoFilter] = useState<string>(
-    searchParams.get('tipo_documento') || 'all'
+  const [surveyTypeFilter, setSurveyTypeFilter] = useState<string>(
+    searchParams.get('survey_type') || 'all'
   );
   const [numeroDocumentoFilter, setNumeroDocumentoFilter] = useState<string>(
     searchParams.get('numero_documento') || ''
@@ -239,6 +267,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(
     parseInt(searchParams.get('page') || '1', 10)
   );
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   // Construir parámetros de consulta (ejecutar siempre, incluso si hay id)
   const queryParams = useMemo(() => {
@@ -248,12 +277,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
       page: currentPage,
     };
     if (hospitalFilter) params.hospital = hospitalFilter;
-    if (tipoDocumentoFilter && tipoDocumentoFilter !== 'all') {
-      params.tipo_documento = tipoDocumentoFilter;
+    if (surveyTypeFilter && surveyTypeFilter !== 'all') {
+      params.survey_type = surveyTypeFilter;
     }
     if (numeroDocumentoFilter) params.numero_documento = numeroDocumentoFilter;
     return params;
-  }, [id, hospitalFilter, tipoDocumentoFilter, numeroDocumentoFilter, perPage, currentPage]);
+  }, [id, hospitalFilter, surveyTypeFilter, numeroDocumentoFilter, perPage, currentPage]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -269,6 +298,35 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
 
   const surveys = surveysResponse?.data || [];
   const pagination = surveysResponse?.pagination;
+  const metrics = surveysResponse?.metrics;
+
+  // Obtener configuración de encuestas
+  const { data: config, isLoading: isLoadingConfig } = useQuery({
+    queryKey: ['survey-config'],
+    queryFn: () => surveyConfigApi.getConfig(),
+    enabled: can('socio_demographic_surveys.config.manage') && !id,
+    retry: 2,
+  });
+
+  // Mutación para actualizar configuración
+  const updateConfigMutation = useMutation({
+    mutationFn: (allowBulkEntry: boolean) =>
+      surveyConfigApi.updateConfig({ allow_bulk_entry_mode: allowBulkEntry }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['survey-config'], data);
+      toast.success('Configuración actualizada exitosamente');
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message ||
+        'Error al actualizar la configuración de encuestas';
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleConfigToggle = (checked: boolean) => {
+    updateConfigMutation.mutate(checked);
+  };
 
   // Verificar permisos (después de todos los hooks)
   if (!can('socio_demographic_surveys.view')) {
@@ -298,8 +356,8 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     setCurrentPage(1);
     const newParams = new URLSearchParams();
     if (hospitalFilter) newParams.set('hospital', hospitalFilter);
-    if (tipoDocumentoFilter && tipoDocumentoFilter !== 'all') {
-      newParams.set('tipo_documento', tipoDocumentoFilter);
+    if (surveyTypeFilter && surveyTypeFilter !== 'all') {
+      newParams.set('survey_type', surveyTypeFilter);
     }
     if (numeroDocumentoFilter) newParams.set('numero_documento', numeroDocumentoFilter);
     newParams.set('per_page', perPage.toString());
@@ -310,7 +368,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   // Función para limpiar filtros
   const handleClearFilters = () => {
     setHospitalFilter('');
-    setTipoDocumentoFilter('all');
+    setSurveyTypeFilter('all');
     setNumeroDocumentoFilter('');
     setCurrentPage(1);
     setSearchParams({});
@@ -411,6 +469,35 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                       </CardDescription>
                     </div>
                   </div>
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                    {can('socio_demographic_surveys.view') && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setExportDialogOpen(true)}
+                        className="w-full sm:w-auto"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Exportar Reporte</span>
+                        <span className="sm:hidden">Exportar</span>
+                      </Button>
+                    )}
+                    {can('socio_demographic_surveys.config.manage') && (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Settings className="h-4 w-4 text-slate-600" />
+                          <Label htmlFor="bulk-entry-mode" className="text-sm font-medium text-slate-700 cursor-pointer">
+                            Modo Ingreso Masivo
+                          </Label>
+                        </div>
+                        <Switch
+                          id="bulk-entry-mode"
+                          checked={config?.data?.allow_bulk_entry_mode ?? false}
+                          onCheckedChange={handleConfigToggle}
+                          disabled={updateConfigMutation.isPending || isLoadingConfig}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
             </Card>
@@ -419,41 +506,80 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           {/* Métricas rápidas */}
           {pagination && (
             <motion.div variants={itemVariants}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-slate-600">
-                  Total de Encuestas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{pagination.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-slate-600">
-                  Mostrando
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {surveys.length} de {pagination.total}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-slate-600">
-                  Página Actual
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {pagination.current_page} de {pagination.last_page}
-                </div>
-              </CardContent>
-            </Card>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-slate-600">
+                      Total de Encuestas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{pagination.total}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-slate-600">
+                      Mostrando
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {surveys.length} de {pagination.total}
+                    </div>
+                  </CardContent>
+                </Card>
+                {metrics && (
+                  <>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Este Mes
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{metrics.current_month.total}</div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          Afiliados: {metrics.current_month.by_type.active_affiliate} • Masivo: {metrics.current_month.by_type.bulk_entry}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Para Afiliados Activos
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{metrics.by_type.active_affiliate}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Para Ingreso Masivo
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{metrics.by_type.bulk_entry}</div>
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+                {!metrics && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-600">
+                        Página Actual
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {pagination.current_page} de {pagination.last_page}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </motion.div>
           )}
@@ -483,19 +609,15 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo de Documento</label>
-                <Select value={tipoDocumentoFilter} onValueChange={setTipoDocumentoFilter}>
+                <label className="text-sm font-medium">Tipo de Encuesta</label>
+                <Select value={surveyTypeFilter} onValueChange={setSurveyTypeFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="CC">CC - Cédula de Ciudadanía</SelectItem>
-                    <SelectItem value="TI">TI - Tarjeta de Identidad</SelectItem>
-                    <SelectItem value="CE">CE - Cédula de Extranjería</SelectItem>
-                    <SelectItem value="PA">PA - Pasaporte</SelectItem>
-                    <SelectItem value="RC">RC - Registro Civil</SelectItem>
-                    <SelectItem value="PT">PT - Permiso por Protección Temporal</SelectItem>
+                    <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
+                    <SelectItem value="bulk_entry">Ingreso Masivo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -517,7 +639,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   <Search className="h-4 w-4 mr-2" />
                   Buscar
                 </Button>
-                {(hospitalFilter || tipoDocumentoFilter || numeroDocumentoFilter) && (
+                {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter) && (
                   <Button variant="outline" onClick={handleClearFilters}>
                     Limpiar
                   </Button>
@@ -566,13 +688,15 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="rounded-md border">
+                {/* Desktop Table View - Hidden on mobile */}
+                <div className="hidden lg:block rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Afiliado</TableHead>
                         <TableHead>Documento</TableHead>
                         <TableHead>Proceso y Hospital</TableHead>
+                        <TableHead>Tipo</TableHead>
                         <TableHead>Fecha</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
@@ -625,7 +749,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-slate-600">{formatDate(survey.created_at)}</span>
+                            <Badge variant="outline" className={getSurveyTypeBadgeClasses(survey.survey_type)}>
+                              {getSurveyTypeDisplayName(survey.survey_type || 'active_affiliate')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">{survey.formatted_created_at || formatDate(survey.created_at)}</span>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -645,8 +774,97 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   </Table>
                 </div>
 
+                {/* Mobile Card View - Visible on mobile and tablet */}
+                <div className="lg:hidden space-y-3">
+                  {surveys.map((survey) => {
+                    const nombreCompleto = [survey.nombres, survey.apellidos].filter(Boolean).join(' ');
+                    return (
+                      <Card key={survey.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            {/* Header with user info and actions */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div className="bg-slate-100 p-2 rounded-full flex-shrink-0">
+                                  <ClipboardList className="h-4 w-4 text-slate-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {nombreCompleto && (
+                                    <p className="font-medium text-slate-900 text-sm mb-1">
+                                      {nombreCompleto}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-slate-600 truncate">{survey.correo}</p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/admin/encuestas-sociodemograficas/${survey.id}`)}
+                                className="flex-shrink-0"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Document */}
+                            <div className="border-t pt-2">
+                              <p className="text-xs font-medium text-slate-500 mb-1">Documento</p>
+                              <div>
+                                <p className="text-sm font-medium text-slate-900 font-mono">
+                                  {survey.numero_documento}
+                                </p>
+                                <p className="text-xs text-slate-600 mt-0.5">
+                                  {getTipoDocumentoDisplayName(survey.tipo_documento)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Process and Hospital */}
+                            <div className="border-t pt-2">
+                              <p className="text-xs font-medium text-slate-500 mb-1">Proceso y Hospital</p>
+                              {survey.profesion ? (
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900">
+                                    {survey.profesion}
+                                  </p>
+                                  {survey.hospital && (
+                                    <p className="text-xs text-slate-600 mt-1">
+                                      {survey.hospital}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400 italic">No disponible</p>
+                              )}
+                            </div>
+
+                            {/* Type and Date */}
+                            <div className="border-t pt-2">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                  <p className="text-xs font-medium text-slate-500 mb-1">Tipo</p>
+                                  <Badge variant="outline" className={getSurveyTypeBadgeClasses(survey.survey_type)}>
+                                    {getSurveyTypeDisplayName(survey.survey_type || 'active_affiliate')}
+                                  </Badge>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs font-medium text-slate-500 mb-1">Fecha</p>
+                                  <p className="text-xs text-slate-900">
+                                    {survey.formatted_created_at || formatDate(survey.created_at)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
                 {/* Paginación */}
-                {pagination && pagination.last_page > 1 && (
+                {pagination && (
                   <div className="mt-4">
                     <DataPagination
                       currentPage={currentPage}
@@ -677,6 +895,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           </motion.div>
         </motion.div>
       </div>
+      
+      {/* Export Dialog */}
+      <ExportSurveysDialog 
+        open={exportDialogOpen} 
+        onOpenChange={setExportDialogOpen}
+      />
     </AdminLayout>
   );
 };
@@ -943,8 +1167,12 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                       <CardTitle className="text-3xl font-bold text-primary-prosalud">
                         Encuesta Sociodemográfica
                       </CardTitle>
-                      <CardDescription className="text-base mt-2">
-                        ID: <span className="font-mono">{survey.id}</span>
+                      <CardDescription className="text-base mt-2 flex items-center gap-2">
+                        <span>ID: <span className="font-mono">{survey.id}</span></span>
+                        <span>•</span>
+                        <span>Tipo: <Badge variant="outline" className={`ml-1 ${getSurveyTypeBadgeClasses(survey.survey_type)}`}>
+                          {getSurveyTypeDisplayName(survey.survey_type || 'active_affiliate')}
+                        </Badge></span>
                       </CardDescription>
                     </div>
                   </div>
@@ -996,14 +1224,18 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
               <label className="text-sm font-medium text-slate-600">Número de Documento</label>
               <p className="text-base font-mono">{survey.numero_documento}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600">Hospital</label>
-              <p className="text-base">{survey.hospital}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600">Profesión</label>
-              <p className="text-base">{survey.profesion}</p>
-            </div>
+            {survey.hospital && (
+              <div>
+                <label className="text-sm font-medium text-slate-600">Hospital</label>
+                <p className="text-base">{survey.hospital}</p>
+              </div>
+            )}
+            {survey.profesion && (
+              <div>
+                <label className="text-sm font-medium text-slate-600">Proceso</label>
+                <p className="text-base">{survey.profesion}</p>
+              </div>
+            )}
           </CardContent>
             </Card>
           </motion.div>

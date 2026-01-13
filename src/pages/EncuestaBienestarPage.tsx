@@ -13,6 +13,8 @@ import { Progress } from '@/components/ui/progress';
 import { submitSurvey } from '@/services/socioDemographicSurveyService';
 import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoDataUpdateAuth';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { surveyConfigApi } from '@/services/surveyConfigApi';
+import { useQuery } from '@tanstack/react-query';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase } from 'lucide-react';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
@@ -331,30 +333,39 @@ const hijoSchema = z.object({
     }, { message: 'La fecha de nacimiento no puede ser futura' }),
 });
 
-const encuestaSchema = z.object({
+// Función para crear el schema dinámicamente según el modo
+const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
   // Autocompletados
-  nombres: z.string().optional(),
-  apellidos: z.string().optional(),
+  nombres: isBulkEntryMode 
+    ? z.string().min(1, 'Nombres es requerido')
+    : z.string().optional(),
+  apellidos: isBulkEntryMode
+    ? z.string().min(1, 'Apellidos es requerido')
+    : z.string().optional(),
   correo: z.string().email('Correo inválido').min(1, 'Correo es requerido'),
   tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
   numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
-  hospital: z.string().min(1, 'Hospital es requerido'),
-  profesion: z.string().min(1, 'Profesión es requerida'),
-  // Campos adicionales de datos básicos
-  rh: z.string().optional(),
-  fechaExpedicion: z.string().optional(),
-  lugarNacimiento: z.string().optional(),
-  departamento: z.string().optional(),
-  celular: z.string()
-    .optional()
+  hospital: isBulkEntryMode 
+    ? z.string().optional()
+    : z.string().min(1, 'Hospital es requerido'),
+  profesion: isBulkEntryMode
+    ? z.string().optional()
+    : z.string().min(1, 'Proceso es requerido'),
+  // Campos adicionales de datos básicos - todos requeridos menos hospital y proceso
+  rh: z.string({ required_error: 'RH es requerido' }).min(1, 'RH es requerido'),
+  fechaExpedicion: z.string({ required_error: 'Fecha de expedición es requerida' }).min(1, 'Fecha de expedición es requerida'),
+  lugarNacimiento: z.string({ required_error: 'Lugar de nacimiento es requerido' }).min(1, 'Lugar de nacimiento es requerido'),
+  departamento: z.string({ required_error: 'Departamento es requerido' }).min(1, 'Departamento es requerido'),
+  celular: z.string({ required_error: 'Celular es requerido' })
+    .min(1, 'Celular es requerido')
     .refine((val) => {
-      if (!val || val.trim() === '') return true; // Opcional, puede estar vacío
+      if (!val || val.trim() === '') return false; // Requerido, no puede estar vacío
       // Validar formato colombiano: 10 dígitos comenzando con 3
       const phoneRegex = /^[3][0-9]{9}$/;
       return phoneRegex.test(val.replace(/\s/g, ''));
     }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
-  direccion: z.string().optional(),
-  municipio: z.string().optional(),
+  direccion: z.string({ required_error: 'Dirección es requerida' }).min(1, 'Dirección es requerida'),
+  municipio: z.string({ required_error: 'Municipio es requerido' }).min(1, 'Municipio es requerido'),
   tallaCalzado: z.string({ required_error: 'Talla de calzado es requerida' })
     .min(1, 'Talla de calzado es requerida')
     .refine((val) => {
@@ -363,7 +374,7 @@ const encuestaSchema = z.object({
       return !isNaN(num) && num >= 20 && num <= 50;
     }, { message: 'La talla de calzado debe ser un número entre 20 y 50' }),
   tallaVestimenta: z.string({ required_error: 'Talla de vestimenta es requerida' }).min(1, 'Talla de vestimenta es requerida'),
-  paisNacimiento: z.string().optional(),
+  paisNacimiento: z.string({ required_error: 'País de nacimiento es requerido' }).min(1, 'País de nacimiento es requerido'),
   
   // Sección sociodemográfica
   tienePersonasACargo: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
@@ -480,9 +491,15 @@ const encuestaSchema = z.object({
   numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
 });
 
-type EncuestaFormValues = z.infer<typeof encuestaSchema>;
+// Crear un tipo base para el formulario (se usará con el schema dinámico)
+type EncuestaFormValuesBase = z.infer<ReturnType<typeof createEncuestaSchema>>;
+type EncuestaFormValues = EncuestaFormValuesBase;
 
-const EncuestaBienestarPageContent: React.FC = () => {
+interface EncuestaBienestarPageContentProps {
+  isBulkEntryMode: boolean;
+}
+
+const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> = ({ isBulkEntryMode }) => {
   const navigate = useNavigate();
   const { afiliado, getActiveConvenio, fechaExpedicion } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -495,6 +512,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const activeConvenio = getActiveConvenio();
   const hospitalValue = activeConvenio?.cliente || '';
   const profesionValue = activeConvenio?.proceso || '';
+
+  // Crear schema dinámico según el modo
+  const encuestaSchema = React.useMemo(
+    () => createEncuestaSchema(isBulkEntryMode),
+    [isBulkEntryMode]
+  );
 
   const form = useForm<EncuestaFormValues>({
     resolver: zodResolver(encuestaSchema),
@@ -740,14 +763,23 @@ const EncuestaBienestarPageContent: React.FC = () => {
   // Campos por paso para validación
   const stepFields: Record<number, (keyof EncuestaFormValues)[]> = {
     1: [
+      'nombres',
+      'apellidos',
       'correo',
       'tipoDocumento',
       'numeroDocumento',
       'hospital',
       'profesion',
+      'rh',
+      'fechaExpedicion',
+      'lugarNacimiento',
+      'departamento',
       'celular',
+      'direccion',
+      'municipio',
       'tallaCalzado',
       'tallaVestimenta',
+      'paisNacimiento',
       'nombreContactoEmergencia',
       'relacionContactoEmergencia',
       'telefonoContactoEmergencia',
@@ -846,9 +878,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
       hasAfiliado: !!afiliado,
       hasSignature,
       firmaLength: data.firma?.length || 0,
+      isBulkEntryMode,
     });
 
-    if (!afiliado) {
+    // En modo afiliados activos, se requiere autenticación
+    if (!isBulkEntryMode && !afiliado) {
       toast.error('No se encontró información del afiliado');
       return;
     }
@@ -888,8 +922,23 @@ const EncuestaBienestarPageContent: React.FC = () => {
       }
 
       console.log('Llamando a submitSurvey...');
+      // Determinar survey_type según el modo
+      const surveyType = isBulkEntryMode ? 'bulk_entry' : 'active_affiliate';
+      
+      // Preparar datos para envío
+      const surveyDataWithType: any = {
+        ...data,
+        survey_type: surveyType,
+      };
+      
+      // En modo masivo, no enviar hospital y profesion (son campos internos)
+      if (isBulkEntryMode) {
+        delete surveyDataWithType.hospital;
+        delete surveyDataWithType.profesion;
+      }
+      
       const response = await submitSurvey(
-        data,
+        surveyDataWithType,
         data.firma, // Base64 de la firma
         recaptchaToken || undefined
       );
@@ -957,7 +1006,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
               Encuesta Sociodemográfica y Diagnóstico de Condiciones de Salud
             </h1>
             <p className="text-slate-600 mb-4">
-              Yo, {afiliado?.nombres} {afiliado?.apellidos}, con {afiliado?.tipo_documento} {afiliado?.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.
+              {isBulkEntryMode ? (
+                <>Yo, con autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+              ) : (
+                <>Yo, {afiliado?.nombres} {afiliado?.apellidos}, con {afiliado?.tipo_documento} {afiliado?.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+              )}
             </p>
             
             {/* Barra de progreso y contador de secciones */}
@@ -998,7 +1051,12 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <User className="h-5 w-5 text-primary-prosalud" />
                     Datos Básicos
                   </CardTitle>
-                  <CardDescription>Esta información se ha autocompletado con sus datos personales</CardDescription>
+                  <CardDescription>
+                    {isBulkEntryMode 
+                      ? 'Por favor, diligencie todos los campos requeridos'
+                      : 'Esta información se ha autocompletado con sus datos personales'
+                    }
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1009,7 +1067,16 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">1. Nombres</FormLabel>
                           <FormControl>
-                            <Input value={field.value || ''} readOnly className="bg-slate-100" />
+                            <Input 
+                              {...field} 
+                              value={field.value || ''} 
+                              readOnly={!isBulkEntryMode} 
+                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                form.clearErrors('nombres');
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1023,7 +1090,16 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">2. Apellidos</FormLabel>
                           <FormControl>
-                            <Input value={field.value || ''} readOnly className="bg-slate-100" />
+                            <Input 
+                              {...field} 
+                              value={field.value || ''} 
+                              readOnly={!isBulkEntryMode} 
+                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                form.clearErrors('apellidos');
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1035,6 +1111,36 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="tipoDocumento"
                       render={({ field }) => {
                         const displayValue = getTipoDocumentoDisplayName(field.value);
+                        if (isBulkEntryMode) {
+                          // En modo masivo, mostrar como Select editable
+                          return (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">3. Tipo de documento</FormLabel>
+                              <Select
+                                value={field.value || ''}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('tipoDocumento');
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione el tipo de documento" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {tiposDocumentoCompletos.map((tipo) => (
+                                    <SelectItem key={tipo.value} value={tipo.value}>
+                                      {tipo.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }
+                        // En modo afiliados activos, mostrar como Input read-only
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">3. Tipo de documento</FormLabel>
@@ -1052,49 +1158,62 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="numeroDocumento"
                       render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">4. Número de documento</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">4. Número de documento</FormLabel>
                           <FormControl>
-                            <Input {...field} readOnly className="bg-slate-100" />
+                            <Input 
+                              {...field} 
+                              readOnly={!isBulkEntryMode} 
+                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                form.clearErrors('numeroDocumento');
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="hospital"
-                      render={({ field }) => {
-                        const displayValue = getHospitalDisplayName(field.value);
-                        return (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">5. Hospital</FormLabel>
-                            <FormControl>
-                              <Input 
-                                value={displayValue} 
-                                readOnly 
-                                className="bg-slate-100" 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
+                    {/* Hospital y Profesión solo se muestran en modo afiliados activos */}
+                    {!isBulkEntryMode && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="hospital"
+                          render={({ field }) => {
+                            const displayValue = getHospitalDisplayName(field.value);
+                            return (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-slate-900">5. Hospital</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    value={displayValue} 
+                                    readOnly 
+                                    className="bg-slate-100" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="profesion"
-                      render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">6. Profesión</FormLabel>
-                          <FormControl>
-                            <Input {...field} readOnly className="bg-slate-100" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        <FormField
+                          control={form.control}
+                          name="profesion"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">6. Proceso</FormLabel>
+                              <FormControl>
+                                <Input {...field} readOnly className="bg-slate-100" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
 
                     <FormField
                       control={form.control}
@@ -1110,7 +1229,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">7. Dirección de correo electrónico</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">
+                              {isBulkEntryMode ? '5. Dirección de correo electrónico' : '7. Dirección de correo electrónico'}
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 type="email"
@@ -1162,7 +1283,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                           return (
                               <FormItem>
-                                <FormLabel className="text-base font-semibold text-slate-900">8. Celular</FormLabel>
+                                <FormLabel className="text-base font-semibold text-slate-900">
+                                  {isBulkEntryMode ? '6. Celular' : '8. Celular'}
+                                </FormLabel>
                                 <FormControl>
                                   <Input
                                       type="tel"
@@ -1205,7 +1328,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="fechaExpedicion"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">9. Fecha de expedición</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">
+                            {isBulkEntryMode ? '7. Fecha de expedición' : '9. Fecha de expedición'}
+                          </FormLabel>
                           <FormControl>
                             <Input type="date" {...field} value={field.value || ''} readOnly={!!afiliado?.fecha_expedicion} className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} />
                           </FormControl>
@@ -1221,7 +1346,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         const selectedPais = paises.find(p => p.value === field.value);
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">10. País de nacimiento</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">
+                              {isBulkEntryMode ? '8. País de nacimiento' : '10. País de nacimiento'}
+                            </FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
@@ -1257,7 +1384,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         name="lugarNacimiento"
                         render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">11. Lugar de nacimiento</FormLabel>
+                              <FormLabel className="text-base font-semibold text-slate-900">
+                                {isBulkEntryMode ? '9. Lugar de nacimiento' : '11. Lugar de nacimiento'}
+                              </FormLabel>
                               <FormControl>
                                 <Input {...field} value={field.value || ''} readOnly={!!afiliado?.lugar_nacimiento} className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} placeholder="Ej: Medellín" />
                               </FormControl>
@@ -1277,7 +1406,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                           return (
                               <FormItem>
-                                <FormLabel className="text-base font-semibold text-slate-900">12. Departamento de residencia</FormLabel>
+                                <FormLabel className="text-base font-semibold text-slate-900">
+                                  {isBulkEntryMode ? '10. Departamento de residencia' : '12. Departamento de residencia'}
+                                </FormLabel>
                                 <FormControl>
                                   <Input
                                       value="Antioquia"
@@ -1296,7 +1427,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         name="municipio"
                         render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">13. Municipio de residencia</FormLabel>
+                              <FormLabel className="text-base font-semibold text-slate-900">
+                                {isBulkEntryMode ? '11. Municipio de residencia' : '13. Municipio de residencia'}
+                              </FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                   <SelectTrigger>
@@ -1330,7 +1463,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                         return (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-900">14. Dirección de residencia</FormLabel>
+                            <FormLabel className="text-base font-semibold text-slate-900">
+                              {isBulkEntryMode ? '12. Dirección de residencia' : '14. Dirección de residencia'}
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 value={displayValue}
@@ -2590,9 +2725,40 @@ const EncuestaBienestarPageContent: React.FC = () => {
 };
 
 const EncuestaBienestarPage: React.FC = () => {
+  // Verificar modo de configuración antes de renderizar
+  const { data: config, isLoading } = useQuery({
+    queryKey: ['survey-config-public'],
+    queryFn: () => surveyConfigApi.getPublicConfig(),
+    retry: 2,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+
+  const isBulkEntryMode = config?.data?.allow_bulk_entry_mode ?? false;
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-prosalud mx-auto mb-4"></div>
+              <p className="text-slate-600">Cargando configuración...</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Si está en modo ingreso masivo, no requiere autenticación
+  if (isBulkEntryMode) {
+    return <EncuestaBienestarPageContent isBulkEntryMode={isBulkEntryMode} />;
+  }
+
+  // Si está en modo afiliados activos, requiere autenticación
   return (
     <RequireAfiliadoDataUpdateAuth>
-      <EncuestaBienestarPageContent />
+      <EncuestaBienestarPageContent isBulkEntryMode={isBulkEntryMode} />
     </RequireAfiliadoDataUpdateAuth>
   );
 };

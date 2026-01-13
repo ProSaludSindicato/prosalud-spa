@@ -2,12 +2,14 @@ import { authenticatedApi } from './api';
 
 export interface SocioDemographicSurveyListItem {
   id: string;
+  survey_type: 'active_affiliate' | 'bulk_entry' | null;
   correo: string;
   tipo_documento: string;
   numero_documento: string;
-  hospital: string;
-  profesion: string;
+  hospital?: string | null;
+  profesion?: string | null;
   created_at: string;
+  formatted_created_at: string;
   nombres?: string | null;
   apellidos?: string | null;
 }
@@ -19,10 +21,26 @@ export interface PaginationData {
   total: number;
 }
 
+export interface SurveyMetrics {
+  total: number;
+  current_month: {
+    total: number;
+    by_type: {
+      active_affiliate: number;
+      bulk_entry: number;
+    };
+  };
+  by_type: {
+    active_affiliate: number;
+    bulk_entry: number;
+  };
+}
+
 export interface SocioDemographicSurveyListResponse {
   success: true;
   data: SocioDemographicSurveyListItem[];
   pagination: PaginationData;
+  metrics: SurveyMetrics;
 }
 
 export interface HijoData {
@@ -127,11 +145,12 @@ export interface LimitacionesFisicas {
 
 export interface SocioDemographicSurveyDetail {
   id: string;
+  survey_type: 'active_affiliate' | 'bulk_entry' | null;
   correo: string;
   tipo_documento: string;
   numero_documento: string;
-  hospital: string;
-  profesion: string;
+  hospital?: string | null;
+  profesion?: string | null;
   nombres?: string | null;
   apellidos?: string | null;
   rh?: string;
@@ -167,7 +186,7 @@ export interface SocioDemographicSurveyDetailResponse {
 
 export interface GetSurveysParams {
   hospital?: string;
-  tipo_documento?: string;
+  survey_type?: string;
   numero_documento?: string;
   per_page?: number;
   page?: number;
@@ -183,8 +202,8 @@ class SocioDemographicSurveyApi {
     if (params?.hospital) {
       queryParams.append('hospital', params.hospital);
     }
-    if (params?.tipo_documento) {
-      queryParams.append('tipo_documento', params.tipo_documento);
+    if (params?.survey_type) {
+      queryParams.append('survey_type', params.survey_type);
     }
     if (params?.numero_documento) {
       queryParams.append('numero_documento', params.numero_documento);
@@ -224,6 +243,67 @@ class SocioDemographicSurveyApi {
       }
     );
     return response.data;
+  }
+
+  /**
+   * Exportar encuestas sociodemográficas a Excel
+   */
+  async exportToExcel(filters: {
+    survey_type?: string;
+    date_range: {
+      include_all: boolean;
+      start_date?: string;
+      end_date?: string;
+    };
+    hospital?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    try {
+      const response = await authenticatedApi.post<Blob>(
+        '/api/socio-demographic-surveys/export/excel',
+        {
+          survey_type: filters.survey_type || 'all',
+          date_range: filters.date_range,
+          hospital: filters.hospital,
+        },
+        {
+          responseType: 'blob',
+          headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        }
+      );
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'Encuestas_Sociodemograficas_ProSalud.xlsx';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      return {
+        blob: response.data,
+        filename,
+      };
+    } catch (error: any) {
+      // Try to extract error message from response
+      if (error.response?.data) {
+        // If the response is JSON (error), try to parse it
+        if (error.response.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text();
+            const errorData = JSON.parse(text);
+            throw new Error(errorData.message || 'Error al exportar encuestas');
+          } catch {
+            throw new Error('Error al exportar encuestas');
+          }
+        }
+      }
+      throw error;
+    }
   }
 }
 
