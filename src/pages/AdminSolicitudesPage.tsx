@@ -363,6 +363,9 @@ const MICROCREDITO_EMAIL_BODY = "Hemos revisado su solicitud de libranza y esta 
 // Mensaje prediligenciado para solicitudes de microcrédito rechazadas
 const MICROCREDITO_REJECTED_EMAIL_BODY = "NO TIENE CAPACIDAD DE ENDEUDAMIENTO";
 
+// Mensaje prediligenciado para solicitudes de retiro-sindical completadas
+const RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY = "Se recibe notificación de retiro libre y voluntario como afiliado(a) del sindicato PROSALUD, a continuación, compartimos información de su interés y solicitamos amablemente diligenciar la siguiente encuesta de retiro, con esto usted nos ayuda a identificar que procesos y factores influyen en la deserción de PROSALUD y los hospitales, y así podremos evaluar e implementar procesos de mejora.\n\nhttps://docs.google.com/forms/d/e/1FAIpQLScibi8bSKhMs1ByN9ySNgQUu9Wqqlbvg4yrIjAs6Je7o1XO_g/formResponse?pli=1";
+
 // Función para convertir texto pegado de Excel a HTML de tabla
 const convertExcelPasteToHtmlTable = (text: string): string => {
   // Dividir el texto en líneas
@@ -660,6 +663,67 @@ const AdminSolicitudesPage: React.FC = () => {
     // Si el estado es "rejected", prediligenciar el mensaje de rechazo
     else if (watchedNewStatus === 'rejected') {
       responseForm.setValue('emailBody', MICROCREDITO_REJECTED_EMAIL_BODY, { shouldValidate: false });
+    }
+  }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
+
+  // Efecto para prediligenciar mensaje y archivo adjunto cuando el estado es "resolved" en solicitudes de retiro-sindical
+  useEffect(() => {
+    // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
+    if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
+    
+    const isRetiroSindical = solicitudToRespond.request_type === 'retiro-sindical' || solicitudToRespond.request_type === 'solicitud-retiro-sindical';
+    if (!isRetiroSindical) return;
+    
+    // Obtener el estado actual del formulario (puede ser el observado o el valor actual)
+    const currentStatus = watchedNewStatus || responseForm.getValues('newStatus');
+    
+    // Si el estado es "resolved" (Completado), prediligenciar el mensaje y adjuntar el PDF
+    if (currentStatus === 'resolved') {
+      // Prediligenciar el mensaje si no está ya establecido
+      const currentEmailBody = responseForm.getValues('emailBody');
+      if (currentEmailBody !== RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY) {
+        responseForm.setValue('emailBody', RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY, { shouldValidate: false });
+      }
+      
+      // Cargar y adjuntar el PDF
+      const loadPdfAttachment = async () => {
+        try {
+          const response = await fetch('/files/RECORDATORIO_PARA_AFILIADOS_QUE_SE_RETIRAN.pdf');
+          if (!response.ok) {
+            logger.warn('No se pudo cargar el archivo PDF de recordatorio');
+            return;
+          }
+          
+          const blob = await response.blob();
+          const file = new File([blob], 'RECORDATORIO_PARA_AFILIADOS_QUE_SE_RETIRAN.pdf', { type: 'application/pdf' });
+          
+          // Obtener archivos actuales
+          const currentAttachments = responseForm.getValues('attachments');
+          const currentFiles = currentAttachments ? Array.from(currentAttachments as FileList) : [];
+          
+          // Verificar si el archivo ya está adjunto
+          const alreadyAttached = currentFiles.some(f => f.name === file.name);
+          if (alreadyAttached) {
+            return; // Ya está adjunto, no hacer nada
+          }
+          
+          // Agregar el nuevo archivo usando DataTransfer
+          const dataTransfer = new DataTransfer();
+          currentFiles.forEach(f => dataTransfer.items.add(f));
+          dataTransfer.items.add(file);
+          
+          responseForm.setValue('attachments', dataTransfer.files, { shouldValidate: false });
+        } catch (error) {
+          logger.error('Error al cargar el archivo PDF de recordatorio:', error);
+        }
+      };
+      
+      // Usar un pequeño delay para asegurar que el formulario esté completamente inicializado
+      const timeoutId = setTimeout(() => {
+        loadPdfAttachment();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
 
@@ -1039,6 +1103,13 @@ const AdminSolicitudesPage: React.FC = () => {
         } else if (defaultStatus === 'rejected') {
           emailBody = MICROCREDITO_REJECTED_EMAIL_BODY;
         }
+      }
+      
+      // Si es retiro-sindical y el estado es "resolved", prediligenciar mensaje
+      // El efecto se encargará de cargar el PDF automáticamente
+      const isRetiroSindical = solicitud.request_type === 'retiro-sindical' || solicitud.request_type === 'solicitud-retiro-sindical';
+      if (isRetiroSindical && defaultStatus === 'resolved') {
+        emailBody = RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY;
       }
       
       // Si es dirigido a fondo de pensiones, prediligenciar mensaje
