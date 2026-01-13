@@ -1,4 +1,5 @@
 import { authenticatedApi } from './api';
+import { buildAdminApiUrl } from '@/config/api';
 
 export interface SocioDemographicSurveyListItem {
   id: string;
@@ -247,6 +248,8 @@ class SocioDemographicSurveyApi {
 
   /**
    * Exportar encuestas sociodemográficas a Excel
+   * Si include_signatures es true, retorna job_id para proceso asíncrono
+   * Si include_signatures es false, retorna blob directamente (síncrono)
    */
   async exportToExcel(filters: {
     survey_type?: string;
@@ -256,25 +259,60 @@ class SocioDemographicSurveyApi {
       end_date?: string;
     };
     hospital?: string;
-  }): Promise<{ blob: Blob; filename: string }> {
+    include_signatures?: boolean;
+  }): Promise<{ blob: Blob; filename: string } | { job_id: string; status: string; check_status_url: string }> {
     try {
-      const response = await authenticatedApi.post<Blob>(
-        '/api/socio-demographic-surveys/export/excel',
-        {
+      const includeSignatures = filters.include_signatures ?? false;
+      const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/excel');
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': includeSignatures 
+            ? 'application/json' 
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
           survey_type: filters.survey_type || 'all',
           date_range: filters.date_range,
           hospital: filters.hospital,
-        },
-        {
-          responseType: 'blob',
-          headers: {
-            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          },
-        }
-      );
+          include_signatures: includeSignatures,
+        }),
+      });
 
-      // Extract filename from Content-Disposition header
-      const contentDisposition = response.headers['content-disposition'];
+      // Si incluye firmas, es asíncrono (HTTP 202)
+      if (response.status === 202) {
+        const data = await response.json();
+        if (!data.success || !data.job_id) {
+          throw new Error(data.message || 'Error al iniciar la generación del reporte');
+        }
+        return {
+          job_id: data.job_id,
+          status: data.status,
+          check_status_url: data.check_status_url,
+        };
+      }
+
+      // Manejar errores
+      if (!response.ok) {
+        let errorMessage = 'Error al generar el reporte';
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            // Si no se puede parsear, usar el mensaje por defecto
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Si no incluye firmas, es síncrono (HTTP 200) - devolver blob
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
       let filename = 'Encuestas_Sociodemograficas_ProSalud.xlsx';
       
       if (contentDisposition) {
@@ -285,24 +323,99 @@ class SocioDemographicSurveyApi {
       }
 
       return {
-        blob: response.data,
+        blob,
         filename,
       };
     } catch (error: any) {
-      // Try to extract error message from response
-      if (error.response?.data) {
-        // If the response is JSON (error), try to parse it
-        if (error.response.data instanceof Blob) {
-          try {
-            const text = await error.response.data.text();
-            const errorData = JSON.parse(text);
-            throw new Error(errorData.message || 'Error al exportar encuestas');
-          } catch {
-            throw new Error('Error al exportar encuestas');
-          }
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al exportar encuestas');
+    }
+  }
+
+  /**
+   * Verifica el estado de un trabajo de exporte asíncrono
+   */
+  async checkExportStatus(jobId: string): Promise<{
+    success: boolean;
+    job_id: string;
+    status: 'processing' | 'completed' | 'failed';
+    download_url?: string;
+    file_name?: string;
+    error?: string;
+    message?: string;
+  }> {
+    try {
+      const url = buildAdminApiUrl(`/api/socio-demographic-surveys/export/status/${jobId}`);
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: false,
+            job_id: jobId,
+            status: 'failed',
+            message: 'Job no encontrado o expirado',
+          };
+        }
+        throw new Error(`Error al verificar estado: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al verificar estado del reporte');
+    }
+  }
+
+  /**
+   * Descarga un reporte completado
+   */
+  async downloadExport(jobId: string): Promise<{ blob: Blob; filename: string }> {
+    try {
+      const url = buildAdminApiUrl(`/api/socio-demographic-surveys/export/download/${jobId}`);
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Job no encontrado o expirado');
+        }
+        if (response.status === 400) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'El reporte aún no está listo');
+        }
+        throw new Error(`Error al descargar reporte: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'Encuestas_Sociodemograficas_ProSalud.xlsx';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
         }
       }
-      throw error;
+
+      return {
+        blob,
+        filename,
+      };
+    } catch (error: any) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al descargar el reporte');
     }
   }
 }
