@@ -6,11 +6,12 @@ import { motion } from 'framer-motion';
 import { 
   Users, GraduationCap, Heart, BarChart3, Settings, Upload, Download, CheckCircle2,
   ClipboardList, Package, AlertCircle, ArrowRight, Clock, Loader2, TrendingUp, Activity,
-  FileText, RefreshCw, ChevronDown, ChevronUp
+  FileText, RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -134,9 +135,13 @@ const AdminDashboard: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasProcessedUploadParam = useRef(false);
   const [compensacionesFileInfo, setCompensacionesFileInfo] = useState<AdminExcelFileInfo | null>(null);
+  const [afiliadosFileInfo, setAfiliadosFileInfo] = useState<AdminExcelFileInfo | null>(null);
+  const [incapacidadesFileInfo, setIncapacidadesFileInfo] = useState<AdminExcelFileInfo | null>(null);
+  const [liquidacionesFileInfo, setLiquidacionesFileInfo] = useState<AdminExcelFileInfo | null>(null);
   const [isLoadingFileInfo, setIsLoadingFileInfo] = useState(false);
   const [isDownloadingFile, setIsDownloadingFile] = useState(false);
-  const [isCompensacionesCardExpanded, setIsCompensacionesCardExpanded] = useState(true);
+  const [downloadingFileType, setDownloadingFileType] = useState<AdminExcelFileType | null>(null);
+  const [activeFileTab, setActiveFileTab] = useState<string>('afiliados');
 
   const handleUploadButtonClick = (type: DashboardUploadType) => {
     if (isUploading) return;
@@ -513,9 +518,15 @@ const AdminDashboard: React.FC = () => {
 
       if (response.success) {
         toast.success(response.message || config.successFallback);
-        // Refresh file info if it's compensaciones
+        // Refresh file info after upload
         if (type === 'compensaciones') {
           await fetchCompensacionesFileInfo();
+        } else if (type === 'afiliados') {
+          await fetchAfiliadosFileInfo();
+        } else if (type === 'incapacidades') {
+          await fetchIncapacidadesFileInfo();
+        } else if (type === 'liquidaciones') {
+          await fetchLiquidacionesFileInfo();
         }
       } else {
         toast.error(response.message || config.errorFallback);
@@ -564,18 +575,59 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDownloadCompensacionesFile = async () => {
+  const fetchAfiliadosFileInfo = async () => {
+    try {
+      setIsLoadingFileInfo(true);
+      const info = await adminExcelFilesService.getFileInfo('afiliados');
+      setAfiliadosFileInfo(info);
+    } catch (error) {
+      logger.error('Error al obtener información del archivo de afiliados', error);
+      toast.error('No fue posible obtener la información del archivo actual.');
+    } finally {
+      setIsLoadingFileInfo(false);
+    }
+  };
+
+  const fetchIncapacidadesFileInfo = async () => {
+    try {
+      setIsLoadingFileInfo(true);
+      const info = await adminExcelFilesService.getFileInfo('incapacidades');
+      setIncapacidadesFileInfo(info);
+    } catch (error) {
+      logger.error('Error al obtener información del archivo de incapacidades', error);
+      toast.error('No fue posible obtener la información del archivo actual.');
+    } finally {
+      setIsLoadingFileInfo(false);
+    }
+  };
+
+  const fetchLiquidacionesFileInfo = async () => {
+    try {
+      setIsLoadingFileInfo(true);
+      const info = await adminExcelFilesService.getFileInfo('liquidaciones');
+      setLiquidacionesFileInfo(info);
+    } catch (error) {
+      logger.error('Error al obtener información del archivo de liquidaciones', error);
+      toast.error('No fue posible obtener la información del archivo actual.');
+    } finally {
+      setIsLoadingFileInfo(false);
+    }
+  };
+
+  const handleDownloadFile = async (type: AdminExcelFileType) => {
     if (isDownloadingFile) return;
     
     try {
       setIsDownloadingFile(true);
-      const blob = await adminExcelFilesService.downloadFile('compensaciones');
+      setDownloadingFileType(type);
+      const blob = await adminExcelFilesService.downloadFile(type);
+      const filename = adminExcelFilesService.getDefaultFilename(type);
       
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'COMPENSACIONES_AFILIADOS_ACTIVOS.xlsx';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -583,17 +635,43 @@ const AdminDashboard: React.FC = () => {
       
       toast.success('Archivo descargado exitosamente');
     } catch (error) {
-      logger.error('Error al descargar archivo de compensaciones', error);
+      logger.error(`Error al descargar archivo de ${type}`, error);
       toast.error('No fue posible descargar el archivo. Intenta nuevamente.');
     } finally {
       setIsDownloadingFile(false);
+      setDownloadingFileType(null);
     }
   };
+
+  const handleDownloadCompensacionesFile = () => handleDownloadFile('compensaciones');
+
+  // Set initial active tab based on available permissions
+  useEffect(() => {
+    const availableTabs: string[] = [];
+    if (can(FILE_PERMISSIONS.afiliados)) availableTabs.push('afiliados');
+    if (can(FILE_PERMISSIONS.incapacidades)) availableTabs.push('incapacidades');
+    if (can(FILE_PERMISSIONS.liquidaciones)) availableTabs.push('liquidaciones');
+    if (can(FILE_PERMISSIONS.compensaciones)) availableTabs.push('compensaciones');
+    
+    if (availableTabs.length > 0 && !availableTabs.includes(activeFileTab)) {
+      setActiveFileTab(availableTabs[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [can]);
 
   // Fetch file info on mount if user has permission
   useEffect(() => {
     if (can(FILE_PERMISSIONS.compensaciones)) {
       fetchCompensacionesFileInfo();
+    }
+    if (can(FILE_PERMISSIONS.afiliados)) {
+      fetchAfiliadosFileInfo();
+    }
+    if (can(FILE_PERMISSIONS.incapacidades)) {
+      fetchIncapacidadesFileInfo();
+    }
+    if (can(FILE_PERMISSIONS.liquidaciones)) {
+      fetchLiquidacionesFileInfo();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -620,6 +698,111 @@ const AdminDashboard: React.FC = () => {
           {isTypeLoading ? config.uploadingLabel : config.buttonLabel}
         </span>
       </motion.button>
+    );
+  };
+
+  const renderFileInfoContent = (
+    type: 'afiliados' | 'incapacidades' | 'liquidaciones' | 'compensaciones',
+    fileInfo: AdminExcelFileInfo | null,
+    fetchInfo: () => Promise<void>
+  ) => {
+    const isDownloading = isDownloadingFile && downloadingFileType === type;
+
+    return (
+      <div>
+        {isLoadingFileInfo ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary-prosalud" />
+            <span className="ml-2 text-slate-600">Cargando información del archivo...</span>
+          </div>
+        ) : fileInfo?.exists ? (
+          <div className="space-y-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Estado:</span>
+                <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                  Archivo disponible
+                </span>
+              </div>
+              {fileInfo.file_path && (
+                <div className="flex items-start justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Ruta:</span>
+                  <span className="text-sm text-slate-700 text-right break-all ml-4">
+                    {fileInfo.file_path}
+                  </span>
+                </div>
+              )}
+              {fileInfo.file_size && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Tamaño:</span>
+                  <span className="text-sm text-slate-700">
+                    {(fileInfo.file_size / (1024 * 1024)).toFixed(2)} MB
+                  </span>
+                </div>
+              )}
+              {fileInfo.last_modified && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Última modificación:</span>
+                  <span className="text-sm text-slate-700">
+                    {new Date(fileInfo.last_modified).toLocaleString('es-ES', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleDownloadFile(type)}
+                disabled={isDownloadingFile}
+                className="flex items-center gap-2"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Descargando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Descargar archivo actual
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={fetchInfo}
+                disabled={isLoadingFileInfo}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoadingFileInfo ? 'animate-spin' : ''}`} />
+                Actualizar información
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Archivo no encontrado
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {fileInfo?.message || `No hay un archivo de ${type} cargado en el sistema.`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1331,140 +1514,120 @@ const AdminDashboard: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Compensaciones File Info Section */}
-          {can(FILE_PERMISSIONS.compensaciones) && (
+          {/* Files Info Section with Tabs */}
+          {(can(FILE_PERMISSIONS.afiliados) || 
+            can(FILE_PERMISSIONS.incapacidades) || 
+            can(FILE_PERMISSIONS.liquidaciones) || 
+            can(FILE_PERMISSIONS.compensaciones)) && (
             <motion.div variants={itemVariants}>
               <Card className="bg-white border shadow-sm">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-6 w-6 text-primary-prosalud" />
-                      <div>
-                        <CardTitle className="text-xl">
-                          Archivo de Compensaciones Actual
-                        </CardTitle>
-                        <CardDescription>
-                          Información del archivo de compensaciones de afiliados activos actualmente en uso
-                        </CardDescription>
-                      </div>
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-6 w-6 text-primary-prosalud" />
+                    <div>
+                      <CardTitle className="text-xl">
+                        Archivos del Sistema
+                      </CardTitle>
+                      <CardDescription>
+                        Consulta y descarga de archivos maestros actualmente en uso
+                      </CardDescription>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsCompensacionesCardExpanded(!isCompensacionesCardExpanded)}
-                      className="flex items-center gap-2"
-                    >
-                      {isCompensacionesCardExpanded ? (
-                        <>
-                          <ChevronUp className="h-4 w-4" />
-                          <span className="hidden sm:inline">Ocultar</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4" />
-                          <span className="hidden sm:inline">Mostrar</span>
-                        </>
-                      )}
-                    </Button>
                   </div>
                 </CardHeader>
-                {isCompensacionesCardExpanded && (
-                  <CardContent>
-                    {isLoadingFileInfo ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary-prosalud" />
-                        <span className="ml-2 text-slate-600">Cargando información del archivo...</span>
-                      </div>
-                    ) : compensacionesFileInfo?.exists ? (
-                      <div className="space-y-4">
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-900">Estado:</span>
-                            <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
-                              Archivo disponible
-                            </span>
-                          </div>
-                          {compensacionesFileInfo.file_path && (
-                            <div className="flex items-start justify-between">
-                              <span className="text-sm font-semibold text-slate-900">Ruta:</span>
-                              <span className="text-sm text-slate-700 text-right break-all ml-4">
-                                {compensacionesFileInfo.file_path}
-                              </span>
-                            </div>
-                          )}
-                          {compensacionesFileInfo.file_size && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-slate-900">Tamaño:</span>
-                              <span className="text-sm text-slate-700">
-                                {(compensacionesFileInfo.file_size / (1024 * 1024)).toFixed(2)} MB
-                              </span>
-                            </div>
-                          )}
-                          {compensacionesFileInfo.last_modified && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-slate-900">Última modificación:</span>
-                              <span className="text-sm text-slate-700">
-                                {new Date(compensacionesFileInfo.last_modified).toLocaleString('es-ES', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </span>
-                            </div>
-                          )}
+                <CardContent>
+                  <Tabs value={activeFileTab} onValueChange={setActiveFileTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-gray-50 border p-1 mb-4">
+                      {can(FILE_PERMISSIONS.afiliados) && (
+                        <TabsTrigger
+                          value="afiliados"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span className="hidden sm:inline">Afiliados</span>
+                          <span className="sm:hidden">Afil.</span>
+                        </TabsTrigger>
+                      )}
+                      {can(FILE_PERMISSIONS.incapacidades) && (
+                        <TabsTrigger
+                          value="incapacidades"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span className="hidden sm:inline">Incapacidades</span>
+                          <span className="sm:hidden">Incap.</span>
+                        </TabsTrigger>
+                      )}
+                      {can(FILE_PERMISSIONS.liquidaciones) && (
+                        <TabsTrigger
+                          value="liquidaciones"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span className="hidden sm:inline">Liquidaciones</span>
+                          <span className="sm:hidden">Liquid.</span>
+                        </TabsTrigger>
+                      )}
+                      {can(FILE_PERMISSIONS.compensaciones) && (
+                        <TabsTrigger
+                          value="compensaciones"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span className="hidden sm:inline">Compensaciones</span>
+                          <span className="sm:hidden">Comp.</span>
+                        </TabsTrigger>
+                      )}
+                    </TabsList>
+
+                    {can(FILE_PERMISSIONS.afiliados) && (
+                      <TabsContent value="afiliados" className="mt-0">
+                        <div className="space-y-2 mb-4">
+                          <h3 className="text-lg font-semibold text-slate-900">Archivo de Afiliados Actual</h3>
+                          <p className="text-sm text-slate-600">
+                            Información del archivo maestro de afiliados actualmente en uso
+                          </p>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleDownloadCompensacionesFile}
-                            disabled={isDownloadingFile}
-                            className="flex items-center gap-2"
-                          >
-                            {isDownloadingFile ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Descargando...
-                              </>
-                            ) : (
-                              <>
-                                <Download className="h-4 w-4" />
-                                Descargar archivo actual
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={fetchCompensacionesFileInfo}
-                            disabled={isLoadingFileInfo}
-                            className="flex items-center gap-2"
-                          >
-                            <RefreshCw className={`h-4 w-4 ${isLoadingFileInfo ? 'animate-spin' : ''}`} />
-                            Actualizar información
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="h-5 w-5 text-amber-600" />
-                          <div>
-                            <p className="text-sm font-semibold text-amber-900">
-                              Archivo no encontrado
-                            </p>
-                            <p className="text-sm text-amber-700 mt-1">
-                              {compensacionesFileInfo?.message || 'No hay un archivo de compensaciones cargado en el sistema.'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                        {renderFileInfoContent('afiliados', afiliadosFileInfo, fetchAfiliadosFileInfo)}
+                      </TabsContent>
                     )}
-                  </CardContent>
-                )}
+
+                    {can(FILE_PERMISSIONS.incapacidades) && (
+                      <TabsContent value="incapacidades" className="mt-0">
+                        <div className="space-y-2 mb-4">
+                          <h3 className="text-lg font-semibold text-slate-900">Archivo de Incapacidades Actual</h3>
+                          <p className="text-sm text-slate-600">
+                            Información del archivo de relación de incapacidades actualmente en uso
+                          </p>
+                        </div>
+                        {renderFileInfoContent('incapacidades', incapacidadesFileInfo, fetchIncapacidadesFileInfo)}
+                      </TabsContent>
+                    )}
+
+                    {can(FILE_PERMISSIONS.liquidaciones) && (
+                      <TabsContent value="liquidaciones" className="mt-0">
+                        <div className="space-y-2 mb-4">
+                          <h3 className="text-lg font-semibold text-slate-900">Archivo de Liquidaciones Pendientes Actual</h3>
+                          <p className="text-sm text-slate-600">
+                            Información del archivo de liquidaciones pendientes actualmente en uso
+                          </p>
+                        </div>
+                        {renderFileInfoContent('liquidaciones', liquidacionesFileInfo, fetchLiquidacionesFileInfo)}
+                      </TabsContent>
+                    )}
+
+                    {can(FILE_PERMISSIONS.compensaciones) && (
+                      <TabsContent value="compensaciones" className="mt-0">
+                        <div className="space-y-2 mb-4">
+                          <h3 className="text-lg font-semibold text-slate-900">Archivo de Compensaciones Actual</h3>
+                          <p className="text-sm text-slate-600">
+                            Información del archivo de compensaciones de afiliados activos actualmente en uso
+                          </p>
+                        </div>
+                        {renderFileInfoContent('compensaciones', compensacionesFileInfo, fetchCompensacionesFileInfo)}
+                      </TabsContent>
+                    )}
+                  </Tabs>
+                </CardContent>
               </Card>
             </motion.div>
           )}

@@ -105,16 +105,16 @@ export const adminExcelFilesService = {
     return response.data;
   },
 
-  async getFileInfo(type: 'compensaciones'): Promise<AdminExcelFileInfo> {
-    const endpoint = '/api/compensaciones-file/info';
+  async getFileInfo(type: AdminExcelFileType): Promise<AdminExcelFileInfo> {
+    const endpoint = `/api/${type}-file/info`;
     const response = await authenticatedApi.get<AdminExcelFileInfo>(
       buildAdminApiUrl(endpoint)
     );
     return response.data;
   },
 
-  async downloadFile(type: 'compensaciones'): Promise<Blob> {
-    const endpoint = '/api/compensaciones-file/download';
+  async downloadFile(type: AdminExcelFileType): Promise<Blob> {
+    const endpoint = `/api/${type}-file/download`;
     const response = await authenticatedApi.get<Blob>(
       buildAdminApiUrl(endpoint),
       {
@@ -122,6 +122,20 @@ export const adminExcelFilesService = {
       }
     );
     return response.data;
+  },
+
+  /**
+   * Get the default filename for a file type when downloading
+   */
+  getDefaultFilename(type: AdminExcelFileType): string {
+    const filenameMap: Record<AdminExcelFileType, string> = {
+      afiliados: 'PROSANET_INFORMACION_AFILIADOS.xlsx',
+      incapacidades: 'RELACION_INCAPACIDADES.xlsx',
+      liquidaciones: 'LIQUIDACIONES_PENDIENTES.xlsx',
+      delegados: 'DELEGADOS.xlsx', // Default fallback, may need to be updated
+      compensaciones: 'COMPENSACIONES_AFILIADOS_ACTIVOS.xlsx',
+    };
+    return filenameMap[type];
   },
 };
 
