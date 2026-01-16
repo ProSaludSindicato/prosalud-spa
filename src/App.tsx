@@ -51,6 +51,7 @@ import SolicitudRetiroSindicalPage from '@/pages/SolicitudRetiroSindicalPage';
 import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
+import FirmaConvenioPage from '@/pages/FirmaConvenioPage';
 
 // Legal Pages
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
@@ -115,6 +116,7 @@ const AppRoutes = () => {
             <Route path="/servicios/retiro-sindical" element={<SolicitudRetiroSindicalPage />} />
             <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
             <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
+            <Route path="/servicios/firma-convenio" element={<FirmaConvenioPage />} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />

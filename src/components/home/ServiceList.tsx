@@ -22,7 +22,8 @@ import {
   CalendarDays,
   CreditCard,
   LogOut,
-  UserPlus
+  UserPlus,
+  FileSignature
 } from 'lucide-react';
 
 // Definición de categorías (debe coincidir con QuickLinksSection)
@@ -165,6 +166,14 @@ const newServices: Service[] = [
     linkTo: '/servicios/retiro-sindical', 
     category: 'Gestión Personal y Sindical',
     keywords: ['retiro', 'sindical', 'proceso', 'iniciar', 'salida', 'desvinculacion', 'abandono']
+  },
+  { 
+    icon: FileSignature, 
+    title: 'Firma de convenios', 
+    description: 'Firma tu convenio de afiliación de forma digital y segura con DocuSign.', 
+    linkTo: '/servicios/firma-convenio', 
+    category: 'Certificados y Documentos',
+    keywords: ['firma', 'convenio', 'docusign', 'digital', 'afiliacion', 'documento', 'contrato', 'autenticacion']
   },
 ];
 
