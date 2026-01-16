@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images, FileText, Download } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, EyeOff, Heart, Pencil, Calendar, Images, FileText, Download, CheckCircle2, XCircle, Clock, AlertCircle, UserCheck, Link2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ const AdminBienestarPage: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<BienestarEvent | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('all');
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,8 +42,10 @@ const AdminBienestarPage: React.FC = () => {
   }, [searchParams, setSearchParams]);
 
   const { data: events = [], isLoading } = useQuery<BienestarEvent[]>({
-    queryKey: ['bienestar-events'],
-    queryFn: () => wellnessEventsApi.getEvents()
+    queryKey: ['bienestar-events', reviewStatusFilter],
+    queryFn: () => wellnessEventsApi.getEvents(
+      reviewStatusFilter !== 'all' ? { review_status: reviewStatusFilter as any } : undefined
+    )
   });
 
   const toggleVisibilityMutation = useMutation({
@@ -66,13 +69,22 @@ const AdminBienestarPage: React.FC = () => {
     }
   });
 
+
   const filteredEvents = events.filter((event: BienestarEvent) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = event.id.toString().includes(searchTerm) ||
                          event.title.toLowerCase().includes(searchLower) ||
                          event.category.toLowerCase().includes(searchLower);
     const matchesCategory = categoryFilter === 'all' || event.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    
+    // Filtro por estado de revisión
+    // Si el evento no tiene reviewStatus (legacy), tratarlo como 'approved'
+    const eventReviewStatus = event.reviewStatus === null || event.reviewStatus === undefined 
+      ? 'approved' 
+      : event.reviewStatus;
+    const matchesReviewStatus = reviewStatusFilter === 'all' || eventReviewStatus === reviewStatusFilter;
+    
+    return matchesSearch && matchesCategory && matchesReviewStatus;
   });
 
   const categories = ['all', ...new Set(events.map((event: BienestarEvent) => event.category))];
@@ -192,6 +204,18 @@ const AdminBienestarPage: React.FC = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Select value={reviewStatusFilter} onValueChange={setReviewStatusFilter}>
+                    <SelectTrigger className="w-full md:w-[220px]">
+                      <SelectValue placeholder="Estado de revisión" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="in_review">En revisión</SelectItem>
+                      <SelectItem value="approved">Aprobado</SelectItem>
+                      <SelectItem value="rejected">Rechazado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -216,7 +240,7 @@ const AdminBienestarPage: React.FC = () => {
                 <CardContent className="text-center py-12">
                   <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-lg text-gray-600">
-                    {searchTerm || categoryFilter !== 'all' 
+                    {searchTerm || categoryFilter !== 'all' || reviewStatusFilter !== 'all'
                       ? 'No se encontraron eventos con los filtros aplicados'
                       : 'No hay eventos creados aún'
                     }
@@ -234,20 +258,56 @@ const AdminBienestarPage: React.FC = () => {
                       animate="visible"
                       transition={{ delay: index * 0.1 }}
                     >
-                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white h-[420px] flex flex-col">
+                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white flex flex-col" style={{ minHeight: '500px' }}>
                         <div className="relative h-48 overflow-hidden">
                           <img
                             src={event.images.find(img => img.isMain)?.url || event.images[0]?.url || '/placeholder.svg'}
                             alt={event.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
-                          <div className="absolute top-2 right-2 flex gap-2">
-                            <Badge variant={event.isVisible ? "default" : "secondary"}>
-                              {event.isVisible ? 'Visible' : 'Oculto'}
-                            </Badge>
-                            <Badge className="bg-white/90 text-gray-800 border-white/20 backdrop-blur-sm">
-                              {event.category}
-                            </Badge>
+                          <div className="absolute top-2 right-2 flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <Badge variant={event.isVisible ? "default" : "secondary"}>
+                                {event.isVisible ? 'Visible' : 'Oculto'}
+                              </Badge>
+                              <Badge className="bg-white/90 text-gray-800 border-white/20 backdrop-blur-sm">
+                                {event.category}
+                              </Badge>
+                            </div>
+                            {/* Badge de estado de revisión */}
+                            {(() => {
+                              const reviewStatus = event.reviewStatus || (event.reviewStatus === null ? null : 'approved');
+                              if (reviewStatus === null) {
+                                // Eventos legacy sin revisión - mostrar como aprobado
+                                return (
+                                  <Badge className="bg-green-100 text-green-800 border-green-300">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Aprobado (Legacy)
+                                  </Badge>
+                                );
+                              }
+                              const statusConfig = {
+                                pending: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', icon: Clock, label: 'Pendiente' },
+                                in_review: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', icon: AlertCircle, label: 'En revisión' },
+                                approved: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', icon: CheckCircle2, label: 'Aprobado' },
+                                rejected: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300', icon: XCircle, label: 'Rechazado' },
+                              };
+                              const config = statusConfig[reviewStatus];
+                              const Icon = config.icon;
+                              return (
+                                <Badge className={`${config.bg} ${config.text} ${config.border}`}>
+                                  <Icon className="h-3 w-3 mr-1" />
+                                  {config.label}
+                                </Badge>
+                              );
+                            })()}
+                            {/* Badge de relación con solicitud */}
+                            {event.wellnessRequestId && (
+                              <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+                                <Link2 className="h-3 w-3 mr-1" />
+                                Relacionado
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <CardContent className="p-4 flex-1 flex flex-col">
@@ -268,24 +328,48 @@ const AdminBienestarPage: React.FC = () => {
                           </div>
 
                           <div className="space-y-3 mt-4">
-                            {/* Visibility Toggle */}
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                {event.isVisible ? (
-                                  <Eye className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <EyeOff className="h-4 w-4 text-gray-400" />
+                            {/* Información de revisión */}
+                            {event.reviewer && (
+                              <div className="p-2 bg-blue-50 rounded-lg text-xs">
+                                <div className="flex items-center gap-1 text-blue-700">
+                                  <UserCheck className="h-3 w-3" />
+                                  <span className="font-medium">Revisado por:</span>
+                                  <span>{event.reviewer.name}</span>
+                                </div>
+                                {event.reviewedAt && (
+                                  <div className="text-blue-600 mt-1">
+                                    {new Date(event.reviewedAt).toLocaleDateString('es-ES')}
+                                  </div>
                                 )}
-                                <span className="text-sm font-medium">
-                                  {event.isVisible ? 'Visible en web' : 'Oculto en web'}
-                                </span>
+                                {event.rejectionReason && (
+                                  <div className="text-red-700 mt-1 font-medium">
+                                    Razón: {event.rejectionReason}
+                                  </div>
+                                )}
                               </div>
-                              <Switch
-                                checked={event.isVisible}
-                                onCheckedChange={() => toggleVisibilityMutation.mutate(event)}
-                                disabled={toggleVisibilityMutation.isPending}
-                              />
-                            </div>
+                            )}
+
+
+                            {/* Visibility Toggle - Solo para eventos aprobados */}
+                            {event.reviewStatus === 'approved' && (
+                              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  {event.isVisible ? (
+                                    <Eye className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <EyeOff className="h-4 w-4 text-gray-400" />
+                                  )}
+                                  <span className="text-sm font-medium">
+                                    {event.isVisible ? 'Visible en web' : 'Oculto en web'}
+                                  </span>
+                                </div>
+                                <Switch
+                                  checked={event.isVisible}
+                                  onCheckedChange={() => toggleVisibilityMutation.mutate(event)}
+                                  disabled={toggleVisibilityMutation.isPending}
+                                />
+                              </div>
+                            )}
 
                             {/* Attendance List Button */}
                             {(event.attendanceListPath || event.attendanceList) && (
@@ -310,15 +394,24 @@ const AdminBienestarPage: React.FC = () => {
                               </Button>
                             )}
 
-                            {/* Edit Button */}
+                            {/* Edit/Review Button */}
                             {can('wellness_events.edit') && (
                               <Button
                                 variant="outline"
                                 onClick={() => handleEdit(event)}
                                 className="w-full"
                               >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
+                                {can('wellness_activity.publish') && (event.reviewStatus === 'pending' || event.reviewStatus === 'in_review') ? (
+                                  <>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Revisar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </>
+                                )}
                               </Button>
                             )}
                           </div>

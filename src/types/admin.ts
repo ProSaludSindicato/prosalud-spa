@@ -36,6 +36,23 @@ export interface BienestarEvent {
     fileUrl: string;
     urlExpiresAt: string;
   };
+  // Campos de revisión
+  reviewStatus?: 'pending' | 'in_review' | 'approved' | 'rejected' | null;
+  reviewStatusText?: string;
+  wellnessRequestId?: number | null;
+  reviewedAt?: string | null;
+  reviewedBy?: number | null;
+  reviewer?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  wellnessRequest?: {
+    id: number;
+    activity_name: string;
+    status: string;
+  } | null;
+  rejectionReason?: string | null;
 }
 
 export interface ComfenalcoEvent {
@@ -131,6 +148,7 @@ export interface CreateBienestarEventData {
   provider?: string;
   images: File[];
   mainImageIndex: number;
+  wellnessRequestId?: number; // ID de solicitud relacionada (opcional)
 }
 
 export interface CreateComfenalcoEventData {

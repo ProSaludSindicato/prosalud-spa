@@ -584,6 +584,38 @@ export const wellnessRequestsService = {
   },
 
   /**
+   * Get completed wellness requests without related activities
+   * Used to show requests that can be linked to wellness events
+   */
+  async getCompletedWellnessRequestsWithoutActivities(filters?: {
+    centroCostos?: string;
+    solicitanteId?: number;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    busqueda?: string;
+    per_page?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<WellnessRequest>> {
+    try {
+      const response = await wellnessRequestsApi.get<PaginatedResponse<WellnessRequest>>(
+        '/api/wellness-requests/completed/without-activities',
+        {
+          params: filters,
+        },
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener las solicitudes completadas');
+      }
+
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  /**
    * Export wellness requests to Excel
    */
   async exportToExcel(filters: {

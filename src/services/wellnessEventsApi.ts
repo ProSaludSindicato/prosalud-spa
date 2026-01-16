@@ -29,6 +29,23 @@ export interface WellnessEventResponse {
   };
   created_at?: string;
   updated_at?: string;
+  // Campos de revisión
+  review_status?: 'pending' | 'in_review' | 'approved' | 'rejected' | null;
+  review_status_text?: string;
+  wellness_request_id?: number | null;
+  reviewed_at?: string | null;
+  reviewed_by?: number | null;
+  reviewer?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  wellness_request?: {
+    id: number;
+    activity_name: string;
+    status: string;
+  } | null;
+  rejection_reason?: string | null;
 }
 
 export interface PaginatedWellnessEvents {
@@ -61,6 +78,7 @@ export interface WellnessEventFilters {
   from_date?: string;
   to_date?: string;
   per_page?: number;
+  review_status?: 'pending' | 'in_review' | 'approved' | 'rejected';
 }
 
 export interface CreateWellnessEventData {
@@ -74,6 +92,7 @@ export interface CreateWellnessEventData {
   is_visible?: boolean;
   images?: File[];
   attendance_list?: File;
+  wellness_request_id?: number; // ID de solicitud relacionada (opcional)
 }
 
 export interface UpdateWellnessEventData {
@@ -145,6 +164,15 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
       fileUrl: apiEvent.attendance_list.file_url,
       urlExpiresAt: apiEvent.attendance_list.url_expires_at,
     } : undefined,
+    // Campos de revisión
+    reviewStatus: apiEvent.review_status || null,
+    reviewStatusText: apiEvent.review_status_text,
+    wellnessRequestId: apiEvent.wellness_request_id || null,
+    reviewedAt: apiEvent.reviewed_at || null,
+    reviewedBy: apiEvent.reviewed_by || null,
+    reviewer: apiEvent.reviewer || null,
+    wellnessRequest: apiEvent.wellness_request || null,
+    rejectionReason: apiEvent.rejection_reason || null,
   };
 }
 
@@ -229,6 +257,12 @@ export async function createWellnessEvent(data: CreateWellnessEventData): Promis
     if (data.attendance_list) {
       formData.append('attendance_list', data.attendance_list);
       logger.debug('Listado de asistencia adjuntado al crear evento');
+    }
+    
+    // Agregar relación con solicitud de bienestar (opcional)
+    if (data.wellness_request_id !== undefined && data.wellness_request_id !== null) {
+      formData.append('wellness_request_id', String(data.wellness_request_id));
+      logger.debug('Relación con solicitud de bienestar establecida', { wellness_request_id: data.wellness_request_id });
     }
     
     const totalCampos = Array.from(formData.keys()).length;
@@ -459,6 +493,80 @@ export async function deleteWellnessEventImage(
 }
 
 /**
+ * Poner un evento en revisión
+ */
+export async function reviewWellnessEvent(id: number | string): Promise<BienestarEvent> {
+  try {
+    logger.debug('Poniendo evento en revisión', { id });
+    
+    const response = await api.post<WellnessEventResponse>(
+      `/api/wellness-events/${id}/review`,
+      {}
+    );
+    
+    logger.debug('Evento puesto en revisión', { status: response.status });
+    
+    return mapToBienestarEvent(response.data);
+  } catch (error: any) {
+    logger.error('Error al poner evento en revisión', error?.message || error);
+    throw error;
+  }
+}
+
+/**
+ * Aprobar un evento de bienestar
+ */
+export async function approveWellnessEvent(
+  id: number | string,
+  isVisible: boolean = true
+): Promise<BienestarEvent> {
+  try {
+    logger.debug('Aprobando evento de bienestar', { id, isVisible });
+    
+    const response = await api.post<WellnessEventResponse>(
+      `/api/wellness-events/${id}/approve`,
+      { is_visible: isVisible }
+    );
+    
+    logger.debug('Evento aprobado', { status: response.status });
+    
+    return mapToBienestarEvent(response.data);
+  } catch (error: any) {
+    logger.error('Error al aprobar evento', error?.message || error);
+    throw error;
+  }
+}
+
+/**
+ * Rechazar un evento de bienestar
+ */
+export async function rejectWellnessEvent(
+  id: number | string,
+  rejectionReason?: string
+): Promise<BienestarEvent> {
+  try {
+    logger.debug('Rechazando evento de bienestar', { id, hasReason: !!rejectionReason });
+    
+    const payload: any = {};
+    if (rejectionReason) {
+      payload.rejection_reason = rejectionReason;
+    }
+    
+    const response = await api.post<WellnessEventResponse>(
+      `/api/wellness-events/${id}/reject`,
+      payload
+    );
+    
+    logger.debug('Evento rechazado', { status: response.status });
+    
+    return mapToBienestarEvent(response.data);
+  } catch (error: any) {
+    logger.error('Error al rechazar evento', error?.message || error);
+    throw error;
+  }
+}
+
+/**
  * Función de prueba para verificar conectividad básica
  */
 export async function testApiConnectivity(): Promise<{ success: boolean; message: string; details?: any }> {
@@ -508,5 +616,8 @@ export const wellnessEventsApi = {
   toggleVisibility: toggleWellnessEventVisibility,
   addImages: addImagesToWellnessEvent,
   deleteImage: deleteWellnessEventImage,
+  review: reviewWellnessEvent,
+  approve: approveWellnessEvent,
+  reject: rejectWellnessEvent,
   testConnectivity: testApiConnectivity,
 };

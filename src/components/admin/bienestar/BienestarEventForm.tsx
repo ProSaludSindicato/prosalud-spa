@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2, FileText, Download, ExternalLink } from "lucide-react";
+import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2, FileText, Download, ExternalLink, Link2, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
+import { wellnessRequestsService, WellnessRequest } from "@/services/wellnessRequestsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
 import { logger } from "@/utils/logger";
 import { optimizeImages, isImageFile } from "@/utils/imageOptimizer";
 import { useSanitizedInput } from "@/hooks/useSanitizedInput";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const formSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
@@ -64,9 +69,23 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [listadoAsistencia, setListadoAsistencia] = useState<File | null>(null);
   const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
   const [eliminarListadoAsistencia, setEliminarListadoAsistencia] = useState(false);
+  const [relateToRequest, setRelateToRequest] = useState(false);
+  const [selectedWellnessRequestId, setSelectedWellnessRequestId] = useState<number | null>(null);
+  const [pendingReviewAction, setPendingReviewAction] = useState<'approve' | 'reject' | null>(null);
+  const [pendingReviewData, setPendingReviewData] = useState<{ isVisible?: boolean; reason?: string } | null>(null);
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   // Security: Use centralized sanitization hook
   const { sanitizeText, sanitizeGeneral } = useSanitizedInput();
+
+  // Cargar solicitudes completadas sin actividades relacionadas
+  const { data: completedRequestsData, isLoading: isLoadingRequests } = useQuery({
+    queryKey: ['completed-wellness-requests-without-activities'],
+    queryFn: () => wellnessRequestsService.getCompletedWellnessRequestsWithoutActivities({ per_page: 100 }),
+    enabled: !event && relateToRequest, // Solo cargar si no es edición y está habilitada la relación
+  });
+
+  const completedRequests = completedRequestsData?.data || [];
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -122,20 +141,53 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       setListadoAsistencia(null);
       setListadoAsistenciaError('');
       setEliminarListadoAsistencia(false);
+      setRelateToRequest(false);
+      setSelectedWellnessRequestId(null);
     } else {
       // Resetear al crear nuevo evento
       setListadoAsistencia(null);
       setListadoAsistenciaError('');
       setEliminarListadoAsistencia(false);
+      setRelateToRequest(false);
+      setSelectedWellnessRequestId(null);
     }
   }, [event, form]);
 
+  // Prellenar datos del formulario cuando se selecciona una solicitud
+  useEffect(() => {
+    if (relateToRequest && selectedWellnessRequestId && completedRequests.length > 0) {
+      const selectedRequest = completedRequests.find(r => r.id === selectedWellnessRequestId);
+      if (selectedRequest) {
+        // Prellenar campos del formulario con datos de la solicitud
+        if (selectedRequest.nombreActividad && !form.getValues('title')) {
+          form.setValue('title', selectedRequest.nombreActividad);
+        }
+        if (selectedRequest.descripcionActividad && !form.getValues('description')) {
+          form.setValue('description', selectedRequest.descripcionActividad);
+        }
+        if (selectedRequest.fechaPropuesta && !form.getValues('date')) {
+          form.setValue('date', selectedRequest.fechaPropuesta);
+        }
+        if (selectedRequest.numeroParticipantes && !form.getValues('attendees')) {
+          form.setValue('attendees', selectedRequest.numeroParticipantes);
+        }
+      }
+    }
+  }, [relateToRequest, selectedWellnessRequestId, completedRequests, form]);
+
   const createMutation = useMutation({
-    mutationFn: (data: CreateWellnessEventData) => wellnessEventsApi.createEvent(data),
+    mutationFn: async (data: CreateWellnessEventData) => {
+      const createdEvent = await wellnessEventsApi.createEvent(data);
+      // Automáticamente poner el evento en revisión después de crearlo
+      if (createdEvent.id) {
+        await wellnessEventsApi.review(Number(createdEvent.id));
+      }
+      return createdEvent;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
       toast.success("Evento creado", {
-        description: "El evento de bienestar ha sido creado exitosamente.",
+        description: "El evento de bienestar ha sido creado y puesto en revisión.",
       });
       onClose();
     },
@@ -176,8 +228,47 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateWellnessEventData) => wellnessEventsApi.updateEvent(event!.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
+    onSuccess: async (updatedEvent) => {
+      // Invalidar queries para refrescar los datos
+      await queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
+      
+      // Si hay una acción de revisión pendiente, ejecutarla después de actualizar
+      if (pendingReviewAction && event) {
+        try {
+          const action = pendingReviewAction;
+          const data = pendingReviewData;
+          
+          // Limpiar estados pendientes antes de ejecutar la acción
+          setPendingReviewAction(null);
+          setPendingReviewData(null);
+          
+          // Pequeño delay para asegurar que la actualización se complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          if (action === 'approve') {
+            await approveMutation.mutateAsync({ 
+              isVisible: data?.isVisible ?? true 
+            });
+          } else if (action === 'reject') {
+            await rejectMutation.mutateAsync({ 
+              reason: data?.reason 
+            });
+          }
+          
+          // No mostrar toast de actualización, ya que se mostrará el de aprobar/rechazar
+          return;
+        } catch (error) {
+          // Si falla la acción de revisión, mostrar toast de actualización
+          logger.error("Error al ejecutar acción de revisión después de actualizar", error);
+          toast.error("Error al ejecutar acción de revisión", {
+            description: "El evento se actualizó pero hubo un error al ejecutar la acción de revisión.",
+          });
+          onClose();
+          return;
+        }
+      }
+      
+      // Si no hay acción pendiente, mostrar toast de actualización normal
       toast.success("Evento actualizado", {
         description: "El evento de bienestar ha sido actualizado exitosamente.",
       });
@@ -215,6 +306,50 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     },
     onSettled: () => {
       logger.debug("Mutación de actualización de evento finalizada");
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ isVisible }: { isVisible: boolean }) => {
+      return wellnessEventsApi.approve(Number(event!.id), isVisible);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
+      toast.success("Evento aprobado", {
+        description: variables.isVisible 
+          ? "El evento ha sido actualizado, aprobado y publicado." 
+          : "El evento ha sido actualizado y aprobado pero permanece oculto."
+      });
+      setPendingReviewAction(null);
+      setPendingReviewData(null);
+      onClose();
+    },
+    onError: (error: any) => {
+      logger.error("Error al aprobar evento de bienestar", error?.message || error);
+      toast.error("Error al aprobar evento", {
+        description: error.response?.data?.message || "No se pudo aprobar el evento.",
+      });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ reason }: { reason?: string }) => {
+      return wellnessEventsApi.reject(Number(event!.id), reason);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
+      toast.success("Evento rechazado", {
+        description: "El evento ha sido actualizado y rechazado."
+      });
+      setPendingReviewAction(null);
+      setPendingReviewData(null);
+      onClose();
+    },
+    onError: (error: any) => {
+      logger.error("Error al rechazar evento de bienestar", error?.message || error);
+      toast.error("Error al rechazar evento", {
+        description: error.response?.data?.message || "No se pudo rechazar el evento.",
+      });
     },
   });
 
@@ -357,6 +492,44 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     }
   };
 
+  // Función auxiliar para verificar si hay cambios pendientes
+  const hasPendingChanges = (data: FormData): boolean => {
+    if (!event) return false;
+    
+    return (
+      images.length > 0 ||
+      listadoAsistencia !== null ||
+      eliminarListadoAsistencia ||
+      form.formState.isDirty ||
+      data.title !== event.title ||
+      data.date !== event.date ||
+      data.category !== event.category ||
+      data.location !== event.location ||
+      data.description !== (event.description || '') ||
+      data.attendees !== (event.attendees || undefined) ||
+      data.gift !== (event.gift || '') ||
+      data.provider !== (event.provider || 'ProSalud')
+    );
+  };
+
+  // Función para preparar datos de actualización
+  const prepareUpdateData = (data: FormData): UpdateWellnessEventData => {
+    return {
+      title: data.title,
+      date: data.date,
+      category: data.category,
+      location: data.location,
+      description: data.description !== undefined ? data.description : (event!.description !== undefined ? event!.description : undefined),
+      attendees: data.attendees !== undefined ? data.attendees : (event!.attendees !== undefined ? event!.attendees : undefined),
+      gift: data.gift !== undefined ? data.gift : (event!.gift !== undefined ? event!.gift : undefined),
+      provider: data.provider || event!.provider || "ProSalud",
+      is_visible: event!.isVisible !== undefined ? event!.isVisible : true,
+      images: images.length > 0 ? images : undefined,
+      attendance_list: listadoAsistencia || undefined,
+      eliminar_attendance_list: eliminarListadoAsistencia && !listadoAsistencia ? true : undefined,
+    };
+  };
+
   const onSubmit = (data: FormData) => {
     if (!event && images.length === 0) {
       toast.error("Imágenes requeridas", {
@@ -366,26 +539,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     }
 
     if (event) {
-      // Actualización de evento existente
-      // Asegurarse de que todos los campos requeridos se envíen siempre
-      // Usar los valores del formulario (que siempre tienen valores por defecto del evento)
-      const updateData: UpdateWellnessEventData = {
-        // Campos requeridos - SIEMPRE enviar (el formulario siempre tiene estos valores)
-        title: data.title,
-        date: data.date,
-        category: data.category,
-        location: data.location,
-        // Campos opcionales - enviar si están definidos
-        description: data.description !== undefined ? data.description : (event.description !== undefined ? event.description : undefined),
-        attendees: data.attendees !== undefined ? data.attendees : (event.attendees !== undefined ? event.attendees : undefined),
-        gift: data.gift !== undefined ? data.gift : (event.gift !== undefined ? event.gift : undefined),
-        provider: data.provider || event.provider || "ProSalud",
-        is_visible: event.isVisible !== undefined ? event.isVisible : true,
-        // Archivos - solo enviar si hay nuevos
-        images: images.length > 0 ? images : undefined,
-        attendance_list: listadoAsistencia || undefined,
-        eliminar_attendance_list: eliminarListadoAsistencia && !listadoAsistencia ? true : undefined,
-      };
+      const updateData = prepareUpdateData(data);
       
       logger.debug("Enviando datos para actualizar evento", {
         eventId: event.id,
@@ -418,27 +572,94 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         description: data.description,
         attendees: data.attendees,
         gift: data.gift,
-        is_visible: true, // Boolean, not string
+        is_visible: false, // Por defecto false hasta aprobación
         images,
         attendance_list: listadoAsistencia || undefined,
+        wellness_request_id: relateToRequest && selectedWellnessRequestId ? selectedWellnessRequestId : undefined,
       };
       createMutation.mutate(createData);
     }
+  };
+
+  // Función para manejar aprobación con guardado automático
+  const handleApprove = async () => {
+    if (!event) return;
+    
+    const isVisible = window.confirm('¿Deseas que el evento sea visible públicamente al aprobarlo?');
+    if (isVisible === null) return; // Usuario canceló
+    
+    // Siempre guardar los cambios primero (más seguro que intentar detectar cambios)
+    // Esto garantiza que cualquier edición se guarde antes de aprobar
+    const formData = form.getValues();
+    setPendingReviewAction('approve');
+    setPendingReviewData({ isVisible });
+    
+    // Validar el formulario antes de guardar
+    const isValid = await form.trigger();
+    if (!isValid) {
+      toast.error("Error de validación", {
+        description: "Por favor corrige los errores en el formulario antes de aprobar.",
+      });
+      setPendingReviewAction(null);
+      setPendingReviewData(null);
+      return;
+    }
+    
+    // Guardar cambios y luego aprobar (la aprobación se ejecutará en onSuccess de updateMutation)
+    const updateData = prepareUpdateData(formData);
+    updateMutation.mutate(updateData);
+  };
+
+  // Función para manejar rechazo con guardado automático
+  const handleReject = async () => {
+    if (!event) return;
+    
+    const reason = window.prompt('Razón del rechazo (opcional):');
+    // Si el usuario cancela el prompt, reason será null, pero queremos continuar con undefined
+    
+    // Siempre guardar los cambios primero (más seguro que intentar detectar cambios)
+    // Esto garantiza que cualquier edición se guarde antes de rechazar
+    const formData = form.getValues();
+    setPendingReviewAction('reject');
+    setPendingReviewData({ reason: reason || undefined });
+    
+    // Validar el formulario antes de guardar
+    const isValid = await form.trigger();
+    if (!isValid) {
+      toast.error("Error de validación", {
+        description: "Por favor corrige los errores en el formulario antes de rechazar.",
+      });
+      setPendingReviewAction(null);
+      setPendingReviewData(null);
+      return;
+    }
+    
+    // Guardar cambios y luego rechazar (el rechazo se ejecutará en onSuccess de updateMutation)
+    const updateData = prepareUpdateData(formData);
+    updateMutation.mutate(updateData);
   };
 
   const categories = ["Salud", "Bienestar", "Capacitación", "Recreación", "Cultura", "Deporte"];
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto p-0 bg-white">
+      <DialogContent className="!max-w-[1400px] w-[90vw] max-h-[95vh] overflow-y-auto p-0 bg-white">
         <div className="p-6 space-y-6">
           {/* Header */}
           <div className="space-y-2">
             <DialogTitle className="text-2xl font-bold text-slate-800">
-              {event ? "Editar Evento" : "Nuevo Evento"} de Bienestar
+              {event 
+                ? (event.reviewStatus === 'pending' || event.reviewStatus === 'in_review')
+                  ? "Revisar Evento"
+                  : "Editar Evento"
+                : "Nuevo Evento"} de Bienestar
             </DialogTitle>
             <DialogDescription className="text-slate-600">
-              {event ? "Modifica los detalles del evento" : "Crea un nuevo evento para bienestar"}
+              {event 
+                ? (event.reviewStatus === 'pending' || event.reviewStatus === 'in_review')
+                  ? "Revisa los detalles del evento y aprueba o rechaza su publicación"
+                  : "Modifica los detalles del evento"
+                : "Crea un nuevo evento para bienestar"}
             </DialogDescription>
           </div>
 
@@ -533,6 +754,93 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Relación con Solicitud de Bienestar - Solo para eventos nuevos */}
+              {!event && (
+                <Card className="border shadow-sm bg-white">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Link2 className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Relación con Solicitud</CardTitle>
+                        <CardDescription>Opcional: Relacionar con una solicitud de bienestar completada</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-slate-600" />
+                        <Label htmlFor="relate-to-request" className="text-sm font-medium cursor-pointer">
+                          Relacionar con solicitud de bienestar completada
+                        </Label>
+                      </div>
+                      <Switch
+                        id="relate-to-request"
+                        checked={relateToRequest}
+                        onCheckedChange={(checked) => {
+                          setRelateToRequest(checked);
+                          if (!checked) {
+                            setSelectedWellnessRequestId(null);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {relateToRequest && (
+                      <div className="space-y-2">
+                        <Label htmlFor="wellness-request-select" className="text-sm font-medium">
+                          Seleccionar Solicitud
+                        </Label>
+                        {isLoadingRequests ? (
+                          <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg">
+                            <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+                            <span className="text-sm text-slate-600">Cargando solicitudes...</span>
+                          </div>
+                        ) : completedRequests.length === 0 ? (
+                          <Alert className="bg-amber-50 border-amber-200">
+                            <AlertDescription className="text-sm text-amber-800">
+                              No hay solicitudes de bienestar completadas sin actividades relacionadas disponibles. 
+                              Puedes crear el evento sin relacionarlo con una solicitud.
+                            </AlertDescription>
+                          </Alert>
+                        ) : (
+                          <Select
+                            value={selectedWellnessRequestId?.toString() || ''}
+                            onValueChange={(value) => setSelectedWellnessRequestId(parseInt(value))}
+                          >
+                            <SelectTrigger id="wellness-request-select" className="h-10">
+                              <SelectValue placeholder="Selecciona una solicitud completada" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {completedRequests.map((request) => (
+                                <SelectItem key={request.id} value={request.id.toString()}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{request.nombreActividad}</span>
+                                    <span className="text-xs text-slate-500">
+                                      {request.centroCostos} • {new Date(request.fechaPropuesta).toLocaleDateString('es-ES')}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {selectedWellnessRequestId && (
+                          <Alert className="bg-green-50 border-green-200">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-sm text-green-800">
+                              Los campos del formulario se prellenarán automáticamente con la información de la solicitud seleccionada.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Detalles Adicionales */}
               <Card className="border shadow-sm bg-white">
@@ -864,9 +1172,39 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
               {/* Botones de acción */}
               <div className="flex flex-col gap-3">
+                {/* Botones de revisión - Solo para eventos en revisión o pendientes y con permiso */}
+                {event && can('wellness_activity.publish') && (event.reviewStatus === 'pending' || event.reviewStatus === 'in_review') && (
+                  <div className="space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <Label className="text-sm font-semibold text-blue-900">Acciones de Revisión</Label>
+                    <p className="text-xs text-blue-700 mb-2">
+                      Los cambios se guardarán automáticamente al aprobar o rechazar.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleApprove}
+                        disabled={approveMutation.isPending || updateMutation.isPending}
+                        className="bg-green-600 text-white border-green-600 hover:bg-green-700 hover:text-white"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        {updateMutation.isPending ? "Guardando..." : approveMutation.isPending ? "Aprobando..." : "Aprobar"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleReject}
+                        disabled={rejectMutation.isPending || updateMutation.isPending}
+                        className="bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        {updateMutation.isPending ? "Guardando..." : rejectMutation.isPending ? "Rechazando..." : "Rechazar"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending || approveMutation.isPending || rejectMutation.isPending}
                   className="h-12 bg-primary-prosalud hover:bg-primary-prosalud-dark"
                 >
                   {createMutation.isPending || updateMutation.isPending
