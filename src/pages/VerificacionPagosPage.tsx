@@ -27,6 +27,21 @@ import ConsultaTramitesRapidosCard from '@/components/verificacion-pagos/Consult
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
 
+// Subtipos válidos para verificación de pagos
+// Estos valores deben coincidir exactamente con los valores del backend (case-sensitive)
+const VERIFICACION_PAGOS_SUBTIPOS = [
+  { value: 'COMPENSACIÓN. FINAL (LIQUIDACIÓN)', label: 'Compensación Final' },
+  { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
+  { value: 'COMPENSACIÓN SEMESTRAL', label: 'Compensación Semestral' },
+  { value: 'COMPENSACIÓN ANUAL DIFERIDA Y/O DESCANSO', label: 'Compensación Anual Diferida' },
+  { value: 'COMPENSACIÓN POR DESCANSO', label: 'Compensación por Descanso' },
+  { value: 'DESCUENTOS SEGURIDAD SOCIAL', label: 'Descuentos Seguridad Social' },
+  { value: 'DUPLICADO COLILLAS', label: 'Duplicado Colillas' },
+  { value: 'VIATICOS', label: 'Viáticos' },
+  { value: 'Ceiisas', label: 'Ceiisas' },
+  { value: 'INCAPACIDADES', label: 'Incapacidades' },
+];
+
 const formSchema = z.object({
   mesAnoNovedad: z.string().min(1, "Este campo es requerido."),
   solicitudRelacionadaCon: z.string().min(1, "Este campo es requerido."),
@@ -206,13 +221,11 @@ const VerificacionPagosPageContent: React.FC = () => {
                             <SelectValue placeholder="Selecciona el tipo" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Compensación Final">Compensación Final</SelectItem>
-                            <SelectItem value="Compensación Anual Diferida">Compensación Anual Diferida</SelectItem>
-                            <SelectItem value="Compensación por Descanso">Compensación por Descanso</SelectItem>
-                            <SelectItem value="Descuentos Seguridad Social">Descuentos Seguridad Social</SelectItem>
-                            <SelectItem value="Duplicado de Colillas">Duplicado de Colillas</SelectItem>
-                            <SelectItem value="Viático">Viático</SelectItem>
-                            <SelectItem value="Ceiisas">Ceiisas</SelectItem>
+                            {VERIFICACION_PAGOS_SUBTIPOS.map((subtype) => (
+                              <SelectItem key={subtype.value} value={subtype.value}>
+                                {subtype.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </FormControl>
