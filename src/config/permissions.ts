@@ -171,8 +171,8 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
     },
   },
   documentSigning: {
-    name: 'Firma de Documentos',
-    href: '/admin/document-signing',
+    name: 'Firma de Convenios',
+    href: '/admin/firma-convenios',
     icon: FileSignature,
     permissions: {
       view: ['document_signing.view'],

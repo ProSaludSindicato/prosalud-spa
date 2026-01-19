@@ -253,7 +253,7 @@ const AppRoutes = () => {
             />
             
             <Route 
-              path="/admin/document-signing" 
+              path="/admin/firma-convenios" 
               element={
                 <ProtectedRoute requiredPermissions={['document_signing.view', 'document_signing.manage']}>
                   <AdminDocumentSigningPage />
