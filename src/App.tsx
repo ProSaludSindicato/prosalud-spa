@@ -34,6 +34,7 @@ import AdminChatbotPage from '@/pages/AdminChatbotPage';
 import AdminVotacionesPage from '@/pages/AdminVotacionesPage';
 import AdminSstPage from '@/pages/AdminSstPage';
 import AdminEncuestasSociodemograficasPage from '@/pages/AdminEncuestasSociodemograficasPage';
+import AdminDocumentSigningPage from '@/pages/AdminDocumentSigningPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -51,7 +52,6 @@ import SolicitudRetiroSindicalPage from '@/pages/SolicitudRetiroSindicalPage';
 import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
-import FirmaConvenioPage from '@/pages/FirmaConvenioPage';
 
 // Legal Pages
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
@@ -116,7 +116,6 @@ const AppRoutes = () => {
             <Route path="/servicios/retiro-sindical" element={<SolicitudRetiroSindicalPage />} />
             <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
             <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
-            <Route path="/servicios/firma-convenio" element={<FirmaConvenioPage />} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
@@ -249,6 +248,15 @@ const AppRoutes = () => {
               element={
                 <ProtectedRoute requiredPermissions={['socio_demographic_surveys.view']}>
                   <AdminEncuestasSociodemograficasPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/admin/document-signing" 
+              element={
+                <ProtectedRoute requiredPermissions={['document_signing.view', 'document_signing.manage']}>
+                  <AdminDocumentSigningPage />
                 </ProtectedRoute>
               } 
             />

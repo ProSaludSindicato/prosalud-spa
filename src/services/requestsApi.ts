@@ -52,6 +52,7 @@ export interface ApiRequest {
   phone_number: string;
   payload: Record<string, any>;
   status: "PENDING" | "IN_REVIEW" | "REJECTED" | "COMPLETED";
+  rejection_reason?: string | null;
   created_at: string;
   formatted_created_at: string;
   processed_at: string | null;
@@ -170,6 +171,7 @@ export const requestsApiService = {
   async updateRequestStatus(
     id: string,
     status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED",
+    rejection_reason?: string | null,
   ): Promise<ApiRequest> {
     try {
       // Validar que el ID es un string válido (10 dígitos)
@@ -177,9 +179,16 @@ export const requestsApiService = {
         throw new Error('ID inválido - debe ser un string de 10 dígitos');
       }
 
-      const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/api/requests/${id}/status`, {
+      const requestBody: { status: string; rejection_reason?: string } = {
         status,
-      });
+      };
+
+      // Solo incluir rejection_reason si el estado es REJECTED
+      if (status === "REJECTED" && rejection_reason) {
+        requestBody.rejection_reason = rejection_reason;
+      }
+
+      const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/api/requests/${id}/status`, requestBody);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Error al actualizar el estado");
@@ -199,6 +208,7 @@ export const requestsApiService = {
       status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED";
       email_subject: string;
       email_body: string;
+      rejection_reason?: string | null;
       attachments?: FileList;
       actividades?: string[];
     }
@@ -215,6 +225,11 @@ export const requestsApiService = {
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
+        
+        // Agregar rejection_reason si el estado es REJECTED
+        if (data.status === "REJECTED" && data.rejection_reason) {
+          formData.append('rejection_reason', data.rejection_reason);
+        }
         
         // Agregar archivos como attachments[0], attachments[1], etc.
         if (data.attachments && data.attachments.length > 0) {
@@ -267,6 +282,11 @@ export const requestsApiService = {
           formData.append('email_subject', data.email_subject);
           formData.append('email_body', data.email_body);
           
+          // Agregar rejection_reason si el estado es REJECTED
+          if (data.status === "REJECTED" && data.rejection_reason) {
+            formData.append('rejection_reason', data.rejection_reason);
+          }
+          
           // Agregar actividades
           if (data.actividades && data.actividades.length > 0) {
             data.actividades.forEach((actividad, index) => {
@@ -305,13 +325,25 @@ export const requestsApiService = {
         }
         
         // Sin archivos ni actividades, usar JSON
+        const requestBody: {
+          status: string;
+          email_subject: string;
+          email_body: string;
+          rejection_reason?: string;
+        } = {
+          status: data.status,
+          email_subject: data.email_subject,
+          email_body: data.email_body,
+        };
+
+        // Solo incluir rejection_reason si el estado es REJECTED
+        if (data.status === "REJECTED" && data.rejection_reason) {
+          requestBody.rejection_reason = data.rejection_reason;
+        }
+
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond`,
-          {
-            status: data.status,
-            email_subject: data.email_subject,
-            email_body: data.email_body,
-          },
+          requestBody,
           {
             timeout: 120000, // 120 segundos - proceso puede ser largo al generar documentos y enviar emails
           }
@@ -357,6 +389,7 @@ export const requestsApiService = {
       status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED";
       email_subject: string;
       email_body: string;
+      rejection_reason?: string | null;
       t_basicos?: number;
       t_auxilios?: number;
       attachments?: FileList;
@@ -382,6 +415,11 @@ export const requestsApiService = {
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
+        
+        // Agregar rejection_reason si el estado es REJECTED
+        if (data.status === "REJECTED" && data.rejection_reason) {
+          formData.append('rejection_reason', data.rejection_reason);
+        }
         
         // Solo agregar t_basicos y t_auxilios si están definidos
         if (data.t_basicos !== undefined) {
@@ -430,6 +468,11 @@ export const requestsApiService = {
           email_subject: data.email_subject,
           email_body: data.email_body,
         };
+        
+        // Solo incluir rejection_reason si el estado es REJECTED
+        if (data.status === "REJECTED" && data.rejection_reason) {
+          requestBody.rejection_reason = data.rejection_reason;
+        }
         
         // Solo incluir t_basicos y t_auxilios si están definidos
         if (data.t_basicos !== undefined) {

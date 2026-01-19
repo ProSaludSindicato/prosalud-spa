@@ -5,7 +5,7 @@
 
 import {
   Users, GraduationCap, BarChart3, Settings, Heart,
-  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText
+  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText, FileSignature
 } from 'lucide-react';
 
 export interface ModulePermissions {
@@ -168,6 +168,16 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
         audit: ['votes.audit.view'],
         manage: ['votes.manage'],
       },
+    },
+  },
+  documentSigning: {
+    name: 'Firma de Documentos',
+    href: '/admin/document-signing',
+    icon: FileSignature,
+    permissions: {
+      view: ['document_signing.view'],
+      create: ['document_signing.manage'],
+      edit: ['document_signing.manage'],
     },
   },
   socioDemographicSurveys: {

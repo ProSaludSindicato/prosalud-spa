@@ -43,6 +43,7 @@ export interface Request {
   phone_number: string;
   payload: Record<string, any>;
   status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
+  rejection_reason?: string | null;
   created_at: string;
   processed_at?: string;
   resolved_at?: string;

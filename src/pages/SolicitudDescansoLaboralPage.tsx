@@ -43,12 +43,12 @@ const formSchema = z.object({
     ),
   fechaInicioDescanso: z.string().min(1, "Este campo es requerido.").refine((val) => {
     const date = new Date(val);
-    return !isNaN(date.getTime()) && date >= new Date(new Date().setHours(0, 0, 0, 0));
-  }, "La fecha de inicio debe ser hoy o posterior."),
+    return !isNaN(date.getTime());
+  }, "La fecha de inicio no es válida."),
   fechaFinalizacionDescanso: z.string().min(1, "Este campo es requerido.").refine((val) => {
     const date = new Date(val);
-    return !isNaN(date.getTime()) && date >= new Date(new Date().setHours(0, 0, 0, 0));
-  }, "La fecha de finalización debe ser hoy o posterior."),
+    return !isNaN(date.getTime());
+  }, "La fecha de finalización no es válida."),
 
   anexoDescanso: z.any().refine(files => {
     return files && files.length > 0;

@@ -88,6 +88,28 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
 ];
 
+// Opciones predefinidas para razones de rechazo
+const REJECTION_REASON_OPTIONS = [
+  { value: 'no_vb_coordinadora', label: 'No cuenta con el V°B de la coordinadora' },
+  { value: 'sin_evidencias', label: 'No anexa evidencias de la solicitud' },
+  { value: 'formato_archivos', label: 'Los archivos adjuntos no cumplen con el formato de ProSalud' },
+  { value: 'solicitud_repetida', label: 'Solicitud repetida' },
+  { value: 'sin_capacidad_endeudamiento', label: 'No tiene capacidad de endeudamiento' },
+  { value: 'anexos_no_validos', label: 'Los anexos adjuntos no son válidos para la solicitud' },
+  { value: 'otro', label: 'Otro' },
+];
+
+// Helper para transformar el código de razón de rechazo a su etiqueta legible
+const getRejectionReasonLabel = (rejectionReason: string | null | undefined): string => {
+  if (!rejectionReason) return '';
+  
+  // Buscar si el valor es uno de los códigos predefinidos
+  const option = REJECTION_REASON_OPTIONS.find(opt => opt.value === rejectionReason);
+  
+  // Si se encuentra, devolver la etiqueta; si no, devolver el valor original (texto libre de "otro")
+  return option ? option.label : rejectionReason;
+};
+
 // Map backend request type to frontend request type
 const mapBackendRequestTypeToFrontend = (backendType: string): Request['request_type'] => {
   const typeMap: Record<string, Request['request_type']> = {
@@ -199,6 +221,8 @@ const responseFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
+  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'otro']).optional(),
+  rejection_reason_other: z.string().max(120, "La razón de rechazo no puede exceder 120 caracteres").optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -232,6 +256,31 @@ const responseFormSchema = z.object({
   }, {
     message: `Archivos comprimidos (ZIP, RAR): máximo 1 archivo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB (no se pueden mezclar con otros archivos). Otros archivos: máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
   }),
+}).refine((data) => {
+  // Si el estado es "rejected", rejection_reason es obligatorio
+  if (data.newStatus === "rejected") {
+    if (!data.rejection_reason) {
+      return false;
+    }
+    // Si es "otro", rejection_reason_other es obligatorio
+    if (data.rejection_reason === "otro") {
+      return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
+    }
+    return true;
+  }
+  return true;
+}, {
+  message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
+  path: ["rejection_reason"],
+}).refine((data) => {
+  // Si rejection_reason es "otro", rejection_reason_other es obligatorio
+  if (data.rejection_reason === "otro" && data.newStatus === "rejected") {
+    return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe especificar la razón de rechazo",
+  path: ["rejection_reason_other"],
 });
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
@@ -243,6 +292,8 @@ const responseWithCompensacionesFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
+  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'otro']).optional(),
+  rejection_reason_other: z.string().max(120, "La razón de rechazo no puede exceder 120 caracteres").optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.union([
@@ -293,6 +344,31 @@ const responseWithCompensacionesFormSchema = z.object({
   }, {
     message: `Archivos comprimidos (ZIP, RAR): máximo 1 archivo de ${MAX_COMPRESSED_FILE_SIZE / (1024 * 1024)}MB (no se pueden mezclar con otros archivos). Otros archivos: máximo ${MAX_FILES} archivos de ${MAX_FILE_SIZE / (1024 * 1024)}MB cada uno.`,
   }),
+}).refine((data) => {
+  // Si el estado es "rejected", rejection_reason es obligatorio
+  if (data.newStatus === "rejected") {
+    if (!data.rejection_reason) {
+      return false;
+    }
+    // Si es "otro", rejection_reason_other es obligatorio
+    if (data.rejection_reason === "otro") {
+      return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
+    }
+    return true;
+  }
+  return true;
+}, {
+  message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
+  path: ["rejection_reason"],
+}).refine((data) => {
+  // Si rejection_reason es "otro", rejection_reason_other es obligatorio
+  if (data.rejection_reason === "otro" && data.newStatus === "rejected") {
+    return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe especificar la razón de rechazo",
+  path: ["rejection_reason_other"],
 });
 
 type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
@@ -577,6 +653,8 @@ const AdminSolicitudesPage: React.FC = () => {
       newStatus: "in_progress",
       emailSubject: "",
       emailBody: "",
+      rejection_reason: undefined,
+      rejection_reason_other: undefined,
       actividades: [],
       attachments: undefined,
     },
@@ -589,6 +667,8 @@ const AdminSolicitudesPage: React.FC = () => {
       newStatus: "in_progress",
       emailSubject: "",
       emailBody: "",
+      rejection_reason: undefined,
+      rejection_reason_other: undefined,
       t_basicos: undefined,
       t_auxilios: undefined,
       attachments: undefined,
@@ -1245,7 +1325,8 @@ const AdminSolicitudesPage: React.FC = () => {
       }
     }
 
-    if (requiresActividadesForm) {
+    // Solo validar actividades si el estado NO es "rejected" (no se genera certificado si se rechaza)
+    if (requiresActividadesForm && data.newStatus !== 'rejected') {
       const actividadesValidas = data.actividades?.filter(a => a.trim() !== '') || [];
       if (actividadesValidas.length === 0) {
         responseForm.setError('actividades', { type: 'custom', message: 'Debe agregar al menos una actividad.' });
@@ -1271,12 +1352,19 @@ const AdminSolicitudesPage: React.FC = () => {
     try {
       // Enviar respuesta usando la API del backend
       // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
+      // Si es "otro", enviar el texto de rejection_reason_other, sino enviar el valor del select
+      const rejectionReasonToSend = finalStatus === 'rejected' 
+        ? (data.rejection_reason === 'otro' ? data.rejection_reason_other : data.rejection_reason)
+        : undefined;
+      
       const updatedRequest = await requestsService.sendResponse(solicitudId, {
         newStatus: finalStatus,
         emailSubject: data.emailSubject,
         emailBody: data.emailBody,
+        rejection_reason: rejectionReasonToSend,
         attachments: data.attachments,
-        actividades: requiresActividadesForm ? (data.actividades || []) : undefined,
+        // No enviar actividades si el estado es "rejected" (no se genera certificado)
+        actividades: (requiresActividadesForm && finalStatus !== 'rejected') ? (data.actividades || []) : undefined,
       });
 
       // Resetear estado
@@ -1483,12 +1571,19 @@ const AdminSolicitudesPage: React.FC = () => {
     const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
     try {
       // Enviar respuesta con compensaciones usando la API del backend
+      // Si es "otro", enviar el texto de rejection_reason_other, sino enviar el valor del select
+      const rejectionReasonToSend = data.newStatus === 'rejected'
+        ? (data.rejection_reason === 'otro' ? data.rejection_reason_other : data.rejection_reason)
+        : undefined;
+      
       const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudId, {
         newStatus: data.newStatus,
         emailSubject: data.emailSubject,
         emailBody: data.emailBody,
-        t_basicos: data.t_basicos,
-        t_auxilios: data.t_auxilios,
+        rejection_reason: rejectionReasonToSend,
+        // No enviar compensaciones si el estado es "rejected" (no se genera certificado)
+        t_basicos: data.newStatus !== 'rejected' ? data.t_basicos : undefined,
+        t_auxilios: data.newStatus !== 'rejected' ? data.t_auxilios : undefined,
         attachments: data.attachments,
       });
 
@@ -1498,14 +1593,20 @@ const AdminSolicitudesPage: React.FC = () => {
       // Verificar si se completó una solicitud de actualización de datos personales
       const isActualizacionCompletada = solicitudToRespond?.request_type === 'actualizar-datos-personales' && data.newStatus === 'resolved';
 
-      // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
-      const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
-
       // Mostrar toast de éxito ANTES de cerrar el modal para que sea visible
-      toast.success("Certificado generado y respuesta enviada exitosamente", {
-        description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
-        duration: 5000,
-      });
+      if (data.newStatus === 'rejected') {
+        toast.success("Respuesta enviada exitosamente", {
+          description: `La respuesta a la solicitud #${solicitudId} ha sido enviada exitosamente al afiliado.`,
+          duration: 5000,
+        });
+      } else {
+        // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
+        const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
+        toast.success("Certificado generado y respuesta enviada exitosamente", {
+          description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
+          duration: 5000,
+        });
+      }
 
       // Cerrar el modal después de un pequeño delay para que el usuario vea el toast
       setTimeout(() => {
@@ -2362,19 +2463,27 @@ const AdminSolicitudesPage: React.FC = () => {
                                   </p>
                                 )}
                                 {solicitud.status === "rejected" && solicitud.resolved_at && (
-                                  <p className="text-xs text-red-600 font-medium mt-2">
-                                    ✗ Rechazado:{" "}
-                                    {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
-                                    ,{" "}
-                                    {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </p>
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs text-red-600 font-medium">
+                                      ✗ Rechazado:{" "}
+                                      {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                      ,{" "}
+                                      {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </p>
+                                    {solicitud.rejection_reason && (
+                                      <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mt-1">
+                                        <p className="font-medium mb-1">Razón de rechazo:</p>
+                                        <p className="text-gray-700 whitespace-pre-wrap break-words">{getRejectionReasonLabel(solicitud.rejection_reason)}</p>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -2666,6 +2775,16 @@ const AdminSolicitudesPage: React.FC = () => {
                               </Badge>
                             </div>
                           </div>
+                          {selectedSolicitud.status === "rejected" && selectedSolicitud.rejection_reason && (
+                            <div className="space-y-2 md:col-span-2">
+                              <label className="text-sm font-medium text-gray-700">Razón de Rechazo</label>
+                              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                <p className="text-gray-900 text-sm whitespace-pre-wrap break-words">
+                                  {getRejectionReasonLabel(selectedSolicitud.rejection_reason)}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                           {requiresManualValidation(selectedSolicitud) && (
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-gray-700">Estado de Validación</label>
@@ -3366,11 +3485,12 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Card>
                     )}
 
-                    {/* Campos de compensaciones */}
-                    <div className="border-t border-gray-200 pt-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Campos de compensaciones - Solo visible cuando el estado NO es "rejected" */}
+                    {responseWithCompensacionesForm.watch('newStatus') !== 'rejected' && (
+                      <div className="border-t border-gray-200 pt-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Total Basicos */}
                         <FormField
                           control={responseWithCompensacionesForm.control}
@@ -3451,7 +3571,8 @@ const AdminSolicitudesPage: React.FC = () => {
                           Total Ingresos = Total Basicos + Total Auxilios
                         </p>
                       </div>
-                    </div>
+                      </div>
+                    )}
 
                     {/* Nuevo Estado */}
                     <FormField
@@ -3515,6 +3636,76 @@ const AdminSolicitudesPage: React.FC = () => {
                       );
                     }}
                   />
+
+                    {/* Razón de Rechazo - Solo visible cuando el estado es "rejected" */}
+                    {responseWithCompensacionesForm.watch('newStatus') === 'rejected' && (
+                      <div className="space-y-4">
+                        <FormField
+                          control={responseWithCompensacionesForm.control}
+                          name="rejection_reason"
+                          render={({ field }) => {
+                            return (
+                              <FormItem>
+                                <FormLabel>Razón de Rechazo *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccione la razón de rechazo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {REJECTION_REASON_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>
+                                  La razón de rechazo es obligatoria cuando se rechaza una solicitud.
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
+                        />
+                        {/* Campo para "Otro" - Solo visible cuando se selecciona "otro" */}
+                        {responseWithCompensacionesForm.watch('rejection_reason') === 'otro' && (
+                          <FormField
+                            control={responseWithCompensacionesForm.control}
+                            name="rejection_reason_other"
+                            render={({ field }) => {
+                              const currentLength = field.value?.length || 0;
+                              const maxLength = 120;
+                              const isNearLimit = currentLength > maxLength * 0.8;
+                              const isOverLimit = currentLength > maxLength;
+                              
+                              return (
+                                <FormItem>
+                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Indique la razón de rechazo..."
+                                      {...field}
+                                      maxLength={maxLength}
+                                    />
+                                  </FormControl>
+                                  <div className="flex items-center justify-between">
+                                    <FormDescription>
+                                      Especifique la razón de rechazo. Máximo 120 caracteres.
+                                    </FormDescription>
+                                    <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                      {currentLength}/{maxLength}
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
 
                     {/* Asunto del correo */}
                     <FormField
@@ -4178,10 +4369,80 @@ const AdminSolicitudesPage: React.FC = () => {
                     }}
                   />
 
+                    {/* Razón de Rechazo - Solo visible cuando el estado es "rejected" */}
+                    {responseForm.watch('newStatus') === 'rejected' && (
+                      <div className="space-y-4">
+                        <FormField
+                          control={responseForm.control}
+                          name="rejection_reason"
+                          render={({ field }) => {
+                            return (
+                              <FormItem>
+                                <FormLabel>Razón de Rechazo *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccione la razón de rechazo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {REJECTION_REASON_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>
+                                  La razón de rechazo es obligatoria cuando se rechaza una solicitud.
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
+                        />
+                        {/* Campo para "Otro" - Solo visible cuando se selecciona "otro" */}
+                        {responseForm.watch('rejection_reason') === 'otro' && (
+                          <FormField
+                            control={responseForm.control}
+                            name="rejection_reason_other"
+                            render={({ field }) => {
+                              const currentLength = field.value?.length || 0;
+                              const maxLength = 120;
+                              const isNearLimit = currentLength > maxLength * 0.8;
+                              const isOverLimit = currentLength > maxLength;
+                              
+                              return (
+                                <FormItem>
+                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Indique la razón de rechazo..."
+                                      {...field}
+                                      maxLength={maxLength}
+                                    />
+                                  </FormControl>
+                                  <div className="flex items-center justify-between">
+                                    <FormDescription>
+                                      Especifique la razón de rechazo. Máximo 120 caracteres.
+                                    </FormDescription>
+                                    <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                      {currentLength}/{maxLength}
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+
                     {/* Asunto del correo */}
                     <FormField
                       control={responseForm.control}
-                      name="emailSubject"
+                    name="emailSubject"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
                       const maxLength = 100;
@@ -4403,7 +4664,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Alert>
                     )}
 
-                    {requiresActividadesForm && (
+                    {requiresActividadesForm && responseForm.watch('newStatus') !== 'rejected' && (
                       <FormField
                         control={responseForm.control}
                         name="actividades"

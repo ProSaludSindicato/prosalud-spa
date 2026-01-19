@@ -54,44 +54,36 @@ const InformacionDescansoSection = <TFieldValues extends FieldValues>({
         <FormField
           control={control}
           name={"fechaInicioDescanso" as FieldPath<TFieldValues>}
-          render={({ field }) => {
-            const today = new Date().toISOString().split('T')[0];
-            return (
-              <FormItem>
-                <FormLabel>Fecha de inicio descanso *</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    {...field}
-                    min={today}
-                    className="w-full"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Fecha de inicio descanso *</FormLabel>
+              <FormControl>
+                <Input
+                  type="date"
+                  {...field}
+                  className="w-full"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
         <FormField
           control={control}
           name={"fechaFinalizacionDescanso" as FieldPath<TFieldValues>}
-          render={({ field }) => {
-            const today = new Date().toISOString().split('T')[0];
-            return (
-              <FormItem>
-                <FormLabel>Fecha de finalización descanso *</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    {...field}
-                    min={today}
-                    className="w-full"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Fecha de finalización descanso *</FormLabel>
+              <FormControl>
+                <Input
+                  type="date"
+                  {...field}
+                  className="w-full"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
       </div>
     </section>
