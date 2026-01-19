@@ -96,7 +96,9 @@ const REJECTION_REASON_OPTIONS = [
   { value: 'solicitud_repetida', label: 'Solicitud repetida' },
   { value: 'sin_capacidad_endeudamiento', label: 'No tiene capacidad de endeudamiento' },
   { value: 'anexos_no_validos', label: 'Los anexos adjuntos no son válidos para la solicitud' },
-  { value: 'otro', label: 'Otro' },
+  { value: 'sin_tiempo_provisionado', label: 'No cuenta con el tiempo provisionado' },
+  { value: 'compensacion_pignorada_libranza', label: 'Compensación pignorada por libranza' },
+  { value: 'no_aplica_otros_certificado', label: 'No aplica la opción de "Otros" para el certificado de convenio' },
 ];
 
 // Helper para transformar el código de razón de rechazo a su etiqueta legible
@@ -221,8 +223,7 @@ const responseFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
-  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'otro']).optional(),
-  rejection_reason_other: z.string().max(120, "La razón de rechazo no puede exceder 120 caracteres").optional(),
+  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'sin_tiempo_provisionado', 'compensacion_pignorada_libranza', 'no_aplica_otros_certificado']).optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -259,28 +260,12 @@ const responseFormSchema = z.object({
 }).refine((data) => {
   // Si el estado es "rejected", rejection_reason es obligatorio
   if (data.newStatus === "rejected") {
-    if (!data.rejection_reason) {
-      return false;
-    }
-    // Si es "otro", rejection_reason_other es obligatorio
-    if (data.rejection_reason === "otro") {
-      return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
-    }
-    return true;
+    return data.rejection_reason && data.rejection_reason.trim().length > 0;
   }
   return true;
 }, {
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
-}).refine((data) => {
-  // Si rejection_reason es "otro", rejection_reason_other es obligatorio
-  if (data.rejection_reason === "otro" && data.newStatus === "rejected") {
-    return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
-  }
-  return true;
-}, {
-  message: "Debe especificar la razón de rechazo",
-  path: ["rejection_reason_other"],
 });
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
@@ -292,8 +277,7 @@ const responseWithCompensacionesFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
-  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'otro']).optional(),
-  rejection_reason_other: z.string().max(120, "La razón de rechazo no puede exceder 120 caracteres").optional(),
+  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'sin_tiempo_provisionado', 'compensacion_pignorada_libranza', 'no_aplica_otros_certificado']).optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.union([
@@ -347,28 +331,12 @@ const responseWithCompensacionesFormSchema = z.object({
 }).refine((data) => {
   // Si el estado es "rejected", rejection_reason es obligatorio
   if (data.newStatus === "rejected") {
-    if (!data.rejection_reason) {
-      return false;
-    }
-    // Si es "otro", rejection_reason_other es obligatorio
-    if (data.rejection_reason === "otro") {
-      return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
-    }
-    return true;
+    return data.rejection_reason && data.rejection_reason.trim().length > 0;
   }
   return true;
 }, {
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
-}).refine((data) => {
-  // Si rejection_reason es "otro", rejection_reason_other es obligatorio
-  if (data.rejection_reason === "otro" && data.newStatus === "rejected") {
-    return data.rejection_reason_other && data.rejection_reason_other.trim().length > 0;
-  }
-  return true;
-}, {
-  message: "Debe especificar la razón de rechazo",
-  path: ["rejection_reason_other"],
 });
 
 type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
@@ -654,7 +622,6 @@ const AdminSolicitudesPage: React.FC = () => {
       emailSubject: "",
       emailBody: "",
       rejection_reason: undefined,
-      rejection_reason_other: undefined,
       actividades: [],
       attachments: undefined,
     },
@@ -668,7 +635,6 @@ const AdminSolicitudesPage: React.FC = () => {
       emailSubject: "",
       emailBody: "",
       rejection_reason: undefined,
-      rejection_reason_other: undefined,
       t_basicos: undefined,
       t_auxilios: undefined,
       attachments: undefined,
@@ -725,6 +691,12 @@ const AdminSolicitudesPage: React.FC = () => {
   // Observar el campo newStatus del formulario de respuesta
   const watchedNewStatus = useWatch({
     control: responseForm.control,
+    name: 'newStatus',
+  });
+
+  // Observar el campo newStatus del formulario de compensaciones
+  const watchedNewStatusCompensaciones = useWatch({
+    control: responseWithCompensacionesForm.control,
     name: 'newStatus',
   });
 
@@ -806,6 +778,28 @@ const AdminSolicitudesPage: React.FC = () => {
       return () => clearTimeout(timeoutId);
     }
   }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
+
+  // Efecto para limpiar emailBody cuando el estado cambia a "rejected" en certificados de convenio con compensaciones
+  useEffect(() => {
+    // Solo aplicar si es el formulario de compensaciones y el diálogo está abierto
+    if (!responseDialogOpen || !solicitudToRespond || !useCompensacionesForm) return;
+    
+    const isCertificadoConvenio = solicitudToRespond.request_type === 'certificado-convenio';
+    if (!isCertificadoConvenio) return;
+    
+    // Si el estado cambia a "rejected", limpiar el emailBody
+    if (watchedNewStatusCompensaciones === 'rejected') {
+      const currentEmailBody = responseWithCompensacionesForm.getValues('emailBody');
+      // Solo limpiar si tiene contenido prediligenciado (no si el usuario ya escribió algo)
+      if (currentEmailBody && (
+        currentEmailBody.includes('Adjunto encontrará su certificado') ||
+        currentEmailBody.includes('certificado de convenio') ||
+        currentEmailBody.includes('Fecha de generación')
+      )) {
+        responseWithCompensacionesForm.setValue('emailBody', '', { shouldValidate: false });
+      }
+    }
+  }, [watchedNewStatusCompensaciones, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseWithCompensacionesForm]);
 
   // Función para redirigir el subtipo de una solicitud
   const handleRedirectSubtype = async () => {
@@ -1141,23 +1135,32 @@ const AdminSolicitudesPage: React.FC = () => {
 
       // Generar asunto y cuerpo según el tipo
       let emailSubject = `Certificado de Convenio - Solicitud #${solicitud.id}`;
-      let emailBody = "Adjunto encontrará su certificado de convenio en formato PDF.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+      let emailBody = "";
 
-      if (paraSubsidioDesempleo) {
-        emailSubject = `Certificado de Convenio - Subsidio de Desempleo - Solicitud #${solicitud.id}`;
-        emailBody = "Adjunto encontrará su certificado de convenio para subsidio de desempleo.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
-      } else if (paraSubsidioVivienda) {
-        emailSubject = `Certificado de Convenio - Subsidio de Vivienda - Solicitud #${solicitud.id}`;
-        emailBody = "Adjunto encontrará su certificado de convenio para subsidio de vivienda con los valores de compensación.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+      // Solo prediligenciar el mensaje si el estado es "resolved" (completado)
+      if (defaultStatus === 'resolved') {
+        emailBody = "Adjunto encontrará su certificado de convenio en formato PDF.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+
+        if (paraSubsidioDesempleo) {
+          emailSubject = `Certificado de Convenio - Subsidio de Desempleo - Solicitud #${solicitud.id}`;
+          emailBody = "Adjunto encontrará su certificado de convenio para subsidio de desempleo.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+        } else if (paraSubsidioVivienda) {
+          emailSubject = `Certificado de Convenio - Subsidio de Vivienda - Solicitud #${solicitud.id}`;
+          emailBody = "Adjunto encontrará su certificado de convenio para subsidio de vivienda con los valores de compensación.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
+        }
+
+        // Agregar fecha de generación solo si se completó
+        const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
+      } else if (defaultStatus === 'rejected') {
+        // Si es rechazado, usar un asunto genérico y dejar el cuerpo vacío
+        emailSubject = `Certificado de Convenio - Solicitud #${solicitud.id}`;
+        emailBody = "";
       }
-
-      // Agregar fecha de generación
-      const fechaGeneracion = new Date().toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-      emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
 
       // Usar formulario de compensaciones
       responseWithCompensacionesForm.reset({
@@ -1192,8 +1195,8 @@ const AdminSolicitudesPage: React.FC = () => {
         emailBody = RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY;
       }
       
-      // Si es dirigido a fondo de pensiones, prediligenciar mensaje
-      if (isFondoPensiones) {
+      // Si es dirigido a fondo de pensiones, prediligenciar mensaje solo si es "resolved"
+      if (isFondoPensiones && defaultStatus === 'resolved') {
         emailSubject = `Certificado de Convenio - Fondo de Pensiones - Solicitud #${solicitud.id}`;
         
         emailBody = "Adjunto encontrará su certificado de convenio dirigido al fondo de pensiones en formato PDF.\n\n";
@@ -1206,8 +1209,8 @@ const AdminSolicitudesPage: React.FC = () => {
           year: 'numeric'
         });
         emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
-      } else if (needsActividades) {
-        // Si requiere adicionar actividades, prediligenciar mensaje
+      } else if (needsActividades && defaultStatus === 'resolved') {
+        // Si requiere adicionar actividades, prediligenciar mensaje solo si es "resolved"
         emailSubject = `Certificado de Convenio - Con Actividades - Solicitud #${solicitud.id}`;
         
         emailBody = "Adjunto encontrará su certificado de convenio en formato PDF con las actividades realizadas.\n\n";
@@ -1352,9 +1355,9 @@ const AdminSolicitudesPage: React.FC = () => {
     try {
       // Enviar respuesta usando la API del backend
       // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
-      // Si es "otro", enviar el texto de rejection_reason_other, sino enviar el valor del select
+      // Enviar el valor del select directamente
       const rejectionReasonToSend = finalStatus === 'rejected' 
-        ? (data.rejection_reason === 'otro' ? data.rejection_reason_other : data.rejection_reason)
+        ? data.rejection_reason
         : undefined;
       
       const updatedRequest = await requestsService.sendResponse(solicitudId, {
@@ -1571,9 +1574,9 @@ const AdminSolicitudesPage: React.FC = () => {
     const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
     try {
       // Enviar respuesta con compensaciones usando la API del backend
-      // Si es "otro", enviar el texto de rejection_reason_other, sino enviar el valor del select
+      // Enviar el valor del select directamente
       const rejectionReasonToSend = data.newStatus === 'rejected'
-        ? (data.rejection_reason === 'otro' ? data.rejection_reason_other : data.rejection_reason)
+        ? data.rejection_reason
         : undefined;
       
       const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudId, {
@@ -1600,12 +1603,12 @@ const AdminSolicitudesPage: React.FC = () => {
           duration: 5000,
         });
       } else {
-        // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
-        const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
-        toast.success("Certificado generado y respuesta enviada exitosamente", {
-          description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
-          duration: 5000,
-        });
+      // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
+      const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
+      toast.success("Certificado generado y respuesta enviada exitosamente", {
+        description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
+        duration: 5000,
+      });
       }
 
       // Cerrar el modal después de un pequeño delay para que el usuario vea el toast
@@ -2465,18 +2468,18 @@ const AdminSolicitudesPage: React.FC = () => {
                                 {solicitud.status === "rejected" && solicitud.resolved_at && (
                                   <div className="mt-2 space-y-1">
                                     <p className="text-xs text-red-600 font-medium">
-                                      ✗ Rechazado:{" "}
-                                      {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
-                                        day: "2-digit",
-                                        month: "short",
-                                        year: "numeric",
-                                      })}
-                                      ,{" "}
-                                      {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
-                                    </p>
+                                    ✗ Rechazado:{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleDateString("es-ES", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                    ,{" "}
+                                    {new Date(solicitud.resolved_at).toLocaleTimeString("es-ES", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </p>
                                     {solicitud.rejection_reason && (
                                       <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mt-1">
                                         <p className="font-medium mb-1">Razón de rechazo:</p>
@@ -3487,10 +3490,10 @@ const AdminSolicitudesPage: React.FC = () => {
 
                     {/* Campos de compensaciones - Solo visible cuando el estado NO es "rejected" */}
                     {responseWithCompensacionesForm.watch('newStatus') !== 'rejected' && (
-                      <div className="border-t border-gray-200 pt-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border-t border-gray-200 pt-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Total Basicos */}
                         <FormField
                           control={responseWithCompensacionesForm.control}
@@ -3571,7 +3574,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           Total Ingresos = Total Basicos + Total Auxilios
                         </p>
                       </div>
-                      </div>
+                    </div>
                     )}
 
                     {/* Nuevo Estado */}
@@ -3669,41 +3672,6 @@ const AdminSolicitudesPage: React.FC = () => {
                             );
                           }}
                         />
-                        {/* Campo para "Otro" - Solo visible cuando se selecciona "otro" */}
-                        {responseWithCompensacionesForm.watch('rejection_reason') === 'otro' && (
-                          <FormField
-                            control={responseWithCompensacionesForm.control}
-                            name="rejection_reason_other"
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = 120;
-                              const isNearLimit = currentLength > maxLength * 0.8;
-                              const isOverLimit = currentLength > maxLength;
-                              
-                              return (
-                                <FormItem>
-                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Indique la razón de rechazo..."
-                                      {...field}
-                                      maxLength={maxLength}
-                                    />
-                                  </FormControl>
-                                  <div className="flex items-center justify-between">
-                                    <FormDescription>
-                                      Especifique la razón de rechazo. Máximo 120 caracteres.
-                                    </FormDescription>
-                                    <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                                      {currentLength}/{maxLength}
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        )}
                       </div>
                     )}
 
@@ -4206,17 +4174,22 @@ const AdminSolicitudesPage: React.FC = () => {
                         disabled={isSubmittingResponse}
                         className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
-                        {isSubmittingResponse ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Generando certificado...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            Generar Certificado y Enviar
-                          </>
-                        )}
+                        {(() => {
+                          const currentStatus = responseWithCompensacionesForm.watch('newStatus');
+                          const isRejected = currentStatus === 'rejected';
+                          
+                          return isSubmittingResponse ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              {isRejected ? 'Enviando...' : 'Generando certificado...'}
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              {isRejected ? 'Enviar Respuesta' : 'Generar Certificado y Enviar'}
+                            </>
+                          );
+                        })()}
                       </Button>
                     </div>
                   </form>
@@ -4401,48 +4374,13 @@ const AdminSolicitudesPage: React.FC = () => {
                             );
                           }}
                         />
-                        {/* Campo para "Otro" - Solo visible cuando se selecciona "otro" */}
-                        {responseForm.watch('rejection_reason') === 'otro' && (
-                          <FormField
-                            control={responseForm.control}
-                            name="rejection_reason_other"
-                            render={({ field }) => {
-                              const currentLength = field.value?.length || 0;
-                              const maxLength = 120;
-                              const isNearLimit = currentLength > maxLength * 0.8;
-                              const isOverLimit = currentLength > maxLength;
-                              
-                              return (
-                                <FormItem>
-                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Indique la razón de rechazo..."
-                                      {...field}
-                                      maxLength={maxLength}
-                                    />
-                                  </FormControl>
-                                  <div className="flex items-center justify-between">
-                                    <FormDescription>
-                                      Especifique la razón de rechazo. Máximo 120 caracteres.
-                                    </FormDescription>
-                                    <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                                      {currentLength}/{maxLength}
-                                    </span>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        )}
                       </div>
                     )}
 
                     {/* Asunto del correo */}
                     <FormField
                       control={responseForm.control}
-                    name="emailSubject"
+                      name="emailSubject"
                     render={({ field }) => {
                       const currentLength = field.value?.length || 0;
                       const maxLength = 100;

@@ -331,9 +331,9 @@ export const requestsApiService = {
           email_body: string;
           rejection_reason?: string;
         } = {
-          status: data.status,
-          email_subject: data.email_subject,
-          email_body: data.email_body,
+            status: data.status,
+            email_subject: data.email_subject,
+            email_body: data.email_body,
         };
 
         // Solo incluir rejection_reason si el estado es REJECTED
