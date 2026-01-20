@@ -88,17 +88,18 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
 ];
 
-// Opciones predefinidas para razones de rechazo
+// Opciones predefinidas para razones de rechazo (ordenadas alfabéticamente)
 const REJECTION_REASON_OPTIONS = [
-  { value: 'no_vb_coordinadora', label: 'No cuenta con el V°B de la coordinadora' },
-  { value: 'sin_evidencias', label: 'No anexa evidencias de la solicitud' },
-  { value: 'formato_archivos', label: 'Los archivos adjuntos no cumplen con el formato de ProSalud' },
-  { value: 'solicitud_repetida', label: 'Solicitud repetida' },
-  { value: 'sin_capacidad_endeudamiento', label: 'No tiene capacidad de endeudamiento' },
-  { value: 'anexos_no_validos', label: 'Los anexos adjuntos no son válidos para la solicitud' },
-  { value: 'sin_tiempo_provisionado', label: 'No cuenta con el tiempo provisionado' },
   { value: 'compensacion_pignorada_libranza', label: 'Compensación pignorada por libranza' },
+  { value: 'anexos_no_validos', label: 'Los anexos adjuntos no son válidos para la solicitud' },
+  { value: 'formato_archivos', label: 'Los archivos adjuntos no cumplen con el formato de ProSalud' },
   { value: 'no_aplica_otros_certificado', label: 'No aplica la opción de "Otros" para el certificado de convenio' },
+  { value: 'no_cumple_causales_retiro', label: 'No cumple con las causales para el retiro (Vivienda / Educación)' },
+  { value: 'no_vb_coordinadora', label: 'No cuenta con el V°B de la coordinadora' },
+  { value: 'sin_capacidad_endeudamiento', label: 'No tiene capacidad de endeudamiento' },
+  { value: 'sin_evidencias', label: 'No anexa evidencias de la solicitud' },
+  { value: 'sin_tiempo_provisionado', label: 'No cuenta con el tiempo provisionado' },
+  { value: 'solicitud_repetida', label: 'Solicitud repetida' },
 ];
 
 // Helper para transformar el código de razón de rechazo a su etiqueta legible
@@ -223,7 +224,7 @@ const responseFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
-  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'sin_tiempo_provisionado', 'compensacion_pignorada_libranza', 'no_aplica_otros_certificado']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -277,7 +278,7 @@ const responseWithCompensacionesFormSchema = z.object({
   }),
   emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
   emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
-  rejection_reason: z.enum(['no_vb_coordinadora', 'sin_evidencias', 'formato_archivos', 'solicitud_repetida', 'sin_capacidad_endeudamiento', 'anexos_no_validos', 'sin_tiempo_provisionado', 'compensacion_pignorada_libranza', 'no_aplica_otros_certificado']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.union([
