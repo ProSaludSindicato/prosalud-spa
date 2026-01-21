@@ -65,8 +65,9 @@ const normalizeTallaUniforme = (value: string | null | undefined): string => {
   return found?.value || normalized;
 };
 
-// Función para parsear el campo de contacto de emergencia
-// Formato esperado: "nombre - relacion - telefono" o "nombre - telefono"
+// Función mejorada para parsear el campo de contacto de emergencia
+// Maneja múltiples formatos: nombre puede estar primero, teléfono puede estar en cualquier posición
+// El nombre siempre está antes del parentesco/relación
 const parseContactoEmergencia = (value: string | null | undefined): {
   telefono: string;
   nombre: string;
@@ -83,75 +84,137 @@ const parseContactoEmergencia = (value: string | null | undefined): {
     return { telefono: '', nombre: '', relacion: '' };
   }
 
-  // Si hay 3 partes: nombre, relacion, telefono
-  if (parts.length >= 3) {
-    // El último es el teléfono (solo números), el primero es el nombre, el segundo es la relación
-    const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
-    if (lastIsPhone) {
-      return {
-      telefono: parts[parts.length - 1] || '',
-      nombre: parts[0] || '',
-      relacion: parts[1] || '',
-      };
-    } else {
-      // Si el último no es teléfono, intentar detectar cuál es
-      // Asumir formato: nombre - relacion - telefono
-      return {
-        telefono: parts[2] || '',
-        nombre: parts[0] || '',
-        relacion: parts[1] || '',
-      };
+  // Función helper para detectar si una parte es un teléfono
+  // Un teléfono es: solo números, o empieza con números (puede tener espacios pero principalmente números)
+  const isPhone = (part: string): boolean => {
+    // Remover espacios para verificar
+    const cleaned = part.replace(/\s/g, '');
+    // Debe tener al menos 7 dígitos y ser principalmente números (sin letras)
+    // También puede empezar con números seguido solo de números
+    if (/^\d{7,}$/.test(cleaned)) {
+      return true;
     }
+    // Si empieza con número y tiene al menos 7 caracteres, verificar que sea principalmente números
+    if (/^\d/.test(cleaned) && cleaned.length >= 7) {
+      // Debe ser al menos 80% números
+      const digitCount = (cleaned.match(/\d/g) || []).length;
+      return digitCount >= 7 && (digitCount / cleaned.length) >= 0.8;
+    }
+    return false;
+  };
+
+  // Lista de parentescos comunes para identificar relaciones
+  // Incluye variaciones en mayúsculas, minúsculas, con acentos y con "/a"
+  const parentescosComunes = [
+    'madre', 'padre', 'mamá', 'mama', 'papá', 'papa',
+    'hijo', 'hija', 'hijo/a', 'hija/a',
+    'hermano', 'hermana', 'hermano/a', 'hermana/a',
+    'conyuge', 'cónyuge', 'conyugue', 'cónyugue', 'esposo', 'esposa',
+    'abuelo', 'abuela', 'abuelo/a', 'abuela/a',
+    'tio', 'tío', 'tia', 'tía', 'tio/a', 'tía/a',
+    'primo', 'prima', 'primo/a', 'prima/a',
+    'amigo', 'amiga', 'amigo/a', 'amiga/a',
+    'pareja', 'otro'
+  ];
+
+  // Función helper para detectar si una parte es un parentesco/relación
+  const isRelacion = (part: string): boolean => {
+    const normalized = part.toLowerCase().trim();
+    return parentescosComunes.some(p => normalized === p || normalized.includes(p));
+  };
+
+  // Identificar qué parte es teléfono, nombre y relación
+  let telefono = '';
+  let nombre = '';
+  let relacion = '';
+
+  // Primero, identificar el teléfono (puede estar en cualquier posición)
+  const phoneIndex = parts.findIndex(p => isPhone(p));
+  if (phoneIndex !== -1) {
+    telefono = parts[phoneIndex];
   }
 
-  // Si hay 2 partes: puede ser telefono - nombre (sin relacion)
-  if (parts.length === 2) {
-    // Intentar determinar cuál es teléfono (solo números) y cuál es nombre
-    const firstIsPhone = /^\d+$/.test(parts[0]);
-    if (firstIsPhone) {
-      return {
-        telefono: parts[0] || '',
-        nombre: parts[1] || '',
-        relacion: '',
-      };
+  // Identificar la relación (puede estar en cualquier posición excepto donde está el teléfono)
+  const relacionIndex = parts.findIndex((p, idx) => idx !== phoneIndex && isRelacion(p));
+  if (relacionIndex !== -1) {
+    relacion = parts[relacionIndex];
+  }
+
+  // El nombre es lo que queda: la parte que no es teléfono ni relación
+  // REGLA: El nombre siempre está antes del parentesco/relación
+  // Si el teléfono está primero, el nombre viene después del teléfono
+  
+  if (relacionIndex !== -1) {
+    // Hay relación identificada
+    if (phoneIndex !== -1) {
+      // Hay teléfono y relación
+      // El nombre es todo lo que está antes de la relación y no es el teléfono
+      const nombreParts = parts.slice(0, relacionIndex).filter((p, idx) => idx !== phoneIndex);
+      nombre = nombreParts.join(' ').trim();
+      
+      // Si no encontramos nombre pero hay 3 partes, asumir formato según posiciones
+      if (!nombre && parts.length === 3) {
+        if (phoneIndex === 0 && relacionIndex === 1) {
+          // "telefono - relacion - nombre" → nombre al final
+          nombre = parts[2];
+        } else if (phoneIndex === 0 && relacionIndex === 2) {
+          // "telefono - nombre - relacion" → nombre en medio
+          nombre = parts[1];
     } else {
-      // Si el primero no es solo números, asumir que es nombre y el segundo teléfono
-      const secondIsPhone = /^\d+$/.test(parts[1]);
-      if (secondIsPhone) {
-        return {
-          telefono: parts[1] || '',
-          nombre: parts[0] || '',
-          relacion: '',
-        };
+          // "nombre - relacion - telefono" (caso normal)
+          nombre = parts[0];
+        }
       }
-      // Si ninguno es solo números, asumir formato: telefono - nombre
-      return {
-        telefono: parts[0] || '',
-        nombre: parts[1] || '',
-        relacion: '',
-      };
-    }
-  }
-
-  // Si solo hay 1 parte, intentar determinar si es teléfono o nombre
-  if (parts.length === 1) {
-    const isPhone = /^\d+$/.test(parts[0]);
-    if (isPhone) {
-      return {
-        telefono: parts[0] || '',
-        nombre: '',
-        relacion: '',
-      };
     } else {
-      return {
-        telefono: '',
-        nombre: parts[0] || '',
-        relacion: '',
-      };
+      // Hay relación pero no teléfono identificado
+      // El nombre es todo lo que está antes de la relación
+      nombre = parts.slice(0, relacionIndex).join(' ').trim();
+    }
+  } else if (phoneIndex !== -1) {
+    // Hay teléfono pero no relación
+    if (phoneIndex === 0) {
+      // Teléfono está primero: "telefono - nombre"
+      nombre = parts.slice(1).join(' ').trim();
+    } else {
+      // Teléfono está después: "nombre - telefono"
+      nombre = parts.slice(0, phoneIndex).join(' ').trim();
+    }
+  } else {
+    // No hay teléfono ni relación identificada, todo es nombre
+    nombre = parts.join(' ').trim();
+  }
+
+  // Casos especiales para 3 partes cuando no identificamos relación:
+  if (parts.length === 3 && phoneIndex !== -1 && relacionIndex === -1) {
+    // La parte del medio probablemente es la relación (aunque no la reconocimos)
+    relacion = parts[1];
+    if (phoneIndex === 0) {
+      // "telefono - relacion - nombre"
+      nombre = parts[2];
+    } else if (phoneIndex === 2) {
+      // "nombre - relacion - telefono"
+      nombre = parts[0];
+    } else {
+      // "nombre - telefono - relacion" (menos común)
+      nombre = parts[0];
+      relacion = parts[2];
     }
   }
 
-  return { telefono: '', nombre: '', relacion: '' };
+  // Casos especiales para 3 partes cuando no identificamos teléfono:
+  if (parts.length === 3 && phoneIndex === -1 && relacionIndex !== -1) {
+    nombre = parts[0];
+    // La última parte podría ser teléfono aunque no lo reconocimos
+    if (parts[2] && /^\d/.test(parts[2].replace(/\s/g, ''))) {
+      telefono = parts[2];
+    }
+  }
+
+  return {
+    telefono: telefono || '',
+    nombre: nombre || '',
+    relacion: relacion || '',
+  };
 };
 
 // Función para normalizar la relación de contacto de emergencia

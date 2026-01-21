@@ -78,6 +78,158 @@ const SESSION_DURATION = 15 * 60 * 1000; // 15 minutos en milisegundos
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos de inactividad para expirar sesión
 const STORAGE_KEY = 'afiliado_auth';
 
+// Función mejorada para parsear el campo de contacto de emergencia
+// Maneja múltiples formatos: nombre puede estar primero, teléfono puede estar en cualquier posición
+// El nombre siempre está antes del parentesco/relación
+const parseContactoEmergenciaImproved = (value: string | null | undefined): {
+  telefono: string;
+  nombre: string;
+  relacion: string;
+} => {
+  if (!value || !value.trim()) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Dividir por " - " (espacio, guion, espacio) - manejar espacios múltiples
+  const parts = value.split(/\s*-\s*/).map((part: string) => part.trim()).filter((part: string) => part.length > 0);
+  
+  if (parts.length === 0) {
+    return { telefono: '', nombre: '', relacion: '' };
+  }
+
+  // Función helper para detectar si una parte es un teléfono
+  // Un teléfono es: solo números, o empieza con números (puede tener espacios pero principalmente números)
+  const isPhone = (part: string): boolean => {
+    // Remover espacios para verificar
+    const cleaned = part.replace(/\s/g, '');
+    // Debe tener al menos 7 dígitos y ser principalmente números (sin letras)
+    // También puede empezar con números seguido solo de números
+    if (/^\d{7,}$/.test(cleaned)) {
+      return true;
+    }
+    // Si empieza con número y tiene al menos 7 caracteres, verificar que sea principalmente números
+    if (/^\d/.test(cleaned) && cleaned.length >= 7) {
+      // Debe ser al menos 80% números
+      const digitCount = (cleaned.match(/\d/g) || []).length;
+      return digitCount >= 7 && (digitCount / cleaned.length) >= 0.8;
+    }
+    return false;
+  };
+
+  // Lista de parentescos comunes para identificar relaciones
+  // Incluye variaciones en mayúsculas, minúsculas, con acentos y con "/a"
+  const parentescosComunes = [
+    'madre', 'padre', 'mamá', 'mama', 'papá', 'papa',
+    'hijo', 'hija', 'hijo/a', 'hija/a',
+    'hermano', 'hermana', 'hermano/a', 'hermana/a',
+    'conyuge', 'cónyuge', 'conyugue', 'cónyugue', 'esposo', 'esposa',
+    'abuelo', 'abuela', 'abuelo/a', 'abuela/a',
+    'tio', 'tío', 'tia', 'tía', 'tio/a', 'tía/a',
+    'primo', 'prima', 'primo/a', 'prima/a',
+    'amigo', 'amiga', 'amigo/a', 'amiga/a',
+    'pareja', 'otro'
+  ];
+
+  // Función helper para detectar si una parte es un parentesco/relación
+  const isRelacion = (part: string): boolean => {
+    const normalized = part.toLowerCase().trim();
+    return parentescosComunes.some(p => normalized === p || normalized.includes(p));
+  };
+
+  // Identificar qué parte es teléfono, nombre y relación
+  let telefono = '';
+  let nombre = '';
+  let relacion = '';
+
+  // Primero, identificar el teléfono (puede estar en cualquier posición)
+  const phoneIndex = parts.findIndex(p => isPhone(p));
+  if (phoneIndex !== -1) {
+    telefono = parts[phoneIndex];
+  }
+
+  // Identificar la relación (puede estar en cualquier posición excepto donde está el teléfono)
+  const relacionIndex = parts.findIndex((p, idx) => idx !== phoneIndex && isRelacion(p));
+  if (relacionIndex !== -1) {
+    relacion = parts[relacionIndex];
+  }
+
+  // El nombre es lo que queda: la parte que no es teléfono ni relación
+  // REGLA: El nombre siempre está antes del parentesco/relación
+  // Si el teléfono está primero, el nombre viene después del teléfono
+  
+  if (relacionIndex !== -1) {
+    // Hay relación identificada
+    if (phoneIndex !== -1) {
+      // Hay teléfono y relación
+      // El nombre es todo lo que está antes de la relación y no es el teléfono
+      const nombreParts = parts.slice(0, relacionIndex).filter((p, idx) => idx !== phoneIndex);
+      nombre = nombreParts.join(' ').trim();
+      
+      // Si no encontramos nombre pero hay 3 partes, asumir formato según posiciones
+      if (!nombre && parts.length === 3) {
+        if (phoneIndex === 0 && relacionIndex === 1) {
+          // "telefono - relacion - nombre" → nombre al final
+          nombre = parts[2];
+        } else if (phoneIndex === 0 && relacionIndex === 2) {
+          // "telefono - nombre - relacion" → nombre en medio
+          nombre = parts[1];
+        } else {
+          // "nombre - relacion - telefono" (caso normal)
+          nombre = parts[0];
+        }
+      }
+    } else {
+      // Hay relación pero no teléfono identificado
+      // El nombre es todo lo que está antes de la relación
+      nombre = parts.slice(0, relacionIndex).join(' ').trim();
+    }
+  } else if (phoneIndex !== -1) {
+    // Hay teléfono pero no relación
+    if (phoneIndex === 0) {
+      // Teléfono está primero: "telefono - nombre"
+      nombre = parts.slice(1).join(' ').trim();
+    } else {
+      // Teléfono está después: "nombre - telefono"
+      nombre = parts.slice(0, phoneIndex).join(' ').trim();
+    }
+  } else {
+    // No hay teléfono ni relación identificada, todo es nombre
+    nombre = parts.join(' ').trim();
+  }
+
+  // Casos especiales para 3 partes cuando no identificamos relación:
+  if (parts.length === 3 && phoneIndex !== -1 && relacionIndex === -1) {
+    // La parte del medio probablemente es la relación (aunque no la reconocimos)
+    relacion = parts[1];
+    if (phoneIndex === 0) {
+      // "telefono - relacion - nombre"
+      nombre = parts[2];
+    } else if (phoneIndex === 2) {
+      // "nombre - relacion - telefono"
+      nombre = parts[0];
+    } else {
+      // "nombre - telefono - relacion" (menos común)
+      nombre = parts[0];
+      relacion = parts[2];
+    }
+  }
+
+  // Casos especiales para 3 partes cuando no identificamos teléfono:
+  if (parts.length === 3 && phoneIndex === -1 && relacionIndex !== -1) {
+    nombre = parts[0];
+    // La última parte podría ser teléfono aunque no lo reconocimos
+    if (parts[2] && /^\d/.test(parts[2].replace(/\s/g, ''))) {
+      telefono = parts[2];
+    }
+  }
+
+  return {
+    telefono: telefono || '',
+    nombre: nombre || '',
+    relacion: relacion || '',
+  };
+};
+
 export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [afiliado, setAfiliado] = useState<AfiliadoData | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
@@ -413,53 +565,14 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         contacto_emergencia: (response.data.afiliado as any).contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...((response.data.afiliado as any).contacto_emergencia && !(response.data.afiliado as any).telefono_contacto_emergencia ? (() => {
-          // Parsear el campo combinado: "nombre - relacion - telefono"
+          // Parsear el campo combinado con función mejorada
           const contacto = (response.data.afiliado as any).contacto_emergencia;
-          // Manejar espacios múltiples: dividir por " - " (espacio, guion, espacio) y limpiar espacios extra
-          const parts = contacto.split(/\s*-\s*/).map((part: string) => part.trim()).filter((part: string) => part.length > 0);
-          if (parts.length >= 3) {
-            // Formato: nombre - relacion - telefono
-            const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
-            if (lastIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[parts.length - 1] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            } else {
-              // Si el último no es teléfono, asumir formato: nombre - relacion - telefono
-              return {
-                telefono_contacto_emergencia: parts[2] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            }
-          } else if (parts.length >= 2) {
-            // Formato: nombre - telefono (sin relación)
-            const firstIsPhone = /^\d+$/.test(parts[0]);
-            const secondIsPhone = /^\d+$/.test(parts[1]);
-            if (firstIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[0] || '',
-                nombre_contacto_emergencia: parts[1] || '',
-                relacion_contacto_emergencia: '',
-              };
-            } else if (secondIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[1] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: '',
-              };
-            } else {
-              // Si ninguno es teléfono, asumir: nombre - relacion
-              return {
-                telefono_contacto_emergencia: '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            }
-          }
-          return {};
+          const parsed = parseContactoEmergenciaImproved(contacto);
+          return {
+            telefono_contacto_emergencia: parsed.telefono || '',
+            nombre_contacto_emergencia: parsed.nombre || '',
+            relacion_contacto_emergencia: parsed.relacion || '',
+          };
         })() : {
           telefono_contacto_emergencia: (response.data.afiliado as any).telefono_contacto_emergencia || null,
           nombre_contacto_emergencia: (response.data.afiliado as any).nombre_contacto_emergencia || null,
@@ -589,53 +702,14 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...(response.data.afiliado.contacto_emergencia && !response.data.afiliado.telefono_contacto_emergencia ? (() => {
-          // Parsear el campo combinado: "nombre - relacion - telefono"
+          // Parsear el campo combinado con función mejorada
           const contacto = response.data.afiliado.contacto_emergencia;
-          // Manejar espacios múltiples: dividir por " - " (espacio, guion, espacio) y limpiar espacios extra
-          const parts = contacto.split(/\s*-\s*/).map(part => part.trim()).filter(part => part.length > 0);
-          if (parts.length >= 3) {
-            // Formato: nombre - relacion - telefono
-            const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
-            if (lastIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[parts.length - 1] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            } else {
-              // Si el último no es teléfono, asumir formato: nombre - relacion - telefono
-              return {
-                telefono_contacto_emergencia: parts[2] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            }
-          } else if (parts.length >= 2) {
-            // Formato: nombre - telefono (sin relación)
-            const firstIsPhone = /^\d+$/.test(parts[0]);
-            const secondIsPhone = /^\d+$/.test(parts[1]);
-            if (firstIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[0] || '',
-                nombre_contacto_emergencia: parts[1] || '',
-                relacion_contacto_emergencia: '',
-              };
-            } else if (secondIsPhone) {
-              return {
-                telefono_contacto_emergencia: parts[1] || '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: '',
-              };
-            } else {
-              // Si ninguno es teléfono, asumir: nombre - relacion
-              return {
-                telefono_contacto_emergencia: '',
-                nombre_contacto_emergencia: parts[0] || '',
-                relacion_contacto_emergencia: parts[1] || '',
-              };
-            }
-          }
-          return {};
+          const parsed = parseContactoEmergenciaImproved(contacto);
+          return {
+            telefono_contacto_emergencia: parsed.telefono || '',
+            nombre_contacto_emergencia: parsed.nombre || '',
+            relacion_contacto_emergencia: parsed.relacion || '',
+          };
         })() : {
           telefono_contacto_emergencia: response.data.afiliado.telefono_contacto_emergencia || null,
           nombre_contacto_emergencia: response.data.afiliado.nombre_contacto_emergencia || null,

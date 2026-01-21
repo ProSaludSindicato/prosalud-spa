@@ -177,6 +177,7 @@ export const bancos = [
   { value: 'colpatria', label: 'Banco Colpatria' },
   { value: 'agrario', label: 'Banco Agrario' },
   { value: 'cooperativo', label: 'Banco Cooperativo Coopcentral' },
+  { value: 'nequi', label: 'Nequi' },
   { value: 'otros', label: 'Otros' },
 ];
 
