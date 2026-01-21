@@ -413,16 +413,51 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         contacto_emergencia: (response.data.afiliado as any).contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...((response.data.afiliado as any).contacto_emergencia && !(response.data.afiliado as any).telefono_contacto_emergencia ? (() => {
-          // Parsear el campo combinado: "telefono - nombre - relacion"
+          // Parsear el campo combinado: "nombre - relacion - telefono"
           const contacto = (response.data.afiliado as any).contacto_emergencia;
-          const parts = contacto.split(' - ').map((part: string) => part.trim()).filter((part: string) => part.length > 0);
-          if (parts.length >= 2) {
+          // Manejar espacios múltiples: dividir por " - " (espacio, guion, espacio) y limpiar espacios extra
+          const parts = contacto.split(/\s*-\s*/).map((part: string) => part.trim()).filter((part: string) => part.length > 0);
+          if (parts.length >= 3) {
+            // Formato: nombre - relacion - telefono
+            const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
+            if (lastIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[parts.length - 1] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            } else {
+              // Si el último no es teléfono, asumir formato: nombre - relacion - telefono
+              return {
+                telefono_contacto_emergencia: parts[2] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            }
+          } else if (parts.length >= 2) {
+            // Formato: nombre - telefono (sin relación)
             const firstIsPhone = /^\d+$/.test(parts[0]);
-            return {
-              telefono_contacto_emergencia: firstIsPhone ? parts[0] : (parts.length >= 3 ? parts[0] : ''),
-              nombre_contacto_emergencia: firstIsPhone ? parts[1] : parts[0],
-              relacion_contacto_emergencia: parts.length >= 3 ? parts[2] : '',
-            };
+            const secondIsPhone = /^\d+$/.test(parts[1]);
+            if (firstIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[0] || '',
+                nombre_contacto_emergencia: parts[1] || '',
+                relacion_contacto_emergencia: '',
+              };
+            } else if (secondIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[1] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: '',
+              };
+            } else {
+              // Si ninguno es teléfono, asumir: nombre - relacion
+              return {
+                telefono_contacto_emergencia: '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            }
           }
           return {};
         })() : {
@@ -521,7 +556,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
             documento: b.documento || '',
             nombres: b.nombres || '',
             apellidos: b.apellidos || '',
-            fecha_nacimiento: '', // No viene en la respuesta por seguridad
+            fecha_nacimiento: b.fecha_nacimiento || '', // Usar fecha_nacimiento del API si está disponible
             parentesco: parentescoFinal,
             sexo: sexoFinal,
             estado: b.estado || null,
@@ -554,16 +589,51 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...(response.data.afiliado.contacto_emergencia && !response.data.afiliado.telefono_contacto_emergencia ? (() => {
-          // Parsear el campo combinado: "telefono - nombre - relacion"
+          // Parsear el campo combinado: "nombre - relacion - telefono"
           const contacto = response.data.afiliado.contacto_emergencia;
-          const parts = contacto.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
-          if (parts.length >= 2) {
+          // Manejar espacios múltiples: dividir por " - " (espacio, guion, espacio) y limpiar espacios extra
+          const parts = contacto.split(/\s*-\s*/).map(part => part.trim()).filter(part => part.length > 0);
+          if (parts.length >= 3) {
+            // Formato: nombre - relacion - telefono
+            const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
+            if (lastIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[parts.length - 1] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            } else {
+              // Si el último no es teléfono, asumir formato: nombre - relacion - telefono
+              return {
+                telefono_contacto_emergencia: parts[2] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            }
+          } else if (parts.length >= 2) {
+            // Formato: nombre - telefono (sin relación)
             const firstIsPhone = /^\d+$/.test(parts[0]);
-            return {
-              telefono_contacto_emergencia: firstIsPhone ? parts[0] : (parts.length >= 3 ? parts[0] : ''),
-              nombre_contacto_emergencia: firstIsPhone ? parts[1] : parts[0],
-              relacion_contacto_emergencia: parts.length >= 3 ? parts[2] : '',
-            };
+            const secondIsPhone = /^\d+$/.test(parts[1]);
+            if (firstIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[0] || '',
+                nombre_contacto_emergencia: parts[1] || '',
+                relacion_contacto_emergencia: '',
+              };
+            } else if (secondIsPhone) {
+              return {
+                telefono_contacto_emergencia: parts[1] || '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: '',
+              };
+            } else {
+              // Si ninguno es teléfono, asumir: nombre - relacion
+              return {
+                telefono_contacto_emergencia: '',
+                nombre_contacto_emergencia: parts[0] || '',
+                relacion_contacto_emergencia: parts[1] || '',
+              };
+            }
           }
           return {};
         })() : {

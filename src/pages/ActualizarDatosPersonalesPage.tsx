@@ -155,7 +155,7 @@ const normalizeAfp = (value: string | null | undefined): string => {
 };
 
 // Función para parsear el campo de contacto de emergencia
-// Formato esperado: "telefono - nombre - relacion" o "telefono - nombre"
+// Formato esperado: "nombre - relacion - telefono" o "nombre - telefono"
 const parseContactoEmergencia = (value: string | null | undefined): {
   telefono: string;
   nombre: string;
@@ -165,20 +165,32 @@ const parseContactoEmergencia = (value: string | null | undefined): {
     return { telefono: '', nombre: '', relacion: '' };
   }
 
-  // Dividir por " - " (espacio, guion, espacio)
-  const parts = value.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
+  // Dividir por " - " (espacio, guion, espacio) - manejar espacios múltiples
+  const parts = value.split(/\s*-\s*/).map(part => part.trim()).filter(part => part.length > 0);
   
   if (parts.length === 0) {
     return { telefono: '', nombre: '', relacion: '' };
   }
 
-  // Si hay 3 partes: telefono, nombre, relacion
+  // Si hay 3 partes: nombre, relacion, telefono
   if (parts.length >= 3) {
-    return {
-      telefono: parts[0] || '',
-      nombre: parts[1] || '',
-      relacion: parts[2] || '',
-    };
+    // El último es el teléfono (solo números), el primero es el nombre, el segundo es la relación
+    const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
+    if (lastIsPhone) {
+      return {
+      telefono: parts[parts.length - 1] || '',
+      nombre: parts[0] || '',
+      relacion: parts[1] || '',
+      };
+    } else {
+      // Si el último no es teléfono, intentar detectar cuál es
+      // Asumir formato: nombre - relacion - telefono
+      return {
+        telefono: parts[2] || '',
+        nombre: parts[0] || '',
+        relacion: parts[1] || '',
+      };
+    }
   }
 
   // Si hay 2 partes: puede ser telefono - nombre (sin relacion)
@@ -387,6 +399,8 @@ const createFormSchema = (initialValues: {
   
     // Beneficiarios nuevos (opcionales)
     beneficiariosNuevos: z.array(beneficiarioSchema).optional().default([]),
+    // Beneficiarios actuales editables (opcionales)
+    beneficiariosActuales: z.array(beneficiarioSchema).optional().default([]),
   });
 };
 
@@ -423,18 +437,35 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     tallaUniforme: afiliado?.talla_uniforme ? afiliado.talla_uniforme.toLowerCase() : '',
     tallaCalzado: afiliado?.talla_calzado || '',
     // Parsear contacto de emergencia: si viene separado, usarlo; si viene combinado, parsearlo
-    ...(afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia ? (() => {
-      const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+    // Siempre intentar parsear desde contacto_emergencia si existe, ya que el contexto puede no haber parseado
+    ...(() => {
+      // Si viene combinado, siempre parsearlo (el contexto puede no haber parseado correctamente)
+      if (afiliado?.contacto_emergencia) {
+        const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+        const relacionNormalizada = normalizeRelacionContactoEmergencia(parsed.relacion);
+        // Usar valores parseados si están disponibles, de lo contrario usar los del contexto
+        return {
+          nombreContactoEmergencia: parsed.nombre || afiliado?.nombre_contacto_emergencia || '',
+          relacionContactoEmergencia: relacionNormalizada || normalizeRelacionContactoEmergencia(afiliado?.relacion_contacto_emergencia),
+          telefonoContactoEmergencia: parsed.telefono || afiliado?.telefono_contacto_emergencia || '',
+        };
+      }
+      // Si ya vienen separados del contexto y no hay contacto_emergencia, usarlos
+      if (afiliado?.nombre_contacto_emergencia || afiliado?.telefono_contacto_emergencia || afiliado?.relacion_contacto_emergencia) {
+        const relacionNormalizada = normalizeRelacionContactoEmergencia(afiliado?.relacion_contacto_emergencia);
+        return {
+          nombreContactoEmergencia: afiliado?.nombre_contacto_emergencia || '',
+          relacionContactoEmergencia: relacionNormalizada,
+          telefonoContactoEmergencia: afiliado?.telefono_contacto_emergencia || '',
+        };
+      }
+      // Si no hay nada, valores vacíos
       return {
-        nombreContactoEmergencia: parsed.nombre,
-        relacionContactoEmergencia: normalizeRelacionContactoEmergencia(parsed.relacion),
-        telefonoContactoEmergencia: parsed.telefono,
+        nombreContactoEmergencia: '',
+        relacionContactoEmergencia: '',
+        telefonoContactoEmergencia: '',
       };
-    })() : {
-      nombreContactoEmergencia: afiliado?.nombre_contacto_emergencia || '',
-      relacionContactoEmergencia: normalizeRelacionContactoEmergencia(afiliado?.relacion_contacto_emergencia),
-      telefonoContactoEmergencia: afiliado?.telefono_contacto_emergencia || '',
-    }),
+    })(),
     nivelEducativo: normalizeNivelEducacion(afiliado?.nivel_educacion),
     diplomaEducativo: undefined,
     actaGrado: undefined,
@@ -447,6 +478,41 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     afp: normalizeAfp(afiliado?.afp),
     certificadoAfp: undefined,
     beneficiariosNuevos: [],
+    // Inicializar beneficiarios actuales como editables
+    beneficiariosActuales: (afiliado?.beneficiarios || []).map(b => ({
+      tipo_documento: b.tipo_documento || '',
+      documento: b.documento || '',
+      nombres: b.nombres || '',
+      apellidos: b.apellidos || '',
+      fecha_nacimiento: b.fecha_nacimiento ? (() => {
+        // Convertir fecha de formato DD/MM/YYYY o YYYY-MM-DD a YYYY-MM-DD
+        const fecha = b.fecha_nacimiento;
+        if (fecha.includes('/')) {
+          const [day, month, year] = fecha.split('/');
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        return fecha.split('T')[0]; // Si tiene hora, solo tomar la fecha
+      })() : '',
+      // Normalizar parentesco a MAYÚSCULA para que coincida con los valores del select
+      parentesco: b.parentesco ? (() => {
+        const parentescoUpper = b.parentesco.toUpperCase().trim();
+        // Mapear valores comunes a los valores del select
+        const parentescoMap: Record<string, string> = {
+          'MADRE': 'MADRE',
+          'PADRE': 'PADRE',
+          'HIJA': 'HIJA',
+          'HIJO': 'HIJO',
+          'CONYUGUE': 'CONYUGUE',
+          'CÓNYUGE': 'CONYUGUE',
+          'ESPOSO': 'CONYUGUE',
+          'ESPOSA': 'CONYUGUE',
+          'HIJO_CONYUGUE': 'HIJO_CONYUGUE',
+          'HIJA_CONYUGUE': 'HIJA_CONYUGUE',
+        };
+        return parentescoMap[parentescoUpper] || parentescoUpper;
+      })() : '',
+      sexo: b.sexo || '',
+    })),
   }), [afiliado]);
 
   // Crear schema dinámico basado en los valores iniciales
@@ -584,16 +650,19 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
     );
   }, [modifiedFields]);
 
-  // Verificar si hay beneficiarios nuevos
+  // Verificar si hay beneficiarios nuevos o actuales editados
   const beneficiariosNuevos = form.watch('beneficiariosNuevos');
+  const beneficiariosActuales = form.watch('beneficiariosActuales');
   const tieneBeneficiariosNuevos = beneficiariosNuevos && beneficiariosNuevos.length > 0;
+  const tieneBeneficiariosActualesEditados = beneficiariosActuales && beneficiariosActuales.length > 0;
 
   const onSubmit = async (data: FormValuesActualizarDatosPersonales) => {
     if (!afiliado) return;
     
-    // Validar que haya al menos un campo modificado (excluyendo archivos) o beneficiarios nuevos
+    // Validar que haya al menos un campo modificado (excluyendo archivos) o beneficiarios nuevos/actuales editados
     // O que se hayan diligenciado los campos requeridos que estaban vacíos
     const tieneBeneficiariosNuevos = data.beneficiariosNuevos && data.beneficiariosNuevos.length > 0;
+    const tieneBeneficiariosActualesEditados = data.beneficiariosActuales && data.beneficiariosActuales.length > 0;
     const tieneCamposRequeridosDiligenciados = Array.from(camposRequeridosPorVacios).some(
       campo => {
         const valor = data[campo as keyof typeof data];
@@ -601,9 +670,9 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       }
     );
     
-    if (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneCamposRequeridosDiligenciados) {
+    if (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneBeneficiariosActualesEditados && !tieneCamposRequeridosDiligenciados) {
       toast.error('No hay cambios para actualizar', {
-        description: 'Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.',
+        description: 'Debe modificar al menos un campo, agregar o editar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.',
         duration: 5000,
         icon: <AlertCircle className="h-5 w-5 text-red-600" />,
       });
@@ -849,8 +918,58 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       }
 
       // Agregar beneficiarios nuevos si hay alguno
+      // Asegurar que las fechas se envíen en formato YYYY-MM-DD sin conversión de timezone
       if (data.beneficiariosNuevos && data.beneficiariosNuevos.length > 0) {
-        payload.beneficiariosNuevos = data.beneficiariosNuevos;
+        payload.beneficiariosNuevos = data.beneficiariosNuevos.map(beneficiario => ({
+          ...beneficiario,
+          // Asegurar que la fecha se mantenga como string YYYY-MM-DD sin conversión
+          fecha_nacimiento: beneficiario.fecha_nacimiento ? 
+            beneficiario.fecha_nacimiento.split('T')[0] : // Si tiene hora, solo tomar la fecha
+            beneficiario.fecha_nacimiento
+        }));
+      }
+
+      // Agregar beneficiarios actuales editados si hay alguno
+      if (data.beneficiariosActuales && data.beneficiariosActuales.length > 0) {
+        payload.beneficiariosActuales = data.beneficiariosActuales.map(beneficiario => ({
+          ...beneficiario,
+          // Asegurar que la fecha se mantenga como string YYYY-MM-DD sin conversión
+          fecha_nacimiento: beneficiario.fecha_nacimiento ? 
+            beneficiario.fecha_nacimiento.split('T')[0] : // Si tiene hora, solo tomar la fecha
+            beneficiario.fecha_nacimiento
+        }));
+      }
+
+      // Detectar beneficiarios eliminados comparando los originales con los editados
+      const beneficiariosOriginales = afiliado?.beneficiarios || [];
+      const beneficiariosEditados = data.beneficiariosActuales || [];
+      
+      // Crear un mapa de beneficiarios editados por documento+tipo_documento para comparación rápida
+      const beneficiariosEditadosMap = new Map<string, boolean>();
+      beneficiariosEditados.forEach(b => {
+        if (b.documento && b.tipo_documento) {
+          const key = `${b.tipo_documento}-${b.documento}`;
+          beneficiariosEditadosMap.set(key, true);
+        }
+      });
+      
+      // Encontrar beneficiarios que estaban en los originales pero no en los editados
+      const beneficiariosEliminados = beneficiariosOriginales.filter(b => {
+        if (!b.documento || !b.tipo_documento) return false;
+        const key = `${b.tipo_documento}-${b.documento}`;
+        return !beneficiariosEditadosMap.has(key);
+      });
+      
+      // Agregar beneficiarios eliminados al payload si hay alguno
+      if (beneficiariosEliminados.length > 0) {
+        payload.beneficiariosEliminados = beneficiariosEliminados.map(b => ({
+          tipo_documento: b.tipo_documento || '',
+          documento: b.documento || '',
+          nombres: b.nombres || '',
+          apellidos: b.apellidos || '',
+          parentesco: b.parentesco || '',
+          sexo: b.sexo || '',
+        }));
       }
 
       // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
@@ -1070,7 +1189,7 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
                       <Button 
                         type="submit" 
                         size="lg" 
-                        disabled={isSubmitting || isInitializing || (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && camposRequeridosPorVacios.size === 0)}
+                        disabled={isSubmitting || isInitializing || (camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneBeneficiariosActualesEditados && camposRequeridosPorVacios.size === 0)}
                         className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
@@ -1087,10 +1206,10 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {!isSubmitting && !isInitializing && camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && camposRequeridosPorVacios.size === 0 && (
+                  {!isSubmitting && !isInitializing && camposModificadosSinArchivos.length === 0 && !tieneBeneficiariosNuevos && !tieneBeneficiariosActualesEditados && camposRequeridosPorVacios.size === 0 && (
                     <TooltipContent side="top" className="max-w-xs bg-gray-800 text-white border-gray-700">
                       <p className="text-sm text-white">
-                        Debe modificar al menos un campo, agregar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.
+                        Debe modificar al menos un campo, agregar o editar miembros al grupo familiar, o completar los campos requeridos (Estado Civil, Celular, Talla de Uniforme, Talla de Calzado, y datos de contacto de emergencia) para enviar la solicitud de actualización.
                       </p>
                     </TooltipContent>
                   )}

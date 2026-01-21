@@ -33,15 +33,26 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
   // Security: Use centralized sanitization hook
   const { sanitizeText, sanitizeId } = useSanitizedInput();
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: fieldsNuevos, append, remove: removeNuevo } = useFieldArray({
     control,
     name: 'beneficiariosNuevos',
   });
 
-  // Observar los valores de beneficiarios nuevos para validación
+  const { fields: fieldsActuales, remove: removeActual } = useFieldArray({
+    control,
+    name: 'beneficiariosActuales',
+  });
+
+  // Observar los valores de beneficiarios nuevos y actuales para validación
   const beneficiariosNuevos = useWatch({
     control,
     name: 'beneficiariosNuevos',
+    defaultValue: [],
+  }) as BeneficiarioFormData[];
+
+  const beneficiariosActualesEditados = useWatch({
+    control,
+    name: 'beneficiariosActuales',
     defaultValue: [],
   }) as BeneficiarioFormData[];
 
@@ -50,7 +61,8 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
   const prevParentescosRef = React.useRef<string[]>([]);
   
   React.useEffect(() => {
-    const currentParentescos = beneficiariosNuevos.map(b => b?.parentesco || '');
+    const allBeneficiarios = [...beneficiariosNuevos, ...beneficiariosActualesEditados];
+    const currentParentescos = allBeneficiarios.map(b => b?.parentesco || '');
     const prevParentescos = prevParentescosRef.current;
     
     // Solo procesar si hay cambios en los parentescos
@@ -78,7 +90,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
       prevParentescosRef.current = currentParentescos;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiariosNuevos.map(b => b?.parentesco || '').join(',')]);
+  }, [beneficiariosNuevos.map(b => b?.parentesco || '').join(','), beneficiariosActualesEditados.map(b => b?.parentesco || '').join(',')]);
 
   const getSexoIcon = (sexo: string) => {
     const sexoNormalized = sexo?.toUpperCase() || '';
@@ -103,7 +115,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
   };
 
   const handleAddBeneficiario = () => {
-    if (fields.length >= 5) {
+    if (fieldsNuevos.length >= 5) {
       toast.error('Límite alcanzado', {
         description: 'Solo se pueden agregar hasta 5 miembros nuevos al grupo familiar.',
       });
@@ -120,27 +132,39 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
     });
   };
 
-  const handleRemoveBeneficiario = (index: number) => {
-    remove(index);
+  const handleRemoveBeneficiario = (index: number, isNuevo: boolean = true) => {
+    if (isNuevo) {
+      removeNuevo(index);
+    } else {
+      removeActual(index);
+    }
   };
 
-  const isBeneficiarioDuplicado = (documento: string, tipoDocumento: string, currentIndex?: number): boolean => {
+  const isBeneficiarioDuplicado = (documento: string, tipoDocumento: string, currentIndex?: number, isNuevo: boolean = true, currentArrayIndex?: number): boolean => {
     if (!documento || !tipoDocumento) return false;
     
-    // Verificar contra beneficiarios actuales
-    const existeEnActuales = beneficiariosActuales.some(
-      b => b.documento === documento && b.tipo_documento === tipoDocumento
+    // Verificar contra beneficiarios actuales editados (excluyendo el actual si es de actuales)
+    const existeEnActualesEditados = beneficiariosActualesEditados.some(
+      (b: BeneficiarioFormData, index: number) => 
+        (!isNuevo && index !== currentArrayIndex) &&
+        b.documento === documento && 
+        b.tipo_documento === tipoDocumento
     );
 
     // Verificar contra otros beneficiarios nuevos (excluyendo el actual)
     const existeEnNuevos = beneficiariosNuevos.some(
       (b: BeneficiarioFormData, index: number) => 
-        index !== currentIndex && 
+        (isNuevo && index !== currentIndex) &&
         b.documento === documento && 
         b.tipo_documento === tipoDocumento
     );
 
-    return existeEnActuales || existeEnNuevos;
+    // Verificar contra beneficiarios actuales originales (solo si es nuevo)
+    const existeEnActualesOriginales = isNuevo && beneficiariosActuales.some(
+      b => b.documento === documento && b.tipo_documento === tipoDocumento
+    );
+
+    return existeEnActualesEditados || existeEnNuevos || existeEnActualesOriginales;
   };
 
   const getTipoDocumentoCompletoLabel = (tipo: string) => {
@@ -158,62 +182,266 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
       </div>
 
       <div className="space-y-6">
-        {/* Nota informativa */}
-        <Alert className="bg-blue-50 border-blue-200">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-sm text-blue-800">
-            Si observa que alguna persona que no pertenece a su grupo familiar está registrada, 
-            comuníquese a través del correo{' '}
-            <a 
-              href="mailto:comunicaciones@sindicatoprosalud.com"
-              className="font-semibold underline hover:text-blue-900"
-            >
-              comunicaciones@sindicatoprosalud.com
-            </a>
-          </AlertDescription>
-        </Alert>
-
-        {/* Grupo Familiar Actual */}
-        {beneficiariosActuales.length > 0 && (
+        {/* Grupo Familiar Actual - Editable */}
+        {fieldsActuales.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-700">Miembros Actuales del Grupo Familiar</h3>
-            <div className="space-y-2">
-              {beneficiariosActuales.map((beneficiario, index) => (
-                <div
-                  key={`actual-${index}`}
-                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Tipo Doc:</span>
-                      <span className="text-sm text-gray-900">
-                        {getTipoDocumentoCompletoLabel(beneficiario.tipo_documento)}
-                      </span>
+            <p className="text-xs text-gray-600 mb-3">
+              Puede editar los datos de los miembros existentes o eliminarlos si ya no pertenecen a su grupo familiar.
+            </p>
+            <div className="space-y-4">
+              {fieldsActuales.map((field, index) => (
+                <Card key={field.id} className="border-2 border-blue-200 bg-blue-50/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-semibold text-gray-700">
+                        Miembro Actual {index + 1}
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveBeneficiario(index, false)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Documento:</span>
-                      <span className="text-sm text-gray-900">{beneficiario.documento}</span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Tipo y Número de Documento agrupados */}
+                      <div className="grid grid-cols-[80px_1fr] gap-2">
+                        <FormField
+                          control={control}
+                          name={`beneficiariosActuales.${index}.tipo_documento`}
+                          rules={{
+                            validate: (value) => {
+                              const beneficiario = beneficiariosActualesEditados[index];
+                              const documento = beneficiario?.documento || '';
+                              if (value && documento && isBeneficiarioDuplicado(documento, value, undefined, false, index)) {
+                                return 'Este miembro ya está registrado';
+                              }
+                              return true;
+                            },
+                          }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Tipo *</FormLabel>
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  const beneficiario = beneficiariosActualesEditados[index];
+                                  const documento = beneficiario?.documento || '';
+                                  if (documento && isBeneficiarioDuplicado(documento, value, undefined, false, index)) {
+                                    toast.error('Este miembro ya está registrado');
+                                  }
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="text-xs">
+                                    <SelectValue placeholder="Tipo" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {tiposDocumento.map((tipo) => (
+                                    <SelectItem key={tipo.value} value={tipo.value}>
+                                      {tipo.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={control}
+                          name={`beneficiariosActuales.${index}.documento`}
+                          rules={{
+                            required: 'El documento es requerido',
+                            validate: (value) => {
+                              const beneficiario = beneficiariosActualesEditados[index];
+                              const tipoDoc = beneficiario?.tipo_documento || '';
+                              if (value && tipoDoc && isBeneficiarioDuplicado(value, tipoDoc, undefined, false, index)) {
+                                return 'Este miembro ya está registrado';
+                              }
+                              return true;
+                            },
+                          }}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Número de Documento *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="Número"
+                                  onChange={(e) => {
+                                    const sanitized = sanitizeId(e.target.value, { maxLength: 20 });
+                                    field.onChange(sanitized);
+                                    const beneficiario = beneficiariosActualesEditados[index];
+                                    const tipoDoc = beneficiario?.tipo_documento || '';
+                                    if (sanitized && tipoDoc && isBeneficiarioDuplicado(sanitized, tipoDoc, undefined, false, index)) {
+                                      toast.error('Este miembro ya está registrado');
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={control}
+                        name={`beneficiariosActuales.${index}.nombres`}
+                        rules={{ required: 'Los nombres son requeridos' }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nombres *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Nombres"
+                                onChange={(e) => {
+                                  const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                                  field.onChange(sanitized);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name={`beneficiariosActuales.${index}.apellidos`}
+                        rules={{ required: 'Los apellidos son requeridos' }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Apellidos *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                placeholder="Apellidos"
+                                onChange={(e) => {
+                                  const sanitized = sanitizeText(e.target.value, { maxLength: 50, allowSpaces: true });
+                                  field.onChange(sanitized);
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name={`beneficiariosActuales.${index}.fecha_nacimiento`}
+                        rules={{
+                          required: 'La fecha de nacimiento es requerida',
+                        }}
+                        render={({ field }) => {
+                          // Convertir fecha de formato DD/MM/YYYY o YYYY-MM-DD a YYYY-MM-DD para el input
+                          let dateValue = field.value || '';
+                          if (dateValue && dateValue.includes('/')) {
+                            const [day, month, year] = dateValue.split('/');
+                            dateValue = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                          }
+                          return (
+                            <FormItem>
+                              <FormLabel>Fecha de Nacimiento *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="date" 
+                                  {...field}
+                                  value={dateValue}
+                                  max={new Date().toISOString().split('T')[0]}
+                                  onChange={(e) => {
+                                    // Asegurar que se guarde solo la fecha sin hora
+                                    const dateStr = e.target.value;
+                                    field.onChange(dateStr);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+
+                      <FormField
+                        control={control}
+                        name={`beneficiariosActuales.${index}.parentesco`}
+                        rules={{ required: 'El parentesco es requerido' }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Parentesco *</FormLabel>
+                            <Select 
+                              value={field.value} 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                const sexoAuto = value === 'HIJA' || value === 'MADRE' ? 'F' : 
+                                               value === 'HIJO' || value === 'PADRE' ? 'M' : '';
+                                if (sexoAuto) {
+                                  const currentSexo = beneficiariosActualesEditados[index]?.sexo || '';
+                                  if (!currentSexo) {
+                                    setTimeout(() => {
+                                      setValue(`beneficiariosActuales.${index}.sexo`, sexoAuto, {
+                                        shouldValidate: false,
+                                        shouldDirty: false,
+                                      });
+                                    }, 10);
+                                  }
+                                }
+                              }}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione parentesco" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {parentescos.map((parentesco) => (
+                                  <SelectItem key={parentesco.value} value={parentesco.value}>
+                                    {parentesco.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={control}
+                        name={`beneficiariosActuales.${index}.sexo`}
+                        rules={{ required: 'El sexo es requerido' }}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sexo *</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione sexo" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="M">Masculino</SelectItem>
+                                <SelectItem value="F">Femenino</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Nombres:</span>
-                      <span className="text-sm text-gray-900">{beneficiario.nombres}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Apellidos:</span>
-                      <span className="text-sm text-gray-900">{beneficiario.apellidos}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Parentesco:</span>
-                      <span className="text-sm text-gray-900">
-                        {getParentescoLabel(beneficiario.parentesco)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-gray-500">Sexo:</span>
-                      {getSexoIcon(beneficiario.sexo)}
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
@@ -228,21 +456,21 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
               variant="outline"
               size="sm"
               onClick={handleAddBeneficiario}
-              disabled={fields.length >= 5}
+              disabled={fieldsNuevos.length >= 5}
               className="flex items-center gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              Agregar Miembro {fields.length >= 5 ? '(Límite alcanzado)' : ''}
+              Agregar Miembro {fieldsNuevos.length >= 5 ? '(Límite alcanzado)' : ''}
             </Button>
           </div>
 
-          {fields.length === 0 && (
+          {fieldsNuevos.length === 0 && (
             <p className="text-sm text-gray-500 text-center py-4">
               No hay miembros nuevos agregados. Haga clic en "Agregar Miembro" para agregar uno (máximo 5).
             </p>
           )}
 
-          {fields.length >= 5 && (
+          {fieldsNuevos.length >= 5 && (
             <Alert className="bg-yellow-50 border-yellow-200">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-sm text-yellow-800">
@@ -251,7 +479,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
             </Alert>
           )}
 
-          {fields.map((field, index) => (
+          {fieldsNuevos.map((field, index) => (
             <Card key={field.id} className="border-2">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-4">
@@ -262,7 +490,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleRemoveBeneficiario(index)}
+                    onClick={() => handleRemoveBeneficiario(index, true)}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -279,7 +507,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                         validate: (value) => {
                           const beneficiario = beneficiariosNuevos[index];
                           const documento = beneficiario?.documento || '';
-                          if (value && documento && isBeneficiarioDuplicado(documento, value, index)) {
+                          if (value && documento && isBeneficiarioDuplicado(documento, value, index, true)) {
                             return 'Este miembro ya está registrado';
                           }
                           return true;
@@ -294,7 +522,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                               field.onChange(value);
                               const beneficiario = beneficiariosNuevos[index];
                               const documento = beneficiario?.documento || '';
-                              if (documento && isBeneficiarioDuplicado(documento, value, index)) {
+                              if (documento && isBeneficiarioDuplicado(documento, value, index, true)) {
                                 toast.error('Este miembro ya está registrado');
                               }
                             }}
@@ -325,7 +553,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                         validate: (value) => {
                           const beneficiario = beneficiariosNuevos[index];
                           const tipoDoc = beneficiario?.tipo_documento || '';
-                          if (value && tipoDoc && isBeneficiarioDuplicado(value, tipoDoc, index)) {
+                          if (value && tipoDoc && isBeneficiarioDuplicado(value, tipoDoc, index, true)) {
                             return 'Este miembro ya está registrado';
                           }
                           return true;
@@ -344,7 +572,7 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                                 field.onChange(sanitized);
                                 const beneficiario = beneficiariosNuevos[index];
                                 const tipoDoc = beneficiario?.tipo_documento || '';
-                                if (sanitized && tipoDoc && isBeneficiarioDuplicado(sanitized, tipoDoc, index)) {
+                                if (sanitized && tipoDoc && isBeneficiarioDuplicado(sanitized, tipoDoc, index, true)) {
                                   toast.error('Este miembro ya está registrado');
                                 }
                               }}
@@ -415,7 +643,12 @@ const BeneficiariosSection: React.FC<BeneficiariosSectionProps> = ({ control }) 
                             <Input 
                               type="date" 
                               {...field}
-                            max={new Date().toISOString().split('T')[0]}
+                              max={new Date().toISOString().split('T')[0]}
+                              onChange={(e) => {
+                                // Asegurar que se guarde solo la fecha sin hora
+                                const dateStr = e.target.value;
+                                field.onChange(dateStr);
+                              }}
                             />
                           </FormControl>
                           <FormMessage />

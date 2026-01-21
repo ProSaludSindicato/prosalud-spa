@@ -101,10 +101,10 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
         : (value !== null && value !== undefined && value !== '');
       
       if (shouldSend) {
-        // Handle arrays (like beneficiariosNuevos) - Laravel expects array notation with indices
+        // Handle arrays (like beneficiariosNuevos, beneficiariosActuales, and beneficiariosEliminados) - Laravel expects array notation with indices
         if (Array.isArray(value)) {
-          // For beneficiariosNuevos, send each item as nested array fields for Laravel
-          if (key === 'beneficiariosNuevos' && value.length > 0) {
+          // For beneficiariosNuevos, beneficiariosActuales, and beneficiariosEliminados, send each item as nested array fields for Laravel
+          if ((key === 'beneficiariosNuevos' || key === 'beneficiariosActuales' || key === 'beneficiariosEliminados') && value.length > 0) {
             value.forEach((item, index) => {
               if (item && typeof item === 'object') {
                 Object.entries(item).forEach(([fieldKey, fieldValue]) => {

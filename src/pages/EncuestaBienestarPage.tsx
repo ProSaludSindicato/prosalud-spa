@@ -66,7 +66,7 @@ const normalizeTallaUniforme = (value: string | null | undefined): string => {
 };
 
 // Función para parsear el campo de contacto de emergencia
-// Formato esperado: "telefono - nombre - relacion" o "telefono - nombre"
+// Formato esperado: "nombre - relacion - telefono" o "nombre - telefono"
 const parseContactoEmergencia = (value: string | null | undefined): {
   telefono: string;
   nombre: string;
@@ -76,20 +76,32 @@ const parseContactoEmergencia = (value: string | null | undefined): {
     return { telefono: '', nombre: '', relacion: '' };
   }
 
-  // Dividir por " - " (espacio, guion, espacio)
-  const parts = value.split(' - ').map(part => part.trim()).filter(part => part.length > 0);
+  // Dividir por " - " (espacio, guion, espacio) - manejar espacios múltiples
+  const parts = value.split(/\s*-\s*/).map(part => part.trim()).filter(part => part.length > 0);
   
   if (parts.length === 0) {
     return { telefono: '', nombre: '', relacion: '' };
   }
 
-  // Si hay 3 partes: telefono, nombre, relacion
+  // Si hay 3 partes: nombre, relacion, telefono
   if (parts.length >= 3) {
-    return {
-      telefono: parts[0] || '',
-      nombre: parts[1] || '',
-      relacion: parts[2] || '',
-    };
+    // El último es el teléfono (solo números), el primero es el nombre, el segundo es la relación
+    const lastIsPhone = /^\d+$/.test(parts[parts.length - 1]);
+    if (lastIsPhone) {
+      return {
+      telefono: parts[parts.length - 1] || '',
+      nombre: parts[0] || '',
+      relacion: parts[1] || '',
+      };
+    } else {
+      // Si el último no es teléfono, intentar detectar cuál es
+      // Asumir formato: nombre - relacion - telefono
+      return {
+        telefono: parts[2] || '',
+        nombre: parts[0] || '',
+        relacion: parts[1] || '',
+      };
+    }
   }
 
   // Si hay 2 partes: puede ser telefono - nombre (sin relacion)

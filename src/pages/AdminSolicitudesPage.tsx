@@ -557,6 +557,43 @@ const requiresManualCompensaciones = (solicitud: Request): boolean => {
   return tieneValorCompensaciones || paraSubsidioVivienda || paraSubsidioDesempleo;
 };
 
+// Función helper para formatear fechas en formato YYYY-MM-DD sin problemas de timezone
+const formatDateOnly = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  
+  // Si ya está en formato DD/MM/YYYY, retornarlo tal cual
+  if (dateString.includes('/')) {
+    return dateString;
+  }
+  
+  // Si está en formato YYYY-MM-DD, convertir a DD/MM/YYYY
+  // Parsear manualmente para evitar problemas de timezone
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    // Remover ceros a la izquierda del día y mes para formato colombiano
+    const dayNum = parseInt(day, 10);
+    const monthNum = parseInt(month, 10);
+    return `${dayNum}/${monthNum}/${year}`;
+  }
+  
+  // Si no es un formato reconocido, intentar con Date pero con cuidado
+  try {
+    // Crear fecha en UTC para evitar problemas de timezone
+    const date = new Date(dateString + 'T00:00:00Z');
+    if (!isNaN(date.getTime())) {
+      const day = date.getUTCDate();
+      const month = date.getUTCMonth() + 1;
+      const year = date.getUTCFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  } catch (e) {
+    // Si falla, retornar el string original
+  }
+  
+  return dateString;
+};
+
 const AdminSolicitudesPage: React.FC = () => {
   const { can } = usePermissions();
   const location = useLocation();
@@ -569,13 +606,14 @@ const AdminSolicitudesPage: React.FC = () => {
   const [verificarCertificadoOpen, setVerificarCertificadoOpen] = useState(false);
   const [bulkTemplateDialogOpen, setBulkTemplateDialogOpen] = useState(false);
   const [bulkProcessDialogOpen, setBulkProcessDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedType, setSelectedType] = useState<string>("all");
-  const [selectedSubtypeFilter, setSelectedSubtypeFilter] = useState<string>("all");
+  // Inicializar filtros desde search params
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || "");
+  const [selectedStatus, setSelectedStatus] = useState<string>(() => searchParams.get('status') || "all");
+  const [selectedType, setSelectedType] = useState<string>(() => searchParams.get('type') || "all");
+  const [selectedSubtypeFilter, setSelectedSubtypeFilter] = useState<string>(() => searchParams.get('subtype') || "all");
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [sortBy, setSortBy] = useState<"name" | "date">("date");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<"name" | "date">(() => (searchParams.get('sortBy') as "name" | "date") || "date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => (searchParams.get('sortOrder') as "asc" | "desc") || "desc");
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
   const [useCompensacionesForm, setUseCompensacionesForm] = useState(false);
@@ -666,6 +704,50 @@ const AdminSolicitudesPage: React.FC = () => {
     queryFn: requestsService.getRequests,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Sincronizar filtros con search params (solo cuando cambian los filtros, no cuando cambian los search params)
+  useEffect(() => {
+    const newSearchParams = new URLSearchParams();
+    
+    // Preservar el parámetro 'view' si existe
+    const viewParam = searchParams.get('view');
+    if (viewParam) {
+      newSearchParams.set('view', viewParam);
+    }
+    
+    // Actualizar search params con los valores actuales de los filtros
+    if (searchTerm) {
+      newSearchParams.set('search', searchTerm);
+    }
+    
+    if (selectedStatus !== "all") {
+      newSearchParams.set('status', selectedStatus);
+    }
+    
+    if (selectedType !== "all") {
+      newSearchParams.set('type', selectedType);
+    }
+    
+    if (selectedSubtypeFilter !== "all") {
+      newSearchParams.set('subtype', selectedSubtypeFilter);
+    }
+    
+    if (sortBy !== "date") {
+      newSearchParams.set('sortBy', sortBy);
+    }
+    
+    if (sortOrder !== "desc") {
+      newSearchParams.set('sortOrder', sortOrder);
+    }
+    
+    // Solo actualizar si hay cambios para evitar loops infinitos
+    const currentParams = searchParams.toString();
+    const newParams = newSearchParams.toString();
+    if (currentParams !== newParams) {
+      setSearchParams(newSearchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
 
   // Open modal from URL parameter
   useEffect(() => {
@@ -907,22 +989,46 @@ const AdminSolicitudesPage: React.FC = () => {
   }, [allSolicitudes]);
 
   // Obtener subtipos únicos de verificacion-pagos (para el filtro)
+  // Agrupa por label normalizado para evitar duplicados visuales
   const existingSubtypes = useMemo(() => {
-    const subtypes = new Set<string>();
+    // Mapa: label normalizado -> array de valores del backend que se mapean a ese label
+    const labelToBackendValues = new Map<string, string[]>();
+    
     allSolicitudes
       .filter((request) => request.request_type === 'verificacion-pagos' && request.request_subtype)
       .forEach((request) => {
         if (request.request_subtype) {
-          subtypes.add(request.request_subtype);
+          const normalizedLabel = getVerificacionPagosSubtypeLabel(request.request_subtype);
+          if (!labelToBackendValues.has(normalizedLabel)) {
+            labelToBackendValues.set(normalizedLabel, []);
+          }
+          const backendValues = labelToBackendValues.get(normalizedLabel)!;
+          // Agregar el valor del backend solo si no está ya en el array
+          if (!backendValues.includes(request.request_subtype)) {
+            backendValues.push(request.request_subtype);
+          }
         }
       });
-    return Array.from(subtypes).sort((a, b) => {
-      // Ordenar usando las etiquetas normalizadas
-      const labelA = getVerificacionPagosSubtypeLabel(a);
-      const labelB = getVerificacionPagosSubtypeLabel(b);
-      return labelA.localeCompare(labelB);
-    });
+    
+    // Convertir a array de objetos con label y el primer valor del backend
+    // Ordenar por label normalizado
+    return Array.from(labelToBackendValues.entries())
+      .map(([label, backendValues]) => ({
+        label,
+        backendValue: backendValues[0], // Usar el primer valor del backend como representante
+        allBackendValues: backendValues, // Guardar todos los valores para el filtrado
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [allSolicitudes]);
+
+  // Mapa auxiliar para buscar todos los valores del backend que corresponden a un label
+  const subtypeLabelToBackendValues = useMemo(() => {
+    const map = new Map<string, string[]>();
+    existingSubtypes.forEach(({ label, allBackendValues }) => {
+      map.set(label, allBackendValues);
+    });
+    return map;
+  }, [existingSubtypes]);
 
   const filteredSolicitudes = useMemo(() => {
     // El backend ya filtra las solicitudes según las asignaciones del usuario
@@ -954,8 +1060,14 @@ const AdminSolicitudesPage: React.FC = () => {
     if (selectedType === 'verificacion-pagos' && selectedSubtypeFilter !== "all") {
       filtered = filtered.filter((request) => {
         if (!request.request_subtype) return false;
-        // Comparar usando el valor original del backend (case-sensitive)
-        return request.request_subtype === selectedSubtypeFilter;
+        
+        // Buscar el label normalizado del valor seleccionado
+        const selectedLabel = getVerificacionPagosSubtypeLabel(selectedSubtypeFilter);
+        // Obtener todos los valores del backend que corresponden a ese label
+        const backendValuesForLabel = subtypeLabelToBackendValues.get(selectedLabel) || [selectedSubtypeFilter];
+        
+        // Comparar con cualquiera de los valores del backend que corresponden a ese label
+        return backendValuesForLabel.includes(request.request_subtype);
       });
     }
 
@@ -972,7 +1084,7 @@ const AdminSolicitudesPage: React.FC = () => {
     });
 
     return filtered;
-  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
+  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder, subtypeLabelToBackendValues]);
 
   const stats = useMemo(() => {
     if (!allSolicitudes || allSolicitudes.length === 0) {
@@ -2098,8 +2210,8 @@ const AdminSolicitudesPage: React.FC = () => {
                           <SelectContent>
                             <SelectItem value="all">Todos los subtipos</SelectItem>
                             {existingSubtypes.map((subtype) => (
-                              <SelectItem key={subtype} value={subtype}>
-                                {getVerificacionPagosSubtypeLabel(subtype)}
+                              <SelectItem key={subtype.label} value={subtype.backendValue}>
+                                {subtype.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -3102,19 +3214,39 @@ const AdminSolicitudesPage: React.FC = () => {
                                     return <span className="text-gray-500 italic">No hay elementos</span>;
                                   }
                                   
-                                  // Special handling for beneficiariosNuevos array
+                                  // Special handling for beneficiarios arrays (nuevos, actuales, eliminados)
                                   if (selectedSolicitud.request_type === 'actualizar-datos-personales' && 
                                       parsedVal.length > 0 && 
                                       parsedVal[0] && 
                                       typeof parsedVal[0] === 'object' &&
                                       ('tipo_documento' in parsedVal[0] || 'documento' in parsedVal[0])) {
+                                    // Determinar el tipo de array según el fieldKey
+                                    const isEliminados = fieldKey === 'beneficiariosEliminados';
+                                    const isActuales = fieldKey === 'beneficiariosActuales';
+                                    const isNuevos = fieldKey === 'beneficiariosNuevos';
+                                    
+                                    const title = isEliminados 
+                                      ? `Miembros Eliminados del Grupo Familiar (${parsedVal.length})`
+                                      : isActuales
+                                      ? `Miembros Actuales Editados del Grupo Familiar (${parsedVal.length})`
+                                      : `Nuevos Miembros del Grupo Familiar (${parsedVal.length})`;
+                                    
+                                    const borderColor = isEliminados 
+                                      ? 'border-red-300 bg-red-50'
+                                      : isActuales
+                                      ? 'border-blue-300 bg-blue-50'
+                                      : 'border-gray-200 bg-gray-50';
+                                    
                                     return (
                                       <div className="space-y-3">
-                                        <p className="text-xs font-semibold text-gray-700 mb-2">
-                                          Nuevos Miembros del Grupo Familiar ({parsedVal.length})
+                                        <p className={`text-xs font-semibold mb-2 ${isEliminados ? 'text-red-700' : isActuales ? 'text-blue-700' : 'text-gray-700'}`}>
+                                          {title}
+                                          {isEliminados && (
+                                            <span className="ml-2 text-red-600 font-bold">⚠️ ELIMINAR</span>
+                                          )}
                                         </p>
                                         {parsedVal.map((beneficiario: any, idx: number) => (
-                                          <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                          <div key={idx} className={`border rounded-lg p-3 ${borderColor}`}>
                                             <div className="grid grid-cols-2 gap-2 text-xs w-full overflow-x-hidden">
                                               <div className="min-w-0 break-words">
                                                 <span className="font-medium text-gray-600">Tipo Doc:</span>{' '}
@@ -3132,28 +3264,32 @@ const AdminSolicitudesPage: React.FC = () => {
                                                 <span className="font-medium text-gray-600">Apellidos:</span>{' '}
                                                 <span className="text-gray-900 break-words">{beneficiario.apellidos || 'N/A'}</span>
                                               </div>
-                                              <div className="min-w-0 break-words">
-                                                <span className="font-medium text-gray-600">Fecha Nacimiento:</span>{' '}
-                                                <span className="text-gray-900 break-words">
-                                                  {beneficiario.fecha_nacimiento 
-                                                    ? new Date(beneficiario.fecha_nacimiento).toLocaleDateString('es-CO')
-                                                    : 'N/A'}
-                                                </span>
-                                              </div>
-                                              <div className="min-w-0 break-words">
-                                                <span className="font-medium text-gray-600">Parentesco:</span>{' '}
-                                                <span className="text-gray-900 break-words">
-                                                  {getParentescoLabel(beneficiario.parentesco || '') || 'N/A'}
-                                                </span>
-                                              </div>
-                                              <div className="min-w-0 break-words">
-                                                <span className="font-medium text-gray-600">Sexo:</span>{' '}
-                                                <span className="text-gray-900 break-words">
-                                                  {beneficiario.sexo === 'M' ? 'Masculino' : 
-                                                   beneficiario.sexo === 'F' ? 'Femenino' : 
-                                                   beneficiario.sexo || 'N/A'}
-                                                </span>
-                                              </div>
+                                              {beneficiario.fecha_nacimiento && (
+                                                <div className="min-w-0 break-words">
+                                                  <span className="font-medium text-gray-600">Fecha Nacimiento:</span>{' '}
+                                                  <span className="text-gray-900 break-words">
+                                                    {formatDateOnly(beneficiario.fecha_nacimiento || '')}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {beneficiario.parentesco && (
+                                                <div className="min-w-0 break-words">
+                                                  <span className="font-medium text-gray-600">Parentesco:</span>{' '}
+                                                  <span className="text-gray-900 break-words">
+                                                    {getParentescoLabel(beneficiario.parentesco || '') || 'N/A'}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {beneficiario.sexo && (
+                                                <div className="min-w-0 break-words">
+                                                  <span className="font-medium text-gray-600">Sexo:</span>{' '}
+                                                  <span className="text-gray-900 break-words">
+                                                    {beneficiario.sexo === 'M' ? 'Masculino' : 
+                                                     beneficiario.sexo === 'F' ? 'Femenino' : 
+                                                     beneficiario.sexo || 'N/A'}
+                                                  </span>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
                                         ))}
