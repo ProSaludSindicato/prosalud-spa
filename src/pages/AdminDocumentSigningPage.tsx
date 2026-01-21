@@ -58,10 +58,13 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('history');
   const [documentNumbersList, setDocumentNumbersList] = useState<string[]>([]);
   const [currentDocumentNumber, setCurrentDocumentNumber] = useState('');
+  const [emailsMap, setEmailsMap] = useState<Record<string, string>>({}); // Mapa de documento -> email
   const [isSending, setIsSending] = useState(false);
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendEmailSubject, setResendEmailSubject] = useState('');
   const [isResending, setIsResending] = useState(false);
   
   // Filtros para historial (Manual)
@@ -104,6 +107,22 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   const handleRemoveDocumentNumber = (number: string) => {
     setDocumentNumbersList(documentNumbersList.filter(n => n !== number));
+    // Remover email asociado si existe
+    const newEmailsMap = { ...emailsMap };
+    delete newEmailsMap[number];
+    setEmailsMap(newEmailsMap);
+  };
+
+  const handleEmailChange = (documentNumber: string, email: string) => {
+    setEmailsMap(prev => {
+      const newMap = { ...prev };
+      if (email.trim()) {
+        newMap[documentNumber] = email.trim();
+      } else {
+        delete newMap[documentNumber];
+      }
+      return newMap;
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -122,11 +141,37 @@ const AdminDocumentSigningPage: React.FC = () => {
       return;
     }
 
+    // Validar emails si se proporcionaron
+    const invalidEmails: string[] = [];
+    Object.entries(emailsMap).forEach(([doc, email]) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (email && !emailRegex.test(email)) {
+        invalidEmails.push(doc);
+      }
+    });
+
+    if (invalidEmails.length > 0) {
+      toast.error('Emails inválidos', {
+        description: `Los siguientes documentos tienen emails inválidos: ${invalidEmails.join(', ')}`,
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
-      const response = await sendBulkEmailsManual({
+      const requestData: any = {
         document_numbers: documentNumbersList,
-      });
+      };
+
+      // Agregar emails solo si hay al menos uno
+      // Formato requerido: emails debe ser un objeto asociativo donde las claves
+      // son los números de documento (strings) y los valores son los correos electrónicos
+      // Ejemplo: { "1234567890": "email@example.com", "9876543210": "otro@example.com" }
+      if (Object.keys(emailsMap).length > 0) {
+        requestData.emails = emailsMap;
+      }
+
+      const response = await sendBulkEmailsManual(requestData);
 
       const { total_requested, files_found, enqueued, errors } = response.data;
 
@@ -147,6 +192,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       // Limpiar formulario
       setDocumentNumbersList([]);
       setCurrentDocumentNumber('');
+      setEmailsMap({});
       
       // Cambiar a historial para ver los nuevos envíos
       if (enqueued > 0) {
@@ -168,6 +214,9 @@ const AdminDocumentSigningPage: React.FC = () => {
   const handleOpenResendDialog = (tracking: ConvenioEmailTracking) => {
     setSelectedTrackingId(tracking.id);
     setSelectedTrackingInfo(tracking);
+    // Prediligenciar el correo actual si está disponible
+    setResendEmail(tracking.email_afiliado || '');
+    setResendEmailSubject('');
     setResendDialogOpen(true);
   };
 
@@ -175,11 +224,39 @@ const AdminDocumentSigningPage: React.FC = () => {
   const handleConfirmResend = async () => {
     if (!selectedTrackingId) return;
 
+    // Validar email si se proporcionó
+    if (resendEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(resendEmail.trim())) {
+        toast.error('Email inválido', {
+          description: 'Por favor, ingresa un email válido.',
+        });
+        return;
+      }
+    }
+
     setIsResending(true);
     try {
-      const response = await resendEmailsManual({
+      const requestData: any = {
         tracking_ids: [selectedTrackingId],
-      });
+      };
+
+      // Agregar email si se proporcionó
+      // Formato requerido: emails debe ser un objeto asociativo donde las claves
+      // son los tracking_ids como strings y los valores son los correos electrónicos
+      // Ejemplo: { "17": "nuevo-email@example.com" }
+      if (resendEmail.trim()) {
+        requestData.emails = {
+          [selectedTrackingId.toString()]: resendEmail.trim(),
+        };
+      }
+
+      // Agregar email_subject si se proporcionó
+      if (resendEmailSubject.trim()) {
+        requestData.email_subject = resendEmailSubject.trim();
+      }
+
+      const response = await resendEmailsManual(requestData);
 
       if (response.data.success_count > 0) {
         toast.success('Correo reenviado exitosamente');
@@ -187,6 +264,8 @@ const AdminDocumentSigningPage: React.FC = () => {
         setResendDialogOpen(false);
         setSelectedTrackingId(null);
         setSelectedTrackingInfo(null);
+        setResendEmail('');
+        setResendEmailSubject('');
       } else if (response.data.failed_count > 0) {
         const failed = response.data.results.failed.find(f => f.tracking_id === selectedTrackingId);
         toast.error('Error al reenviar', {
@@ -499,29 +578,49 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </div>
                         
                         {documentNumbersList.length > 0 && (
-                          <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-slate-50 min-h-[60px]">
-                            {documentNumbersList.map((number) => (
-                              <Badge
-                                key={number}
-                                variant="secondary"
-                                className="flex items-center gap-1 px-3 py-1.5 font-mono text-sm"
-                              >
-                                {number}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveDocumentNumber(number)}
-                                  className="ml-1 hover:bg-slate-200 rounded-full p-0.5 transition-colors"
-                                  aria-label={`Eliminar ${number}`}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            ))}
+                          <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[200px]">Número de Documento</TableHead>
+                                  <TableHead>Correo Electrónico (Opcional)</TableHead>
+                                  <TableHead className="w-[100px]">Acción</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {documentNumbersList.map((number) => (
+                                  <TableRow key={number}>
+                                    <TableCell className="font-mono">{number}</TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="email"
+                                        placeholder="email@ejemplo.com (opcional)"
+                                        value={emailsMap[number] || ''}
+                                        onChange={(e) => handleEmailChange(number, e.target.value)}
+                                        className="font-mono text-sm"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveDocumentNumber(number)}
+                                        className="text-red-600 hover:text-red-700"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
                           </div>
                         )}
                         
                         <p className="text-sm text-gray-500">
-                          Agrega números de documento uno por uno. El sistema buscará automáticamente el PDF del convenio y el correo del afiliado.
+                          Agrega números de documento uno por uno. Opcionalmente, puedes especificar un correo electrónico para cada documento.
+                          Si no proporcionas un correo, el sistema buscará automáticamente el email del afiliado en la base de datos.
                           {documentNumbersList.length > 0 && (
                             <span className="block mt-1 font-medium text-gray-700">
                               Total: {documentNumbersList.length} documento(s) agregado(s)
@@ -540,11 +639,12 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </div>
                         <div className="flex-1">
                           <h4 className="font-semibold text-blue-900 mb-1">Información importante</h4>
-                          <p className="text-sm text-blue-800">
-                            Los correos se enviarán de forma asíncrona con el PDF del convenio adjunto. 
-                            El proceso puede tardar varios minutos dependiendo de la cantidad de correos. 
-                            Puedes ver el progreso y estado de cada envío en la pestaña "Historial".
-                          </p>
+                          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                            <li>Los correos se enviarán de forma asíncrona con el PDF del convenio adjunto.</li>
+                            <li>El proceso puede tardar varios minutos dependiendo de la cantidad de correos.</li>
+                            <li>Puedes ver el progreso y estado de cada envío en la pestaña "Historial".</li>
+                            <li>Si no proporcionas un correo, se usará el email del afiliado en la base de datos.</li>
+                          </ul>
                         </div>
                       </div>
                     </div>
@@ -781,7 +881,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
               {selectedTrackingInfo && (
-                <div className="space-y-2 py-4">
+                <div className="space-y-4 py-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-semibold">Documento:</span>
@@ -792,8 +892,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                       <p>{selectedTrackingInfo.nombre_afiliado}</p>
                     </div>
                     <div>
-                      <span className="font-semibold">Correo:</span>
-                      <p>{selectedTrackingInfo.email_afiliado}</p>
+                      <span className="font-semibold">Correo actual:</span>
+                      <p className="break-all">{selectedTrackingInfo.email_afiliado}</p>
                     </div>
                     <div>
                       <span className="font-semibold">Convenio:</span>
@@ -810,6 +910,38 @@ const AdminDocumentSigningPage: React.FC = () => {
                       <p>{selectedTrackingInfo.intentos}</p>
                     </div>
                   </div>
+
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="resendEmail">Correo Electrónico (Opcional)</Label>
+                      <Input
+                        id="resendEmail"
+                        type="email"
+                        placeholder="email@ejemplo.com"
+                        value={resendEmail}
+                        onChange={(e) => setResendEmail(e.target.value)}
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-gray-500">
+                        {selectedTrackingInfo.email_afiliado 
+                          ? `Correo actual: ${selectedTrackingInfo.email_afiliado}. Puedes cambiarlo si lo deseas.`
+                          : 'Si no proporcionas un correo, se usará el email del afiliado en la base de datos o el del registro original.'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="resendEmailSubject">Asunto del Correo (Opcional)</Label>
+                      <Input
+                        id="resendEmailSubject"
+                        placeholder="Ej: Firma de Convenio de Afiliación"
+                        value={resendEmailSubject}
+                        onChange={(e) => setResendEmailSubject(e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500">
+                        Si no se proporciona, se usará el asunto por defecto.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
               <DialogFooter>
@@ -819,6 +951,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                     setResendDialogOpen(false);
                     setSelectedTrackingId(null);
                     setSelectedTrackingInfo(null);
+                    setResendEmail('');
+                    setResendEmailSubject('');
                   }}
                   disabled={isResending}
                 >

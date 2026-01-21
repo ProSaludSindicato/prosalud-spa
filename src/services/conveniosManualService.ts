@@ -6,6 +6,9 @@ import axios, { AxiosError } from 'axios';
  */
 export interface SendBulkEmailsRequest {
   document_numbers: string[];
+  emails?: Record<string, string>; // Objeto asociativo: { "documento": "email" }
+  email_subject?: string;
+  document_name?: string;
 }
 
 /**
@@ -87,6 +90,8 @@ export interface EmailHistoryParams {
  */
 export interface ResendEmailsRequest {
   tracking_ids: number[];
+  emails?: Record<string, string>; // Objeto asociativo: { "tracking_id": "email" }
+  email_subject?: string;
 }
 
 /**
