@@ -35,6 +35,7 @@ export interface RequestFile {
 export interface Request {
   id: string;
   request_type: 'certificado-convenio' | 'compensacion-anual' | 'descanso-laboral' | 'verificacion-pagos' | 'retiro-sindical' | 'actualizar-datos-personales' | 'microcredito' | 'incapacidad-licencia' | 'permisos-turnos' | 'solicitud-bienestar';
+  request_subtype?: string | null;
   id_type: 'CC' | 'CE' | 'TI' | 'PP';
   id_number: string;
   name: string;

@@ -43,6 +43,7 @@ export interface ApiRequestFile {
 export interface ApiRequest {
   id: number;
   request_type: string;
+  request_subtype?: string | null;
   document_type: string;
   document_number: string;
   name: string;

@@ -88,6 +88,18 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
 ];
 
+// Helper para normalizar/parsear el subtipo de verificación de pagos
+const getVerificacionPagosSubtypeLabel = (subtype?: string | null): string => {
+  if (!subtype) return '';
+
+  const found = VERIFICACION_PAGOS_SUBTIPOS.find(
+    (item) => item.value.toLowerCase() === subtype.toLowerCase()
+  );
+
+  // Si lo encontramos en el catálogo, usamos el label "bonito"; si no, devolvemos el texto original
+  return found?.label || subtype;
+};
+
 // Opciones predefinidas para razones de rechazo (ordenadas alfabéticamente)
 const REJECTION_REASON_OPTIONS = [
   { value: 'compensacion_pignorada_libranza', label: 'Compensación pignorada por libranza' },
@@ -152,6 +164,7 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
   return {
     id: apiRequest.id?.toString() || '',
     request_type: mapBackendRequestTypeToFrontend(apiRequest.request_type),
+    request_subtype: apiRequest.request_subtype || null,
     id_type: apiRequest.document_type as Request['id_type'],
     id_number: apiRequest.document_number || '',
     name: apiRequest.name || '',
@@ -2159,7 +2172,16 @@ const AdminSolicitudesPage: React.FC = () => {
                               <TableCell>
                                 <div>
                                   <p className="font-medium text-gray-900">
-                                    {getRequestTypeLabel(solicitud.request_type)}
+                                    {solicitud.request_type === 'verificacion-pagos' && solicitud.request_subtype ? (
+                                      <>
+                                        <span>{getRequestTypeLabel(solicitud.request_type)} – </span>
+                                        <span className="font-semibold">
+                                          {getVerificacionPagosSubtypeLabel(solicitud.request_subtype)}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      getRequestTypeLabel(solicitud.request_type)
+                                    )}
                                   </p>
                                   <p className="text-sm text-gray-500">ID: {solicitud.id}</p>
                                 </div>
@@ -2367,7 +2389,16 @@ const AdminSolicitudesPage: React.FC = () => {
                                   <p className="text-xs text-gray-500">ID: {solicitud.id}</p>
                                 </div>
                                 <p className="font-medium text-gray-900 text-sm">
-                                  {getRequestTypeLabel(solicitud.request_type)}
+                                  {solicitud.request_type === 'verificacion-pagos' && solicitud.request_subtype ? (
+                                    <>
+                                      <span>{getRequestTypeLabel(solicitud.request_type)} – </span>
+                                      <span className="font-semibold">
+                                        {getVerificacionPagosSubtypeLabel(solicitud.request_subtype)}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    getRequestTypeLabel(solicitud.request_type)
+                                  )}
                                 </p>
                               </div>
 
@@ -2768,7 +2799,18 @@ const AdminSolicitudesPage: React.FC = () => {
                           <div className="space-y-2 min-w-0">
                             <label className="text-sm font-medium text-gray-700">Tipo de Solicitud</label>
                             <div className="bg-[#EFF0FF] p-3 rounded-md border border-gray-200 overflow-x-hidden">
-                              <p className="text-gray-900 break-words overflow-wrap-anywhere">{getRequestTypeLabel(selectedSolicitud.request_type)}</p>
+                              <p className="text-gray-900 break-words overflow-wrap-anywhere">
+                                {selectedSolicitud.request_type === 'verificacion-pagos' && selectedSolicitud.request_subtype ? (
+                                  <>
+                                    <span>{getRequestTypeLabel(selectedSolicitud.request_type)} – </span>
+                                    <span className="font-semibold">
+                                      {getVerificacionPagosSubtypeLabel(selectedSolicitud.request_subtype)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  getRequestTypeLabel(selectedSolicitud.request_type)
+                                )}
+                              </p>
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -3476,7 +3518,18 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                             <div>
                               <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
-                              <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
+                              <p className="text-gray-900">
+                                {solicitudToRespond.request_type === 'verificacion-pagos' && solicitudToRespond.request_subtype ? (
+                                  <>
+                                    <span>{getRequestTypeLabel(solicitudToRespond.request_type)} – </span>
+                                    <span className="font-semibold">
+                                      {getVerificacionPagosSubtypeLabel(solicitudToRespond.request_subtype)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  getRequestTypeLabel(solicitudToRespond.request_type)
+                                )}
+                              </p>
                             </div>
                             <div>
                               <p className="text-gray-600 font-medium">Estado Actual:</p>
@@ -4215,7 +4268,18 @@ const AdminSolicitudesPage: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
-                            <p className="text-gray-900">{getRequestTypeLabel(solicitudToRespond.request_type)}</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.request_type === 'verificacion-pagos' && solicitudToRespond.request_subtype ? (
+                                <>
+                                  <span>{getRequestTypeLabel(solicitudToRespond.request_type)} – </span>
+                                  <span className="font-semibold">
+                                    {getVerificacionPagosSubtypeLabel(solicitudToRespond.request_subtype)}
+                                  </span>
+                                </>
+                              ) : (
+                                getRequestTypeLabel(solicitudToRespond.request_type)
+                              )}
+                            </p>
                           </div>
                           <div>
                             <p className="text-gray-600 font-medium">Estado Actual:</p>

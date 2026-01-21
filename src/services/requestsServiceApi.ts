@@ -112,6 +112,7 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
   return {
     id: apiRequest.id?.toString() || '',
     request_type: mapBackendRequestTypeToFrontend(apiRequest.request_type),
+    request_subtype: apiRequest.request_subtype || null,
     id_type: apiRequest.document_type as Request['id_type'],
     id_number: apiRequest.document_number || '',
     name: apiRequest.name || '',
