@@ -81,6 +81,7 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'COMPENSACIÓN POR DESCANSO', label: 'Compensación por Descanso' },
   { value: 'DESCUENTOS SEGURIDAD SOCIAL', label: 'Descuentos Seguridad Social' },
   { value: 'DUPLICADO COLILLAS', label: 'Duplicado Colillas' },
+  { value: 'DUPLICADO DE COLILLAS', label: 'Duplicado Colillas' }, // Variante que se agrupa con DUPLICADO COLILLAS
   { value: 'VIATICOS', label: 'Viáticos' },
   { value: 'Ceiisas', label: 'Ceiisas' },
   { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
@@ -92,9 +93,31 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
 const getVerificacionPagosSubtypeLabel = (subtype?: string | null): string => {
   if (!subtype) return '';
 
-  const found = VERIFICACION_PAGOS_SUBTIPOS.find(
-    (item) => item.value.toLowerCase() === subtype.toLowerCase()
+  // Normalizar el subtipo para comparación (remover espacios extra, normalizar "de")
+  const normalizedSubtype = subtype.trim().toLowerCase();
+  
+  // Buscar coincidencia exacta primero
+  let found = VERIFICACION_PAGOS_SUBTIPOS.find(
+    (item) => item.value.toLowerCase() === normalizedSubtype
   );
+
+  // Si no se encuentra, intentar normalizar variaciones comunes
+  if (!found) {
+    // Normalizar variaciones de "Duplicado Colillas" / "Duplicado de Colillas"
+    const normalizedForMatching = normalizedSubtype
+      .replace(/\s+/g, ' ') // Normalizar espacios múltiples
+      .replace(/\bde\b/g, '') // Remover "de" para comparación
+      .trim();
+    
+    // Buscar por normalización flexible para casos como "duplicado colillas" vs "duplicado de colillas"
+    found = VERIFICACION_PAGOS_SUBTIPOS.find((item) => {
+      const itemNormalized = item.value.toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\bde\b/g, '')
+        .trim();
+      return itemNormalized === normalizedForMatching;
+    });
+  }
 
   // Si lo encontramos en el catálogo, usamos el label "bonito"; si no, devolvemos el texto original
   return found?.label || subtype;
@@ -1934,6 +1957,18 @@ const AdminSolicitudesPage: React.FC = () => {
     setSelectedSubtypeFilter("all");
   };
 
+  // Detectar si hay filtros activos
+  const hasActiveFilters = useMemo(() => {
+    return (
+      searchTerm.trim() !== "" ||
+      selectedStatus !== "all" ||
+      selectedType !== "all" ||
+      selectedSubtypeFilter !== "all" ||
+      sortBy !== "date" ||
+      sortOrder !== "desc"
+    );
+  }, [searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
+
   // Limpiar el filtro de subtipo cuando se cambie el tipo de solicitud
   useEffect(() => {
     if (selectedType !== 'verificacion-pagos') {
@@ -2220,7 +2255,15 @@ const AdminSolicitudesPage: React.FC = () => {
                     </div>
                   )}
                   <div className={`sm:col-span-2 ${selectedType === 'verificacion-pagos' && existingSubtypes.length > 0 ? 'lg:col-span-1' : 'lg:col-span-1'}`}>
-                    <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center justify-center gap-2">
+                    <Button 
+                      variant={hasActiveFilters ? "default" : "outline"} 
+                      onClick={clearFilters} 
+                      className={`h-10 w-full flex items-center justify-center gap-2 ${
+                        hasActiveFilters 
+                          ? "bg-accent text-white hover:bg-accent/90" 
+                          : ""
+                      }`}
+                    >
                       <Brush className="w-4 h-4" />
                       <span className="sm:hidden">Limpiar</span>
                       <span className="hidden sm:inline">Limpiar Filtros</span>
