@@ -572,6 +572,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedSubtypeFilter, setSelectedSubtypeFilter] = useState<string>("all");
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -905,6 +906,24 @@ const AdminSolicitudesPage: React.FC = () => {
     return Array.from(types).sort(); // Convertir a array ordenado para el select
   }, [allSolicitudes]);
 
+  // Obtener subtipos únicos de verificacion-pagos (para el filtro)
+  const existingSubtypes = useMemo(() => {
+    const subtypes = new Set<string>();
+    allSolicitudes
+      .filter((request) => request.request_type === 'verificacion-pagos' && request.request_subtype)
+      .forEach((request) => {
+        if (request.request_subtype) {
+          subtypes.add(request.request_subtype);
+        }
+      });
+    return Array.from(subtypes).sort((a, b) => {
+      // Ordenar usando las etiquetas normalizadas
+      const labelA = getVerificacionPagosSubtypeLabel(a);
+      const labelB = getVerificacionPagosSubtypeLabel(b);
+      return labelA.localeCompare(labelB);
+    });
+  }, [allSolicitudes]);
+
   const filteredSolicitudes = useMemo(() => {
     // El backend ya filtra las solicitudes según las asignaciones del usuario
     // Solo aplicamos filtros de búsqueda, estado y tipo
@@ -931,6 +950,15 @@ const AdminSolicitudesPage: React.FC = () => {
       filtered = filtered.filter((request) => request.request_type === selectedType as Request['request_type']);
     }
 
+    // Filtrar por subtipo si el tipo es verificacion-pagos y hay un subtipo seleccionado
+    if (selectedType === 'verificacion-pagos' && selectedSubtypeFilter !== "all") {
+      filtered = filtered.filter((request) => {
+        if (!request.request_subtype) return false;
+        // Comparar usando el valor original del backend (case-sensitive)
+        return request.request_subtype === selectedSubtypeFilter;
+      });
+    }
+
     filtered.sort((a, b) => {
       if (sortBy === "name") {
         const nameA = `${a.name} ${a.last_name}`.toLowerCase();
@@ -944,7 +972,7 @@ const AdminSolicitudesPage: React.FC = () => {
     });
 
     return filtered;
-  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, sortBy, sortOrder]);
+  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
 
   const stats = useMemo(() => {
     if (!allSolicitudes || allSolicitudes.length === 0) {
@@ -1791,7 +1819,15 @@ const AdminSolicitudesPage: React.FC = () => {
     setSearchTerm("");
     setSelectedStatus("all");
     setSelectedType("all");
+    setSelectedSubtypeFilter("all");
   };
+
+  // Limpiar el filtro de subtipo cuando se cambie el tipo de solicitud
+  useEffect(() => {
+    if (selectedType !== 'verificacion-pagos') {
+      setSelectedSubtypeFilter("all");
+    }
+  }, [selectedType]);
 
   const toggleSort = (column: "name" | "date") => {
     if (sortBy === column) {
@@ -1999,7 +2035,7 @@ const AdminSolicitudesPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${selectedType === 'verificacion-pagos' && existingSubtypes.length > 0 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-4 items-end`}>
                   <div className="sm:col-span-2 lg:col-span-2">
                     <div className="space-y-2">
                       <Label htmlFor="search-input">Buscar</Label>
@@ -2051,7 +2087,27 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Select>
                     </div>
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-1">
+                  {selectedType === 'verificacion-pagos' && existingSubtypes.length > 0 && (
+                    <div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subtype-filter">Subtipo de Solicitud</Label>
+                        <Select value={selectedSubtypeFilter} onValueChange={setSelectedSubtypeFilter}>
+                          <SelectTrigger id="subtype-filter" className="h-10">
+                            <SelectValue placeholder="Todos los subtipos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los subtipos</SelectItem>
+                            {existingSubtypes.map((subtype) => (
+                              <SelectItem key={subtype} value={subtype}>
+                                {getVerificacionPagosSubtypeLabel(subtype)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  <div className={`sm:col-span-2 ${selectedType === 'verificacion-pagos' && existingSubtypes.length > 0 ? 'lg:col-span-1' : 'lg:col-span-1'}`}>
                     <Button variant="outline" onClick={clearFilters} className="h-10 w-full flex items-center justify-center gap-2">
                       <Brush className="w-4 h-4" />
                       <span className="sm:hidden">Limpiar</span>
