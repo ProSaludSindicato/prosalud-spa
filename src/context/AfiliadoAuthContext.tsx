@@ -561,8 +561,6 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         eps: (response.data.afiliado as any).eps || null,
         afp: (response.data.afiliado as any).afp || null,
         pais_nacimiento: (response.data.afiliado as any).pais_nacimiento || null,
-        // Parsear contacto_emergencia si viene del backend (para OTP también)
-        contacto_emergencia: (response.data.afiliado as any).contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...((response.data.afiliado as any).contacto_emergencia && !(response.data.afiliado as any).telefono_contacto_emergencia ? (() => {
           // Parsear el campo combinado con función mejorada
@@ -698,8 +696,6 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         eps: (response.data.afiliado as any).eps || null,
         afp: (response.data.afiliado as any).afp || null,
         pais_nacimiento: (response.data.afiliado as any).pais_nacimiento || null,
-        // Parsear contacto_emergencia si viene del backend
-        contacto_emergencia: response.data.afiliado.contacto_emergencia || null,
         // Si ya vienen separados, usarlos; si no, parsear desde contacto_emergencia
         ...(response.data.afiliado.contacto_emergencia && !response.data.afiliado.telefono_contacto_emergencia ? (() => {
           // Parsear el campo combinado con función mejorada

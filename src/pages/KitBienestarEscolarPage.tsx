@@ -152,18 +152,20 @@ const KitBienestarEscolarPage: React.FC = () => {
   // Verificar si el período de inscripción está activo
   const isActive = isEnrollmentPeriodActive();
 
-  // Observar cambios en el documento para mostrar el botón nuevamente
+  // Observar cambios en el documento y fecha de expedición para mostrar el botón nuevamente
   const documento = form.watch('documento');
   const tipoDocumento = form.watch('tipo_documento');
+  const fechaExpedicion = form.watch('fecha_expedicion');
 
   useEffect(() => {
-    // Si el botón está oculto y cambia el documento o tipo de documento, mostrarlo nuevamente
-    if (!showVerifyButton && (documento || tipoDocumento)) {
+    // Si el botón está oculto y cambia el documento, tipo de documento o fecha de expedición, mostrarlo nuevamente
+    // Esto permite al usuario corregir errores en cualquiera de estos campos
+    if (!showVerifyButton && (documento || tipoDocumento || fechaExpedicion)) {
       setShowVerifyButton(true);
       setAuthError(null); // Limpiar el error también
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documento, tipoDocumento]);
+  }, [documento, tipoDocumento, fechaExpedicion]);
 
   const handleAuthenticate = async (data: AuthenticateFormValues) => {
     setIsAuthenticating(true);
