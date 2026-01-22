@@ -12,6 +12,12 @@ export interface WellnessDeliveryBeneficiary {
   edad?: string;
 }
 
+export interface EntregadoPorUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface WellnessDeliveryRequest {
   id: number;
   tipo_entrega: string;
@@ -31,6 +37,8 @@ export interface WellnessDeliveryRequest {
   observaciones?: string | null;
   ip_address?: string;
   user_agent?: string;
+  entregado_por_user_id?: number;
+  entregado_por?: EntregadoPorUser;
   created_at: string;
   updated_at: string;
 }

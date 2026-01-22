@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -137,6 +137,7 @@ const KitBienestarEscolarPage: React.FC = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showVerifyButton, setShowVerifyButton] = useState(true);
   const signaturePadRef = useRef<SignaturePadRef>(null);
 
   const form = useForm<AuthenticateFormValues>({
@@ -150,6 +151,19 @@ const KitBienestarEscolarPage: React.FC = () => {
 
   // Verificar si el período de inscripción está activo
   const isActive = isEnrollmentPeriodActive();
+
+  // Observar cambios en el documento para mostrar el botón nuevamente
+  const documento = form.watch('documento');
+  const tipoDocumento = form.watch('tipo_documento');
+
+  useEffect(() => {
+    // Si el botón está oculto y cambia el documento o tipo de documento, mostrarlo nuevamente
+    if (!showVerifyButton && (documento || tipoDocumento)) {
+      setShowVerifyButton(true);
+      setAuthError(null); // Limpiar el error también
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documento, tipoDocumento]);
 
   const handleAuthenticate = async (data: AuthenticateFormValues) => {
     setIsAuthenticating(true);
@@ -169,6 +183,7 @@ const KitBienestarEscolarPage: React.FC = () => {
 
       if (response.success && response.data) {
         setAuthResult(response.data);
+        setShowVerifyButton(true); // Asegurar que el botón esté visible en caso de éxito
         toast.success('Autenticación exitosa');
       } else {
         // Usar mensaje amigable si es un error 404 (no encontrado)
@@ -178,6 +193,11 @@ const KitBienestarEscolarPage: React.FC = () => {
         
         setAuthError(friendlyMessage);
         toast.error(friendlyMessage);
+        
+        // Si es el mensaje de requisitos no cumplidos, ocultar el botón
+        if (friendlyMessage.includes('no cumples con los requisitos')) {
+          setShowVerifyButton(false);
+        }
       }
     } catch (error) {
       logger.error('Error al autenticar', { error });
@@ -277,6 +297,8 @@ const KitBienestarEscolarPage: React.FC = () => {
     if (signaturePadRef.current) {
       signaturePadRef.current.clear();
     }
+    // Redirigir a la página principal
+    navigate('/');
   };
 
   const handleCloseErrorModal = () => {
@@ -502,20 +524,22 @@ const KitBienestarEscolarPage: React.FC = () => {
                       </div>
                     )}
 
-                    <Button
-                      type="submit"
-                      disabled={isAuthenticating}
-                      className="w-full"
-                    >
-                      {isAuthenticating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Verificando...
-                        </>
-                      ) : (
-                        'Verificar requisitos'
-                      )}
-                    </Button>
+                    {showVerifyButton && (
+                      <Button
+                        type="submit"
+                        disabled={isAuthenticating}
+                        className="w-full"
+                      >
+                        {isAuthenticating ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Verificando...
+                          </>
+                        ) : (
+                          'Verificar requisitos'
+                        )}
+                      </Button>
+                    )}
                   </form>
                 </Form>
               )}
@@ -614,7 +638,14 @@ const KitBienestarEscolarPage: React.FC = () => {
         )}
 
         {/* Modal de éxito */}
-        <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <Dialog 
+          open={showSuccessModal} 
+          onOpenChange={(open) => {
+            if (!open) {
+              handleCloseSuccessModal();
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <div className="flex items-center justify-center mb-4">
@@ -633,10 +664,7 @@ const KitBienestarEscolarPage: React.FC = () => {
             {successData && (
               <div className="space-y-4 py-4">
                 <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-slate-600">Número de solicitud:</span>
-                    <span className="text-sm font-semibold text-slate-900">#{successData.id}</span>
-                  </div>
+                  
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Tipo de entrega:</span>
                     <span className="text-sm text-slate-900">Kit Escolar</span>

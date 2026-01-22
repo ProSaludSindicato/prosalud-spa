@@ -98,6 +98,20 @@ const deliveryStatusChangeSchema = z.object({
 
 type DeliveryStatusChangeFormValues = z.infer<typeof deliveryStatusChangeSchema>;
 
+// Función helper para parsear el parentesco a un formato más amigable
+const parseParentesco = (parentesco: string | undefined): string => {
+  if (!parentesco) return '';
+  
+  switch (parentesco.toUpperCase()) {
+    case 'HIJO_BIOLOGICO':
+      return 'Hijo/a Biológico/a';
+    case 'BENEFICIARIO_EN_CUSTODIA':
+      return 'Beneficiario en Custodia';
+    default:
+      return parentesco;
+  }
+};
+
 // Componente para el menú de acciones con hover
 interface ActionMenuProps {
   solicitud: WellnessRequest;
@@ -2134,6 +2148,18 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                     <p className="text-xs sm:text-sm text-gray-600">Información completa de la solicitud de entrega de bienestar</p>
                   </div>
                 </div>
+                {selectedDeliveryRequest && can('wellness_delivery.manage') && selectedDeliveryRequest.estado !== 'entregado' && selectedDeliveryRequest.estado !== 'cancelado' && (
+                  <Button
+                    onClick={() => {
+                      handleOpenDeliveryStatusDialog(selectedDeliveryRequest);
+                      setShowDeliveryDetailModal(false);
+                    }}
+                    className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Cambiar Estado
+                  </Button>
+                )}
               </div>
 
               {selectedDeliveryRequest && (
@@ -2246,7 +2272,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 <div className="flex flex-wrap gap-2 mt-2">
                                   {beneficiario.parentesco && (
                                     <Badge variant="outline" className="text-xs">
-                                      {beneficiario.parentesco}
+                                      {parseParentesco(beneficiario.parentesco)}
                                     </Badge>
                                   )}
                                   {beneficiario.edad && (
@@ -2325,6 +2351,37 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 whitespace-pre-wrap">
                           {selectedDeliveryRequest.observaciones}
                         </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Información del Usuario que Realizó la Entrega/Cancelación */}
+                  {selectedDeliveryRequest.entregado_por && 
+                   (selectedDeliveryRequest.estado === 'entregado' || selectedDeliveryRequest.estado === 'cancelado') && (
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                          <Users className="h-5 w-5" />
+                          {selectedDeliveryRequest.estado === 'entregado' 
+                            ? 'Entregado por' 
+                            : 'Cancelado por'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Nombre</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {selectedDeliveryRequest.entregado_por.name}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Correo electrónico</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {selectedDeliveryRequest.entregado_por.email}
+                            </p>
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
                   )}

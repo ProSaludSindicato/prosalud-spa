@@ -66,6 +66,12 @@ const MODULE_LABELS: Record<string, string> = {
   incapacidades_files: 'Archivos de Incapacidades',
   liquidaciones_files: 'Archivos de Liquidaciones',
   delegados_files: 'Archivos de Delegados',
+  assembly: 'Asamblea',
+  compensaciones_files: 'Archivos de Compensaciones',
+  socio_demographic_surveys: 'Encuestas Sociodemográficas',
+  document_signing: 'Firma de Convenios',
+  wellness_delivery: 'Entrega de Bienestar',
+  view_dashboard: 'Dashboard',
 };
 
 const AdminRolesListPage: React.FC = () => {

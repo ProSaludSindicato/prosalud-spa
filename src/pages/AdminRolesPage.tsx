@@ -24,7 +24,9 @@ import {
   Calendar,
   UserCheck,
   Lock,
-  Plus
+  Plus,
+  FileSignature,
+  ClipboardList
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +63,12 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   'dotacion': <Package className="h-4 w-4" />,
   'inventory': <ShoppingCart className="h-4 w-4" />,
   'hospital_requests': <Building2 className="h-4 w-4" />,
+  'assembly': <Users className="h-4 w-4" />,
+  'compensaciones_files': <FileText className="h-4 w-4" />,
+  'socio_demographic_surveys': <ClipboardList className="h-4 w-4" />,
+  'document_signing': <FileSignature className="h-4 w-4" />,
+  'wellness_delivery': <Package className="h-4 w-4" />,
+  'view_dashboard': <BarChart3 className="h-4 w-4" />,
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -83,6 +91,12 @@ const MODULE_LABELS: Record<string, string> = {
   'incapacidades_files': 'Archivos de Incapacidades',
   'liquidaciones_files': 'Archivos de Liquidaciones',
   'delegados_files': 'Archivos de Delegados',
+  'assembly': 'Asamblea',
+  'compensaciones_files': 'Archivos de Compensaciones',
+  'socio_demographic_surveys': 'Encuestas Sociodemográficas',
+  'document_signing': 'Firma de Convenios',
+  'wellness_delivery': 'Entrega de Bienestar',
+  'view_dashboard': 'Dashboard',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -105,6 +119,12 @@ const translatePermission = (permissionName: string): string => {
   
   if (parts.length === 2) {
     const [module, action] = parts;
+    
+    // Caso especial: inventory.view_dashboard no debe mostrar "Ver"
+    if (module === 'inventory' && action === 'view_dashboard') {
+      return 'Dashboard de Inventario';
+    }
+    
     const translatedModule = MODULE_LABELS[module] || module;
     const translatedAction = ACTION_LABELS[action] || action;
     return `${translatedAction} ${translatedModule}`;
@@ -139,6 +159,11 @@ const translatePermissionAction = (permissionName: string): string => {
   
   if (parts.length === 2) {
     const [module, action] = parts;
+    
+    // Caso especial: inventory.view_dashboard no debe mostrar "Ver"
+    if (module === 'inventory' && action === 'view_dashboard') {
+      return 'Dashboard';
+    }
     
     // Permisos de archivos: cambiar "Ver" o "Gestionar" a "Cargar archivo"
     if (module.endsWith('_files') && (action === 'view' || action === 'manage')) {
