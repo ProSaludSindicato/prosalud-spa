@@ -35,6 +35,11 @@ export const API_CONFIG = {
     AFILIADOS_AUTHENTICATE_FOR_DATA_UPDATE: '/api/afiliados/authenticate-for-data-update',
     // Socio Demographic Survey endpoint
     SOCIO_DEMOGRAPHIC_SURVEYS: '/api/socio-demographic-surveys',
+    // Kit Bienestar Escolar endpoints
+    KIT_BIENESTAR_AUTHENTICATE: '/api/kit-bienestar/authenticate',
+    KIT_BIENESTAR_SUBMIT: '/api/kit-bienestar/submit',
+    // Wellness Delivery Requests endpoints
+    WELLNESS_DELIVERY_REQUESTS: '/api/wellness-delivery-requests',
   },
 } as const;
 

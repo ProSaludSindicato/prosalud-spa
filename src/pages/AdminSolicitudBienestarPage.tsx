@@ -12,8 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,17 +47,26 @@ import {
   CheckCircle2,
   Globe,
   EyeOff,
+  Package,
+  Signature,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 import DataPagination from '@/components/ui/data-pagination';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
+import { wellnessDeliveryService, WellnessDeliveryRequest } from '@/services/wellnessDeliveryService';
 import { TableLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import WellnessRequestForm from '@/components/admin/solicitudes/WellnessRequestForm';
 import WellnessActivityRealizedForm from '@/components/admin/solicitudes/WellnessActivityRealizedForm';
 import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
 import ExportWellnessReportDialog from '@/components/admin/solicitudes/ExportWellnessReportDialog';
+import ExportWellnessDeliveryReportDialog from '@/components/admin/solicitudes/ExportWellnessDeliveryReportDialog';
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -66,6 +77,26 @@ const statusChangeSchema = z.object({
 });
 
 type StatusChangeFormValues = z.infer<typeof statusChangeSchema>;
+
+// Schema para cambiar estado de entrega de bienestar
+const deliveryStatusChangeSchema = z.object({
+  estado: z.enum(['entregado', 'cancelado'], {
+    required_error: 'Debe seleccionar un estado',
+  }),
+  firma_recibido: z.string().optional(),
+  observaciones: z.string().optional(),
+}).refine((data) => {
+  // Si el estado es "entregado", firma_recibido es obligatorio
+  if (data.estado === 'entregado') {
+    return !!data.firma_recibido && data.firma_recibido.trim().length > 0;
+  }
+  return true;
+}, {
+  message: 'La firma de recibido es obligatoria cuando el estado es "entregado"',
+  path: ['firma_recibido'],
+});
+
+type DeliveryStatusChangeFormValues = z.infer<typeof deliveryStatusChangeSchema>;
 
 // Componente para el menú de acciones con hover
 interface ActionMenuProps {
@@ -181,12 +212,47 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [showActivityReviewDialog, setShowActivityReviewDialog] = useState(false);
   const [solicitudForReview, setSolicitudForReview] = useState<WellnessRequest | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showExportDeliveryDialog, setShowExportDeliveryDialog] = useState(false);
+  // Persistir el tab activo en localStorage
+  const [activeTab, setActiveTab] = useState<'solicitudes' | 'entregas'>(() => {
+    const savedTab = localStorage.getItem('adminSolicitudBienestarActiveTab');
+    return (savedTab === 'solicitudes' || savedTab === 'entregas') ? savedTab : 'solicitudes';
+  });
+
+  // Guardar el tab cuando cambia
+  useEffect(() => {
+    localStorage.setItem('adminSolicitudBienestarActiveTab', activeTab);
+  }, [activeTab]);
+  
+  // Estados para Entregas de Bienestar
+  const [tipoEntregaFilter, setTipoEntregaFilter] = useState<string>('all');
+  const [estadoEntregaFilter, setEstadoEntregaFilter] = useState<string>('all');
+  const [documentoEntregaFilter, setDocumentoEntregaFilter] = useState<string>('');
+  const [currentPageEntregas, setCurrentPageEntregas] = useState<number>(1);
+  const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(15);
+  const [selectedDeliveryRequest, setSelectedDeliveryRequest] = useState<WellnessDeliveryRequest | null>(null);
+  const [showDeliveryDetailModal, setShowDeliveryDetailModal] = useState(false);
+  const [showDeliveryStatusDialog, setShowDeliveryStatusDialog] = useState(false);
+  const [deliveryRequestToUpdate, setDeliveryRequestToUpdate] = useState<WellnessDeliveryRequest | null>(null);
+  const [isSubmittingDeliveryStatus, setIsSubmittingDeliveryStatus] = useState(false);
+  const [deliverySignature, setDeliverySignature] = useState<string | null>(null);
+  const [showDeliverySignatureError, setShowDeliverySignatureError] = useState(false);
+  const deliverySignaturePadRef = React.useRef<SignaturePadRef>(null);
+  
   const queryClient = useQueryClient();
 
   const statusChangeForm = useForm<StatusChangeFormValues>({
     resolver: zodResolver(statusChangeSchema),
     defaultValues: {
       newStatus: 'in_progress',
+    },
+  });
+
+  const deliveryStatusChangeForm = useForm<DeliveryStatusChangeFormValues>({
+    resolver: zodResolver(deliveryStatusChangeSchema),
+    defaultValues: {
+      estado: 'entregado',
+      observaciones: undefined,
     },
   });
 
@@ -227,6 +293,43 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   const bienestarSolicitudes = wellnessRequestsData?.data || [];
   const pagination = wellnessRequestsData?.pagination;
+
+  // Filtros para Entregas de Bienestar
+  const entregasFilters = useMemo(() => {
+    const filters: any = {
+      page: currentPageEntregas,
+      per_page: itemsPerPageEntregas,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+    };
+
+    if (tipoEntregaFilter && tipoEntregaFilter !== 'all') {
+      filters.tipo_entrega = tipoEntregaFilter;
+    }
+    if (estadoEntregaFilter && estadoEntregaFilter !== 'all') {
+      filters.estado = estadoEntregaFilter;
+    }
+    if (documentoEntregaFilter) {
+      filters.documento = documentoEntregaFilter;
+    }
+
+    return filters;
+  }, [currentPageEntregas, itemsPerPageEntregas, tipoEntregaFilter, estadoEntregaFilter, documentoEntregaFilter]);
+
+  // Query para Entregas de Bienestar
+  const {
+    data: entregasResponse,
+    isLoading: isLoadingEntregas,
+    error: errorEntregas,
+    refetch: refetchEntregas,
+  } = useQuery({
+    queryKey: ['wellness-delivery-requests', entregasFilters],
+    queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
+    enabled: can('wellness_delivery.view') && activeTab === 'entregas',
+  });
+
+  const entregas = entregasResponse?.data || [];
+  const entregasPagination = entregasResponse?.pagination;
 
   // Open modal from URL parameter
   useEffect(() => {
@@ -357,6 +460,121 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     setSelectedSolicitud(solicitud);
   }, []);
 
+  // Función para ver detalles de entrega
+  const handleViewDeliveryDetails = async (request: WellnessDeliveryRequest) => {
+    try {
+      const response = await wellnessDeliveryService.getRequestById(request.id);
+      if (response.success && response.data) {
+        setSelectedDeliveryRequest(response.data);
+        setShowDeliveryDetailModal(true);
+      }
+    } catch (error) {
+      toast.error('Error al cargar los detalles de la solicitud', {
+        description: getErrorMessage(error),
+      });
+    }
+  };
+
+  // Formatear fecha para entregas
+  const formatDeliveryDate = (dateString: string): string => {
+    try {
+      return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Función para abrir el diálogo de cambio de estado de entrega
+  const handleOpenDeliveryStatusDialog = React.useCallback((request: WellnessDeliveryRequest) => {
+    setDeliveryRequestToUpdate(request);
+    deliveryStatusChangeForm.reset({
+      estado: 'entregado' as 'entregado' | 'cancelado', // Por defecto "entregado"
+      observaciones: undefined,
+      firma_recibido: undefined,
+    });
+    setDeliverySignature(null);
+    setShowDeliverySignatureError(false);
+    if (deliverySignaturePadRef.current) {
+      deliverySignaturePadRef.current.clear();
+    }
+    setShowDeliveryStatusDialog(true);
+  }, [deliveryStatusChangeForm]);
+
+  // Función para cerrar el diálogo de cambio de estado
+  const handleCloseDeliveryStatusDialog = () => {
+    setIsSubmittingDeliveryStatus(false);
+    setShowDeliveryStatusDialog(false);
+    setDeliveryRequestToUpdate(null);
+    setDeliverySignature(null);
+    setShowDeliverySignatureError(false);
+    if (deliverySignaturePadRef.current) {
+      deliverySignaturePadRef.current.clear();
+    }
+    deliveryStatusChangeForm.reset();
+  };
+
+  // Función para manejar el cambio de firma
+  const handleDeliverySignatureChange = (dataUrl: string | null) => {
+    setDeliverySignature(dataUrl);
+    setShowDeliverySignatureError(false);
+    // Actualizar el formulario con la firma
+    if (dataUrl) {
+      deliveryStatusChangeForm.setValue('firma_recibido', dataUrl);
+    } else {
+      deliveryStatusChangeForm.setValue('firma_recibido', undefined);
+    }
+  };
+
+  // Mutation para actualizar estado de entrega
+  const updateDeliveryStatusMutation = useMutation({
+    mutationFn: async (data: DeliveryStatusChangeFormValues) => {
+      if (!deliveryRequestToUpdate) throw new Error('No hay solicitud seleccionada');
+      
+      const requestData: any = {
+        estado: data.estado,
+        observaciones: data.observaciones || undefined,
+      };
+
+      // Solo incluir firma_recibido si el estado es "entregado"
+      if (data.estado === 'entregado' && data.firma_recibido) {
+        requestData.firma_recibido = data.firma_recibido;
+      }
+
+      return wellnessDeliveryService.updateStatus(deliveryRequestToUpdate.id, requestData);
+    },
+    onSuccess: async () => {
+      toast.success('Estado actualizado exitosamente', {
+        description: 'El estado de la solicitud de entrega ha sido actualizado.',
+      });
+      // Invalidar queries y refetch
+      await queryClient.invalidateQueries({ queryKey: ['wellness-delivery-requests'] });
+      await refetchEntregas();
+      handleCloseDeliveryStatusDialog();
+    },
+    onError: (error: any) => {
+      const errorMessage = getErrorMessage(error);
+      toast.error('Error al actualizar el estado', {
+        description: errorMessage,
+      });
+      setIsSubmittingDeliveryStatus(false);
+    },
+  });
+
+  // Función para enviar el cambio de estado
+  const handleSubmitDeliveryStatusChange = async (data: DeliveryStatusChangeFormValues) => {
+    // Validar firma si el estado es "entregado"
+    if (data.estado === 'entregado' && !data.firma_recibido) {
+      setShowDeliverySignatureError(true);
+      return;
+    }
+
+    setIsSubmittingDeliveryStatus(true);
+    updateDeliveryStatusMutation.mutate(data);
+  };
+
+  // Observar cambios en el estado para mostrar/ocultar el campo de firma
+  const selectedEstado = deliveryStatusChangeForm.watch('estado');
+
   const handleAddActivityRealized = React.useCallback((solicitud: WellnessRequest) => {
     setSolicitudForActivity(solicitud);
     setShowActivityRealizedForm(true);
@@ -484,19 +702,23 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                         <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">
-                          Solicitudes de Bienestar
+                          Bienestar
                         </CardTitle>
-                        <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
-                          Total: {stats?.total || 0}
-                        </Badge>
+                        {activeTab === 'solicitudes' && (
+                          <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
+                            Total: {stats?.total || 0}
+                          </Badge>
+                        )}
                       </div>
                       <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
-                        Gestiona las solicitudes de actividades de bienestar
+                        {activeTab === 'solicitudes' 
+                          ? 'Gestiona las solicitudes de actividades de bienestar'
+                          : 'Gestiona las solicitudes de entrega de kits escolares y otros beneficios'}
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
-                    {can('wellness_requests.view') && (
+                    {activeTab === 'solicitudes' && can('wellness_requests.view') && (
                       <Button
                         onClick={() => setShowExportDialog(true)}
                         variant="outline"
@@ -507,7 +729,18 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         <span className="sm:hidden">Exportar</span>
                       </Button>
                     )}
-                    {can('wellness_requests.create') && (
+                    {activeTab === 'entregas' && can('wellness_delivery.view') && (
+                      <Button
+                        onClick={() => setShowExportDeliveryDialog(true)}
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Exportar Reporte</span>
+                        <span className="sm:hidden">Exportar</span>
+                      </Button>
+                    )}
+                    {activeTab === 'solicitudes' && can('wellness_requests.create') && (
                       <Button
                         onClick={() => setShowCreateForm(true)}
                         className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
@@ -523,9 +756,37 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             </Card>
           </motion.div>
 
-          {/* Stats Cards */}
+          {/* Tabs */}
           <motion.div variants={itemVariants}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <Card className="border shadow-sm bg-white">
+              <CardContent className="p-0">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'solicitudes' | 'entregas')} className="space-y-6">
+                  <div className="p-6 pb-0">
+                    <TabsList className="grid w-full grid-cols-2 bg-gray-50 border p-1">
+                      <TabsTrigger
+                        value="solicitudes"
+                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                      >
+                        <Heart className="h-4 w-4" />
+                        <span>Solicitudes de Bienestar</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="entregas"
+                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        disabled={!can('wellness_delivery.view')}
+                      >
+                        <Package className="h-4 w-4" />
+                        <span>Entregas de Bienestar</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  <div className="p-6 pt-0">
+                    {/* Tab: Solicitudes de Bienestar */}
+                    <TabsContent value="solicitudes" className="space-y-6 mt-0">
+                      {/* Stats Cards */}
+                      <motion.div variants={itemVariants}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -971,6 +1232,313 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                     />
                   </>
                 )}
+              </CardContent>
+            </Card>
+          </motion.div>
+                    </TabsContent>
+
+                    {/* Tab: Entregas de Bienestar */}
+                    <TabsContent value="entregas" className="space-y-6 mt-0">
+                      {!can('wellness_delivery.view') ? (
+                        <Card>
+                          <CardContent className="p-6">
+                            <p className="text-red-600">No tienes permisos para acceder a esta sección.</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <>
+                          {/* Filtros para Entregas */}
+                          <Card className="border shadow-sm bg-white">
+                            <CardHeader>
+                              <CardTitle className="flex items-center space-x-2">
+                                <Filter className="h-5 w-5" />
+                                <span>Filtros</span>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="relative sm:col-span-2 lg:col-span-2">
+                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                  <Input
+                                    placeholder="Buscar por documento..."
+                                    value={documentoEntregaFilter}
+                                    onChange={(e) => {
+                                      setDocumentoEntregaFilter(e.target.value);
+                                      setCurrentPageEntregas(1);
+                                    }}
+                                    className="pl-10"
+                                  />
+                                </div>
+                                <Select
+                                  value={tipoEntregaFilter}
+                                  onValueChange={(value) => {
+                                    setTipoEntregaFilter(value);
+                                    setCurrentPageEntregas(1);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Tipo de entrega" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">Todos los tipos</SelectItem>
+                                    <SelectItem value="kit_escolar">Kit Escolar</SelectItem>
+                                    <SelectItem value="desayuno">Desayuno</SelectItem>
+                                    <SelectItem value="lonchera">Lonchera</SelectItem>
+                                    <SelectItem value="otro">Otro</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={estadoEntregaFilter}
+                                  onValueChange={(value) => {
+                                    setEstadoEntregaFilter(value);
+                                    setCurrentPageEntregas(1);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Estado" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">Todos los estados</SelectItem>
+                                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                                    <SelectItem value="procesado">Procesado</SelectItem>
+                                    <SelectItem value="entregado">Entregado</SelectItem>
+                                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Tabla de Entregas */}
+                          <Card className="border shadow-sm bg-white">
+                            <CardHeader>
+                              <CardTitle className="text-2xl font-bold text-gray-900">
+                                Entregas de Bienestar ({entregasPagination?.total || 0})
+                              </CardTitle>
+                              <CardDescription className="text-gray-600 mt-1">
+                                Lista completa de solicitudes de entrega de bienestar
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              {isLoadingEntregas ? (
+                                <TableLoadingSkeleton columns={7} rows={5} />
+                              ) : errorEntregas ? (
+                                <div className="text-center py-8 text-red-600">
+                                  Error al cargar las entregas. Por favor, intente nuevamente.
+                                  <Button onClick={() => refetchEntregas()} variant="outline" className="mt-4">
+                                    Reintentar
+                                  </Button>
+                                </div>
+                              ) : entregas.length === 0 ? (
+                                <div className="text-center py-12">
+                                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                                  <p className="text-lg text-gray-600">
+                                    {documentoEntregaFilter || tipoEntregaFilter !== 'all' || estadoEntregaFilter !== 'all'
+                                      ? 'No se encontraron entregas con los filtros aplicados'
+                                      : 'No hay entregas de bienestar registradas'}
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Desktop Table View - Hidden on mobile */}
+                                  <div className="hidden lg:block overflow-x-auto">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>ID</TableHead>
+                                          <TableHead>Tipo</TableHead>
+                                          <TableHead>Afiliado</TableHead>
+                                          <TableHead>Documento</TableHead>
+                                          <TableHead>Hospital</TableHead>
+                                          <TableHead>Estado</TableHead>
+                                          <TableHead>Fecha</TableHead>
+                                          <TableHead className="text-right">Acciones</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {entregas.map((request) => (
+                                          <TableRow key={request.id}>
+                                            <TableCell className="font-medium">#{request.id}</TableCell>
+                                            <TableCell>
+                                              {request.tipo_entrega_text || 
+                                               (request.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
+                                                request.tipo_entrega === 'desayuno' ? 'Desayuno' :
+                                                request.tipo_entrega === 'lonchera' ? 'Lonchera' :
+                                                request.tipo_entrega === 'otro' ? 'Otro' : request.tipo_entrega)}
+                                            </TableCell>
+                                            <TableCell className="max-w-[200px] truncate">
+                                              {request.nombre_afiliado}
+                                            </TableCell>
+                                            <TableCell>{request.documento_afiliado}</TableCell>
+                                            <TableCell>{request.hospital || '-'}</TableCell>
+                                            <TableCell>
+                                              <Badge className={
+                                                request.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                                request.estado === 'procesado' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                                request.estado === 'entregado' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                                request.estado === 'cancelado' ? 'bg-red-100 text-red-800 border border-red-300' :
+                                                'bg-gray-100 text-gray-800 border border-gray-300'
+                                              }>
+                                                {request.estado_text || 
+                                                 (request.estado === 'pendiente' ? 'Pendiente' :
+                                                  request.estado === 'procesado' ? 'Procesado' :
+                                                  request.estado === 'entregado' ? 'Entregado' :
+                                                  request.estado === 'cancelado' ? 'Cancelado' : request.estado)}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-gray-600">
+                                              {format(new Date(request.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem onClick={() => handleViewDeliveryDetails(request)}>
+                                                    <Eye className="h-4 w-4 mr-2" />
+                                                    Ver Detalles
+                                                  </DropdownMenuItem>
+                                                  {can('wellness_delivery.manage') && request.estado !== 'entregado' && request.estado !== 'cancelado' && (
+                                                    <DropdownMenuItem onClick={() => handleOpenDeliveryStatusDialog(request)}>
+                                                      <Send className="h-4 w-4 mr-2" />
+                                                      Cambiar Estado
+                                                    </DropdownMenuItem>
+                                                  )}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+
+                                  {/* Mobile Card View - Visible on mobile and tablet */}
+                                  <div className="lg:hidden space-y-3">
+                                    {entregas.map((request) => (
+                                      <Card key={request.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                                        <CardContent className="p-4">
+                                          <div className="space-y-3">
+                                            {/* Header with ID and actions */}
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                  <p className="font-medium text-gray-900 text-sm">
+                                                    #{request.id}
+                                                  </p>
+                                                  <Badge className={
+                                                    request.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                                                    request.estado === 'procesado' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                                    request.estado === 'entregado' ? 'bg-green-100 text-green-800 border border-green-300' :
+                                                    request.estado === 'cancelado' ? 'bg-red-100 text-red-800 border border-red-300' :
+                                                    'bg-gray-100 text-gray-800 border border-gray-300'
+                                                  }>
+                                                    {request.estado_text || 
+                                                     (request.estado === 'pendiente' ? 'Pendiente' :
+                                                      request.estado === 'procesado' ? 'Procesado' :
+                                                      request.estado === 'entregado' ? 'Entregado' :
+                                                      request.estado === 'cancelado' ? 'Cancelado' : request.estado)}
+                                                  </Badge>
+                                                </div>
+                                              </div>
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem onClick={() => handleViewDeliveryDetails(request)}>
+                                                    <Eye className="h-4 w-4 mr-2" />
+                                                    Ver Detalles
+                                                  </DropdownMenuItem>
+                                                  {can('wellness_delivery.manage') && request.estado !== 'entregado' && request.estado !== 'cancelado' && (
+                                                    <DropdownMenuItem onClick={() => handleOpenDeliveryStatusDialog(request)}>
+                                                      <Send className="h-4 w-4 mr-2" />
+                                                      Cambiar Estado
+                                                    </DropdownMenuItem>
+                                                  )}
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            </div>
+
+                                            {/* Tipo y Afiliado */}
+                                            <div className="border-t pt-2">
+                                              <div className="space-y-2">
+                                                <div>
+                                                  <p className="text-xs font-medium text-gray-500 mb-1">Tipo</p>
+                                                  <p className="text-sm text-gray-900">
+                                                    {request.tipo_entrega_text || 
+                                                     (request.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
+                                                      request.tipo_entrega === 'desayuno' ? 'Desayuno' :
+                                                      request.tipo_entrega === 'lonchera' ? 'Lonchera' :
+                                                      request.tipo_entrega === 'otro' ? 'Otro' : request.tipo_entrega)}
+                                                  </p>
+                                                </div>
+                                                <div>
+                                                  <p className="text-xs font-medium text-gray-500 mb-1">Afiliado</p>
+                                                  <p className="text-sm text-gray-900">{request.nombre_afiliado}</p>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Documento y Hospital */}
+                                            <div className="border-t pt-2">
+                                              <div className="grid grid-cols-1 gap-2">
+                                                <div>
+                                                  <p className="text-xs font-medium text-gray-500 mb-1">Documento</p>
+                                                  <p className="text-sm text-gray-900">{request.documento_afiliado}</p>
+                                                </div>
+                                                {request.hospital && (
+                                                  <div>
+                                                    <p className="text-xs font-medium text-gray-500 mb-1">Hospital</p>
+                                                    <p className="text-sm text-gray-900">{request.hospital}</p>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            {/* Fecha */}
+                                            <div className="border-t pt-2">
+                                              <div className="flex items-center gap-2 text-sm">
+                                                <Calendar className="h-4 w-4 text-gray-400" />
+                                                <span className="text-gray-600">
+                                                  {format(new Date(request.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                  {entregasPagination && (
+                                    <div className="mt-4">
+                                      <DataPagination
+                                        currentPage={entregasPagination.current_page}
+                                        totalPages={entregasPagination.last_page}
+                                        itemsPerPage={entregasPagination.per_page}
+                                        totalItems={entregasPagination.total}
+                                        onPageChange={setCurrentPageEntregas}
+                                        onItemsPerPageChange={(value) => {
+                                          setItemsPerPageEntregas(value);
+                                          setCurrentPageEntregas(1);
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+                    </TabsContent>
+                  </div>
+                </Tabs>
               </CardContent>
             </Card>
           </motion.div>
@@ -1535,11 +2103,412 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           />
         )}
 
-        {/* Diálogo de Exportación de Reporte */}
+        {/* Diálogo de Exportación de Reporte de Solicitudes */}
         <ExportWellnessReportDialog
           open={showExportDialog}
           onOpenChange={setShowExportDialog}
         />
+
+        {/* Diálogo de Exportación de Reporte de Entregas */}
+        <ExportWellnessDeliveryReportDialog
+          open={showExportDeliveryDialog}
+          onOpenChange={setShowExportDeliveryDialog}
+        />
+
+        {/* Modal de Detalles de Entrega */}
+        <Dialog open={showDeliveryDetailModal} onOpenChange={setShowDeliveryDetailModal}>
+          <DialogContent className="max-sm:inset-x-4 max-sm:max-w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
+            <DialogTitle className="sr-only">
+              Detalles de la Solicitud de Entrega #{selectedDeliveryRequest?.id}
+            </DialogTitle>
+            <div className="bg-white min-h-full">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary-prosalud/10 p-2 rounded-lg flex-shrink-0">
+                    <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary-prosalud" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
+                      Detalles de la Solicitud de Entrega #{selectedDeliveryRequest?.id}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-gray-600">Información completa de la solicitud de entrega de bienestar</p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedDeliveryRequest && (
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                  {/* Información de la Solicitud */}
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
+                        Información de la Solicitud
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Tipo de Entrega</label>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {selectedDeliveryRequest.tipo_entrega_text || 
+                             (selectedDeliveryRequest.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
+                              selectedDeliveryRequest.tipo_entrega === 'desayuno' ? 'Desayuno' :
+                              selectedDeliveryRequest.tipo_entrega === 'lonchera' ? 'Lonchera' :
+                              selectedDeliveryRequest.tipo_entrega === 'otro' ? 'Otro' : selectedDeliveryRequest.tipo_entrega)}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Estado</label>
+                          <p className="mt-1">
+                            <Badge className={
+                              selectedDeliveryRequest.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
+                              selectedDeliveryRequest.estado === 'procesado' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                              selectedDeliveryRequest.estado === 'entregado' ? 'bg-green-100 text-green-800 border border-green-300' :
+                              selectedDeliveryRequest.estado === 'cancelado' ? 'bg-red-100 text-red-800 border border-red-300' :
+                              'bg-gray-100 text-gray-800 border border-gray-300'
+                            }>
+                              {selectedDeliveryRequest.estado_text || 
+                               (selectedDeliveryRequest.estado === 'pendiente' ? 'Pendiente' :
+                                selectedDeliveryRequest.estado === 'procesado' ? 'Procesado' :
+                                selectedDeliveryRequest.estado === 'entregado' ? 'Entregado' :
+                                selectedDeliveryRequest.estado === 'cancelado' ? 'Cancelado' : selectedDeliveryRequest.estado)}
+                            </Badge>
+                          </p>
+                        </div>
+                        {selectedDeliveryRequest.hospital && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Hospital</label>
+                              <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.hospital}</p>
+                            </div>
+                        )}
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Fecha de Creación</label>
+                          <p className="mt-1 text-sm text-gray-900">{formatDeliveryDate(selectedDeliveryRequest.created_at)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Última Actualización</label>
+                          <p className="mt-1 text-sm text-gray-900">{formatDeliveryDate(selectedDeliveryRequest.updated_at)}</p>
+                        </div>
+                        {selectedDeliveryRequest.ip_address && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Dirección IP</label>
+                            <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.ip_address}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Información del Afiliado */}
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
+                        Información del Afiliado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Nombre Completo</label>
+                          <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.nombre_afiliado}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Documento</label>
+                          <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.documento_afiliado}</p>
+                        </div>
+                        {selectedDeliveryRequest.fecha_expedicion && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Fecha de Expedición del Documento</label>
+                            <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.fecha_expedicion}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Beneficiarios */}
+                  {selectedDeliveryRequest.beneficiarios && selectedDeliveryRequest.beneficiarios.length > 0 && (
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                          <Users className="h-5 w-5" />
+                          Beneficiarios
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {selectedDeliveryRequest.beneficiarios.map((beneficiario, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <p className="text-sm font-medium text-gray-900">
+                                {beneficiario.beneficiario}
+                              </p>
+                              {(beneficiario.parentesco || beneficiario.edad) && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {beneficiario.parentesco && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {beneficiario.parentesco}
+                                    </Badge>
+                                  )}
+                                  {beneficiario.edad && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Edad: {beneficiario.edad} años
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Firmas Digitales */}
+                  {(selectedDeliveryRequest.firma || selectedDeliveryRequest.firma_recibido) && (
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                          <Signature className="h-5 w-5" />
+                          Firmas Digitales
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                          {/* Firma Digital del Afiliado */}
+                          {selectedDeliveryRequest.firma && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-3">Firma de solicitud</h4>
+                              <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-gray-200 flex justify-center items-center" style={{ minHeight: '250px' }}>
+                                <img
+                                  src={selectedDeliveryRequest.firma}
+                                  alt="Firma del afiliado"
+                                  className="max-w-full h-auto rounded shadow-sm"
+                                  style={{ maxHeight: '250px' }}
+                                />
+                              </div>
+                              {selectedDeliveryRequest.tipo_firma_text && (
+                                <p className="text-xs text-gray-600 mt-3 text-center">
+                                  Tipo: {selectedDeliveryRequest.tipo_firma_text}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Firma de Recibido */}
+                          {selectedDeliveryRequest.firma_recibido && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-3">Firma de recibido</h4>
+                              <div className="bg-gray-50 rounded-lg p-4 sm:p-6 border-2 border-gray-200 flex justify-center items-center" style={{ minHeight: '250px' }}>
+                                <img
+                                  src={selectedDeliveryRequest.firma_recibido}
+                                  alt="Firma de recibido"
+                                  className="max-w-full h-auto rounded shadow-sm"
+                                  style={{ maxHeight: '250px' }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Observaciones */}
+                  {selectedDeliveryRequest.observaciones && (
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardHeader className="bg-gray-50 border-b border-gray-200 p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
+                          Observaciones
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 whitespace-pre-wrap">
+                          {selectedDeliveryRequest.observaciones}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Drawer de Cambio de Estado de Entrega */}
+        {deliveryRequestToUpdate && (
+          <Drawer 
+            open={showDeliveryStatusDialog} 
+            onOpenChange={(open) => {
+              // Solo permitir cerrar con el botón Cancelar, no arrastrando
+              if (!open) {
+                handleCloseDeliveryStatusDialog();
+              }
+            }}
+            dismissible={false}
+          >
+            <DrawerContent className="h-[75vh] border-t border-slate-200 bg-white px-4 sm:px-6 flex flex-col overflow-hidden">
+              <DrawerHeader className="pb-2 flex-shrink-0">
+                <DrawerTitle className="text-lg sm:text-xl font-semibold text-slate-800">
+                  Cambiar Estado de la Solicitud #{deliveryRequestToUpdate.id}
+                </DrawerTitle>
+                <DrawerDescription className="text-xs sm:text-sm text-slate-500">
+                  Actualiza el estado de la solicitud de entrega de bienestar
+                </DrawerDescription>
+              </DrawerHeader>
+
+              <Form {...deliveryStatusChangeForm}>
+                <form onSubmit={deliveryStatusChangeForm.handleSubmit(handleSubmitDeliveryStatusChange)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-5 pr-2">
+                  <FormField
+                    control={deliveryStatusChangeForm.control}
+                    name="estado"
+                    render={({ field }) => {
+                      const getEstadoColor = (estado: string) => {
+                        switch (estado) {
+                          case 'pendiente':
+                            return 'border-yellow-300 bg-yellow-50';
+                          case 'procesado':
+                            return 'border-blue-300 bg-blue-50';
+                          case 'entregado':
+                            return 'border-green-300 bg-green-50';
+                          case 'cancelado':
+                            return 'border-red-300 bg-red-50';
+                          default:
+                            return '';
+                        }
+                      };
+
+                      return (
+                        <FormItem className="w-full">
+                          <FormLabel>Nuevo Estado</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className={`w-full max-w-full ${field.value ? getEstadoColor(field.value) : ''}`}>
+                                <SelectValue placeholder="Seleccione un estado" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem 
+                                value="entregado"
+                                className="hover:bg-green-50 focus:bg-green-50 data-[highlighted]:bg-green-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                  Entregado
+                                </span>
+                              </SelectItem>
+                              <SelectItem 
+                                value="cancelado"
+                                className="hover:bg-red-50 focus:bg-red-50 data-[highlighted]:bg-red-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                  Cancelado
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+
+                  {/* Campo de Firma - Solo cuando el estado es "entregado" */}
+                  {selectedEstado === 'entregado' && (
+                    <FormField
+                      control={deliveryStatusChangeForm.control}
+                      name="firma_recibido"
+                      render={({ field }) => (
+                        <FormItem className="flex-shrink-0">
+                          <FormLabel className="text-base sm:text-lg font-semibold text-gray-900">
+                            Firma de Recibido <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <div className="space-y-3 w-full">
+                              <div className="relative w-full border-2 border-gray-300 rounded-lg bg-white overflow-hidden">
+                                <div className="[&>div>div:last-child]:!hidden w-full">
+                                  <SignaturePad
+                                    ref={deliverySignaturePadRef}
+                                    onChange={(dataUrl) => {
+                                      handleDeliverySignatureChange(dataUrl);
+                                      field.onChange(dataUrl || undefined);
+                                    }}
+                                    height={240}
+                                  />
+                                </div>
+                                {!deliverySignature && (
+                                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-2">
+                                    <p className="text-sm text-slate-400 italic text-center">
+                                      Firma aquí con el mouse o tu dedo
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (deliverySignaturePadRef.current) {
+                                      deliverySignaturePadRef.current.clear();
+                                    }
+                                    setDeliverySignature(null);
+                                    setShowDeliverySignatureError(false);
+                                    field.onChange(undefined);
+                                  }}
+                                  className="text-sm text-slate-600 hover:text-slate-900 underline"
+                                >
+                                  Limpiar firma
+                                </button>
+                              </div>
+                              {showDeliverySignatureError && (
+                                <Alert variant="destructive" className="py-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <AlertDescription className="text-sm font-medium">
+                                    La firma de recibido es obligatoria cuando el estado es "entregado".
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  </div>
+
+                  <DrawerFooter className="flex flex-col-reverse gap-2 pb-4 sm:pb-6 sm:flex-row sm:justify-end sm:gap-3 px-0 flex-shrink-0 border-t pt-4 mt-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleCloseDeliveryStatusDialog}
+                      className="sm:w-40"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingDeliveryStatus || updateDeliveryStatusMutation.isPending}
+                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white sm:w-48"
+                    >
+                      {isSubmittingDeliveryStatus || updateDeliveryStatusMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Actualizando...
+                        </>
+                      ) : (
+                        <>
+                          Actualizar Estado
+                        </>
+                      )}
+                    </Button>
+                  </DrawerFooter>
+                </form>
+              </Form>
+            </DrawerContent>
+          </Drawer>
+        )}
       </div>
     </AdminLayout>
   );
