@@ -49,6 +49,7 @@ import {
   EyeOff,
   Package,
   Signature,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -67,6 +68,7 @@ import WellnessActivityRealizedForm from '@/components/admin/solicitudes/Wellnes
 import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
 import ExportWellnessReportDialog from '@/components/admin/solicitudes/ExportWellnessReportDialog';
 import ExportWellnessDeliveryReportDialog from '@/components/admin/solicitudes/ExportWellnessDeliveryReportDialog';
+import KitBienestarFileManager from '@/components/admin/solicitudes/KitBienestarFileManager';
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -227,6 +229,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [solicitudForReview, setSolicitudForReview] = useState<WellnessRequest | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showExportDeliveryDialog, setShowExportDeliveryDialog] = useState(false);
+  const [showFileManagerModal, setShowFileManagerModal] = useState(false);
   // Persistir el tab activo en localStorage
   const [activeTab, setActiveTab] = useState<'solicitudes' | 'entregas'>(() => {
     const savedTab = localStorage.getItem('adminSolicitudBienestarActiveTab');
@@ -1264,10 +1267,22 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           {/* Filtros para Entregas */}
                           <Card className="border shadow-sm bg-white">
                             <CardHeader>
-                              <CardTitle className="flex items-center space-x-2">
-                                <Filter className="h-5 w-5" />
-                                <span>Filtros</span>
-                              </CardTitle>
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center space-x-2">
+                                  <Filter className="h-5 w-5" />
+                                  <span>Filtros</span>
+                                </CardTitle>
+                                {can('wellness_delivery.view') && (
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => setShowFileManagerModal(true)}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Gestión de Archivo Excel
+                                  </Button>
+                                )}
+                              </div>
                             </CardHeader>
                             <CardContent>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2566,6 +2581,24 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             </DrawerContent>
           </Drawer>
         )}
+
+        {/* Modal de Gestión de Archivo Excel */}
+        <Dialog open={showFileManagerModal} onOpenChange={setShowFileManagerModal}>
+          <DialogContent className="max-sm:inset-x-4 sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[90vw] sm:max-w-[90vw] max-w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Gestión de Archivo Excel
+              </DialogTitle>
+              <DialogDescription>
+                Gestiona el archivo Excel utilizado para autenticar afiliados en el sistema de kits escolares
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <KitBienestarFileManager />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

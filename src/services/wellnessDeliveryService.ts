@@ -116,6 +116,37 @@ export interface ExportDeliveryReportStatusResponse {
 }
 
 /**
+ * Tipos para la gestión del archivo Excel de Kit de Bienestar
+ */
+
+export interface UploadedByUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface KitBienestarFileVersion {
+  id: number;
+  file_name: string;
+  s3_path: string;
+  is_active: boolean;
+  uploaded_by: UploadedByUser | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadFileResponse {
+  success: boolean;
+  message: string;
+  data: KitBienestarFileVersion;
+}
+
+export interface FileVersionsResponse {
+  success: boolean;
+  data: KitBienestarFileVersion[];
+}
+
+/**
  * Servicio para gestionar solicitudes de entrega de bienestar
  */
 class WellnessDeliveryService {
@@ -371,6 +402,100 @@ class WellnessDeliveryService {
         throw error;
       }
       logger.error('Error inesperado al descargar reporte', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Subir/Actualizar archivo Excel de Kit de Bienestar
+   * POST /api/wellness-delivery-requests/file/upload
+   */
+  async uploadFile(file: File): Promise<UploadFileResponse> {
+    try {
+      logger.debug('Subiendo archivo Excel de Kit de Bienestar', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
+
+      // Validar tipo de archivo
+      const allowedExtensions = ['.xlsx', '.xls'];
+      const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+      if (!allowedExtensions.includes(fileExtension)) {
+        throw new Error('El archivo debe ser un Excel (.xlsx o .xls)');
+      }
+
+      // Validar tamaño (10MB máximo)
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSizeBytes) {
+        throw new Error('El archivo no puede ser mayor a 10MB');
+      }
+
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Realizar petición
+      // El interceptor de authenticatedApi elimina automáticamente Content-Type para FormData
+      // permitiendo que axios lo establezca con el boundary correcto
+      const response = await authenticatedApi.post<UploadFileResponse>(
+        '/api/wellness-delivery-requests/file/upload',
+        formData,
+        {
+          headers: {
+            'Accept': 'application/json',
+          },
+        }
+      );
+
+      logger.debug('Archivo subido exitosamente', {
+        id: response.data.data?.id,
+        fileName: response.data.data?.file_name,
+        isActive: response.data.data?.is_active,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al subir archivo Excel', {
+          error: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+        throw error;
+      }
+      logger.error('Error inesperado al subir archivo', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Listar versiones del archivo Excel de Kit de Bienestar
+   * GET /api/wellness-delivery-requests/file/versions
+   */
+  async getFileVersions(): Promise<FileVersionsResponse> {
+    try {
+      logger.debug('Obteniendo versiones del archivo Excel de Kit de Bienestar');
+
+      const response = await authenticatedApi.get<FileVersionsResponse>(
+        '/api/wellness-delivery-requests/file/versions'
+      );
+
+      logger.debug('Versiones obtenidas exitosamente', {
+        count: response.data.data?.length || 0,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al obtener versiones del archivo', {
+          error: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+        throw error;
+      }
+      logger.error('Error inesperado al obtener versiones', { error });
       throw error;
     }
   }
