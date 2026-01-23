@@ -1695,25 +1695,29 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                   </Badge>
                                                 </div>
                                               </div>
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <MoreHorizontal className="h-4 w-4" />
+                                              {/* Botones de acción en móvil - En lugar del menú flotante */}
+                                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-8 px-2 text-xs"
+                                                  onClick={() => handleViewDeliveryDetails(request)}
+                                                >
+                                                  <Eye className="h-3.5 w-3.5 mr-1" />
+                                                  Ver
+                                                </Button>
+                                                {can('wellness_delivery.manage') && request.estado !== 'entregado' && request.estado !== 'cancelado' && (
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 px-2 text-xs"
+                                                    onClick={() => handleOpenDeliveryStatusDialog(request)}
+                                                  >
+                                                    <Send className="h-3.5 w-3.5 mr-1" />
+                                                    Estado
                                                   </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                  <DropdownMenuItem onSelect={() => handleViewDeliveryDetails(request)}>
-                                                    <Eye className="h-4 w-4 mr-2" />
-                                                    Ver Detalles
-                                                  </DropdownMenuItem>
-                                                  {can('wellness_delivery.manage') && request.estado !== 'entregado' && request.estado !== 'cancelado' && (
-                                                    <DropdownMenuItem onSelect={() => handleOpenDeliveryStatusDialog(request)}>
-                                                      <Send className="h-4 w-4 mr-2" />
-                                                      Cambiar Estado
-                                                    </DropdownMenuItem>
-                                                  )}
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
+                                                )}
+                                              </div>
                                             </div>
 
                                             {/* Tipo y Afiliado */}
