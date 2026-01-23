@@ -274,7 +274,7 @@ const AdminUsuariosPage: React.FC = () => {
                       <div className="flex items-center gap-2 w-full sm:w-auto">
                         {/** Mostrar menú solo si hay al menos una acción permitida */} 
                         {(can('users.edit') || can('users.change_status')) && (
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
                                 <MoreVertical className="h-4 w-4" />

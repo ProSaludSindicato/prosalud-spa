@@ -172,7 +172,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -1640,7 +1640,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               {format(new Date(request.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                              <DropdownMenu>
+                                              <DropdownMenu modal={false}>
                                                 <DropdownMenuTrigger asChild>
                                                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                                     <MoreHorizontal className="h-4 w-4" />
@@ -1694,7 +1694,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                   </Badge>
                                                 </div>
                                               </div>
-                                              <DropdownMenu>
+                                              <DropdownMenu modal={false}>
                                                 <DropdownMenuTrigger asChild>
                                                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                                     <MoreHorizontal className="h-4 w-4" />

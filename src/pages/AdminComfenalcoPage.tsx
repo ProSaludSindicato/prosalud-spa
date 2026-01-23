@@ -683,7 +683,7 @@ const AdminComfenalcoPage: React.FC = () => {
                             </Button>
                           <div className="flex items-center gap-1">
                             {(can('comfenalco_events.edit') || can('comfenalco_events.delete')) && (
-                              <DropdownMenu>
+                              <DropdownMenu modal={false}>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="sm">
                                     <MoreHorizontal className="h-4 w-4" />

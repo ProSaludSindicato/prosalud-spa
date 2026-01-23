@@ -505,7 +505,7 @@ const ProductManagement: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                             <Button 
                               variant="ghost" 

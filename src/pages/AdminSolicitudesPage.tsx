@@ -2058,7 +2058,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     )} */}
                     
                     {/* Menú desplegable para Acciones Adicionales */}
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="w-full sm:w-auto">
                           <MoreHorizontal className="h-4 w-4" />
@@ -2507,7 +2507,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <DropdownMenu>
+                                <DropdownMenu modal={false}>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                       <MoreHorizontal className="h-4 w-4" />
@@ -2572,7 +2572,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </p>
                                   </div>
                                 </div>
-                                <DropdownMenu>
+                                <DropdownMenu modal={false}>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
                                       <MoreHorizontal className="h-4 w-4" />
