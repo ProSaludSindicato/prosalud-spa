@@ -185,6 +185,14 @@ class WellnessDeliveryService {
       const queryString = params.toString();
       const endpoint = `/api/wellness-delivery-requests${queryString ? `?${queryString}` : ''}`;
 
+      logger.debug('Endpoint y parámetros de búsqueda', {
+        endpoint,
+        queryString,
+        documento: filters?.documento,
+        tipo_entrega: filters?.tipo_entrega,
+        estado: filters?.estado,
+      });
+
       const response = await authenticatedApi.get<WellnessDeliveryRequestListResponse>(endpoint);
 
       logger.debug('Solicitudes de entrega de bienestar obtenidas', {

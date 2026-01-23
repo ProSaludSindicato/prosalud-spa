@@ -265,8 +265,19 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [tipoEntregaFilter, setTipoEntregaFilter] = useState<string>('all');
   const [estadoEntregaFilter, setEstadoEntregaFilter] = useState<string>('all');
   const [documentoEntregaFilter, setDocumentoEntregaFilter] = useState<string>('');
+  const [documentoEntregaFilterDebounced, setDocumentoEntregaFilterDebounced] = useState<string>('');
   const [currentPageEntregas, setCurrentPageEntregas] = useState<number>(1);
   const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(15);
+  
+  // Debounce para el filtro de documento (esperar 500ms después de que el usuario deje de escribir)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDocumentoEntregaFilterDebounced(documentoEntregaFilter);
+      setCurrentPageEntregas(1); // Resetear a la primera página cuando cambia el filtro
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [documentoEntregaFilter]);
   const [selectedDeliveryRequest, setSelectedDeliveryRequest] = useState<WellnessDeliveryRequest | null>(null);
   const [showDeliveryDetailModal, setShowDeliveryDetailModal] = useState(false);
   const [showDeliveryStatusDialog, setShowDeliveryStatusDialog] = useState(false);
@@ -332,11 +343,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const bienestarSolicitudes = wellnessRequestsData?.data || [];
   const pagination = wellnessRequestsData?.pagination;
 
-  // Filtros para Entregas de Bienestar
+  // Normalizar el filtro de documento (trim y convertir a string) - usar el valor con debounce
+  const documentoFilterNormalized = useMemo(() => {
+    return documentoEntregaFilterDebounced ? documentoEntregaFilterDebounced.trim().toLowerCase() : '';
+  }, [documentoEntregaFilterDebounced]);
+
+  // Filtros para Entregas de Bienestar (sin documento, se filtra en frontend)
   const entregasFilters = useMemo(() => {
     const filters: any = {
-      page: currentPageEntregas,
-      per_page: itemsPerPageEntregas,
+      page: 1, // Siempre obtener la primera página completa para filtrar en frontend
+      per_page: 1000, // Obtener muchos registros para poder filtrar en frontend
       sort_by: 'created_at',
       sort_order: 'desc',
     };
@@ -347,27 +363,62 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     if (estadoEntregaFilter && estadoEntregaFilter !== 'all') {
       filters.estado = estadoEntregaFilter;
     }
-    if (documentoEntregaFilter) {
-      filters.documento = documentoEntregaFilter;
-    }
+    // No incluimos documento aquí, se filtra en frontend
 
     return filters;
-  }, [currentPageEntregas, itemsPerPageEntregas, tipoEntregaFilter, estadoEntregaFilter, documentoEntregaFilter]);
+  }, [tipoEntregaFilter, estadoEntregaFilter]);
 
-  // Query para Entregas de Bienestar
+  // Query para Entregas de Bienestar (obtiene todos los datos para filtrar en frontend)
   const {
     data: entregasResponse,
     isLoading: isLoadingEntregas,
     error: errorEntregas,
     refetch: refetchEntregas,
   } = useQuery({
-    queryKey: ['wellness-delivery-requests', entregasFilters],
+    queryKey: [
+      'wellness-delivery-requests',
+      tipoEntregaFilter,
+      estadoEntregaFilter,
+    ],
     queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
     enabled: canViewEntregas && activeTab === 'entregas',
   });
 
-  const entregas = entregasResponse?.data || [];
-  const entregasPagination = entregasResponse?.pagination;
+  // Filtrar entregas por documento en el frontend
+  const entregasFiltered = useMemo(() => {
+    let filtered = entregasResponse?.data || [];
+    
+    // Filtrar por documento si hay un valor
+    if (documentoFilterNormalized) {
+      filtered = filtered.filter((entrega) =>
+        entrega.documento_afiliado?.toLowerCase().includes(documentoFilterNormalized)
+      );
+    }
+    
+    return filtered;
+  }, [entregasResponse?.data, documentoFilterNormalized]);
+
+  // Aplicar paginación en el frontend
+  const entregas = useMemo(() => {
+    const startIndex = (currentPageEntregas - 1) * itemsPerPageEntregas;
+    const endIndex = startIndex + itemsPerPageEntregas;
+    return entregasFiltered.slice(startIndex, endIndex);
+  }, [entregasFiltered, currentPageEntregas, itemsPerPageEntregas]);
+
+  // Calcular paginación manual
+  const entregasPagination = useMemo(() => {
+    const total = entregasFiltered.length;
+    const totalPages = Math.ceil(total / itemsPerPageEntregas);
+    return {
+      current_page: currentPageEntregas,
+      per_page: itemsPerPageEntregas,
+      total,
+      total_pages: totalPages,
+      last_page: totalPages,
+      from: total > 0 ? (currentPageEntregas - 1) * itemsPerPageEntregas + 1 : 0,
+      to: Math.min(currentPageEntregas * itemsPerPageEntregas, total),
+    };
+  }, [entregasFiltered.length, currentPageEntregas, itemsPerPageEntregas]);
 
   // Open modal from URL parameter
   useEffect(() => {
