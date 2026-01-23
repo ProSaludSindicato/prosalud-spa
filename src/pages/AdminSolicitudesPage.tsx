@@ -2575,25 +2575,29 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </p>
                                   </div>
                                 </div>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
-                                      <MoreHorizontal className="h-4 w-4" />
+                                {/* Botones de acción en móvil - En lugar del menú flotante */}
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-xs"
+                                    onClick={() => handleViewDetails(solicitud)}
+                                  >
+                                    <Eye className="h-3.5 w-3.5 mr-1" />
+                                    Ver
+                                  </Button>
+                                  {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2 text-xs"
+                                      onClick={() => handleOpenResponseDialog(solicitud)}
+                                    >
+                                      <Send className="h-3.5 w-3.5 mr-1" />
+                                      Responder
                                     </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onSelect={() => handleViewDetails(solicitud)}>
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      Ver Detalles
-                                    </DropdownMenuItem>
-                                    {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
-                                      <DropdownMenuItem onSelect={() => handleOpenResponseDialog(solicitud)}>
-                                        <Send className="h-4 w-4 mr-2" />
-                                        Dar Respuesta
-                                      </DropdownMenuItem>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Type and ID */}

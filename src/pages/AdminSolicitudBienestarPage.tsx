@@ -1344,15 +1344,83 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                     </Badge>
                                   </div>
                                 </div>
-                                <ActionMenu
-                                  solicitud={solicitud}
-                                  onViewDetails={handleViewDetails}
-                                  onEdit={handleEdit}
-                                  onChangeStatus={handleOpenStatusDialog}
-                                  onAddActivityRealized={handleAddActivityRealized}
-                                  onReviewActivity={handleReviewActivity}
-                                  can={can}
-                                />
+                                {/* Botones de acción en móvil - En lugar del menú flotante */}
+                                {(() => {
+                                  const canEditSolicitud = (s: WellnessRequest): boolean => {
+                                    return s.estado === 'pending' || s.estado === 'in_progress';
+                                  };
+                                  const hasActivityRealized = !!solicitud.actividad_realizada;
+                                  const canAddActivity = solicitud.estado === 'resolved';
+                                  const isApproved = solicitud.estado === 'resolved';
+                                  const isActivityProcessed = hasActivityRealized && 
+                                    (solicitud.actividad_realizada.publicado_en_galeria !== null && 
+                                     solicitud.actividad_realizada.publicado_en_galeria !== undefined);
+                                  const canEdit = can('wellness_requests.edit') && canEditSolicitud(solicitud);
+                                  const canChangeStatus = can('wellness_requests.update_status') && !isApproved;
+                                  const canAddActivityAction = can('wellness_requests.edit') && canAddActivity && !hasActivityRealized && !!handleAddActivityRealized;
+                                  const canReviewActivityAction = can('wellness_activity.publish') && hasActivityRealized && !isActivityProcessed && !!handleReviewActivity;
+                                  const hasAnyAction = canEdit || canChangeStatus || canAddActivityAction || canReviewActivityAction;
+                                  
+                                  if (!hasAnyAction) return null;
+                                  
+                                  return (
+                                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs"
+                                        onClick={() => handleViewDetails(solicitud)}
+                                      >
+                                        <Eye className="h-3.5 w-3.5 mr-1" />
+                                        Ver
+                                      </Button>
+                                      {canEdit && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => handleEdit(solicitud)}
+                                        >
+                                          <Pencil className="h-3.5 w-3.5 mr-1" />
+                                          Editar
+                                        </Button>
+                                      )}
+                                      {canChangeStatus && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => handleOpenStatusDialog(solicitud)}
+                                        >
+                                          <Send className="h-3.5 w-3.5 mr-1" />
+                                          Estado
+                                        </Button>
+                                      )}
+                                      {canAddActivityAction && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => handleAddActivityRealized(solicitud)}
+                                        >
+                                          <Plus className="h-3.5 w-3.5 mr-1" />
+                                          Actividad
+                                        </Button>
+                                      )}
+                                      {canReviewActivityAction && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                          onClick={() => handleReviewActivity(solicitud)}
+                                        >
+                                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                          Revisar
+                                        </Button>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
 
                               {/* Actividad */}

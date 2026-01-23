@@ -681,41 +681,39 @@ const AdminComfenalcoPage: React.FC = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                          <div className="flex items-center gap-1">
-                            {(can('comfenalco_events.edit') || can('comfenalco_events.delete')) && (
-                              <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  {can('comfenalco_events.edit') && (
-                                    <DropdownMenuItem onClick={() => handleEdit(event)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Editar
-                                    </DropdownMenuItem>
-                                  )}
-                                  {can('comfenalco_events.delete') && (
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDelete(event)}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* Botones de acción en móvil - En lugar del menú flotante */}
+                            {can('comfenalco_events.edit') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => handleEdit(event)}
+                              >
+                                <Edit className="h-3.5 w-3.5 mr-1" />
+                                Editar
+                              </Button>
                             )}
-                              {event.registration_link && (
-                                <a href={event.registration_link} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="sm">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </Button>
-                                </a>
-                              )}
-                            </div>
+                            {can('comfenalco_events.delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleDelete(event)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                Eliminar
+                              </Button>
+                            )}
+                            {event.registration_link && (
+                              <a href={event.registration_link} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
+                                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                                  Link
+                                </Button>
+                              </a>
+                            )}
+                          </div>
                           </div>
                         </div>
                       </Card>
