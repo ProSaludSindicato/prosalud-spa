@@ -650,6 +650,9 @@ const AdminSolicitudesPage: React.FC = () => {
   const [selectedSubtype, setSelectedSubtype] = useState<string>("");
   const [isRedirectingSubtype, setIsRedirectingSubtype] = useState(false);
   const [isSubtypeRedirectOpen, setIsSubtypeRedirectOpen] = useState(false);
+  
+  // Estados para controlar los menús desplegables en las tablas
+  const [openRequestMenuId, setOpenRequestMenuId] = useState<number | string | null>(null);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -2507,19 +2510,19 @@ const AdminSolicitudesPage: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <DropdownMenu modal={false}>
+                                <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={() => handleViewDetails(solicitud)}>
+                                    <DropdownMenuItem onSelect={() => handleViewDetails(solicitud)}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
                                     {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
-                                      <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
+                                      <DropdownMenuItem onSelect={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
                                         Dar Respuesta
                                       </DropdownMenuItem>
@@ -2572,19 +2575,19 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </p>
                                   </div>
                                 </div>
-                                <DropdownMenu modal={false}>
+                                <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={() => handleViewDetails(solicitud)}>
+                                    <DropdownMenuItem onSelect={() => handleViewDetails(solicitud)}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalles
                                     </DropdownMenuItem>
                                     {can('requests.respond') && (solicitud.status === "pending" || solicitud.status === "in_progress") && (
-                                      <DropdownMenuItem onClick={() => handleOpenResponseDialog(solicitud)}>
+                                      <DropdownMenuItem onSelect={() => handleOpenResponseDialog(solicitud)}>
                                         <Send className="h-4 w-4 mr-2" />
                                         Dar Respuesta
                                       </DropdownMenuItem>
