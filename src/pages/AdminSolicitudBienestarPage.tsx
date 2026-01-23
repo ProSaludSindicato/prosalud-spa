@@ -230,16 +230,36 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showExportDeliveryDialog, setShowExportDeliveryDialog] = useState(false);
   const [showFileManagerModal, setShowFileManagerModal] = useState(false);
-  // Persistir el tab activo en localStorage
+  
+  // Determinar qué tabs están disponibles según los permisos
+  const canViewSolicitudes = can('wellness_requests.view');
+  const canViewEntregas = can('wellness_delivery.view');
+  
+  // Persistir el tab activo en localStorage, pero ajustar según permisos disponibles
   const [activeTab, setActiveTab] = useState<'solicitudes' | 'entregas'>(() => {
     const savedTab = localStorage.getItem('adminSolicitudBienestarActiveTab');
-    return (savedTab === 'solicitudes' || savedTab === 'entregas') ? savedTab : 'solicitudes';
+    // Si el tab guardado no está disponible, usar el primero disponible
+    if (savedTab === 'solicitudes' && canViewSolicitudes) return 'solicitudes';
+    if (savedTab === 'entregas' && canViewEntregas) return 'entregas';
+    // Por defecto, usar el primero disponible
+    if (canViewSolicitudes) return 'solicitudes';
+    if (canViewEntregas) return 'entregas';
+    return 'solicitudes'; // Fallback
   });
 
   // Guardar el tab cuando cambia
   useEffect(() => {
     localStorage.setItem('adminSolicitudBienestarActiveTab', activeTab);
   }, [activeTab]);
+  
+  // Ajustar el tab activo si el actual no está disponible
+  useEffect(() => {
+    if (activeTab === 'solicitudes' && !canViewSolicitudes && canViewEntregas) {
+      setActiveTab('entregas');
+    } else if (activeTab === 'entregas' && !canViewEntregas && canViewSolicitudes) {
+      setActiveTab('solicitudes');
+    }
+  }, [canViewSolicitudes, canViewEntregas, activeTab]);
   
   // Estados para Entregas de Bienestar
   const [tipoEntregaFilter, setTipoEntregaFilter] = useState<string>('all');
@@ -305,6 +325,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   } = useQuery({
     queryKey: ['wellness-requests', apiFilters],
     queryFn: () => wellnessRequestsService.getAllWellnessRequests(apiFilters),
+    enabled: canViewSolicitudes,
     staleTime: 0, // Siempre considerar los datos como obsoletos para forzar refetch
   });
 
@@ -342,7 +363,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   } = useQuery({
     queryKey: ['wellness-delivery-requests', entregasFilters],
     queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
-    enabled: can('wellness_delivery.view') && activeTab === 'entregas',
+    enabled: canViewEntregas && activeTab === 'entregas',
   });
 
   const entregas = entregasResponse?.data || [];
@@ -779,31 +800,42 @@ const AdminSolicitudBienestarPage: React.FC = () => {
               <CardContent className="p-0">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'solicitudes' | 'entregas')} className="space-y-6">
                   <div className="p-6 pb-0">
-                    <TabsList className="grid w-full grid-cols-2 bg-gray-50 border p-1">
-                      <TabsTrigger
-                        value="solicitudes"
-                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
-                      >
-                        <Heart className="h-4 w-4" />
-                        <span>Solicitudes de Bienestar</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="entregas"
-                        className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
-                        disabled={!can('wellness_delivery.view')}
-                      >
-                        <Package className="h-4 w-4" />
-                        <span>Entregas de Bienestar</span>
-                      </TabsTrigger>
+                    <TabsList className={`grid w-full bg-gray-50 border p-1 ${canViewSolicitudes && canViewEntregas ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      {canViewSolicitudes && (
+                        <TabsTrigger
+                          value="solicitudes"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <Heart className="h-4 w-4" />
+                          <span>Solicitudes de Bienestar</span>
+                        </TabsTrigger>
+                      )}
+                      {canViewEntregas && (
+                        <TabsTrigger
+                          value="entregas"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <Package className="h-4 w-4" />
+                          <span>Entregas de Bienestar</span>
+                        </TabsTrigger>
+                      )}
                     </TabsList>
                   </div>
 
                   <div className="p-6 pt-0">
                     {/* Tab: Solicitudes de Bienestar */}
                     <TabsContent value="solicitudes" className="space-y-6 mt-0">
-                      {/* Stats Cards */}
-                      <motion.div variants={itemVariants}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {!canViewSolicitudes ? (
+                        <Card>
+                          <CardContent className="p-6">
+                            <p className="text-red-600">No tienes permisos para acceder a esta sección.</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <>
+                          {/* Stats Cards */}
+                          <motion.div variants={itemVariants}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <Card className="border-l-4 border-l-yellow-500 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -1234,6 +1266,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         </Card>
                       ))}
                     </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
                     <DataPagination
                       currentPage={currentPage}
@@ -1247,16 +1284,13 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       }}
                       className="mt-4"
                     />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                        </>
+                      )}
                     </TabsContent>
 
                     {/* Tab: Entregas de Bienestar */}
                     <TabsContent value="entregas" className="space-y-6 mt-0">
-                      {!can('wellness_delivery.view') ? (
+                      {!canViewEntregas ? (
                         <Card>
                           <CardContent className="p-6">
                             <p className="text-red-600">No tienes permisos para acceder a esta sección.</p>

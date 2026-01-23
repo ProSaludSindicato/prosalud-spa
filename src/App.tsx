@@ -176,7 +176,7 @@ const AppRoutes = () => {
             <Route 
               path="/admin/solicitudes-bienestar" 
               element={
-                <ProtectedRoute requiredPermissions={['wellness_requests.view']}>
+                <ProtectedRoute requiredPermissions={['wellness_requests.view', 'wellness_delivery.view', 'wellness_delivery.manage']}>
                   <AdminSolicitudBienestarPage />
                 </ProtectedRoute>
               } 

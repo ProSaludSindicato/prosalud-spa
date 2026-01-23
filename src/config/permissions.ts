@@ -118,7 +118,9 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
     href: '/admin/solicitudes-bienestar',
     icon: Heart,
     permissions: {
-      view: ['wellness_requests.view'],
+      // Incluir permisos de solicitudes de bienestar y entrega de bienestar
+      // Si el usuario tiene cualquiera de estos permisos, puede ver el módulo
+      view: ['wellness_requests.view', 'wellness_delivery.view', 'wellness_delivery.manage'],
       create: ['wellness_requests.create'],
       edit: ['wellness_requests.edit'],
       custom: {
