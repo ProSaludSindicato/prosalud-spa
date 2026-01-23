@@ -62,7 +62,9 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RotateCw, Eraser } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useScreenOrientation } from '@/hooks/useScreenOrientation';
 import WellnessRequestForm from '@/components/admin/solicitudes/WellnessRequestForm';
 import WellnessActivityRealizedForm from '@/components/admin/solicitudes/WellnessActivityRealizedForm';
 import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
@@ -86,6 +88,7 @@ const deliveryStatusChangeSchema = z.object({
     required_error: 'Debe seleccionar un estado',
   }),
   firma_recibido: z.string().optional(),
+  cantidad_entregada: z.union([z.string(), z.number()]).optional(),
   observaciones: z.string().optional(),
 }).refine((data) => {
   // Si el estado es "entregado", firma_recibido es obligatorio
@@ -96,6 +99,15 @@ const deliveryStatusChangeSchema = z.object({
 }, {
   message: 'La firma de recibido es obligatoria cuando el estado es "entregado"',
   path: ['firma_recibido'],
+}).refine((data) => {
+  // Si el estado es "entregado", cantidad_entregada es obligatoria
+  if (data.estado === 'entregado') {
+    return data.cantidad_entregada !== undefined && data.cantidad_entregada !== '';
+  }
+  return true;
+}, {
+  message: 'La cantidad entregada es obligatoria cuando el estado es "entregado"',
+  path: ['cantidad_entregada'],
 });
 
 type DeliveryStatusChangeFormValues = z.infer<typeof deliveryStatusChangeSchema>;
@@ -285,7 +297,73 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [isSubmittingDeliveryStatus, setIsSubmittingDeliveryStatus] = useState(false);
   const [deliverySignature, setDeliverySignature] = useState<string | null>(null);
   const [showDeliverySignatureError, setShowDeliverySignatureError] = useState(false);
+  const [showSignatureDrawer, setShowSignatureDrawer] = useState(false);
   const deliverySignaturePadRef = React.useRef<SignaturePadRef>(null);
+  
+  // Hooks para móvil y orientación
+  const isMobile = useIsMobile();
+  const { canRotate, lockToLandscape, unlockOrientation, currentOrientation } = useScreenOrientation();
+  
+  // Calcular altura del canvas de firma en móviles (reactivo a cambios de tamaño)
+  const [signaturePadHeight, setSignaturePadHeight] = useState(400);
+  
+  useEffect(() => {
+    if (isMobile && showSignatureDrawer) {
+      const calculateHeight = () => {
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const isLandscape = viewportWidth > viewportHeight;
+        
+        // Calcular espacio disponible restando:
+        // - Header: ~100px
+        // - Mensaje de orientación (si está visible): ~60px
+        // - Botones y padding: ~140px
+        // - Espacios entre elementos: ~30px
+        const headerHeight = 100;
+        const orientationMessageHeight = (canRotate && currentOrientation === 'portrait') ? 60 : 0;
+        const buttonsHeight = 140;
+        const spacing = 30;
+        const reservedSpace = headerHeight + orientationMessageHeight + buttonsHeight + spacing;
+        
+        // Altura disponible para el canvas (95vh es la altura del drawer)
+        const availableHeight = viewportHeight * 0.95 - reservedSpace;
+        
+        // También considerar el ancho para evitar que sea demasiado ancho
+        const maxWidthBasedHeight = viewportWidth * 0.85;
+        
+        // Usar el menor entre la altura disponible y la basada en el ancho
+        const calculatedHeight = Math.min(
+          availableHeight,
+          maxWidthBasedHeight,
+          500 // Máximo 500px para asegurar que quepan los botones
+        );
+        
+        // Mínimo 250px para que sea usable
+        setSignaturePadHeight(Math.max(calculatedHeight, 250));
+      };
+      
+      // Calcular inmediatamente
+      calculateHeight();
+      
+      // Recalcular después de un pequeño delay para asegurar que las dimensiones estén actualizadas
+      const timeoutId = setTimeout(calculateHeight, 100);
+      
+      window.addEventListener('resize', calculateHeight);
+      window.addEventListener('orientationchange', () => {
+        // Delay adicional para orientationchange ya que las dimensiones pueden tardar en actualizarse
+        setTimeout(calculateHeight, 200);
+      });
+      
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('resize', calculateHeight);
+        window.removeEventListener('orientationchange', calculateHeight);
+      };
+    } else if (showSignatureDrawer) {
+      // Si no es móvil pero el drawer está abierto, usar altura por defecto
+      setSignaturePadHeight(400);
+    }
+  }, [isMobile, showSignatureDrawer, currentOrientation, canRotate]);
   
   const queryClient = useQueryClient();
 
@@ -576,10 +654,17 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   // Función para abrir el diálogo de cambio de estado de entrega
   const handleOpenDeliveryStatusDialog = React.useCallback((request: WellnessDeliveryRequest) => {
     setDeliveryRequestToUpdate(request);
+    
+    // Pre-llenar cantidad_entregada con el número de beneficiarios si es Kit Escolar
+    const cantidadInicial = request.tipo_entrega === 'kit_escolar' 
+      ? request.beneficiarios?.length || 1 
+      : undefined;
+    
     deliveryStatusChangeForm.reset({
       estado: 'entregado' as 'entregado' | 'cancelado', // Por defecto "entregado"
       observaciones: undefined,
       firma_recibido: undefined,
+      cantidad_entregada: cantidadInicial,
     });
     setDeliverySignature(null);
     setShowDeliverySignatureError(false);
@@ -593,6 +678,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const handleCloseDeliveryStatusDialog = () => {
     setIsSubmittingDeliveryStatus(false);
     setShowDeliveryStatusDialog(false);
+    setShowSignatureDrawer(false);
     setDeliveryRequestToUpdate(null);
     setDeliverySignature(null);
     setShowDeliverySignatureError(false);
@@ -600,6 +686,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       deliverySignaturePadRef.current.clear();
     }
     deliveryStatusChangeForm.reset();
+    // Desbloquear orientación al cerrar
+    unlockOrientation();
   };
 
   // Función para manejar el cambio de firma
@@ -624,9 +712,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
         observaciones: data.observaciones || undefined,
       };
 
-      // Solo incluir firma_recibido si el estado es "entregado"
-      if (data.estado === 'entregado' && data.firma_recibido) {
-        requestData.firma_recibido = data.firma_recibido;
+      // Solo incluir firma_recibido y cantidad_entregada si el estado es "entregado"
+      if (data.estado === 'entregado') {
+        if (data.firma_recibido) {
+          requestData.firma_recibido = data.firma_recibido;
+        }
+        if (data.cantidad_entregada) {
+          requestData.cantidad_entregada = data.cantidad_entregada;
+        }
       }
 
       return wellnessDeliveryService.updateStatus(deliveryRequestToUpdate.id, requestData);
@@ -651,10 +744,18 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   // Función para enviar el cambio de estado
   const handleSubmitDeliveryStatusChange = async (data: DeliveryStatusChangeFormValues) => {
-    // Validar firma si el estado es "entregado"
-    if (data.estado === 'entregado' && !data.firma_recibido) {
-      setShowDeliverySignatureError(true);
-      return;
+    // Validar firma y cantidad si el estado es "entregado"
+    if (data.estado === 'entregado') {
+      if (!data.firma_recibido) {
+        setShowDeliverySignatureError(true);
+        return;
+      }
+      if (!data.cantidad_entregada || data.cantidad_entregada === '') {
+        toast.error('Cantidad requerida', {
+          description: 'Debe ingresar la cantidad entregada para marcar como entregado.',
+        });
+        return;
+      }
     }
 
     setIsSubmittingDeliveryStatus(true);
@@ -663,6 +764,41 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   // Observar cambios en el estado para mostrar/ocultar el campo de firma
   const selectedEstado = deliveryStatusChangeForm.watch('estado');
+  
+  // Restaurar cantidad_entregada cuando el estado cambia a "entregado"
+  useEffect(() => {
+    if (selectedEstado === 'entregado' && deliveryRequestToUpdate) {
+      const currentCantidad = deliveryStatusChangeForm.getValues('cantidad_entregada');
+      // Si no hay cantidad establecida y es Kit Escolar, establecer el valor por defecto
+      if (!currentCantidad && deliveryRequestToUpdate.tipo_entrega === 'kit_escolar') {
+        const cantidadDefault = deliveryRequestToUpdate.beneficiarios?.length || 1;
+        deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadDefault);
+      }
+    } else if (selectedEstado === 'cancelado') {
+      // Limpiar cantidad cuando se cancela
+      deliveryStatusChangeForm.setValue('cantidad_entregada', undefined);
+    }
+  }, [selectedEstado, deliveryRequestToUpdate, deliveryStatusChangeForm]);
+
+  // Manejar orientación cuando se muestra el drawer de firma en móviles
+  useEffect(() => {
+    if (showSignatureDrawer && isMobile && selectedEstado === 'entregado') {
+      // Intentar bloquear en landscape si es posible
+      if (canRotate) {
+        lockToLandscape();
+      }
+    } else if (!showSignatureDrawer) {
+      // Desbloquear cuando se cierra el drawer
+      unlockOrientation();
+    }
+
+    return () => {
+      // Cleanup: desbloquear al desmontar
+      if (!showSignatureDrawer) {
+        unlockOrientation();
+      }
+    };
+  }, [showSignatureDrawer, isMobile, selectedEstado, canRotate, lockToLandscape, unlockOrientation]);
 
   const handleAddActivityRealized = React.useCallback((solicitud: WellnessRequest) => {
     setSolicitudForActivity(solicitud);
@@ -2503,7 +2639,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             }}
             dismissible={false}
           >
-            <DrawerContent className="h-[75vh] border-t border-slate-200 bg-white px-4 sm:px-6 flex flex-col overflow-hidden">
+            <DrawerContent className={`${isMobile ? 'h-[95vh]' : 'h-[75vh]'} border-t border-slate-200 bg-white px-4 sm:px-6 flex flex-col overflow-hidden`}>
               <DrawerHeader className="pb-2 flex-shrink-0">
                 <DrawerTitle className="text-lg sm:text-xl font-semibold text-slate-800">
                   Cambiar Estado de la Solicitud #{deliveryRequestToUpdate.id}
@@ -2516,60 +2652,96 @@ const AdminSolicitudBienestarPage: React.FC = () => {
               <Form {...deliveryStatusChangeForm}>
                 <form onSubmit={deliveryStatusChangeForm.handleSubmit(handleSubmitDeliveryStatusChange)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <div className="flex-1 overflow-y-auto space-y-4 sm:space-y-5 pr-2">
-                  <FormField
-                    control={deliveryStatusChangeForm.control}
-                    name="estado"
-                    render={({ field }) => {
-                      const getEstadoColor = (estado: string) => {
-                        switch (estado) {
-                          case 'pendiente':
-                            return 'border-yellow-300 bg-yellow-50';
-                          case 'procesado':
-                            return 'border-blue-300 bg-blue-50';
-                          case 'entregado':
-                            return 'border-green-300 bg-green-50';
-                          case 'cancelado':
-                            return 'border-red-300 bg-red-50';
-                          default:
-                            return '';
-                        }
-                      };
+                  {/* Grid responsive: 1 columna en portrait, 2 columnas en landscape cuando hay espacio */}
+                  <div className={`grid grid-cols-1 gap-4 sm:gap-5 ${currentOrientation === 'landscape' ? 'sm:grid-cols-2' : ''}`}>
+                    <FormField
+                      control={deliveryStatusChangeForm.control}
+                      name="estado"
+                      render={({ field }) => {
+                        const getEstadoColor = (estado: string) => {
+                          switch (estado) {
+                            case 'pendiente':
+                              return 'border-yellow-300 bg-yellow-50';
+                            case 'procesado':
+                              return 'border-blue-300 bg-blue-50';
+                            case 'entregado':
+                              return 'border-green-300 bg-green-50';
+                            case 'cancelado':
+                              return 'border-red-300 bg-red-50';
+                            default:
+                              return '';
+                          }
+                        };
 
-                      return (
-                        <FormItem className="w-full">
-                          <FormLabel>Nuevo Estado</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                        return (
+                          <FormItem className="w-full">
+                            <FormLabel className="text-base sm:text-lg font-semibold text-gray-900">
+                              Nuevo Estado
+                            </FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger className={`w-full max-w-full ${field.value ? getEstadoColor(field.value) : ''}`}>
+                                  <SelectValue placeholder="Seleccione un estado" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem 
+                                  value="entregado"
+                                  className="hover:bg-green-50 focus:bg-green-50 data-[highlighted]:bg-green-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                    Entregado
+                                  </span>
+                                </SelectItem>
+                                <SelectItem 
+                                  value="cancelado"
+                                  className="hover:bg-red-50 focus:bg-red-50 data-[highlighted]:bg-red-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                    Cancelado
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    {/* Campo de Cantidad Entregada - Solo cuando el estado es "entregado" */}
+                    {selectedEstado === 'entregado' && (
+                      <FormField
+                        control={deliveryStatusChangeForm.control}
+                        name="cantidad_entregada"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base sm:text-lg font-semibold text-gray-900">
+                              Cantidad Entregada <span className="text-red-500">*</span>
+                            </FormLabel>
                             <FormControl>
-                              <SelectTrigger className={`w-full max-w-full ${field.value ? getEstadoColor(field.value) : ''}`}>
-                                <SelectValue placeholder="Seleccione un estado" />
-                              </SelectTrigger>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="Ingrese la cantidad entregada"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => {
+                                  // Solo permitir números, permitir borrar completamente
+                                  const value = e.target.value.replace(/[^0-9]/g, '');
+                                  field.onChange(value);
+                                }}
+                                className="text-base"
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem 
-                                value="entregado"
-                                className="hover:bg-green-50 focus:bg-green-50 data-[highlighted]:bg-green-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                  Entregado
-                                </span>
-                              </SelectItem>
-                              <SelectItem 
-                                value="cancelado"
-                                className="hover:bg-red-50 focus:bg-red-50 data-[highlighted]:bg-red-50 hover:text-gray-900 focus:text-gray-900 data-[highlighted]:text-gray-900"
-                              >
-                                <span className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                                  Cancelado
-                                </span>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
 
                   {/* Campo de Firma - Solo cuando el estado es "entregado" */}
                   {selectedEstado === 'entregado' && (
@@ -2583,41 +2755,83 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           </FormLabel>
                           <FormControl>
                             <div className="space-y-3 w-full">
-                              <div className="relative w-full border-2 border-gray-300 rounded-lg bg-white overflow-hidden">
-                                <div className="[&>div>div:last-child]:!hidden w-full">
-                                  <SignaturePad
-                                    ref={deliverySignaturePadRef}
-                                    onChange={(dataUrl) => {
-                                      handleDeliverySignatureChange(dataUrl);
-                                      field.onChange(dataUrl || undefined);
-                                    }}
-                                    height={240}
-                                  />
-                                </div>
-                                {!deliverySignature && (
-                                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-2">
-                                    <p className="text-sm text-slate-400 italic text-center">
-                                      Firma aquí con el mouse o tu dedo
-                                    </p>
+                              {isMobile ? (
+                                // En móviles: mostrar botón para abrir drawer de firma
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant={deliverySignature ? "default" : "default"}
+                                    onClick={() => setShowSignatureDrawer(true)}
+                                    className={`w-full h-12 text-base ${
+                                      deliverySignature 
+                                        ? 'bg-green-600 hover:bg-green-700 text-white border-2 border-green-700' 
+                                        : 'bg-primary-prosalud hover:bg-primary-prosalud-dark text-white'
+                                    }`}
+                                  >
+                                    {deliverySignature ? (
+                                      <>
+                                        <CheckCircle2 className="h-5 w-5 mr-2" />
+                                        Firma capturada - Toca para ver/editar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Signature className="h-5 w-5 mr-2" />
+                                        Capturar Firma
+                                      </>
+                                    )}
+                                  </Button>
+                                  {deliverySignature && (
+                                    <div className="mt-2 text-xs text-slate-500 text-center">
+                                      <p>Firma registrada correctamente</p>
+                                    </div>
+                                  )}
+                                  {canRotate && currentOrientation === 'portrait' && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-600 bg-blue-50 p-2 rounded">
+                                      <RotateCw className="h-4 w-4" />
+                                      <span>Puedes rotar tu dispositivo horizontalmente para más espacio</span>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                // En desktop: mostrar SignaturePad directamente
+                                <>
+                                  <div className="relative w-full border-2 border-gray-300 rounded-lg bg-white overflow-hidden">
+                                    <div className="[&>div>div:last-child]:!hidden w-full">
+                                      <SignaturePad
+                                        ref={deliverySignaturePadRef}
+                                        onChange={(dataUrl) => {
+                                          handleDeliverySignatureChange(dataUrl);
+                                          field.onChange(dataUrl || undefined);
+                                        }}
+                                        height={240}
+                                      />
+                                    </div>
+                                    {!deliverySignature && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-2">
+                                        <p className="text-sm text-slate-400 italic text-center">
+                                          Firma aquí con el mouse o tu dedo
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (deliverySignaturePadRef.current) {
-                                      deliverySignaturePadRef.current.clear();
-                                    }
-                                    setDeliverySignature(null);
-                                    setShowDeliverySignatureError(false);
-                                    field.onChange(undefined);
-                                  }}
-                                  className="text-sm text-slate-600 hover:text-slate-900 underline"
-                                >
-                                  Limpiar firma
-                                </button>
-                              </div>
+                                  <div className="flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (deliverySignaturePadRef.current) {
+                                          deliverySignaturePadRef.current.clear();
+                                        }
+                                        setDeliverySignature(null);
+                                        setShowDeliverySignatureError(false);
+                                        field.onChange(undefined);
+                                      }}
+                                      className="text-sm text-slate-600 hover:text-slate-900 underline"
+                                    >
+                                      Limpiar firma
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                               {showDeliverySignatureError && (
                                 <Alert variant="destructive" className="py-2">
                                   <AlertCircle className="h-4 w-4" />
@@ -2663,6 +2877,115 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                   </DrawerFooter>
                 </form>
               </Form>
+            </DrawerContent>
+          </Drawer>
+        )}
+
+        {/* Drawer de Firma en Móviles */}
+        {isMobile && selectedEstado === 'entregado' && (
+          <Drawer
+            open={showSignatureDrawer}
+            onOpenChange={(open) => {
+              // Solo permitir cerrar con los botones, no arrastrando
+              // Esto evita que se cierre accidentalmente al firmar
+              if (!open) {
+                return; // No cerrar si se intenta arrastrar
+              }
+            }}
+            dismissible={false}
+          >
+            <DrawerContent className="h-[95vh] border-t border-slate-200 bg-white px-4 sm:px-6 flex flex-col overflow-hidden">
+              <DrawerHeader className="pb-3 flex-shrink-0">
+                <DrawerTitle className="text-lg sm:text-xl font-semibold text-slate-800">
+                  Firma de Recibido
+                </DrawerTitle>
+                <DrawerDescription className="text-xs sm:text-sm text-slate-500">
+                  {deliverySignature 
+                    ? 'Revisa o modifica tu firma para confirmar la entrega' 
+                    : 'Firma en el recuadro para confirmar la entrega'}
+                </DrawerDescription>
+              </DrawerHeader>
+
+              {/* Mensaje de orientación si está disponible */}
+              {canRotate && currentOrientation === 'portrait' && (
+                <div className="mb-3 flex-shrink-0">
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <RotateCw className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-sm text-blue-800">
+                      Para más espacio, puedes rotar tu dispositivo horizontalmente
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+
+              {/* Canvas de firma - altura calculada para que quepan los botones */}
+              <div className="flex-1 flex flex-col min-h-0 mb-4">
+                <div className="relative w-full border-2 border-gray-300 rounded-lg bg-white overflow-hidden" style={{ height: `${signaturePadHeight}px` }}>
+                  <div className="[&>div>div:last-child]:!hidden w-full h-full">
+                    <SignaturePad
+                      ref={deliverySignaturePadRef}
+                      onChange={(dataUrl) => {
+                        handleDeliverySignatureChange(dataUrl);
+                        deliveryStatusChangeForm.setValue('firma_recibido', dataUrl || undefined);
+                      }}
+                      height={signaturePadHeight}
+                      initialValue={deliverySignature ?? undefined}
+                    />
+                  </div>
+                  {!deliverySignature && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 px-4">
+                      <p className="text-sm sm:text-base text-slate-400 italic text-center">
+                        Firma aquí con tu dedo
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botones de acción - siempre visibles */}
+              <div className="flex flex-col gap-2 pb-4 flex-shrink-0 border-t pt-4">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (deliverySignaturePadRef.current) {
+                        deliverySignaturePadRef.current.clear();
+                      }
+                      setDeliverySignature(null);
+                      setShowDeliverySignatureError(false);
+                      deliveryStatusChangeForm.setValue('firma_recibido', undefined);
+                    }}
+                    className="flex-1 h-11 text-base"
+                  >
+                    <Eraser className="h-4 w-4 mr-2" />
+                    Limpiar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (deliverySignature) {
+                        setShowSignatureDrawer(false);
+                        unlockOrientation();
+                      } else {
+                        setShowDeliverySignatureError(true);
+                      }
+                    }}
+                    className="flex-1 h-11 text-base bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Confirmar Firma
+                  </Button>
+                </div>
+                {showDeliverySignatureError && !deliverySignature && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm font-medium">
+                      Debes capturar una firma antes de continuar
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             </DrawerContent>
           </Drawer>
         )}
