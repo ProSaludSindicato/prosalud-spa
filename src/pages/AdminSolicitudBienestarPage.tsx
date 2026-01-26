@@ -2516,6 +2516,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                               <p className="mt-1 text-sm text-gray-900">{selectedDeliveryRequest.hospital}</p>
                             </div>
                         )}
+                        {selectedDeliveryRequest.cantidad_entregada !== undefined && selectedDeliveryRequest.cantidad_entregada !== null && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Cantidad Entregada</label>
+                            <p className="mt-1 text-sm text-gray-900 font-semibold">
+                              {selectedDeliveryRequest.cantidad_entregada}
+                            </p>
+                          </div>
+                        )}
                         <div>
                           <label className="text-sm font-medium text-gray-700">Fecha de Creación</label>
                           <p className="mt-1 text-sm text-gray-900">{formatDeliveryDate(selectedDeliveryRequest.created_at)}</p>

@@ -1,42 +1,33 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { 
   Sparkles, 
   MessageSquare,
   Settings, 
-  CheckCircle, 
-  X 
+  CheckCircle
 } from 'lucide-react';
 
 // Feature flag to control modal visibility
 const SHOW_WELCOME_MODAL = true;
+const WELCOME_MODAL_STORAGE_KEY = 'prosalud_welcome_modal_shown';
 
 const WelcomeModal: React.FC = () => {
-  const navigate = useNavigate();
-  
-  // TODO: TEMPORAL - Siempre mostrar el modal del kit escolar, sin controlar localStorage
-  // Initialize as open if feature flag is enabled
+  // Initialize as open if feature flag is enabled and modal hasn't been shown before
   const [isOpen, setIsOpen] = useState(() => {
     if (!SHOW_WELCOME_MODAL) return false;
-    return true; // Siempre mostrar el modal
+    
+    // Check if modal has been shown before
+    const hasBeenShown = localStorage.getItem(WELCOME_MODAL_STORAGE_KEY) === 'true';
+    return !hasBeenShown;
   });
 
   const handleClose = () => {
     setIsOpen(false);
-    // TODO: TEMPORAL - No guardar en localStorage para que siempre se muestre
+    // Mark modal as shown in localStorage
+    localStorage.setItem(WELCOME_MODAL_STORAGE_KEY, 'true');
   };
 
-  const handleImageClick = () => {
-    handleClose();
-    navigate('/kit-bienestar-escolar');
-  };
-
-  // TODO: TEMPORAL - Código comentado para mostrar imagen del kit escolar
-  // Restaurar el código original cuando se termine la promoción del kit escolar
-  /*
   const features = [
     {
       icon: Settings,
@@ -54,42 +45,14 @@ const WelcomeModal: React.FC = () => {
       description: 'Interfaz moderna y adaptativa para una mejor experiencia de usuario. Instala ProSalud como app y accede más rápido desde tu celular.'
     }
   ];
-  */
 
   if (!SHOW_WELCOME_MODAL) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent 
-        className="sm:max-w-2xl w-[calc(100vw-3rem)] max-w-[calc(100vw-3rem)] sm:w-full p-0 overflow-visible border-0 shadow-none bg-transparent mx-auto max-h-[90vh] flex flex-col rounded-lg"
-        overlayClassName="fixed inset-0 z-50 bg-black/60 supports-[backdrop-filter]:backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="sm:max-w-2xl w-[calc(100vw-3rem)] max-w-[calc(100vw-3rem)] sm:w-full p-0 overflow-hidden border-0 shadow-xl mx-auto max-h-[90vh] flex flex-col rounded-lg"
       >
-        {/* TODO: TEMPORAL - Mostrar imagen del kit escolar en lugar del modal de bienvenida original */}
-        {/* Imagen del kit escolar - TEMPORAL */}
-        <div 
-          onClick={handleImageClick}
-          className="cursor-pointer w-full flex items-center justify-center overflow-hidden rounded-lg relative"
-        >
-          <img
-            src="/images/Imagen_aviso_beneficio_kit_escolar.png"
-            alt="Aviso beneficio kit escolar"
-            className="w-full h-auto object-contain max-h-[85vh] rounded-lg"
-          />
-          {/* Close button - posicionado sobre la imagen dentro del contenedor */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
-            className="absolute right-2 top-2 z-20 p-1.5 rounded-full bg-white/90 hover:bg-white transition-colors shadow-sm"
-            style={{ margin: 0 }}
-          >
-            <X className="h-4 w-4 text-gray-700" />
-          </button>
-        </div>
-
-        {/* TODO: TEMPORAL - Código original del modal de bienvenida comentado */}
-        {/* 
         <div className="bg-gradient-to-br from-primary-prosalud to-primary-prosalud-dark text-white px-4 sm:px-6 py-5 sm:py-6">
           <div className="text-center">
             <div className="flex justify-center mb-4">
@@ -108,7 +71,7 @@ const WelcomeModal: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 py-3 sm:py-4">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 bg-white overflow-y-auto">
           <div className="space-y-3 sm:space-y-4">
             <div className="text-center mb-3 sm:mb-4">
               <h3 className="text-base sm:text-xl font-semibold text-gray-900 mb-1.5">
@@ -163,7 +126,6 @@ const WelcomeModal: React.FC = () => {
             </div>
           </div>
         </div>
-        */}
       </DialogContent>
     </Dialog>
   );

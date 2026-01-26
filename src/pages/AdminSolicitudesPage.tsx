@@ -258,8 +258,8 @@ const responseFormSchema = z.object({
   newStatus: z.enum(["in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
-  emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
-  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
+  emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
+  emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
@@ -303,6 +303,16 @@ const responseFormSchema = z.object({
 }, {
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
+}).refine((data) => {
+  // Si el estado NO es "in_progress", emailSubject y emailBody son obligatorios
+  if (data.newStatus !== "in_progress") {
+    return data.emailSubject && data.emailSubject.trim().length > 0 && 
+           data.emailBody && data.emailBody.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "El asunto y el cuerpo del correo son obligatorios cuando el estado no es 'En Revisión'",
+  path: ["emailSubject"],
 });
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
@@ -312,8 +322,8 @@ const responseWithCompensacionesFormSchema = z.object({
   newStatus: z.enum(["in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
-  emailSubject: z.string().min(1, "El asunto es obligatorio").max(100, "El asunto no puede exceder 100 caracteres"),
-  emailBody: z.string().min(1, "El cuerpo del correo es obligatorio").max(5000, "El cuerpo no puede exceder 5000 caracteres"),
+  emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
+  emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
@@ -374,6 +384,16 @@ const responseWithCompensacionesFormSchema = z.object({
 }, {
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
+}).refine((data) => {
+  // Si el estado NO es "in_progress", emailSubject y emailBody son obligatorios
+  if (data.newStatus !== "in_progress") {
+    return data.emailSubject && data.emailSubject.trim().length > 0 && 
+           data.emailBody && data.emailBody.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "El asunto y el cuerpo del correo son obligatorios cuando el estado no es 'En Revisión'",
+  path: ["emailSubject"],
 });
 
 type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
@@ -1533,6 +1553,47 @@ const AdminSolicitudesPage: React.FC = () => {
     }
     
     try {
+      // Si el estado es "in_progress", solo actualizar el estado sin enviar email
+      if (finalStatus === 'in_progress') {
+        // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
+        const solicitudIdString = String(solicitudId).padStart(10, '0');
+        const updatedRequest = await requestsService.updateRequestStatus(solicitudIdString, 'in_progress');
+        
+        // Resetear estado
+        setIsSubmittingResponse(false);
+        
+        // Mostrar toast de éxito
+        toast.success("Estado actualizado exitosamente", {
+          description: `La solicitud #${solicitudId} ha sido marcada como "En Revisión".`,
+          duration: 4000,
+        });
+        
+        // Cerrar el modal después de un pequeño delay
+        setTimeout(() => {
+          handleCloseResponseDialog();
+        }, 500);
+        
+        // Refetch para actualizar la lista
+        await refetch();
+        
+        // Actualizar la solicitud seleccionada si es la misma
+        if (selectedSolicitud?.id === solicitudId) {
+          const refetchedData = (await refetch()).data || [];
+          const updatedFromList = refetchedData.find(req => req.id === solicitudId);
+          
+          if (updatedFromList) {
+            setSelectedSolicitud(updatedFromList);
+            setExpandedFields({});
+          } else {
+            setSelectedSolicitud(updatedRequest);
+            setExpandedFields({});
+          }
+        }
+        
+        return; // Salir temprano, no enviar email
+      }
+      
+      // Si el estado NO es "in_progress", enviar respuesta con email
       // Enviar respuesta usando la API del backend
       // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
       // Enviar el valor del select directamente
@@ -1540,10 +1601,12 @@ const AdminSolicitudesPage: React.FC = () => {
         ? data.rejection_reason
         : undefined;
       
-      const updatedRequest = await requestsService.sendResponse(solicitudId, {
+      // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
+      const solicitudIdString = String(solicitudId).padStart(10, '0');
+      const updatedRequest = await requestsService.sendResponse(solicitudIdString, {
         newStatus: finalStatus,
-        emailSubject: data.emailSubject,
-        emailBody: data.emailBody,
+        emailSubject: data.emailSubject!,
+        emailBody: data.emailBody!,
         rejection_reason: rejectionReasonToSend,
         attachments: data.attachments,
         // No enviar actividades si el estado es "rejected" (no se genera certificado)
@@ -1753,16 +1816,58 @@ const AdminSolicitudesPage: React.FC = () => {
     setIsSubmittingResponse(true);
     const solicitudId = solicitudToRespond.id; // Guardar ID antes de que pueda cambiar
     try {
-      // Enviar respuesta con compensaciones usando la API del backend
+      // Si el estado es "in_progress", solo actualizar el estado sin enviar email
+      if (data.newStatus === 'in_progress') {
+        // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
+        const solicitudIdString = String(solicitudId).padStart(10, '0');
+        const updatedRequest = await requestsService.updateRequestStatus(solicitudIdString, 'in_progress');
+        
+        // Resetear estado
+        setIsSubmittingResponse(false);
+        
+        // Mostrar toast de éxito
+        toast.success("Estado actualizado exitosamente", {
+          description: `La solicitud #${solicitudId} ha sido marcada como "En Revisión".`,
+          duration: 4000,
+        });
+        
+        // Cerrar el modal después de un pequeño delay
+        setTimeout(() => {
+          handleCloseResponseDialog();
+        }, 500);
+        
+        // Refetch para actualizar la lista
+        await refetch();
+        
+        // Actualizar la solicitud seleccionada si es la misma
+        if (selectedSolicitud?.id === solicitudId) {
+          const refetchedData = (await refetch()).data || [];
+          const updatedFromList = refetchedData.find(req => req.id === solicitudId);
+          
+          if (updatedFromList) {
+            setSelectedSolicitud(updatedFromList);
+            setExpandedFields({});
+          } else {
+            setSelectedSolicitud(updatedRequest);
+            setExpandedFields({});
+          }
+        }
+        
+        return; // Salir temprano, no enviar email
+      }
+      
+      // Si el estado NO es "in_progress", enviar respuesta con compensaciones usando la API del backend
       // Enviar el valor del select directamente
       const rejectionReasonToSend = data.newStatus === 'rejected'
         ? data.rejection_reason
         : undefined;
       
-      const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudId, {
+      // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
+      const solicitudIdString = String(solicitudId).padStart(10, '0');
+      const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudIdString, {
         newStatus: data.newStatus,
-        emailSubject: data.emailSubject,
-        emailBody: data.emailBody,
+        emailSubject: data.emailSubject!,
+        emailBody: data.emailBody!,
         rejection_reason: rejectionReasonToSend,
         // No enviar compensaciones si el estado es "rejected" (no se genera certificado)
         t_basicos: data.newStatus !== 'rejected' ? data.t_basicos : undefined,
@@ -3971,45 +4076,48 @@ const AdminSolicitudesPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Asunto del correo */}
-                    <FormField
-                      control={responseWithCompensacionesForm.control}
-                    name="emailSubject"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 100;
-                      const isNearLimit = currentLength > maxLength * 0.8;
-                      const isOverLimit = currentLength > maxLength;
-                      
-                      return (
-                        <FormItem>
-                          <FormLabel>Asunto del Correo *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder={useCompensacionesForm ? "Ej: Certificado de Convenio - Consecutivo 202412150001" : "Ej: Respuesta a su solicitud #123"} 
-                              {...field}
-                              maxLength={maxLength}
-                            />
-                          </FormControl>
-                          <div className="flex items-center justify-between">
-                            <FormDescription>
-                              El asunto del correo que se enviará al afiliado.
-                            </FormDescription>
-                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                              {currentLength}/{maxLength}
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
+                    {/* Asunto del correo - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseWithCompensacionesForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseWithCompensacionesForm.control}
+                        name="emailSubject"
+                        render={({ field }) => {
+                          const currentLength = field.value?.length || 0;
+                          const maxLength = 100;
+                          const isNearLimit = currentLength > maxLength * 0.8;
+                          const isOverLimit = currentLength > maxLength;
+                          
+                          return (
+                            <FormItem>
+                              <FormLabel>Asunto del Correo *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder={useCompensacionesForm ? "Ej: Certificado de Convenio - Consecutivo 202412150001" : "Ej: Respuesta a su solicitud #123"} 
+                                  {...field}
+                                  maxLength={maxLength}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormDescription>
+                                  El asunto del correo que se enviará al afiliado.
+                                </FormDescription>
+                                <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                  {currentLength}/{maxLength}
+                                </span>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    )}
 
-                    {/* Cuerpo del correo - Texto del mensaje */}
-                    <FormField
-                      control={responseWithCompensacionesForm.control}
-                    name="emailBody"
-                    render={({ field }) => {
+                    {/* Cuerpo del correo - Texto del mensaje - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseWithCompensacionesForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseWithCompensacionesForm.control}
+                        name="emailBody"
+                        render={({ field }) => {
                       const [pasteError, setPasteError] = useState<string | null>(null);
                       
                       const maxLength = 5000;
@@ -4184,12 +4292,14 @@ const AdminSolicitudesPage: React.FC = () => {
                         </FormItem>
                       );
                     }}
-                  />
+                      />
+                    )}
 
-                    {/* Adjuntar archivos */}
-                    <FormField
-                      control={responseWithCompensacionesForm.control}
-                    name="attachments"
+                    {/* Adjuntar archivos - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseWithCompensacionesForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseWithCompensacionesForm.control}
+                        name="attachments"
                     render={({ field }) => {
                       const files = field.value ? Array.from(field.value as FileList) : [];
                       const hasFiles = files.length > 0;
@@ -4452,7 +4562,8 @@ const AdminSolicitudesPage: React.FC = () => {
                         </FormItem>
                       );
                     }}
-                  />
+                      />
+                    )}
 
                     {/* Botones de acción */}
                     <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
@@ -4473,16 +4584,17 @@ const AdminSolicitudesPage: React.FC = () => {
                         {(() => {
                           const currentStatus = responseWithCompensacionesForm.watch('newStatus');
                           const isRejected = currentStatus === 'rejected';
+                          const isInProgress = currentStatus === 'in_progress';
                           
                           return isSubmittingResponse ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              {isRejected ? 'Enviando...' : 'Generando certificado...'}
+                              {isInProgress ? 'Actualizando estado...' : isRejected ? 'Enviando...' : 'Generando certificado...'}
                             </>
                           ) : (
                             <>
                               <Send className="h-4 w-4 mr-2" />
-                              {isRejected ? 'Enviar Respuesta' : 'Generar Certificado y Enviar'}
+                              {isInProgress ? 'Actualizar Estado' : isRejected ? 'Enviar Respuesta' : 'Generar Certificado y Enviar'}
                             </>
                           );
                         })()}
@@ -4684,45 +4796,48 @@ const AdminSolicitudesPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Asunto del correo */}
-                    <FormField
-                      control={responseForm.control}
-                      name="emailSubject"
-                    render={({ field }) => {
-                      const currentLength = field.value?.length || 0;
-                      const maxLength = 100;
-                      const isNearLimit = currentLength > maxLength * 0.8;
-                      const isOverLimit = currentLength > maxLength;
-                      
-                      return (
-                        <FormItem>
-                          <FormLabel>Asunto del Correo *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Ej: Respuesta a su solicitud #123" 
-                              {...field}
-                              maxLength={maxLength}
-                            />
-                          </FormControl>
-                          <div className="flex items-center justify-between">
-                            <FormDescription>
-                              El asunto del correo que se enviará al afiliado.
-                            </FormDescription>
-                            <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
-                              {currentLength}/{maxLength}
-                            </span>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
+                    {/* Asunto del correo - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseForm.control}
+                        name="emailSubject"
+                        render={({ field }) => {
+                          const currentLength = field.value?.length || 0;
+                          const maxLength = 100;
+                          const isNearLimit = currentLength > maxLength * 0.8;
+                          const isOverLimit = currentLength > maxLength;
+                          
+                          return (
+                            <FormItem>
+                              <FormLabel>Asunto del Correo *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Ej: Respuesta a su solicitud #123" 
+                                  {...field}
+                                  maxLength={maxLength}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormDescription>
+                                  El asunto del correo que se enviará al afiliado.
+                                </FormDescription>
+                                <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : isNearLimit ? 'text-orange-600' : 'text-gray-500'}`}>
+                                  {currentLength}/{maxLength}
+                                </span>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    )}
 
-                    {/* Cuerpo del correo - Texto del mensaje */}
-                    <FormField
-                      control={responseForm.control}
-                    name="emailBody"
-                    render={({ field }) => {
+                    {/* Cuerpo del correo - Texto del mensaje - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseForm.control}
+                        name="emailBody"
+                        render={({ field }) => {
                       const [pasteError, setPasteError] = useState<string | null>(null);
                       
                       const maxLength = 5000;
@@ -4897,9 +5012,10 @@ const AdminSolicitudesPage: React.FC = () => {
                         </FormItem>
                       );
                     }}
-                  />
+                      />
+                    )}
 
-                    {requiresFondoPensionesAnnex && (
+                    {requiresFondoPensionesAnnex && responseForm.watch('newStatus') !== 'in_progress' && (
                       <Alert className="bg-amber-50 border-amber-200 text-amber-800">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle className="text-sm font-semibold">Anexo requerido</AlertTitle>
@@ -4909,7 +5025,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       </Alert>
                     )}
 
-                    {requiresActividadesForm && responseForm.watch('newStatus') !== 'rejected' && (
+                    {requiresActividadesForm && responseForm.watch('newStatus') !== 'rejected' && responseForm.watch('newStatus') !== 'in_progress' && (
                       <FormField
                         control={responseForm.control}
                         name="actividades"
@@ -5026,11 +5142,12 @@ const AdminSolicitudesPage: React.FC = () => {
                       />
                     )}
 
-                    {/* Adjuntar archivos */}
-                    <FormField
-                      control={responseForm.control}
-                      name="attachments"
-                      render={({ field }) => {
+                    {/* Adjuntar archivos - Solo visible cuando el estado NO es "in_progress" */}
+                    {responseForm.watch('newStatus') !== 'in_progress' && (
+                      <FormField
+                        control={responseForm.control}
+                        name="attachments"
+                        render={({ field }) => {
                       const files = field.value ? Array.from(field.value as FileList) : [];
                       const hasFiles = files.length > 0;
                       
@@ -5278,7 +5395,8 @@ const AdminSolicitudesPage: React.FC = () => {
                         </FormItem>
                       );
                     }}
-                  />
+                      />
+                    )}
 
                     {/* Botones de acción */}
                     <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200">
@@ -5296,17 +5414,22 @@ const AdminSolicitudesPage: React.FC = () => {
                         disabled={isSubmittingResponse}
                         className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
-                        {isSubmittingResponse ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Enviando...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            Enviar Respuesta
-                          </>
-                        )}
+                        {(() => {
+                          const currentStatus = responseForm.watch('newStatus');
+                          const isInProgress = currentStatus === 'in_progress';
+                          
+                          return isSubmittingResponse ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              {isInProgress ? 'Actualizando estado...' : 'Enviando...'}
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              {isInProgress ? 'Actualizar Estado' : 'Enviar Respuesta'}
+                            </>
+                          );
+                        })()}
                       </Button>
                     </div>
                   </form>

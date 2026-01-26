@@ -32,6 +32,7 @@ export interface WellnessDeliveryRequest {
   tipo_firma?: string;
   tipo_firma_text?: string;
   firma_recibido?: string; // Firma capturada al momento de la entrega
+  cantidad_entregada?: number | string; // Cantidad de elementos entregados
   estado: string;
   estado_text?: string;
   observaciones?: string | null;
