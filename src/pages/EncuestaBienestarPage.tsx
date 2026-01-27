@@ -428,7 +428,25 @@ const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
     : z.string().min(1, 'Proceso es requerido'),
   // Campos adicionales de datos básicos - todos requeridos menos hospital y proceso
   rh: z.string({ required_error: 'RH es requerido' }).min(1, 'RH es requerido'),
-  fechaExpedicion: z.string({ required_error: 'Fecha de expedición es requerida' }).min(1, 'Fecha de expedición es requerida'),
+  fechaExpedicion: z.string({ required_error: 'Fecha de expedición es requerida' })
+    .min(1, 'Fecha de expedición es requerida')
+    .refine((val) => {
+      if (!val) return false;
+      // Validar formato de fecha YYYY-MM-DD y que el año tenga exactamente 4 dígitos
+      const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+      const match = val.match(dateRegex);
+      if (!match) return false;
+      const year = parseInt(match[1], 10);
+      // Verificar que el año tenga exactamente 4 dígitos (entre 1000 y 9999)
+      if (year < 1000 || year > 9999) {
+        return false;
+      }
+      // Verificar que la fecha no sea futura
+      const fecha = new Date(val);
+      const hoy = new Date();
+      hoy.setHours(23, 59, 59, 999); // Establecer al final del día para permitir fechas de hoy
+      return fecha <= hoy;
+    }, { message: 'El año debe tener exactamente 4 dígitos y la fecha no puede ser futura' }),
   lugarNacimiento: z.string({ required_error: 'Lugar de nacimiento es requerido' }).min(1, 'Lugar de nacimiento es requerido'),
   departamento: z.string({ required_error: 'Departamento es requerido' }).min(1, 'Departamento es requerido'),
   celular: z.string({ required_error: 'Celular es requerido' })
@@ -1401,17 +1419,54 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                     <FormField
                       control={form.control}
                       name="fechaExpedicion"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">
-                            {isBulkEntryMode ? '7. Fecha de expedición' : '9. Fecha de expedición'}
-                          </FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} value={field.value || ''} readOnly={!!afiliado?.fecha_expedicion} className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                          const value = e.target.value;
+                          if (!value) {
+                            field.onChange('');
+                            return;
+                          }
+                          // Validar y corregir el año si tiene más de 4 dígitos
+                          const dateRegex = /^(\d{4,})-(\d{2})-(\d{2})$/;
+                          const match = value.match(dateRegex);
+                          if (match) {
+                            const year = match[1];
+                            // Si el año tiene más de 4 dígitos, tomar solo los primeros 4
+                            if (year.length > 4) {
+                              const correctedYear = year.substring(0, 4);
+                              const correctedDate = `${correctedYear}-${match[2]}-${match[3]}`;
+                              field.onChange(correctedDate);
+                              return;
+                            }
+                          }
+                          field.onChange(value);
+                        };
+
+                        // Calcular fechas mínima y máxima (año de 4 dígitos)
+                        const minDate = '1000-01-01';
+                        const maxDate = new Date().toISOString().split('T')[0];
+
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold text-slate-900">
+                              {isBulkEntryMode ? '7. Fecha de expedición' : '9. Fecha de expedición'}
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                value={field.value || ''} 
+                                onChange={handleDateChange}
+                                min={minDate}
+                                max={maxDate}
+                                readOnly={!!afiliado?.fecha_expedicion} 
+                                className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
