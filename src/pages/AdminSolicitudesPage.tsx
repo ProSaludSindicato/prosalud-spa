@@ -1375,7 +1375,11 @@ const AdminSolicitudesPage: React.FC = () => {
       responseWithCompensacionesForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
       } else {
       // Usar formulario normal
-      let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}`;
+      const documentInfo =
+        solicitud.id_type && solicitud.id_number
+          ? ` - ${solicitud.id_type} ${solicitud.id_number}`
+          : "";
+      let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}${documentInfo}`;
       let emailBody = "";
       
       // Si es microcrédito, prediligenciar mensaje según el estado
@@ -3808,10 +3812,19 @@ const AdminSolicitudesPage: React.FC = () => {
             <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
               <DialogHeader>
                 <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 break-words">
-                  {useCompensacionesForm 
-                    ? `Responder con Compensaciones Manuales - Solicitud #${solicitudToRespond?.id}`
-                    : `Dar Respuesta a Solicitud #${solicitudToRespond?.id}`
-                  }
+                  <div className="inline-flex flex-col items-start gap-2">
+                    <span>
+                      {useCompensacionesForm
+                        ? `Responder con Compensaciones Manuales - Solicitud #${solicitudToRespond?.id}`
+                        : `Dar Respuesta a Solicitud #${solicitudToRespond?.id}`
+                      }
+                    </span>
+                    {solicitudToRespond && (
+                      <Badge className={getStatusColor(solicitudToRespond.status)}>
+                        {getStatusLabel(solicitudToRespond.status)}
+                      </Badge>
+                    )}
+                  </div>
                 </DialogTitle>
                 <DialogDescription className="text-sm">
                   {useCompensacionesForm 
@@ -3853,16 +3866,22 @@ const AdminSolicitudesPage: React.FC = () => {
                       <Card className="border border-gray-200 bg-gray-50">
                         <CardContent className="p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-600 font-medium">Solicitante:</p>
-                              <p className="text-gray-900">
-                                {solicitudToRespond.name} {solicitudToRespond.last_name}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 font-medium">Correo:</p>
-                              <p className="text-gray-900">{solicitudToRespond.email}</p>
-                            </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Solicitante:</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.name} {solicitudToRespond.last_name}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Documento:</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.id_type} {solicitudToRespond.id_number}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 font-medium">Correo:</p>
+                            <p className="text-gray-900">{solicitudToRespond.email}</p>
+                          </div>
                             <div>
                               <p className="text-gray-600 font-medium">Tipo de Solicitud:</p>
                               <p className="text-gray-900">
@@ -3877,12 +3896,6 @@ const AdminSolicitudesPage: React.FC = () => {
                                   getRequestTypeLabel(solicitudToRespond.request_type)
                                 )}
                               </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 font-medium">Estado Actual:</p>
-                              <Badge className={getStatusColor(solicitudToRespond.status)}>
-                                {getStatusLabel(solicitudToRespond.status)}
-                              </Badge>
                             </div>
                           </div>
                         </CardContent>
@@ -4617,6 +4630,12 @@ const AdminSolicitudesPage: React.FC = () => {
                             </p>
                           </div>
                           <div>
+                            <p className="text-gray-600 font-medium">Documento:</p>
+                            <p className="text-gray-900">
+                              {solicitudToRespond.id_type} {solicitudToRespond.id_number}
+                            </p>
+                          </div>
+                          <div>
                             <p className="text-gray-600 font-medium">Correo:</p>
                             <p className="text-gray-900">{solicitudToRespond.email}</p>
                           </div>
@@ -4634,12 +4653,6 @@ const AdminSolicitudesPage: React.FC = () => {
                                 getRequestTypeLabel(solicitudToRespond.request_type)
                               )}
                             </p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Estado Actual:</p>
-                            <Badge className={getStatusColor(solicitudToRespond.status)}>
-                              {getStatusLabel(solicitudToRespond.status)}
-                            </Badge>
                           </div>
                         </div>
                       </CardContent>
