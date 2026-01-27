@@ -19,6 +19,7 @@ const InformacionDescansoSection = <TFieldValues extends FieldValues>({
     'Beatriz Veronica Bernal Velez',
     'Luz Maria Garcia Rincon',
     'Maria Alejandra Garcia Mesa',
+    'Alisson Caro Holguin',
   ];
 
   return (
