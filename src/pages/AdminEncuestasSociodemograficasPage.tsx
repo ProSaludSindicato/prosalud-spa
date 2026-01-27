@@ -269,20 +269,73 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   );
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
+  // Debounce para el filtro de número de documento
+  const [numeroDocumentoFilterDebounced, setNumeroDocumentoFilterDebounced] = useState<string>(
+    searchParams.get('numero_documento') || ''
+  );
+  
+  // Sincronizar el estado debounced cuando cambia el input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setNumeroDocumentoFilterDebounced(numeroDocumentoFilter);
+    }, 500); // 500ms de debounce
+    
+    return () => clearTimeout(timer);
+  }, [numeroDocumentoFilter]);
+
+  // Resetear página a 1 cuando cambian los filtros (excepto perPage y currentPage)
+  useEffect(() => {
+    if (id) return;
+    setCurrentPage(1);
+  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, id]);
+
+  // Sincronizar filtros con searchParams automáticamente (reactivo)
+  useEffect(() => {
+    if (id) return; // No actualizar si estamos en vista de detalle
+    
+    const newParams = new URLSearchParams();
+    if (hospitalFilter.trim()) newParams.set('hospital', hospitalFilter.trim());
+    if (surveyTypeFilter && surveyTypeFilter !== 'all') {
+      newParams.set('survey_type', surveyTypeFilter);
+    }
+    if (numeroDocumentoFilterDebounced.trim()) {
+      newParams.set('numero_documento', numeroDocumentoFilterDebounced.trim());
+    }
+    newParams.set('per_page', perPage.toString());
+    newParams.set('page', currentPage.toString());
+    
+    // Solo actualizar si hay cambios para evitar loops infinitos
+    const currentParams = searchParams.toString();
+    const newParamsString = newParams.toString();
+    if (currentParams !== newParamsString) {
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, perPage, currentPage, id]);
+
   // Construir parámetros de consulta (ejecutar siempre, incluso si hay id)
+  // NOTA: numero_documento se filtra en frontend temporalmente
   const queryParams = useMemo(() => {
     if (id) return {}; // Retornar objeto vacío si hay id, no se usará
     const params: any = {
-      per_page: perPage,
-      page: currentPage,
+      // Obtener más registros para poder filtrar en frontend
+      per_page: 1000, // Obtener muchos registros para filtrar en frontend
+      page: 1, // Siempre obtener la primera página completa
     };
-    if (hospitalFilter) params.hospital = hospitalFilter;
+    const hospitalTrimmed = hospitalFilter.trim();
+    if (hospitalTrimmed) params.hospital = hospitalTrimmed;
+    
     if (surveyTypeFilter && surveyTypeFilter !== 'all') {
       params.survey_type = surveyTypeFilter;
     }
-    if (numeroDocumentoFilter) params.numero_documento = numeroDocumentoFilter;
+    
+    // NO enviar numero_documento al backend, se filtra en frontend
+    // const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
+    // if (documentoTrimmed) {
+    //   params.numero_documento = documentoTrimmed;
+    // }
+    
     return params;
-  }, [id, hospitalFilter, surveyTypeFilter, numeroDocumentoFilter, perPage, currentPage]);
+  }, [id, hospitalFilter, surveyTypeFilter]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -296,8 +349,43 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     enabled: can('socio_demographic_surveys.view') && !id,
   });
 
-  const surveys = surveysResponse?.data || [];
-  const pagination = surveysResponse?.pagination;
+  // Filtrar por número de documento en el frontend
+  const filteredSurveys = useMemo(() => {
+    let surveys = surveysResponse?.data || [];
+    
+    // Filtrar por número de documento si hay un valor
+    const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
+    if (documentoTrimmed) {
+      surveys = surveys.filter((survey) =>
+        survey.numero_documento?.includes(documentoTrimmed)
+      );
+    }
+    
+    return surveys;
+  }, [surveysResponse?.data, numeroDocumentoFilterDebounced]);
+
+  // Aplicar paginación en el frontend
+  const paginatedSurveys = useMemo(() => {
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    return filteredSurveys.slice(startIndex, endIndex);
+  }, [filteredSurveys, currentPage, perPage]);
+
+  // Calcular paginación para frontend
+  const totalFiltered = filteredSurveys.length;
+  const totalPages = Math.ceil(totalFiltered / perPage);
+  
+  const pagination = useMemo(() => {
+    if (!surveysResponse?.pagination) return undefined;
+    return {
+      current_page: currentPage,
+      last_page: totalPages,
+      per_page: perPage,
+      total: totalFiltered,
+    };
+  }, [currentPage, totalPages, perPage, totalFiltered, surveysResponse?.pagination]);
+
+  const surveys = paginatedSurveys;
   const metrics = surveysResponse?.metrics;
 
   // Obtener configuración de encuestas
@@ -351,19 +439,8 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     return <AdminEncuestaDetailView surveyId={id} />;
   }
 
-  // Función para actualizar filtros y resetear a página 1
-  const handleFilterChange = () => {
-    setCurrentPage(1);
-    const newParams = new URLSearchParams();
-    if (hospitalFilter) newParams.set('hospital', hospitalFilter);
-    if (surveyTypeFilter && surveyTypeFilter !== 'all') {
-      newParams.set('survey_type', surveyTypeFilter);
-    }
-    if (numeroDocumentoFilter) newParams.set('numero_documento', numeroDocumentoFilter);
-    newParams.set('per_page', perPage.toString());
-    newParams.set('page', '1');
-    setSearchParams(newParams);
-  };
+  // Función para actualizar filtros y resetear a página 1 (ya no se usa, pero se mantiene por si acaso)
+  // Los filtros ahora son reactivos y se actualizan automáticamente
 
   // Función para limpiar filtros
   const handleClearFilters = () => {
@@ -601,11 +678,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   placeholder="Buscar por hospital"
                   value={hospitalFilter}
                   onChange={(e) => setHospitalFilter(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleFilterChange();
-                    }
-                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -627,20 +699,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   placeholder="Buscar por número"
                   value={numeroDocumentoFilter}
                   onChange={(e) => setNumeroDocumentoFilter(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleFilterChange();
-                    }
-                  }}
                 />
               </div>
               <div className="flex items-end gap-2">
-                <Button onClick={handleFilterChange} className="flex-1">
-                  <Search className="h-4 w-4 mr-2" />
-                  Buscar
-                </Button>
                 {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter) && (
-                  <Button variant="outline" onClick={handleClearFilters}>
+                  <Button variant="outline" onClick={handleClearFilters} className="flex-1">
                     Limpiar
                   </Button>
                 )}
