@@ -54,6 +54,18 @@ const normalizeMunicipio = (value: string | null | undefined): string => {
   return found?.value || normalized.replace(/\s+/g, '_');
 };
 
+// Función helper para convertir a mayúsculas mientras se escribe (Input)
+const handleUppercaseInput = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
+  const value = e.target.value.toUpperCase();
+  onChange(value);
+};
+
+// Función helper para convertir a mayúsculas mientras se escribe (Textarea)
+const handleUppercaseTextarea = (e: React.ChangeEvent<HTMLTextAreaElement>, onChange: (value: string) => void) => {
+  const value = e.target.value.toUpperCase();
+  onChange(value);
+};
+
 // Función para normalizar la talla de uniforme/vestimenta
 const normalizeTallaUniforme = (value: string | null | undefined): string => {
   if (!value) return '';
@@ -1166,8 +1178,10 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               readOnly={!isBulkEntryMode} 
                               className={!isBulkEntryMode ? "bg-slate-100" : ""}
                               onChange={(e) => {
-                                field.onChange(e);
-                                form.clearErrors('nombres');
+                                handleUppercaseInput(e, (value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('nombres');
+                                });
                               }}
                             />
                           </FormControl>
@@ -1189,8 +1203,10 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               readOnly={!isBulkEntryMode} 
                               className={!isBulkEntryMode ? "bg-slate-100" : ""}
                               onChange={(e) => {
-                                field.onChange(e);
-                                form.clearErrors('apellidos');
+                                handleUppercaseInput(e, (value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('apellidos');
+                                });
                               }}
                             />
                           </FormControl>
@@ -1518,7 +1534,16 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                 {isBulkEntryMode ? '9. Lugar de nacimiento' : '11. Lugar de nacimiento'}
                               </FormLabel>
                               <FormControl>
-                                <Input {...field} value={field.value || ''} readOnly={!!afiliado?.lugar_nacimiento} className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} placeholder="Ej: Medellín" />
+                                <Input 
+                                  {...field} 
+                                  value={field.value || ''} 
+                                  readOnly={!!afiliado?.lugar_nacimiento} 
+                                  className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} 
+                                  placeholder="Ej: Medellín"
+                                  onChange={(e) => {
+                                    handleUppercaseInput(e, field.onChange);
+                                  }}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1600,7 +1625,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               <Input
                                 value={displayValue}
                                 onChange={(e) => {
-                                  const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
+                                  const upperValue = e.target.value.toUpperCase();
+                                  const sanitized = sanitizeGeneral(upperValue, { maxLength: 200 });
                                   field.onChange(sanitized);
                                   form.clearErrors('direccion');
                                 }}
@@ -1745,8 +1771,10 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               placeholder="Ej: Juan Pérez"
                               {...field}
                               onChange={(e) => {
-                                field.onChange(e);
-                                form.clearErrors('nombreContactoEmergencia');
+                                handleUppercaseInput(e, (value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('nombreContactoEmergencia');
+                                });
                               }}
                             />
                           </FormControl>
@@ -2100,10 +2128,17 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                 <FormItem>
                                   <FormLabel className="text-base font-semibold text-slate-900">Número de documento</FormLabel>
                                   <FormControl>
-                                    <Input {...field} onChange={(e) => {
-                                      field.onChange(e);
-                                      form.clearErrors(`hijos.${index}.numeroDocumento` as any);
-                                    }} />
+                                    <Input 
+                                      {...field} 
+                                      type="text"
+                                      inputMode="numeric"
+                                      onChange={(e) => {
+                                        // Solo permitir números
+                                        const value = e.target.value.replace(/[^0-9]/g, '');
+                                        field.onChange(value);
+                                        form.clearErrors(`hijos.${index}.numeroDocumento` as any);
+                                      }}
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -2117,8 +2152,10 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                   <FormLabel className="text-base font-semibold text-slate-900">Nombre completo</FormLabel>
                                   <FormControl>
                                     <Input {...field} onChange={(e) => {
-                                      field.onChange(e);
-                                      form.clearErrors(`hijos.${index}.nombre` as any);
+                                      handleUppercaseInput(e, (value) => {
+                                        field.onChange(value);
+                                        form.clearErrors(`hijos.${index}.nombre` as any);
+                                      });
                                     }} />
                                   </FormControl>
                                   <FormMessage />
@@ -2597,7 +2634,13 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                             <FormItem>
                               <FormLabel className="text-base font-semibold text-slate-900">{question.otherLabel}</FormLabel>
                               <FormControl>
-                                <Textarea {...field} placeholder="Especifique..." />
+                                <Textarea 
+                                  {...field} 
+                                  placeholder="Especifique..." 
+                                  onChange={(e) => {
+                                    handleUppercaseTextarea(e, field.onChange);
+                                  }}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -2661,15 +2704,15 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                 form.clearErrors(question.name as any);
                               }} value={field.value} className="flex flex-col gap-2">
                                 <div className="flex items-center space-x-2">
-                                  <RadioGroupItem value="limita_mucho" id={`${question.name}-mucho`} />
+                                  <RadioGroupItem value="LIMITA_MUCHO" id={`${question.name}-mucho`} />
                                   <label htmlFor={`${question.name}-mucho`} className="text-base font-normal text-slate-600 cursor-pointer">Sí, me limita mucho</label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="limita_poco" id={`${question.name}-poco`} />
+                                <RadioGroupItem value="LIMITA_POCO" id={`${question.name}-poco`} />
                                 <label htmlFor={`${question.name}-poco`} className="text-base font-normal text-slate-600 cursor-pointer">Sí, me limita un poco</label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="no_limita" id={`${question.name}-no`} />
+                                <RadioGroupItem value="NO_LIMITA" id={`${question.name}-no`} />
                                 <label htmlFor={`${question.name}-no`} className="text-base font-normal text-slate-600 cursor-pointer">No, no me limita nada</label>
                                 </div>
                               </RadioGroup>
@@ -2727,7 +2770,14 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">Especifique la recomendación o restricción laboral:</FormLabel>
                           <FormControl>
-                            <Textarea {...field} placeholder="Describa la recomendación o restricción..." rows={4} />
+                            <Textarea 
+                              {...field} 
+                              placeholder="Describa la recomendación o restricción..." 
+                              rows={4}
+                              onChange={(e) => {
+                                handleUppercaseTextarea(e, field.onChange);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

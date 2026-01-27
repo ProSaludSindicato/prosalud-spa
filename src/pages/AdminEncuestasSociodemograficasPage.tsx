@@ -1068,12 +1068,18 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
 
   // Helper para formatear limitaciones
   const formatLimitacion = (value: string) => {
+    // Normalizar a mayúsculas para manejar ambos casos (minúscula y mayúscula)
+    const normalizedValue = value?.toUpperCase() || '';
     const map: Record<string, string> = {
+      'LIMITA_MUCHO': 'Me limita mucho',
+      'LIMITA_POCO': 'Me limita un poco',
+      'NO_LIMITA': 'No me limita nada',
+      // Mantener compatibilidad con valores en minúscula (por si acaso)
       'limita_mucho': 'Me limita mucho',
       'limita_poco': 'Me limita un poco',
       'no_limita': 'No me limita nada',
     };
-    return map[value] || value;
+    return map[normalizedValue] || map[value] || value;
   };
 
   // Helper para formatear fechas (sin hora)
@@ -1276,16 +1282,13 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
               <p className="text-base">{survey.correo}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">Tipo de Documento</label>
+              <label className="text-sm font-medium text-slate-600">Documento de Identidad</label>
               <p className="text-base">
-                <Badge variant="outline">
+                <Badge variant="outline" className="mr-2">
                   {getTipoDocumentoDisplayName(survey.tipo_documento)}
                 </Badge>
+                <span className="font-mono">{survey.numero_documento}</span>
               </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600">Número de Documento</label>
-              <p className="text-base font-mono">{survey.numero_documento}</p>
             </div>
             {survey.hospital && (
               <div>

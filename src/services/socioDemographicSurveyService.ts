@@ -148,6 +148,85 @@ export interface SuccessResponse {
 /**
  * Convertir data URI (base64) a Blob
  */
+/**
+ * Convierte los campos de texto a mayúsculas, excepto campos que no deben convertirse
+ * (emails, teléfonos, números, fechas, etc.)
+ */
+function convertToUppercase(data: any): any {
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  // Campos que NO deben convertirse a mayúsculas
+  const excludeFields = [
+    'correo',
+    'celular',
+    'telefonoContactoEmergencia',
+    'numeroDocumento',
+    'numeroDocumentoFirma',
+    'fechaExpedicion',
+    'fechaNacimiento',
+    'estatura',
+    'peso',
+    'tallaCalzado',
+    'numeroHijos',
+    'numeroPersonasDependientes',
+    'tiempoCirugia',
+    'tiempoAccidenteLaboral',
+    'tiempoAccidenteTransito',
+    'firma',
+    'survey_type',
+  ];
+
+  // Si es un array, procesar cada elemento
+  if (Array.isArray(data)) {
+    return data.map(item => convertToUppercase(item));
+  }
+
+  // Si es un objeto, procesar recursivamente
+  if (typeof data === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      // Si es un campo excluido, mantener el valor original
+      if (excludeFields.includes(key)) {
+        result[key] = value;
+      }
+      // Si es un objeto anidado (serviciosPublicos, manejoTiempoLibre), mantener como está (son booleanos)
+      else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Verificar si es un objeto de booleanos (serviciosPublicos, manejoTiempoLibre)
+        const isBooleanObject = Object.values(value).every(v => typeof v === 'boolean');
+        if (isBooleanObject) {
+          result[key] = value;
+        } else {
+          // Procesar recursivamente
+          result[key] = convertToUppercase(value);
+        }
+      }
+      // Si es un array (hijos), procesar recursivamente
+      else if (Array.isArray(value)) {
+        result[key] = convertToUppercase(value);
+      }
+      // Si es un string, convertir a mayúsculas
+      else if (typeof value === 'string') {
+        result[key] = value.toUpperCase();
+      }
+      // Para otros tipos (number, boolean), mantener el valor original
+      else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  // Si es un string y no está excluido, convertir a mayúsculas
+  if (typeof data === 'string') {
+    return data.toUpperCase();
+  }
+
+  // Para otros tipos, retornar tal cual
+  return data;
+}
+
 function dataURItoBlob(dataURI: string): Blob {
   // Separar el data URI en sus partes
   const splitDataURI = dataURI.split(',');
@@ -180,10 +259,13 @@ export const submitSurvey = async (
   recaptchaToken?: string
 ): Promise<SuccessResponse> => {
   try {
+    // Convertir todos los campos de texto a mayúsculas antes de enviar
+    const surveyDataUppercase = convertToUppercase(surveyData);
+    
     const formData = new FormData();
     
     // Agregar todos los campos del formulario
-    Object.entries(surveyData).forEach(([key, value]) => {
+    Object.entries(surveyDataUppercase).forEach(([key, value]) => {
       // Saltar el campo firma, lo manejaremos por separado
       if (key === 'firma') return;
       
