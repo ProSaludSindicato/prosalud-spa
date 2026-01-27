@@ -594,6 +594,158 @@ const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
   // Firma - solo se valida al enviar, no en validación de pasos
   firma: z.string().optional(),
   numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
+})
+.refine((data) => {
+  // Validar campos condicionales cuando la respuesta es "si"
+  if (data.trasplante === 'si' && (!data.tipoTrasplante || data.tipoTrasplante.trim() === '')) {
+    return false;
+  }
+  if (data.problemasPulmonares === 'si' && (!data.tipoProblemaPulmonar || data.tipoProblemaPulmonar.trim() === '')) {
+    return false;
+  }
+  if (data.alergias === 'si' && (!data.tipoAlergia || data.tipoAlergia.trim() === '')) {
+    return false;
+  }
+  if (data.problemasVisuales === 'si' && (!data.tipoProblemaVisual || data.tipoProblemaVisual.trim() === '')) {
+    return false;
+  }
+  if (data.doloresArticulares === 'si' && (!data.tipoDolorArticular || data.tipoDolorArticular.trim() === '')) {
+    return false;
+  }
+  if (data.otraEnfermedad === 'si' && (!data.tipoOtraEnfermedad || data.tipoOtraEnfermedad.trim() === '')) {
+    return false;
+  }
+  if (data.medicamentoPermanente === 'si' && (!data.tipoMedicamento || data.tipoMedicamento.trim() === '')) {
+    return false;
+  }
+  if (data.cirugias === 'si') {
+    if (!data.tipoCirugia || data.tipoCirugia.trim() === '') {
+      return false;
+    }
+    if (!data.tiempoCirugia || data.tiempoCirugia.trim() === '') {
+      return false;
+    }
+  }
+  if (data.accidenteLaboral === 'si') {
+    if (!data.tipoAccidenteLaboral || data.tipoAccidenteLaboral.trim() === '') {
+      return false;
+    }
+    if (!data.tiempoAccidenteLaboral || data.tiempoAccidenteLaboral.trim() === '') {
+      return false;
+    }
+  }
+  if (data.accidenteTransitoCasero === 'si') {
+    if (!data.tipoAccidenteTransito || data.tipoAccidenteTransito.trim() === '') {
+      return false;
+    }
+    if (!data.tiempoAccidenteTransito || data.tiempoAccidenteTransito.trim() === '') {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: 'Los campos condicionales son requeridos cuando la respuesta es "Sí"',
+  path: ['tipoTrasplante'], // Path por defecto, se ajustará dinámicamente
+})
+.superRefine((data, ctx) => {
+  // Validaciones específicas con paths personalizados para mejor UX
+  if (data.trasplante === 'si' && (!data.tipoTrasplante || data.tipoTrasplante.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoTrasplante'],
+    });
+  }
+  if (data.problemasPulmonares === 'si' && (!data.tipoProblemaPulmonar || data.tipoProblemaPulmonar.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoProblemaPulmonar'],
+    });
+  }
+  if (data.alergias === 'si' && (!data.tipoAlergia || data.tipoAlergia.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoAlergia'],
+    });
+  }
+  if (data.problemasVisuales === 'si' && (!data.tipoProblemaVisual || data.tipoProblemaVisual.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoProblemaVisual'],
+    });
+  }
+  if (data.doloresArticulares === 'si' && (!data.tipoDolorArticular || data.tipoDolorArticular.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoDolorArticular'],
+    });
+  }
+  if (data.otraEnfermedad === 'si' && (!data.tipoOtraEnfermedad || data.tipoOtraEnfermedad.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoOtraEnfermedad'],
+    });
+  }
+  if (data.medicamentoPermanente === 'si' && (!data.tipoMedicamento || data.tipoMedicamento.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Este campo es requerido cuando la respuesta es "Sí"',
+      path: ['tipoMedicamento'],
+    });
+  }
+  if (data.cirugias === 'si') {
+    if (!data.tipoCirugia || data.tipoCirugia.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tipoCirugia'],
+      });
+    }
+    if (!data.tiempoCirugia || data.tiempoCirugia.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tiempoCirugia'],
+      });
+    }
+  }
+  if (data.accidenteLaboral === 'si') {
+    if (!data.tipoAccidenteLaboral || data.tipoAccidenteLaboral.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tipoAccidenteLaboral'],
+      });
+    }
+    if (!data.tiempoAccidenteLaboral || data.tiempoAccidenteLaboral.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tiempoAccidenteLaboral'],
+      });
+    }
+  }
+  if (data.accidenteTransitoCasero === 'si') {
+    if (!data.tipoAccidenteTransito || data.tipoAccidenteTransito.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tipoAccidenteTransito'],
+      });
+    }
+    if (!data.tiempoAccidenteTransito || data.tiempoAccidenteTransito.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Este campo es requerido cuando la respuesta es "Sí"',
+        path: ['tiempoAccidenteTransito'],
+      });
+    }
+  }
 });
 
 // Crear un tipo base para el formulario (se usará con el schema dinámico)
@@ -917,20 +1069,33 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
       'antecedentesMedicosMentales',
       'epilepsiaConvulsiones',
       'trasplante',
+      'tipoTrasplante',
       'cancer',
       'problemasPulmonares',
+      'tipoProblemaPulmonar',
       'alergias',
+      'tipoAlergia',
       'tuberculosis',
       'problemasVisuales',
+      'tipoProblemaVisual',
       'doloresArticulares',
+      'tipoDolorArticular',
       'problemasSangre',
       'otraEnfermedad',
+      'tipoOtraEnfermedad',
       'protesisArticular',
       'medicamentoPermanente',
+      'tipoMedicamento',
       'tratamientoMedico',
       'cirugias',
+      'tipoCirugia',
+      'tiempoCirugia',
       'accidenteLaboral',
+      'tipoAccidenteLaboral',
+      'tiempoAccidenteLaboral',
       'accidenteTransitoCasero',
+      'tipoAccidenteTransito',
+      'tiempoAccidenteTransito',
       'vacunadoCovid',
     ],
     4: [
@@ -948,6 +1113,39 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
   // Validar paso actual antes de avanzar
   const validateStep = async (step: number): Promise<boolean> => {
     const fields = stepFields[step] || [];
+    
+    // Si estamos en el paso 3 (condiciones de salud), validar el objeto completo
+    // para ejecutar las validaciones condicionales con superRefine
+    // Esto es necesario porque las validaciones condicionales están a nivel del objeto completo
+    if (step === 3) {
+      // Validar primero los campos específicos del paso
+      const fieldsResult = await form.trigger(fields as any);
+      if (!fieldsResult) return false;
+      
+      // Luego validar el objeto completo para ejecutar las validaciones condicionales
+      // Usamos getValues() para obtener los valores actuales y validarlos con el schema
+      const currentValues = form.getValues();
+      try {
+        encuestaSchema.parse(currentValues);
+        return true;
+      } catch (error) {
+        // Si hay errores, mostrarlos en el formulario
+        if (error instanceof z.ZodError) {
+          error.errors.forEach((err) => {
+            if (err.path.length > 0) {
+              const fieldName = err.path[0] as string;
+              form.setError(fieldName as any, {
+                type: 'manual',
+                message: err.message,
+              });
+            }
+          });
+        }
+        return false;
+      }
+    }
+    
+    // Para otros pasos, validar solo los campos específicos
     const result = await form.trigger(fields as any);
     return result;
   };
