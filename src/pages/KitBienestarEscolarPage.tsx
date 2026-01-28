@@ -18,20 +18,9 @@ import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignatureP
 import { kitBienestarService, AuthenticateResponseData, SingleBeneficiaryResponse, MultipleBeneficiariesResponse } from '@/services/kitBienestarService';
 import { logger } from '@/utils/logger';
 
-// Validación de fechas: solo disponible 21, 22, 23 y 24 de Enero
-// Usar fechas en hora local (Colombia) para evitar problemas de zona horaria
+// Por ahora el período de inscripción estará siempre activo para permitir inscribirse desde el enlace directo
 const isEnrollmentPeriodActive = (): boolean => {
-  const now = new Date();
-  const month = now.getMonth(); // 0-11 (enero = 0)
-  const day = now.getDate();
-  
-  // Verificar si estamos en enero
-  if (month !== 0) {
-    return false;
-  }
-  
-  // Verificar si el día está entre 21 y 24
-  return day >= 21 && day <= 24;
+  return true;
 };
 
 // Función para convertir fecha de YYYY-MM-DD (formato input date) a dd/mm/aa (formato API)
