@@ -1015,12 +1015,22 @@ const ActualizarDatosPersonalesPageContent: React.FC = () => {
       }
       if (modifiedFields.has('numeroCuenta') && data.numeroCuenta) {
         payload.numeroCuenta = data.numeroCuenta;
-      }
-      if (modifiedFields.has('tipoCuenta') && data.tipoCuenta) {
-        payload.tipoCuenta = data.tipoCuenta;
-      }
-      if (modifiedFields.has('banco') && data.banco) {
-        payload.banco = data.banco;
+        // Si se actualiza el número de cuenta, también se debe enviar tipoCuenta y banco
+        // incluso si no fueron modificados, ya que el backend los requiere
+        if (data.tipoCuenta) {
+          payload.tipoCuenta = data.tipoCuenta;
+        }
+        if (data.banco) {
+          payload.banco = data.banco;
+        }
+      } else {
+        // Solo enviar tipoCuenta y banco si fueron modificados explícitamente
+        if (modifiedFields.has('tipoCuenta') && data.tipoCuenta) {
+          payload.tipoCuenta = data.tipoCuenta;
+        }
+        if (modifiedFields.has('banco') && data.banco) {
+          payload.banco = data.banco;
+        }
       }
       if (modifiedFields.has('eps') && data.eps) {
         payload.eps = data.eps;

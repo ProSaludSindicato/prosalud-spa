@@ -232,9 +232,15 @@ const ActualizarCuentaBancariaPageContent: React.FC = () => {
           ...(data.correo && { correo: data.correo }),
           ...(data.tallaUniforme && { tallaUniforme: data.tallaUniforme }),
           ...(data.nivelEducativo && { nivelEducativo: data.nivelEducativo }),
-          ...(data.numeroCuenta && { numeroCuenta: data.numeroCuenta }),
-          ...(data.tipoCuenta && { tipoCuenta: data.tipoCuenta }),
-          ...(data.banco && { banco: data.banco }),
+          // Si se actualiza el número de cuenta, también se debe enviar tipoCuenta y banco
+          // incluso si no fueron modificados, ya que el backend los requiere
+          ...(data.numeroCuenta && data.numeroCuenta.trim() !== '' && { 
+            numeroCuenta: data.numeroCuenta,
+            // El backend requiere tipoCuenta y banco cuando se actualiza numeroCuenta
+            // La validación del formulario ya garantiza que estos campos tienen valor
+            tipoCuenta: data.tipoCuenta || '',
+            banco: data.banco || '',
+          }),
           ...(data.eps && { eps: data.eps }),
           ...(data.afp && { afp: data.afp }),
         },
