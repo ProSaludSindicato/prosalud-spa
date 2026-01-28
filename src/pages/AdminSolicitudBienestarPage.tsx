@@ -656,11 +656,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const handleOpenDeliveryStatusDialog = React.useCallback((request: WellnessDeliveryRequest) => {
     setDeliveryRequestToUpdate(request);
     
-    // Pre-llenar cantidad_entregada con el número de beneficiarios (contar el array de beneficiarios)
-    // Si el array existe y tiene elementos, usar su longitud; si está vacío o no existe, usar 1 como fallback
-    const cantidadInicial = (request.beneficiarios && request.beneficiarios.length > 0) 
-      ? request.beneficiarios.length 
-      : 1;
+    // Pre-llenar cantidad_entregada usando beneficiarios_count que viene del API
+    // Si beneficiarios_count es > 0 usarlo, de lo contrario usar 1 como valor por defecto
+    const beneficiariosCount = request.beneficiarios_count ?? 0;
+    const cantidadInicial = beneficiariosCount > 0 ? beneficiariosCount : 1;
     
     deliveryStatusChangeForm.reset({
       estado: 'entregado' as 'entregado' | 'cancelado', // Por defecto "entregado"
@@ -770,16 +769,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   // Asegurar que la cantidad se establezca correctamente cuando se abre el diálogo
   useEffect(() => {
     if (showDeliveryStatusDialog && deliveryRequestToUpdate && selectedEstado === 'entregado') {
-      // Intentar usar selectedDeliveryRequest si está disponible y tiene el mismo ID (tiene beneficiarios completos)
-      const requestConBeneficiarios = (selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id)
-        ? selectedDeliveryRequest
-        : deliveryRequestToUpdate;
-      
-      // Calcular la cantidad de beneficiarios
-      const cantidadBeneficiarios = (requestConBeneficiarios.beneficiarios && requestConBeneficiarios.beneficiarios.length > 0)
-        ? requestConBeneficiarios.beneficiarios.length
-        : 1;
-      
+      // Usar beneficiarios_count de la solicitud seleccionada (detalles) si está disponible,
+      // de lo contrario usar el de deliveryRequestToUpdate. Siempre priorizar el valor del API.
+      const sourceRequest =
+        selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id
+          ? selectedDeliveryRequest
+          : deliveryRequestToUpdate;
+
+      const beneficiariosCount = sourceRequest.beneficiarios_count ?? 0;
+      const cantidadBeneficiarios = beneficiariosCount > 0 ? beneficiariosCount : 1;
+
       // Establecer el valor en el formulario
       deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadBeneficiarios);
     }
@@ -788,15 +787,15 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   // Restaurar cantidad_entregada cuando el estado cambia a "entregado"
   useEffect(() => {
     if (selectedEstado === 'entregado' && deliveryRequestToUpdate) {
-      // Intentar usar selectedDeliveryRequest si está disponible y tiene el mismo ID (tiene beneficiarios completos)
-      const requestConBeneficiarios = (selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id)
-        ? selectedDeliveryRequest
-        : deliveryRequestToUpdate;
-      
-      // Siempre establecer la cantidad basada en la cantidad de beneficiarios cuando el estado es "entregado"
-      const cantidadDefault = (requestConBeneficiarios.beneficiarios && requestConBeneficiarios.beneficiarios.length > 0)
-        ? requestConBeneficiarios.beneficiarios.length
-        : 1;
+      // Usar beneficiarios_count para restaurar la cantidad cuando el estado es "entregado"
+      const sourceRequest =
+        selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id
+          ? selectedDeliveryRequest
+          : deliveryRequestToUpdate;
+
+      const beneficiariosCount = sourceRequest.beneficiarios_count ?? 0;
+      const cantidadDefault = beneficiariosCount > 0 ? beneficiariosCount : 1;
+
       deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadDefault);
     } else if (selectedEstado === 'cancelado') {
       // Limpiar cantidad cuando se cancela

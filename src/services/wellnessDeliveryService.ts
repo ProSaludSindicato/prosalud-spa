@@ -27,6 +27,9 @@ export interface WellnessDeliveryRequest {
   hospital?: string;
   fecha_expedicion?: string;
   beneficiarios: WellnessDeliveryBeneficiary[];
+  // Cantidad de beneficiarios asociados a la solicitud (tamaño del array beneficiarios)
+  // 0 si no hay arreglo o está vacío
+  beneficiarios_count?: number;
   beneficiarios_nombres?: string;
   firma?: string;
   tipo_firma?: string;
