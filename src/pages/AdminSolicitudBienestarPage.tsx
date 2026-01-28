@@ -656,10 +656,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const handleOpenDeliveryStatusDialog = React.useCallback((request: WellnessDeliveryRequest) => {
     setDeliveryRequestToUpdate(request);
     
-    // Pre-llenar cantidad_entregada con el número de beneficiarios si es Kit Escolar
-    const cantidadInicial = request.tipo_entrega === 'kit_escolar' 
-      ? request.beneficiarios?.length || 1 
-      : undefined;
+    // Pre-llenar cantidad_entregada con el número de beneficiarios (contar el array de beneficiarios)
+    // Si el array existe y tiene elementos, usar su longitud; si está vacío o no existe, usar 1 como fallback
+    const cantidadInicial = (request.beneficiarios && request.beneficiarios.length > 0) 
+      ? request.beneficiarios.length 
+      : 1;
     
     deliveryStatusChangeForm.reset({
       estado: 'entregado' as 'entregado' | 'cancelado', // Por defecto "entregado"
@@ -766,20 +767,42 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   // Observar cambios en el estado para mostrar/ocultar el campo de firma
   const selectedEstado = deliveryStatusChangeForm.watch('estado');
   
+  // Asegurar que la cantidad se establezca correctamente cuando se abre el diálogo
+  useEffect(() => {
+    if (showDeliveryStatusDialog && deliveryRequestToUpdate && selectedEstado === 'entregado') {
+      // Intentar usar selectedDeliveryRequest si está disponible y tiene el mismo ID (tiene beneficiarios completos)
+      const requestConBeneficiarios = (selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id)
+        ? selectedDeliveryRequest
+        : deliveryRequestToUpdate;
+      
+      // Calcular la cantidad de beneficiarios
+      const cantidadBeneficiarios = (requestConBeneficiarios.beneficiarios && requestConBeneficiarios.beneficiarios.length > 0)
+        ? requestConBeneficiarios.beneficiarios.length
+        : 1;
+      
+      // Establecer el valor en el formulario
+      deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadBeneficiarios);
+    }
+  }, [showDeliveryStatusDialog, deliveryRequestToUpdate, selectedDeliveryRequest, selectedEstado, deliveryStatusChangeForm]);
+  
   // Restaurar cantidad_entregada cuando el estado cambia a "entregado"
   useEffect(() => {
     if (selectedEstado === 'entregado' && deliveryRequestToUpdate) {
-      const currentCantidad = deliveryStatusChangeForm.getValues('cantidad_entregada');
-      // Si no hay cantidad establecida y es Kit Escolar, establecer el valor por defecto
-      if (!currentCantidad && deliveryRequestToUpdate.tipo_entrega === 'kit_escolar') {
-        const cantidadDefault = deliveryRequestToUpdate.beneficiarios?.length || 1;
-        deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadDefault);
-      }
+      // Intentar usar selectedDeliveryRequest si está disponible y tiene el mismo ID (tiene beneficiarios completos)
+      const requestConBeneficiarios = (selectedDeliveryRequest && selectedDeliveryRequest.id === deliveryRequestToUpdate.id)
+        ? selectedDeliveryRequest
+        : deliveryRequestToUpdate;
+      
+      // Siempre establecer la cantidad basada en la cantidad de beneficiarios cuando el estado es "entregado"
+      const cantidadDefault = (requestConBeneficiarios.beneficiarios && requestConBeneficiarios.beneficiarios.length > 0)
+        ? requestConBeneficiarios.beneficiarios.length
+        : 1;
+      deliveryStatusChangeForm.setValue('cantidad_entregada', cantidadDefault);
     } else if (selectedEstado === 'cancelado') {
       // Limpiar cantidad cuando se cancela
       deliveryStatusChangeForm.setValue('cantidad_entregada', undefined);
     }
-  }, [selectedEstado, deliveryRequestToUpdate, deliveryStatusChangeForm]);
+  }, [selectedEstado, deliveryRequestToUpdate, selectedDeliveryRequest, deliveryStatusChangeForm]);
 
   // Manejar orientación cuando se muestra el drawer de firma en móviles
   useEffect(() => {
@@ -2792,7 +2815,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       }}
                     />
 
-                    {/* Campo de Cantidad Entregada - Solo cuando el estado es "entregado" */}
+                    {/* Campo de Cantidad Entregada - Solo cuando el estado es "entregado"
+                        Ahora es solo de referencia visual (no editable) y muestra el valor
+                        que el frontend prellena automáticamente. */}
                     {selectedEstado === 'entregado' && (
                       <FormField
                         control={deliveryStatusChangeForm.control}
@@ -2800,21 +2825,15 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-base sm:text-lg font-semibold text-gray-900">
-                              Cantidad Entregada <span className="text-red-500">*</span>
+                              Cantidad Entregada
                             </FormLabel>
                             <FormControl>
                               <Input
                                 type="text"
-                                inputMode="numeric"
-                                placeholder="Ingrese la cantidad entregada"
-                                {...field}
                                 value={field.value ?? ''}
-                                onChange={(e) => {
-                                  // Solo permitir números, permitir borrar completamente
-                                  const value = e.target.value.replace(/[^0-9]/g, '');
-                                  field.onChange(value);
-                                }}
-                                className="text-base"
+                                readOnly
+                                disabled
+                                className="text-base bg-gray-100 cursor-not-allowed text-black font-semibold"
                               />
                             </FormControl>
                             <FormMessage />
