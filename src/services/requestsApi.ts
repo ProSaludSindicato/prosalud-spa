@@ -54,6 +54,18 @@ export interface ApiRequest {
   payload: Record<string, any>;
   status: "PENDING" | "IN_REVIEW" | "REJECTED" | "COMPLETED";
   rejection_reason?: string | null;
+  // Optional reason provided by the admin when changing the status (especially for IN_REVIEW)
+  status_reason?: string | null;
+  // Information about the last status change, provided by the backend
+  last_status_change?: {
+    old_status: string | null;
+    new_status: string | null;
+    reason?: string | null;
+    changed_by_name?: string | null;
+    changed_by_email?: string | null;
+    changed_at: string;
+    changed_at_human?: string;
+  } | null;
   created_at: string;
   formatted_created_at: string;
   processed_at: string | null;
@@ -173,6 +185,7 @@ export const requestsApiService = {
     id: string,
     status: "PENDING" | "IN_REVIEW" | "COMPLETED" | "REJECTED",
     rejection_reason?: string | null,
+    status_reason?: string | null,
   ): Promise<ApiRequest> {
     try {
       // Validar que el ID es un string válido (10 dígitos)
@@ -180,13 +193,18 @@ export const requestsApiService = {
         throw new Error('ID inválido - debe ser un string de 10 dígitos');
       }
 
-      const requestBody: { status: string; rejection_reason?: string } = {
+      const requestBody: { status: string; rejection_reason?: string; status_reason?: string } = {
         status,
       };
 
       // Solo incluir rejection_reason si el estado es REJECTED
       if (status === "REJECTED" && rejection_reason) {
         requestBody.rejection_reason = rejection_reason;
+      }
+
+      // Incluir status_reason cuando se proporciona (especialmente útil para IN_REVIEW)
+      if (status_reason && status_reason.trim().length > 0) {
+        requestBody.status_reason = status_reason.trim();
       }
 
       const response = await requestsApi.patch<ApiResponse<ApiRequest>>(`/api/requests/${id}/status`, requestBody);
@@ -212,6 +230,7 @@ export const requestsApiService = {
       rejection_reason?: string | null;
       attachments?: FileList;
       actividades?: string[];
+      status_reason?: string | null;
     }
   ): Promise<ApiRequest> {
     try {
@@ -230,6 +249,11 @@ export const requestsApiService = {
         // Agregar rejection_reason si el estado es REJECTED
         if (data.status === "REJECTED" && data.rejection_reason) {
           formData.append('rejection_reason', data.rejection_reason);
+        }
+
+        // Agregar status_reason si se proporciona (por ejemplo, al marcar como IN_REVIEW)
+        if (data.status_reason && data.status_reason.trim().length > 0) {
+          formData.append('status_reason', data.status_reason.trim());
         }
         
         // Agregar archivos como attachments[0], attachments[1], etc.
@@ -287,6 +311,11 @@ export const requestsApiService = {
           if (data.status === "REJECTED" && data.rejection_reason) {
             formData.append('rejection_reason', data.rejection_reason);
           }
+
+          // Agregar status_reason si se proporciona
+          if (data.status_reason && data.status_reason.trim().length > 0) {
+            formData.append('status_reason', data.status_reason.trim());
+          }
           
           // Agregar actividades
           if (data.actividades && data.actividades.length > 0) {
@@ -331,6 +360,7 @@ export const requestsApiService = {
           email_subject: string;
           email_body: string;
           rejection_reason?: string;
+          status_reason?: string;
         } = {
             status: data.status,
             email_subject: data.email_subject,
@@ -340,6 +370,11 @@ export const requestsApiService = {
         // Solo incluir rejection_reason si el estado es REJECTED
         if (data.status === "REJECTED" && data.rejection_reason) {
           requestBody.rejection_reason = data.rejection_reason;
+        }
+
+        // Solo incluir status_reason cuando se proporcione
+        if (data.status_reason && data.status_reason.trim().length > 0) {
+          requestBody.status_reason = data.status_reason.trim();
         }
 
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(

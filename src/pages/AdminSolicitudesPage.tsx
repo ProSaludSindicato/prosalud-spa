@@ -258,6 +258,11 @@ const responseFormSchema = z.object({
   newStatus: z.enum(["in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
+  // Razón opcional para cambios de estado; requerida cuando se marca como "in_progress"
+  statusReason: z
+    .string()
+    .max(200, "La razón no puede exceder 200 caracteres")
+    .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
@@ -313,6 +318,15 @@ const responseFormSchema = z.object({
 }, {
   message: "El asunto y el cuerpo del correo son obligatorios cuando el estado no es 'En Revisión'",
   path: ["emailSubject"],
+}).refine((data) => {
+  // Si el estado ES "in_progress", la razón es obligatoria en el frontend
+  if (data.newStatus === "in_progress") {
+    return data.statusReason && data.statusReason.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe ingresar una razón cuando la solicitud se marca como 'En Revisión'",
+  path: ["statusReason"],
 });
 
 type ResponseFormValues = z.infer<typeof responseFormSchema>;
@@ -322,6 +336,11 @@ const responseWithCompensacionesFormSchema = z.object({
   newStatus: z.enum(["in_progress", "resolved", "rejected"], {
     required_error: "Debe seleccionar un nuevo estado",
   }),
+  // Razón opcional para cambios de estado; requerida cuando se marca como "in_progress"
+  statusReason: z
+    .string()
+    .max(200, "La razón no puede exceder 200 caracteres")
+    .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
@@ -394,6 +413,15 @@ const responseWithCompensacionesFormSchema = z.object({
 }, {
   message: "El asunto y el cuerpo del correo son obligatorios cuando el estado no es 'En Revisión'",
   path: ["emailSubject"],
+}).refine((data) => {
+  // Si el estado ES "in_progress", la razón es obligatoria en el frontend
+  if (data.newStatus === "in_progress") {
+    return data.statusReason && data.statusReason.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe ingresar una razón cuando la solicitud se marca como 'En Revisión'",
+  path: ["statusReason"],
 });
 
 type ResponseWithCompensacionesFormValues = z.infer<typeof responseWithCompensacionesFormSchema>;
@@ -718,6 +746,7 @@ const AdminSolicitudesPage: React.FC = () => {
     resolver: zodResolver(responseFormSchema),
     defaultValues: {
       newStatus: "in_progress",
+      statusReason: "",
       emailSubject: "",
       emailBody: "",
       rejection_reason: undefined,
@@ -731,6 +760,7 @@ const AdminSolicitudesPage: React.FC = () => {
     resolver: zodResolver(responseWithCompensacionesFormSchema),
     defaultValues: {
       newStatus: "in_progress",
+      statusReason: "",
       emailSubject: "",
       emailBody: "",
       rejection_reason: undefined,
@@ -1561,7 +1591,12 @@ const AdminSolicitudesPage: React.FC = () => {
       if (finalStatus === 'in_progress') {
         // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
         const solicitudIdString = String(solicitudId).padStart(10, '0');
-        const updatedRequest = await requestsService.updateRequestStatus(solicitudIdString, 'in_progress');
+        const updatedRequest = await requestsService.updateRequestStatus(
+          solicitudIdString,
+          'in_progress',
+          undefined,
+          data.statusReason,
+        );
         
         // Resetear estado
         setIsSubmittingResponse(false);
@@ -1612,6 +1647,7 @@ const AdminSolicitudesPage: React.FC = () => {
         emailSubject: data.emailSubject!,
         emailBody: data.emailBody!,
         rejection_reason: rejectionReasonToSend,
+        status_reason: data.statusReason,
         attachments: data.attachments,
         // No enviar actividades si el estado es "rejected" (no se genera certificado)
         actividades: (requiresActividadesForm && finalStatus !== 'rejected') ? (data.actividades || []) : undefined,
@@ -1824,7 +1860,12 @@ const AdminSolicitudesPage: React.FC = () => {
       if (data.newStatus === 'in_progress') {
         // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
         const solicitudIdString = String(solicitudId).padStart(10, '0');
-        const updatedRequest = await requestsService.updateRequestStatus(solicitudIdString, 'in_progress');
+        const updatedRequest = await requestsService.updateRequestStatus(
+          solicitudIdString,
+          'in_progress',
+          undefined,
+          data.statusReason,
+        );
         
         // Resetear estado
         setIsSubmittingResponse(false);
@@ -1873,6 +1914,7 @@ const AdminSolicitudesPage: React.FC = () => {
         emailSubject: data.emailSubject!,
         emailBody: data.emailBody!,
         rejection_reason: rejectionReasonToSend,
+        status_reason: data.statusReason,
         // No enviar compensaciones si el estado es "rejected" (no se genera certificado)
         t_basicos: data.newStatus !== 'rejected' ? data.t_basicos : undefined,
         t_auxilios: data.newStatus !== 'rejected' ? data.t_auxilios : undefined,
@@ -1990,7 +2032,31 @@ const AdminSolicitudesPage: React.FC = () => {
 
   const handleChangeStatus = async (id: string, newStatus: Request["status"]) => {
     try {
-      await requestsService.updateRequestStatus(id, newStatus);
+      let statusReason: string | undefined;
+
+      // Cuando se marca "En Revisión" desde acciones rápidas, pedir siempre la razón
+      if (newStatus === "in_progress") {
+        const input = window.prompt(
+          "Ingrese la razón por la que la solicitud pasa a 'En Revisión' (máx. 200 caracteres):",
+        );
+
+        if (input === null) {
+          // Usuario canceló
+          return;
+        }
+
+        const trimmed = input.trim();
+        if (!trimmed) {
+          toast.error("Razón requerida", {
+            description: "Debe ingresar una razón para marcar la solicitud como 'En Revisión'.",
+          });
+          return;
+        }
+
+        statusReason = trimmed.length > 200 ? trimmed.slice(0, 200) : trimmed;
+      }
+
+      await requestsService.updateRequestStatus(id, newStatus, undefined, statusReason);
 
       const statusLabels = {
         in_progress: "Marcada en Revisión",
@@ -2059,6 +2125,58 @@ const AdminSolicitudesPage: React.FC = () => {
         return "Rechazado";
       default:
         return status;
+    }
+  };
+
+  // Helper para mapear estados del backend (PENDING, IN_REVIEW, etc.) a etiquetas legibles
+  const getBackendStatusLabel = (status?: string | null) => {
+    if (!status) return "Desconocido";
+    const normalized = status.toUpperCase();
+    switch (normalized) {
+      case "PENDING":
+        return "Pendiente";
+      case "IN_REVIEW":
+        return "En Revisión";
+      case "COMPLETED":
+        return "Completado";
+      case "REJECTED":
+        return "Rechazado";
+      default:
+        // También soportar los valores normalizados del frontend por si llegan así
+        if (status === "pending" || status === "in_progress" || status === "resolved" || status === "rejected") {
+          return getStatusLabel(status);
+        }
+        return status;
+    }
+  };
+
+  // Formatea la fecha del último cambio de estado en un formato amigable, sin segundos
+  const formatLastStatusChangeDate = (change?: Request["last_status_change"]) => {
+    if (!change) return "Fecha no disponible";
+
+    if (change.changed_at_human && change.changed_at_human.trim() !== "") {
+      return change.changed_at_human;
+    }
+
+    if (!change.changed_at) {
+      return "Fecha no disponible";
+    }
+
+    try {
+      const date = new Date(change.changed_at);
+      const datePart = date.toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const timePart = date.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `${datePart} a las ${timePart}`;
+    } catch {
+      // Si por alguna razón falla el parseo, devolver el valor bruto
+      return change.changed_at;
     }
   };
 
@@ -3148,6 +3266,58 @@ const AdminSolicitudesPage: React.FC = () => {
                               </Badge>
                             </div>
                           </div>
+                          {selectedSolicitud.last_status_change && (
+                            <div className="space-y-2 md:col-span-2">
+                              <label className="text-sm font-medium text-gray-700">
+                                Detalle de la última revisión
+                              </label>
+                              <div className="bg-slate-50 border border-slate-200 rounded-md p-3 md:p-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                                  <div className="space-y-1">
+                                    <p className="text-sm text-gray-900">
+                                      De{" "}
+                                      <span className="font-semibold">
+                                        {getBackendStatusLabel(selectedSolicitud.last_status_change.old_status)}
+                                      </span>{" "}
+                                      a{" "}
+                                      <span className="font-semibold">
+                                        {getBackendStatusLabel(selectedSolicitud.last_status_change.new_status)}
+                                      </span>
+                                    </p>
+                                    {selectedSolicitud.last_status_change.reason && (
+                                      <p className="text-sm text-gray-800">
+                                        Motivo:{" "}
+                                        <span className="font-medium">
+                                          {selectedSolicitud.last_status_change.reason}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1 text-xs md:text-sm text-gray-600">
+                                    {(selectedSolicitud.last_status_change.changed_by_name ||
+                                      selectedSolicitud.last_status_change.changed_by_email) && (
+                                      <p>
+                                        Por{" "}
+                                        <span className="font-medium">
+                                          {selectedSolicitud.last_status_change.changed_by_name ||
+                                            "Usuario no disponible"}
+                                        </span>
+                                        {selectedSolicitud.last_status_change.changed_by_email && (
+                                          <>
+                                            {" "}
+                                            ({selectedSolicitud.last_status_change.changed_by_email})
+                                          </>
+                                        )}
+                                      </p>
+                                    )}
+                                    <p className="text-xs md:text-sm text-gray-500">
+                                      {formatLastStatusChangeDate(selectedSolicitud.last_status_change)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           {selectedSolicitud.status === "rejected" && selectedSolicitud.rejection_reason && (
                             <div className="space-y-2 md:col-span-2">
                               <label className="text-sm font-medium text-gray-700">Razón de Rechazo</label>
@@ -4089,6 +4259,53 @@ const AdminSolicitudesPage: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Razón de cambio de estado - requerida cuando el estado es "in_progress" */}
+                    {responseWithCompensacionesForm.watch('newStatus') === 'in_progress' && (
+                      <FormField
+                        control={responseWithCompensacionesForm.control}
+                        name="statusReason"
+                        render={({ field }) => {
+                          const currentLength = field.value?.length || 0;
+                          const maxLength = 200;
+                          const isNearLimit = currentLength > maxLength * 0.8;
+                          const isOverLimit = currentLength > maxLength;
+
+                          return (
+                            <FormItem>
+                              <FormLabel>
+                                Razón de cambio de estado a &quot;En Revisión&quot; *
+                              </FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Explique brevemente por qué la solicitud pasa a En Revisión..."
+                                  className="min-h-[80px]"
+                                  {...field}
+                                  maxLength={maxLength}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormDescription>
+                                  Esta razón se registrará en el historial de la solicitud.
+                                </FormDescription>
+                                <span
+                                  className={`text-xs ${
+                                    isOverLimit
+                                      ? 'text-red-600 font-semibold'
+                                      : isNearLimit
+                                      ? 'text-orange-600'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  {currentLength}/{maxLength}
+                                </span>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    )}
+
                     {/* Asunto del correo - Solo visible cuando el estado NO es "in_progress" */}
                     {responseWithCompensacionesForm.watch('newStatus') !== 'in_progress' && (
                       <FormField
@@ -4807,6 +5024,53 @@ const AdminSolicitudesPage: React.FC = () => {
                           }}
                         />
                       </div>
+                    )}
+
+                    {/* Razón de cambio de estado - requerida cuando el estado es "in_progress" */}
+                    {responseForm.watch('newStatus') === 'in_progress' && (
+                      <FormField
+                        control={responseForm.control}
+                        name="statusReason"
+                        render={({ field }) => {
+                          const currentLength = field.value?.length || 0;
+                          const maxLength = 200;
+                          const isNearLimit = currentLength > maxLength * 0.8;
+                          const isOverLimit = currentLength > maxLength;
+
+                          return (
+                            <FormItem>
+                              <FormLabel>
+                                Razón de cambio de estado a &quot;En Revisión&quot; *
+                              </FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Explique brevemente por qué la solicitud pasa a En Revisión..."
+                                  className="min-h-[80px]"
+                                  {...field}
+                                  maxLength={maxLength}
+                                />
+                              </FormControl>
+                              <div className="flex items-center justify-between">
+                                <FormDescription>
+                                  Esta razón se registrará en el historial de la solicitud.
+                                </FormDescription>
+                                <span
+                                  className={`text-xs ${
+                                    isOverLimit
+                                      ? 'text-red-600 font-semibold'
+                                      : isNearLimit
+                                      ? 'text-orange-600'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  {currentLength}/{maxLength}
+                                </span>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
                     )}
 
                     {/* Asunto del correo - Solo visible cuando el estado NO es "in_progress" */}

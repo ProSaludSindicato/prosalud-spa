@@ -122,6 +122,7 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     payload: apiRequest.payload || {},
     status: mapApiStatusToFrontendStatus(apiRequest.status),
     rejection_reason: apiRequest.rejection_reason || undefined,
+    status_reason: apiRequest.status_reason || undefined,
     created_at: apiRequest.created_at || '',
     processed_at: apiRequest.processed_at,
     resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
@@ -133,6 +134,7 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     responses_count: apiRequest.responses_count ?? apiRequest.responses?.length ?? 0,
     files,
     files_count: apiRequest.files_count,
+    last_status_change: apiRequest.last_status_change || undefined,
   };
 };
 
@@ -155,14 +157,19 @@ export const requestsService = {
     return mapApiRequestToFrontendRequest(apiRequest);
   },
 
-  async updateRequestStatus(id: string, status: Request['status'], rejection_reason?: string | null): Promise<Request> {
+  async updateRequestStatus(
+    id: string,
+    status: Request['status'],
+    rejection_reason?: string | null,
+    status_reason?: string | null,
+  ): Promise<Request> {
     // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
     if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
       throw new Error('ID inválido - debe ser un string de 10 dígitos');
     }
 
     const apiStatus = mapFrontendStatusToApiStatus(status);
-    const updatedApiRequest = await requestsApiService.updateRequestStatus(id, apiStatus, rejection_reason);
+    const updatedApiRequest = await requestsApiService.updateRequestStatus(id, apiStatus, rejection_reason, status_reason);
     return mapApiRequestToFrontendRequest(updatedApiRequest);
   },
 
@@ -173,6 +180,7 @@ export const requestsService = {
       emailSubject: string;
       emailBody: string;
       rejection_reason?: string | null;
+      status_reason?: string | null;
       attachments?: FileList;
       actividades?: string[];
     }
@@ -188,6 +196,7 @@ export const requestsService = {
       email_subject: data.emailSubject,
       email_body: data.emailBody,
       rejection_reason: data.rejection_reason,
+      status_reason: data.status_reason,
       attachments: data.attachments,
       actividades: data.actividades,
     });
@@ -202,6 +211,7 @@ export const requestsService = {
       emailSubject: string;
       emailBody: string;
       rejection_reason?: string | null;
+      status_reason?: string | null;
       t_basicos?: number;
       t_auxilios?: number;
       attachments?: FileList;
@@ -218,6 +228,7 @@ export const requestsService = {
       email_subject: data.emailSubject,
       email_body: data.emailBody,
       rejection_reason: data.rejection_reason,
+      status_reason: data.status_reason,
       t_basicos: data.t_basicos,
       t_auxilios: data.t_auxilios,
       attachments: data.attachments,

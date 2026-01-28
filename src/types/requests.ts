@@ -45,6 +45,18 @@ export interface Request {
   payload: Record<string, any>;
   status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
   rejection_reason?: string | null;
+  // Razón opcional asociada al último cambio de estado (por ejemplo, cuando pasa a En Revisión)
+  status_reason?: string | null;
+  // Información del último cambio de estado, proveniente del backend
+  last_status_change?: {
+    old_status?: string | null;
+    new_status?: string | null;
+    reason?: string | null;
+    changed_by_name?: string | null;
+    changed_by_email?: string | null;
+    changed_at?: string;
+    changed_at_human?: string;
+  };
   created_at: string;
   processed_at?: string;
   resolved_at?: string;
