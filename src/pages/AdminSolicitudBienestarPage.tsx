@@ -275,6 +275,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [estadoEntregaFilter, setEstadoEntregaFilter] = useState<string>('all');
   const [documentoEntregaFilter, setDocumentoEntregaFilter] = useState<string>('');
   const [documentoEntregaFilterDebounced, setDocumentoEntregaFilterDebounced] = useState<string>('');
+  const [fechaDesdeEntrega, setFechaDesdeEntrega] = useState<string>('');
+  const [fechaHastaEntrega, setFechaHastaEntrega] = useState<string>('');
   const [currentPageEntregas, setCurrentPageEntregas] = useState<number>(1);
   const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(15);
   
@@ -442,10 +444,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     if (estadoEntregaFilter && estadoEntregaFilter !== 'all') {
       filters.estado = estadoEntregaFilter;
     }
+    if (fechaDesdeEntrega) {
+      filters.fecha_desde = fechaDesdeEntrega;
+    }
+    if (fechaHastaEntrega) {
+      filters.fecha_hasta = fechaHastaEntrega;
+    }
     // No incluimos documento aquí, se filtra en frontend
 
     return filters;
-  }, [tipoEntregaFilter, estadoEntregaFilter]);
+  }, [tipoEntregaFilter, estadoEntregaFilter, fechaDesdeEntrega, fechaHastaEntrega]);
 
   // Query para Entregas de Bienestar (obtiene todos los datos para filtrar en frontend)
   const {
@@ -458,6 +466,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       'wellness-delivery-requests',
       tipoEntregaFilter,
       estadoEntregaFilter,
+      fechaDesdeEntrega,
+      fechaHastaEntrega,
     ],
     queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
     enabled: canViewEntregas && activeTab === 'entregas',
@@ -1647,6 +1657,38 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                    Fecha desde
+                                  </label>
+                                  <Input
+                                    type="date"
+                                    value={fechaDesdeEntrega}
+                                    onChange={(e) => {
+                                      setFechaDesdeEntrega(e.target.value);
+                                      setCurrentPageEntregas(1);
+                                    }}
+                                    max={fechaHastaEntrega || undefined}
+                                    className="w-full"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                    Fecha hasta
+                                  </label>
+                                  <Input
+                                    type="date"
+                                    value={fechaHastaEntrega}
+                                    onChange={(e) => {
+                                      setFechaHastaEntrega(e.target.value);
+                                      setCurrentPageEntregas(1);
+                                    }}
+                                    min={fechaDesdeEntrega || undefined}
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
                             </CardContent>
                           </Card>
 
@@ -1674,7 +1716,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 <div className="text-center py-12">
                                   <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                                   <p className="text-lg text-gray-600">
-                                    {documentoEntregaFilter || tipoEntregaFilter !== 'all' || estadoEntregaFilter !== 'all'
+                                    {documentoEntregaFilter || tipoEntregaFilter !== 'all' || estadoEntregaFilter !== 'all' || fechaDesdeEntrega || fechaHastaEntrega
                                       ? 'No se encontraron entregas con los filtros aplicados'
                                       : 'No hay entregas de bienestar registradas'}
                                   </p>

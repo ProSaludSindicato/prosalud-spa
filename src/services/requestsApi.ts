@@ -279,7 +279,7 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
-            timeout: data.actividades && data.actividades.length > 0 ? 150000 : 120000, // 150 segundos si hay actividades, 120 segundos si solo hay archivos
+            timeout: data.actividades && data.actividades.length > 0 ? 300000 : 180000, // 5 minutos si hay actividades, 3 minutos si solo hay archivos
           }
         );
 
@@ -333,7 +333,7 @@ export const requestsApiService = {
               headers: {
                 'Content-Type': 'multipart/form-data',
               },
-              timeout: 150000, // 150 segundos - proceso largo que genera certificado con actividades y envía email
+              timeout: 300000, // 5 minutos - proceso largo que genera certificado con actividades y envía email (puede requerir conexiones con proveedores externos)
             }
           );
 
@@ -381,7 +381,7 @@ export const requestsApiService = {
           `/api/requests/${id}/respond`,
           requestBody,
           {
-            timeout: 120000, // 120 segundos - proceso puede ser largo al generar documentos y enviar emails
+            timeout: 180000, // 3 minutos - proceso puede ser largo al generar documentos y enviar emails (puede requerir conexiones con proveedores externos)
           }
         );
 
@@ -477,7 +477,7 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
-            timeout: 150000, // 150 segundos - proceso largo que genera certificado y envía email
+            timeout: 240000, // 4 minutos - proceso largo que genera certificado con compensaciones y envía email (puede requerir conexiones con proveedores externos)
           }
         );
 
@@ -522,7 +522,7 @@ export const requestsApiService = {
           `/api/requests/${id}/respond-with-compensaciones`,
           requestBody,
           {
-            timeout: 150000, // 150 segundos - proceso largo que genera certificado y envía email
+            timeout: 240000, // 4 minutos - proceso largo que genera certificado con compensaciones y envía email (puede requerir conexiones con proveedores externos)
           }
         );
 

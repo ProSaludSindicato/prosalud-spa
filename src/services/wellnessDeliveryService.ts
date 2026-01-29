@@ -68,6 +68,8 @@ export interface WellnessDeliveryRequestFilters {
   tipo_entrega?: string;
   estado?: string;
   documento?: string;
+  fecha_desde?: string; // YYYY-MM-DD - Fecha de inicio del rango (incluye todo el día desde 00:00:00)
+  fecha_hasta?: string; // YYYY-MM-DD - Fecha de fin del rango (incluye todo el día hasta 23:59:59)
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   per_page?: number;
@@ -172,6 +174,12 @@ class WellnessDeliveryService {
       }
       if (filters?.documento) {
         params.append('documento', filters.documento);
+      }
+      if (filters?.fecha_desde) {
+        params.append('fecha_desde', filters.fecha_desde);
+      }
+      if (filters?.fecha_hasta) {
+        params.append('fecha_hasta', filters.fecha_hasta);
       }
       if (filters?.sort_by) {
         params.append('sort_by', filters.sort_by);
