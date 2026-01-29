@@ -38,6 +38,7 @@ import {
   Info,
   Upload,
   FileSpreadsheet,
+  Clipboard,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -70,7 +71,7 @@ import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpd
 import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
 import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/UpdateAfiliadosReminderDialog";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown, ClipboardPaste } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // Subtipos válidos para verificación de pagos
@@ -698,6 +699,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const [selectedSubtype, setSelectedSubtype] = useState<string>("");
   const [isRedirectingSubtype, setIsRedirectingSubtype] = useState(false);
   const [isSubtypeRedirectOpen, setIsSubtypeRedirectOpen] = useState(false);
+  const [showPasteActividadesModal, setShowPasteActividadesModal] = useState(false);
+  const [pasteActividadesText, setPasteActividadesText] = useState("");
   
   // Estados para controlar los menús desplegables en las tablas
   const [openRequestMenuId, setOpenRequestMenuId] = useState<number | string | null>(null);
@@ -5309,6 +5312,70 @@ const AdminSolicitudesPage: React.FC = () => {
                         render={({ field }) => {
                           const actividades = field.value || [];
                           
+                          // Función para parsear texto pegado en actividades
+                          const parsearActividadesDesdeTexto = (texto: string): string[] => {
+                            if (!texto || texto.trim() === "") return [];
+                            
+                            // Normalizar el texto: dividir en líneas pero mantener el contenido
+                            const lineas = texto.split(/\r?\n/).map(linea => linea.trim()).filter(linea => linea.length > 0);
+                            
+                            if (lineas.length === 0) return [];
+                            
+                            // Función para detectar si una línea tiene un prefijo de lista
+                            const tienePrefijoLista = (linea: string): boolean => {
+                              // Verificar si empieza con número seguido de punto o paréntesis (1., 2), etc.)
+                              if (/^[\d]+[.)]\s/.test(linea)) return true;
+                              // Verificar si empieza con letra seguida de punto o paréntesis (a., b), etc.)
+                              if (/^[a-zA-Z][.)]\s/.test(linea)) return true;
+                              // Verificar si empieza con viñetas comunes
+                              if (/^[-•*▪▫○●]\s/.test(linea)) return true;
+                              // Verificar otros caracteres de viñeta Unicode
+                              if (/^[\u2022\u2023\u25E6\u2043]\s/.test(linea)) return true;
+                              return false;
+                            };
+                            
+                            // Función para remover el prefijo de lista de una línea
+                            const removerPrefijo = (linea: string): string => {
+                              return linea
+                                .replace(/^[\d]+[.)]\s*/, '') // Remover "1.", "2)", etc.
+                                .replace(/^[a-zA-Z][.)]\s*/, '') // Remover "a.", "b)", etc.
+                                .replace(/^[-•*▪▫○●]\s*/, '') // Remover viñetas comunes
+                                .replace(/^[\u2022\u2023\u25E6\u2043]\s*/, '') // Remover otros caracteres de viñeta Unicode
+                                .trim();
+                            };
+                            
+                            const actividadesParseadas: string[] = [];
+                            let actividadActual: string | null = null;
+                            
+                            for (const linea of lineas) {
+                              if (tienePrefijoLista(linea)) {
+                                // Si hay una actividad en construcción, guardarla con un salto de línea adicional al final para separación visual
+                                if (actividadActual !== null && actividadActual.trim().length > 0) {
+                                  actividadesParseadas.push(actividadActual.trim() + "\n");
+                                }
+                                // Iniciar una nueva actividad
+                                actividadActual = removerPrefijo(linea);
+                              } else {
+                                // Esta línea no tiene prefijo, es continuación de la actividad anterior
+                                if (actividadActual !== null) {
+                                  // Agregar esta línea a la actividad actual (con un espacio para unir las líneas)
+                                  // Esto elimina los saltos de línea del PDF que ocurren por el ancho de página
+                                  actividadActual += " " + linea;
+                                } else {
+                                  // Si no hay actividad en construcción, esta línea sin prefijo se ignora
+                                  // (no consideramos saltos de línea simples como separadores)
+                                }
+                              }
+                            }
+                            
+                            // Agregar la última actividad si existe, con salto de línea adicional al final
+                            if (actividadActual !== null && actividadActual.trim().length > 0) {
+                              actividadesParseadas.push(actividadActual.trim() + "\n");
+                            }
+                            
+                            return actividadesParseadas;
+                          };
+                          
                           const agregarActividad = () => {
                             field.onChange([...actividades, ""]);
                           };
@@ -5338,16 +5405,121 @@ const AdminSolicitudesPage: React.FC = () => {
                             field.onChange(nuevasActividades);
                           };
                           
+                          const limpiarTodasActividades = () => {
+                            field.onChange([]);
+                            toast.success("Actividades eliminadas", {
+                              description: "Todas las actividades han sido eliminadas.",
+                              duration: 2000,
+                            });
+                          };
+                          
+                          // Función para formatear el texto pegado agregando líneas en blanco entre actividades
+                          const formatearTextoConSeparacion = (texto: string): string => {
+                            if (!texto || texto.trim() === "") return texto;
+                            
+                            // Dividir en líneas
+                            const lineas = texto.split(/\r?\n/);
+                            const lineasFormateadas: string[] = [];
+                            
+                            // Función para detectar si una línea tiene un prefijo de lista
+                            const tienePrefijoLista = (linea: string): boolean => {
+                              const lineaTrim = linea.trim();
+                              if (!lineaTrim) return false;
+                              // Verificar si empieza con número seguido de punto o paréntesis (1., 2), etc.)
+                              if (/^[\d]+[.)]\s/.test(lineaTrim)) return true;
+                              // Verificar si empieza con letra seguida de punto o paréntesis (a., b), etc.)
+                              if (/^[a-zA-Z][.)]\s/.test(lineaTrim)) return true;
+                              // Verificar si empieza con viñetas comunes
+                              if (/^[-•*▪▫○●]\s/.test(lineaTrim)) return true;
+                              // Verificar otros caracteres de viñeta Unicode
+                              if (/^[\u2022\u2023\u25E6\u2043]\s/.test(lineaTrim)) return true;
+                              return false;
+                            };
+                            
+                            let encontroPrimeraActividad = false;
+                            
+                            for (let i = 0; i < lineas.length; i++) {
+                              const linea = lineas[i];
+                              const lineaTrim = linea.trim();
+                              
+                              // Si la línea tiene prefijo de lista (es una nueva actividad)
+                              if (lineaTrim && tienePrefijoLista(linea)) {
+                                // Si ya encontramos al menos una actividad antes, agregar línea en blanco
+                                if (encontroPrimeraActividad) {
+                                  // Verificar que la última línea agregada no sea ya una línea en blanco
+                                  const ultimaLinea = lineasFormateadas[lineasFormateadas.length - 1];
+                                  if (ultimaLinea && ultimaLinea.trim() !== "") {
+                                    lineasFormateadas.push("");
+                                  }
+                                }
+                                encontroPrimeraActividad = true;
+                              }
+                              
+                              lineasFormateadas.push(linea);
+                            }
+                            
+                            return lineasFormateadas.join("\n");
+                          };
+                          
+                          const handlePegarActividades = () => {
+                            if (!pasteActividadesText || pasteActividadesText.trim() === "") {
+                              toast.error("Texto vacío", {
+                                description: "Por favor, pegue el texto con las actividades antes de continuar.",
+                                duration: 3000,
+                              });
+                              return;
+                            }
+                            
+                            const actividadesParseadas = parsearActividadesDesdeTexto(pasteActividadesText);
+                            
+                            if (actividadesParseadas.length === 0) {
+                              toast.error("No se encontraron actividades", {
+                                description: "No se pudieron identificar actividades en el texto pegado. Asegúrese de que el texto tenga formato de lista (números, viñetas o saltos de línea).",
+                                duration: 4000,
+                              });
+                              return;
+                            }
+                            
+                            // Agregar las actividades parseadas a las existentes
+                            const nuevasActividades = [...actividades, ...actividadesParseadas];
+                            field.onChange(nuevasActividades);
+                            
+                            toast.success("Actividades agregadas", {
+                              description: `Se agregaron ${actividadesParseadas.length} actividad(es) exitosamente.`,
+                              duration: 3000,
+                            });
+                            
+                            // Limpiar y cerrar el modal
+                            setPasteActividadesText("");
+                            setShowPasteActividadesModal(false);
+                          };
+                          
+                          const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+                            e.preventDefault();
+                            const pastedText = e.clipboardData.getData('text');
+                            const textoFormateado = formatearTextoConSeparacion(pastedText);
+                            
+                            // Agregar al texto existente en lugar de reemplazarlo
+                            const textoActual = pasteActividadesText || "";
+                            if (textoActual.trim() === "") {
+                              // Si no hay texto, simplemente usar el nuevo
+                              setPasteActividadesText(textoFormateado);
+                            } else {
+                              // Si hay texto existente, agregar el nuevo con una separación
+                              setPasteActividadesText(textoActual + "\n\n" + textoFormateado);
+                            }
+                          };
+                          
                           return (
                             <FormItem>
                               <FormLabel>Actividades a incluir en el certificado *</FormLabel>
                               <FormDescription className="mb-3">
-                                Agregue las actividades realizadas que se incluirán en el certificado. Puede agregar tantas actividades como necesite y reordenarlas según sea necesario.
+                                Agregue las actividades realizadas que se incluirán en el certificado. Puede agregar tantas actividades como necesite. También puede pegar una lista completa de actividades desde un documento (PDF, Word, etc.).
                               </FormDescription>
                               <div className="space-y-2 max-h-[400px] overflow-y-auto border border-gray-200 rounded-md p-4 bg-gray-50">
                                 {actividades.length === 0 ? (
                                   <p className="text-sm text-gray-500 text-center py-4">
-                                    No hay actividades agregadas. Haga clic en "Agregar Actividad" para comenzar.
+                                    No hay actividades agregadas. Haga clic en "Agregar Actividad" o "Pegar Actividades" para comenzar.
                                   </p>
                                 ) : (
                                   actividades.map((actividad: string, index: number) => (
@@ -5361,12 +5533,13 @@ const AdminSolicitudesPage: React.FC = () => {
                                           onChange={(e) => actualizarActividad(index, e.target.value)}
                                           placeholder={`Actividad ${index + 1}`}
                                           maxLength={500}
-                                          className="w-full min-h-[60px] resize-y"
-                                          rows={2}
+                                          className="w-full min-h-[90px] resize-y"
+                                          rows={3}
                                         />
                                       </div>
                                       <div className="flex-shrink-0 flex items-center gap-1">
-                                        <Button
+                                        {/* Botones de ordenamiento comentados - pueden ser necesarios en el futuro */}
+                                        {/* <Button
                                           type="button"
                                           variant="ghost"
                                           size="icon"
@@ -5387,7 +5560,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                           title="Mover abajo"
                                         >
                                           <ArrowDown className="h-4 w-4" />
-                                        </Button>
+                                        </Button> */}
                                         <Button
                                           type="button"
                                           variant="ghost"
@@ -5402,17 +5575,86 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </div>
                                   ))
                                 )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={agregarActividad}
-                                  className="w-full mt-2"
-                                >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  Agregar Actividad {actividades.length > 0 && `(${actividades.length})`}
-                                </Button>
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={agregarActividad}
+                                    className="flex-1"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Agregar Actividad {actividades.length > 0 && `(${actividades.length})`}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowPasteActividadesModal(true)}
+                                    className="flex-1"
+                                  >
+                                    <ClipboardPaste className="h-4 w-4 mr-2" />
+                                    Pegar Actividades
+                                  </Button>
+                                  {actividades.length > 0 && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={limpiarTodasActividades}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <X className="h-4 w-4 mr-2" />
+                                      Limpiar Todas
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               <FormMessage />
+                              
+                              {/* Modal para pegar actividades */}
+                              <Dialog open={showPasteActividadesModal} onOpenChange={setShowPasteActividadesModal}>
+                                <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[85vh] overflow-y-auto">
+                                  <DialogHeader>
+                                    <DialogTitle>Pegar Actividades desde Texto</DialogTitle>
+                                    <DialogDescription>
+                                      Pegue aquí el texto con las actividades copiadas desde un PDF, Word u otro documento. El sistema identificará automáticamente cada actividad en la lista.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="paste-textarea">Texto con actividades:</Label>
+                                      <Textarea
+                                        id="paste-textarea"
+                                        value={pasteActividadesText}
+                                        onChange={(e) => setPasteActividadesText(e.target.value)}
+                                        onPaste={handlePaste}
+                                        placeholder="Pegue aquí el texto con las actividades. Puede ser una lista numerada, con viñetas, o simplemente separada por saltos de línea. Ejemplo:&#10;&#10;1. Primera actividad&#10;2. Segunda actividad&#10;3. Tercera actividad"
+                                        className="min-h-[300px] mt-2 font-mono text-sm"
+                                      />
+                                      <p className="text-xs text-gray-500 mt-2">
+                                        El sistema detectará automáticamente actividades en listas numeradas (1., 2., 3.) o con viñetas (-, •, *).
+                                      </p>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setPasteActividadesText("");
+                                          setShowPasteActividadesModal(false);
+                                        }}
+                                      >
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        onClick={handlePegarActividades}
+                                      >
+                                        <ClipboardPaste className="h-4 w-4 mr-2" />
+                                        Agregar Actividades
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
                             </FormItem>
                           );
                         }}
