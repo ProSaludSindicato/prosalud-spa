@@ -100,9 +100,9 @@ export interface UpdateWellnessEventData {
   date?: string;
   category?: string;
   location?: string;
-  description?: string;
+  description?: string | null;
   attendees?: number;
-  gift?: string;
+  gift?: string | null;
   provider?: string;
   is_visible?: boolean;
   images?: File[];
@@ -334,13 +334,25 @@ export async function updateWellnessEvent(
       formData.append('location', String(data.location));
     }
     if (data.description !== undefined) {
-      formData.append('description', String(data.description || ''));
+      // Si es null, no enviar el campo (el backend lo interpretará como eliminación)
+      // Si es string vacío, también tratarlo como null
+      if (data.description !== null && data.description.trim() !== '') {
+        formData.append('description', String(data.description));
+      } else {
+        // Enviar como string 'null' para que el backend lo interprete como null
+        formData.append('description', 'null');
+      }
     }
     if (data.attendees !== undefined && data.attendees !== null) {
       formData.append('attendees', String(data.attendees));
     }
     if (data.gift !== undefined) {
-      formData.append('gift', String(data.gift || ''));
+      // Si es null o string vacío, enviar como 'null' para indicar que se debe eliminar el valor
+      if (data.gift === null || (typeof data.gift === 'string' && data.gift.trim() === '')) {
+        formData.append('gift', 'null');
+      } else {
+        formData.append('gift', String(data.gift));
+      }
     }
     if (data.provider !== undefined) {
       formData.append('provider', String(data.provider || ''));

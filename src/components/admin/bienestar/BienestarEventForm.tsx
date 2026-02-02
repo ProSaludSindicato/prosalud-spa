@@ -69,7 +69,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [listadoAsistencia, setListadoAsistencia] = useState<File | null>(null);
   const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
   const [eliminarListadoAsistencia, setEliminarListadoAsistencia] = useState(false);
-  const [relateToRequest, setRelateToRequest] = useState(false);
+  const [relateToRequest, setRelateToRequest] = useState(true);
   const [selectedWellnessRequestId, setSelectedWellnessRequestId] = useState<number | null>(null);
   const [pendingReviewAction, setPendingReviewAction] = useState<'approve' | 'reject' | null>(null);
   const [pendingReviewData, setPendingReviewData] = useState<{ isVisible?: boolean; reason?: string } | null>(null);
@@ -82,7 +82,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const { data: completedRequestsData, isLoading: isLoadingRequests } = useQuery({
     queryKey: ['completed-wellness-requests-without-activities'],
     queryFn: () => wellnessRequestsService.getCompletedWellnessRequestsWithoutActivities({ per_page: 100 }),
-    enabled: !event && relateToRequest, // Solo cargar si no es edición y está habilitada la relación
+    enabled: !event, // Cargar automáticamente al crear nuevo evento
   });
 
   const completedRequests = completedRequestsData?.data || [];
@@ -148,7 +148,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       setListadoAsistencia(null);
       setListadoAsistenciaError('');
       setEliminarListadoAsistencia(false);
-      setRelateToRequest(false);
+      setRelateToRequest(true); // Activar por defecto
       setSelectedWellnessRequestId(null);
     }
   }, [event, form]);
@@ -178,16 +178,12 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const createMutation = useMutation({
     mutationFn: async (data: CreateWellnessEventData) => {
       const createdEvent = await wellnessEventsApi.createEvent(data);
-      // Automáticamente poner el evento en revisión después de crearlo
-      if (createdEvent.id) {
-        await wellnessEventsApi.review(Number(createdEvent.id));
-      }
       return createdEvent;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bienestar-events"] });
       toast.success("Evento creado", {
-        description: "El evento de bienestar ha sido creado y puesto en revisión.",
+        description: "El evento de bienestar ha sido creado exitosamente.",
       });
       onClose();
     },
@@ -514,14 +510,20 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
   // Función para preparar datos de actualización
   const prepareUpdateData = (data: FormData): UpdateWellnessEventData => {
+    // Convertir strings vacíos a null para campos opcionales que fueron eliminados
+    const normalizeOptionalString = (value: string | undefined): string | null | undefined => {
+      if (value === undefined) return undefined;
+      return value.trim() === '' ? null : value;
+    };
+
     return {
       title: data.title,
       date: data.date,
       category: data.category,
       location: data.location,
-      description: data.description !== undefined ? data.description : (event!.description !== undefined ? event!.description : undefined),
+      description: data.description !== undefined ? normalizeOptionalString(data.description) : (event!.description !== undefined ? event!.description : undefined),
       attendees: data.attendees !== undefined ? data.attendees : (event!.attendees !== undefined ? event!.attendees : undefined),
-      gift: data.gift !== undefined ? data.gift : (event!.gift !== undefined ? event!.gift : undefined),
+      gift: data.gift !== undefined ? normalizeOptionalString(data.gift) : (event!.gift !== undefined ? event!.gift : undefined),
       provider: data.provider || event!.provider || "ProSalud",
       is_visible: event!.isVisible !== undefined ? event!.isVisible : true,
       images: images.length > 0 ? images : undefined,
@@ -555,6 +557,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           provider: updateData.provider,
           is_visible: updateData.is_visible,
           tieneNuevasImagenes: images.length > 0,
+          cantidadImagenes: images.length,
+          imagenesEnUpdateData: updateData.images ? updateData.images.length : 0,
           tieneListadoAsistencia: !!listadoAsistencia,
           eliminarListadoAsistencia: updateData.eliminar_attendance_list,
         },
@@ -756,7 +760,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
               </Card>
 
               {/* Relación con Solicitud de Bienestar - Solo para eventos nuevos */}
-              {!event && (
+              {!event && !isLoadingRequests && completedRequests.length > 0 && (
                 <Card className="border shadow-sm bg-white">
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-3">
@@ -799,13 +803,6 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                             <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
                             <span className="text-sm text-slate-600">Cargando solicitudes...</span>
                           </div>
-                        ) : completedRequests.length === 0 ? (
-                          <Alert className="bg-amber-50 border-amber-200">
-                            <AlertDescription className="text-sm text-amber-800">
-                              No hay solicitudes de bienestar completadas sin actividades relacionadas disponibles. 
-                              Puedes crear el evento sin relacionarlo con una solicitud.
-                            </AlertDescription>
-                          </Alert>
                         ) : (
                           <Select
                             value={selectedWellnessRequestId?.toString() || ''}
@@ -827,14 +824,6 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                               ))}
                             </SelectContent>
                           </Select>
-                        )}
-                        {selectedWellnessRequestId && (
-                          <Alert className="bg-green-50 border-green-200">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            <AlertDescription className="text-sm text-green-800">
-                              Los campos del formulario se prellenarán automáticamente con la información de la solicitud seleccionada.
-                            </AlertDescription>
-                          </Alert>
                         )}
                       </div>
                     )}
@@ -1202,17 +1191,20 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                   </div>
                 )}
                 
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending || approveMutation.isPending || rejectMutation.isPending}
-                  className="h-12 bg-primary-prosalud hover:bg-primary-prosalud-dark"
-                >
-                  {createMutation.isPending || updateMutation.isPending
-                    ? "Guardando..."
-                    : event
-                      ? "Actualizar Evento"
-                      : "Crear Evento"}
-                </Button>
+                {/* Botón de Actualizar/Crear - Oculto en modo de revisión */}
+                {!(event && can('wellness_activity.publish') && (event.reviewStatus === 'pending' || event.reviewStatus === 'in_review')) && (
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending || updateMutation.isPending || approveMutation.isPending || rejectMutation.isPending}
+                    className="h-12 bg-primary-prosalud hover:bg-primary-prosalud-dark"
+                  >
+                    {createMutation.isPending || updateMutation.isPending
+                      ? "Guardando..."
+                      : event
+                        ? "Actualizar Evento"
+                        : "Crear Evento"}
+                  </Button>
+                )}
                 <Button type="button" variant="outline" onClick={onClose} className="h-12">
                   Cancelar
                 </Button>

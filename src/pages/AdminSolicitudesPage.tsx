@@ -136,6 +136,7 @@ const REJECTION_REASON_OPTIONS = [
   { value: 'sin_evidencias', label: 'No anexa evidencias de la solicitud' },
   { value: 'sin_tiempo_provisionado', label: 'No cuenta con el tiempo provisionado' },
   { value: 'solicitud_repetida', label: 'Solicitud repetida' },
+  { value: 'otros', label: 'Otros' },
 ];
 
 // Helper para transformar el código de razón de rechazo a su etiqueta legible
@@ -266,7 +267,8 @@ const responseFormSchema = z.object({
     .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
-  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
+  rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
@@ -310,6 +312,15 @@ const responseFormSchema = z.object({
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
 }).refine((data) => {
+  // Si el estado es "rejected" y se selecciona "otros", rejection_reason_otros es obligatorio
+  if (data.newStatus === "rejected" && data.rejection_reason === "otros") {
+    return data.rejection_reason_otros && data.rejection_reason_otros.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe especificar la razón de rechazo cuando selecciona 'Otros'",
+  path: ["rejection_reason_otros"],
+}).refine((data) => {
   // Si el estado NO es "in_progress", emailSubject y emailBody son obligatorios
   if (data.newStatus !== "in_progress") {
     return data.emailSubject && data.emailSubject.trim().length > 0 && 
@@ -344,7 +355,8 @@ const responseWithCompensacionesFormSchema = z.object({
     .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
-  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
+  rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.union([
@@ -404,6 +416,15 @@ const responseWithCompensacionesFormSchema = z.object({
 }, {
   message: "La razón de rechazo es obligatoria cuando se rechaza una solicitud",
   path: ["rejection_reason"],
+}).refine((data) => {
+  // Si el estado es "rejected" y se selecciona "otros", rejection_reason_otros es obligatorio
+  if (data.newStatus === "rejected" && data.rejection_reason === "otros") {
+    return data.rejection_reason_otros && data.rejection_reason_otros.trim().length > 0;
+  }
+  return true;
+}, {
+  message: "Debe especificar la razón de rechazo cuando selecciona 'Otros'",
+  path: ["rejection_reason_otros"],
 }).refine((data) => {
   // Si el estado NO es "in_progress", emailSubject y emailBody son obligatorios
   if (data.newStatus !== "in_progress") {
@@ -877,22 +898,23 @@ const AdminSolicitudesPage: React.FC = () => {
   });
 
   // Efecto para actualizar el emailBody cuando cambia el estado en solicitudes de microcrédito
-  useEffect(() => {
-    // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
-    if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
-    
-    const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
-    if (!isMicrocredito) return;
-    
-    // Si el estado es "in_progress" o "resolved", prediligenciar el mensaje
-    if (watchedNewStatus === 'in_progress' || watchedNewStatus === 'resolved') {
-      responseForm.setValue('emailBody', MICROCREDITO_EMAIL_BODY, { shouldValidate: false });
-    } 
-    // Si el estado es "rejected", prediligenciar el mensaje de rechazo
-    else if (watchedNewStatus === 'rejected') {
-      responseForm.setValue('emailBody', MICROCREDITO_REJECTED_EMAIL_BODY, { shouldValidate: false });
-    }
-  }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
+  // DESHABILITADO: No se quiere auto-completar el email para microcrédito, prefieren ingresarlo manualmente
+  // useEffect(() => {
+  //   // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
+  //   if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
+  //   
+  //   const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
+  //   if (!isMicrocredito) return;
+  //   
+  //   // Si el estado es "in_progress" o "resolved", prediligenciar el mensaje
+  //   if (watchedNewStatus === 'in_progress' || watchedNewStatus === 'resolved') {
+  //     responseForm.setValue('emailBody', MICROCREDITO_EMAIL_BODY, { shouldValidate: false });
+  //   } 
+  //   // Si el estado es "rejected", prediligenciar el mensaje de rechazo
+  //   else if (watchedNewStatus === 'rejected') {
+  //     responseForm.setValue('emailBody', MICROCREDITO_REJECTED_EMAIL_BODY, { shouldValidate: false });
+  //   }
+  // }, [watchedNewStatus, responseDialogOpen, solicitudToRespond, useCompensacionesForm, responseForm]);
 
   // Efecto para prediligenciar mensaje y archivo adjunto cuando el estado es "resolved" en solicitudes de retiro-sindical
   useEffect(() => {
@@ -1415,15 +1437,15 @@ const AdminSolicitudesPage: React.FC = () => {
       let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}${documentInfo}`;
       let emailBody = "";
       
-      // Si es microcrédito, prediligenciar mensaje según el estado
-      const isMicrocredito = solicitud.request_type === 'microcredito' || solicitud.request_type === 'solicitud-microcredito';
-      if (isMicrocredito) {
-        if (defaultStatus === 'in_progress' || defaultStatus === 'resolved') {
-          emailBody = MICROCREDITO_EMAIL_BODY;
-        } else if (defaultStatus === 'rejected') {
-          emailBody = MICROCREDITO_REJECTED_EMAIL_BODY;
-        }
-      }
+      // Si es microcrédito, NO prediligenciar mensaje - prefieren ingresarlo manualmente
+      // const isMicrocredito = solicitud.request_type === 'microcredito' || solicitud.request_type === 'solicitud-microcredito';
+      // if (isMicrocredito) {
+      //   if (defaultStatus === 'in_progress' || defaultStatus === 'resolved') {
+      //     emailBody = MICROCREDITO_EMAIL_BODY;
+      //   } else if (defaultStatus === 'rejected') {
+      //     emailBody = MICROCREDITO_REJECTED_EMAIL_BODY;
+      //   }
+      // }
       
       // Si es retiro-sindical y el estado es "resolved", prediligenciar mensaje
       // El efecto se encargará de cargar el PDF automáticamente
@@ -1638,9 +1660,11 @@ const AdminSolicitudesPage: React.FC = () => {
       // Si el estado NO es "in_progress", enviar respuesta con email
       // Enviar respuesta usando la API del backend
       // Las actividades se envían en FormData como actividades[0], actividades[1], etc., NO en el email_body
-      // Enviar el valor del select directamente
+      // Si se selecciona "otros", enviar el texto personalizado; de lo contrario, enviar el valor del select
       const rejectionReasonToSend = finalStatus === 'rejected' 
-        ? data.rejection_reason
+        ? (data.rejection_reason === 'otros' && data.rejection_reason_otros 
+            ? data.rejection_reason_otros.trim() 
+            : data.rejection_reason)
         : undefined;
       
       // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
@@ -1905,9 +1929,11 @@ const AdminSolicitudesPage: React.FC = () => {
       }
       
       // Si el estado NO es "in_progress", enviar respuesta con compensaciones usando la API del backend
-      // Enviar el valor del select directamente
+      // Si se selecciona "otros", enviar el texto personalizado; de lo contrario, enviar el valor del select
       const rejectionReasonToSend = data.newStatus === 'rejected'
-        ? data.rejection_reason
+        ? (data.rejection_reason === 'otros' && data.rejection_reason_otros 
+            ? data.rejection_reason_otros.trim() 
+            : data.rejection_reason)
         : undefined;
       
       // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
@@ -4234,17 +4260,31 @@ const AdminSolicitudesPage: React.FC = () => {
                           control={responseWithCompensacionesForm.control}
                           name="rejection_reason"
                           render={({ field }) => {
+                            // Determinar si es microcrédito para mostrar opción "otros"
+                            const isMicrocredito = solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito';
+                            
+                            // Filtrar opciones: mostrar "otros" solo para microcrédito
+                            const availableOptions = isMicrocredito 
+                              ? REJECTION_REASON_OPTIONS 
+                              : REJECTION_REASON_OPTIONS.filter(opt => opt.value !== 'otros');
+                            
                             return (
                               <FormItem>
                                 <FormLabel>Razón de Rechazo *</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <Select onValueChange={(value) => {
+                                  field.onChange(value);
+                                  // Limpiar el campo de texto cuando se cambia la razón
+                                  if (value !== 'otros') {
+                                    responseWithCompensacionesForm.setValue('rejection_reason_otros', '');
+                                  }
+                                }} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Seleccione la razón de rechazo" />
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    {REJECTION_REASON_OPTIONS.map((option) => (
+                                    {availableOptions.map((option) => (
                                       <SelectItem key={option.value} value={option.value}>
                                         {option.label}
                                       </SelectItem>
@@ -4259,6 +4299,50 @@ const AdminSolicitudesPage: React.FC = () => {
                             );
                           }}
                         />
+                        {/* Campo de texto para "otros" - Solo visible cuando se selecciona "otros" y es microcrédito */}
+                        {responseWithCompensacionesForm.watch('rejection_reason') === 'otros' && (
+                          <FormField
+                            control={responseWithCompensacionesForm.control}
+                            name="rejection_reason_otros"
+                            render={({ field }) => {
+                              const currentLength = field.value?.length || 0;
+                              const maxLength = 200;
+                              const isNearLimit = currentLength > maxLength * 0.8;
+                              const isOverLimit = currentLength > maxLength;
+                              
+                              return (
+                                <FormItem>
+                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Indique cuál es la razón de rechazo..."
+                                      className="min-h-[80px]"
+                                      {...field}
+                                      maxLength={maxLength}
+                                    />
+                                  </FormControl>
+                                  <div className="flex items-center justify-between">
+                                    <FormDescription>
+                                      Por favor, especifique la razón de rechazo.
+                                    </FormDescription>
+                                    <span
+                                      className={`text-xs ${
+                                        isOverLimit
+                                          ? 'text-red-600 font-semibold'
+                                          : isNearLimit
+                                          ? 'text-orange-600'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      {currentLength}/{maxLength}
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
                       </div>
                     )}
 
@@ -5001,17 +5085,31 @@ const AdminSolicitudesPage: React.FC = () => {
                           control={responseForm.control}
                           name="rejection_reason"
                           render={({ field }) => {
+                            // Determinar si es microcrédito para mostrar opción "otros"
+                            const isMicrocredito = solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito';
+                            
+                            // Filtrar opciones: mostrar "otros" solo para microcrédito
+                            const availableOptions = isMicrocredito 
+                              ? REJECTION_REASON_OPTIONS 
+                              : REJECTION_REASON_OPTIONS.filter(opt => opt.value !== 'otros');
+                            
                             return (
                               <FormItem>
                                 <FormLabel>Razón de Rechazo *</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <Select onValueChange={(value) => {
+                                  field.onChange(value);
+                                  // Limpiar el campo de texto cuando se cambia la razón
+                                  if (value !== 'otros') {
+                                    responseForm.setValue('rejection_reason_otros', '');
+                                  }
+                                }} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Seleccione la razón de rechazo" />
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    {REJECTION_REASON_OPTIONS.map((option) => (
+                                    {availableOptions.map((option) => (
                                       <SelectItem key={option.value} value={option.value}>
                                         {option.label}
                                       </SelectItem>
@@ -5026,6 +5124,50 @@ const AdminSolicitudesPage: React.FC = () => {
                             );
                           }}
                         />
+                        {/* Campo de texto para "otros" - Solo visible cuando se selecciona "otros" y es microcrédito */}
+                        {responseForm.watch('rejection_reason') === 'otros' && (
+                          <FormField
+                            control={responseForm.control}
+                            name="rejection_reason_otros"
+                            render={({ field }) => {
+                              const currentLength = field.value?.length || 0;
+                              const maxLength = 200;
+                              const isNearLimit = currentLength > maxLength * 0.8;
+                              const isOverLimit = currentLength > maxLength;
+                              
+                              return (
+                                <FormItem>
+                                  <FormLabel>Especifique la razón de rechazo *</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Indique cuál es la razón de rechazo..."
+                                      className="min-h-[80px]"
+                                      {...field}
+                                      maxLength={maxLength}
+                                    />
+                                  </FormControl>
+                                  <div className="flex items-center justify-between">
+                                    <FormDescription>
+                                      Por favor, especifique la razón de rechazo.
+                                    </FormDescription>
+                                    <span
+                                      className={`text-xs ${
+                                        isOverLimit
+                                          ? 'text-red-600 font-semibold'
+                                          : isNearLimit
+                                          ? 'text-orange-600'
+                                          : 'text-gray-500'
+                                      }`}
+                                    >
+                                      {currentLength}/{maxLength}
+                                    </span>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
                       </div>
                     )}
 

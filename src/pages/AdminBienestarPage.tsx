@@ -249,7 +249,7 @@ const AdminBienestarPage: React.FC = () => {
               </Card>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
                   {paginatedEvents.map((event, index) => (
                     <motion.div
                       key={event.id}
@@ -257,9 +257,10 @@ const AdminBienestarPage: React.FC = () => {
                       initial="hidden"
                       animate="visible"
                       transition={{ delay: index * 0.1 }}
+                      className="h-full"
                     >
-                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white flex flex-col" style={{ minHeight: '500px' }}>
-                        <div className="relative h-48 overflow-hidden">
+                      <Card className="group relative overflow-hidden border shadow-sm hover:shadow-lg transition-all duration-300 bg-white flex flex-col h-full">
+                        <div className="relative h-48 overflow-hidden flex-shrink-0">
                           <img
                             src={event.images.find(img => img.isMain)?.url || event.images[0]?.url || '/placeholder.svg'}
                             alt={event.title}
@@ -314,7 +315,7 @@ const AdminBienestarPage: React.FC = () => {
                           <h3 className="font-semibold text-lg text-text-dark mb-2 line-clamp-2 min-h-[3.5rem]">
                             {event.title}
                           </h3>
-                          <div className="space-y-1 text-sm text-text-gray flex-1">
+                          <div className="space-y-1 text-sm text-text-gray mb-4">
                             <p className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
                               {new Date(event.date).toLocaleDateString('es-ES')}
@@ -327,72 +328,79 @@ const AdminBienestarPage: React.FC = () => {
                             )}
                           </div>
 
-                          <div className="space-y-3 mt-4">
-                            {/* Información de revisión */}
-                            {event.reviewer && (
-                              <div className="p-2 bg-blue-50 rounded-lg text-xs">
-                                <div className="flex items-center gap-1 text-blue-700">
-                                  <UserCheck className="h-3 w-3" />
-                                  <span className="font-medium">Revisado por:</span>
-                                  <span>{event.reviewer.name}</span>
-                                </div>
-                                {event.reviewedAt && (
-                                  <div className="text-blue-600 mt-1">
-                                    {new Date(event.reviewedAt).toLocaleDateString('es-ES')}
+                          <div className="space-y-3 mt-auto">
+                            {/* Información de revisión - Reservar espacio mínimo */}
+                            <div className="min-h-[3rem]">
+                              {event.reviewer && (
+                                <div className="p-2 bg-blue-50 rounded-lg text-xs">
+                                  <div className="flex items-center gap-1 text-blue-700">
+                                    <UserCheck className="h-3 w-3" />
+                                    <span className="font-medium">Revisado por:</span>
+                                    <span>{event.reviewer.name}</span>
                                   </div>
-                                )}
-                                {event.rejectionReason && (
-                                  <div className="text-red-700 mt-1 font-medium">
-                                    Razón: {event.rejectionReason}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-
-                            {/* Visibility Toggle - Solo para eventos aprobados */}
-                            {event.reviewStatus === 'approved' && (
-                              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                <div className="flex items-center gap-2">
-                                  {event.isVisible ? (
-                                    <Eye className="h-4 w-4 text-green-600" />
-                                  ) : (
-                                    <EyeOff className="h-4 w-4 text-gray-400" />
+                                  {event.reviewedAt && (
+                                    <div className="text-blue-600 mt-1">
+                                      {new Date(event.reviewedAt).toLocaleDateString('es-ES')}
+                                    </div>
                                   )}
-                                  <span className="text-sm font-medium">
-                                    {event.isVisible ? 'Visible en web' : 'Oculto en web'}
-                                  </span>
+                                  {event.rejectionReason && (
+                                    <div className="text-red-700 mt-1 font-medium">
+                                      Razón: {event.rejectionReason}
+                                    </div>
+                                  )}
                                 </div>
-                                <Switch
-                                  checked={event.isVisible}
-                                  onCheckedChange={() => toggleVisibilityMutation.mutate(event)}
-                                  disabled={toggleVisibilityMutation.isPending}
-                                />
+                              )}
+                            </div>
+
+                            {/* Visibility Toggle - Solo para eventos aprobados y usuarios con permiso - Reservar espacio mínimo */}
+                            {can('wellness_activity.publish') && (
+                              <div className="min-h-[3.5rem]">
+                                {event.reviewStatus === 'approved' && (
+                                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                      {event.isVisible ? (
+                                        <Eye className="h-4 w-4 text-green-600" />
+                                      ) : (
+                                        <EyeOff className="h-4 w-4 text-gray-400" />
+                                      )}
+                                      <span className="text-sm font-medium">
+                                        {event.isVisible ? 'Visible en web' : 'Oculto en web'}
+                                      </span>
+                                    </div>
+                                    <Switch
+                                      checked={event.isVisible}
+                                      onCheckedChange={() => toggleVisibilityMutation.mutate(event)}
+                                      disabled={toggleVisibilityMutation.isPending}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
 
-                            {/* Attendance List Button */}
-                            {(event.attendanceListPath || event.attendanceList) && (
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  if (event.attendanceList?.fileUrl) {
-                                    window.open(event.attendanceList.fileUrl, '_blank');
-                                  } else {
-                                    toast({
-                                      title: "Listado de asistencia",
-                                      description: "El archivo está disponible pero no hay URL temporal. Por favor, edita el evento para regenerar la URL.",
-                                      variant: "default"
-                                    });
-                                  }
-                                }}
-                                className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-700"
-                                title="Ver/Descargar listado de asistencia"
-                              >
-                                <FileText className="h-4 w-4 mr-2" />
-                                Ver Listado de Asistencia
-                              </Button>
-                            )}
+                            {/* Attendance List Button - Reservar espacio mínimo */}
+                            <div className="min-h-[2.5rem]">
+                              {(event.attendanceListPath || event.attendanceList) && (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (event.attendanceList?.fileUrl) {
+                                      window.open(event.attendanceList.fileUrl, '_blank');
+                                    } else {
+                                      toast({
+                                        title: "Listado de asistencia",
+                                        description: "El archivo está disponible pero no hay URL temporal. Por favor, edita el evento para regenerar la URL.",
+                                        variant: "default"
+                                      });
+                                    }
+                                  }}
+                                  className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-700"
+                                  title="Ver/Descargar listado de asistencia"
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Ver Listado de Asistencia
+                                </Button>
+                              )}
+                            </div>
 
                             {/* Edit/Review Button */}
                             {can('wellness_events.edit') && (
