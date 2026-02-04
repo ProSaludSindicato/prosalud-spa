@@ -1129,17 +1129,44 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
         encuestaSchema.parse(currentValues);
         return true;
       } catch (error) {
-        // Si hay errores, mostrarlos en el formulario
+        // Si hay errores, solo mostrar los que corresponden al paso actual
         if (error instanceof z.ZodError) {
+          // Campos del paso 3 y sus dependencias condicionales
+          const step3FieldsAndDeps = [
+            ...fields,
+            'tipoTrasplante',
+            'tipoProblemaPulmonar',
+            'tipoAlergia',
+            'tipoProblemaVisual',
+            'tipoDolorArticular',
+            'tipoOtraEnfermedad',
+            'tipoMedicamento',
+            'tipoCirugia',
+            'tiempoCirugia',
+            'tipoAccidenteLaboral',
+            'tiempoAccidenteLaboral',
+            'tipoAccidenteTransito',
+            'tiempoAccidenteTransito',
+          ];
+          
+          let hasRelevantError = false;
           error.errors.forEach((err) => {
             if (err.path.length > 0) {
               const fieldName = err.path[0] as string;
-              form.setError(fieldName as any, {
-                type: 'manual',
-                message: err.message,
-              });
+              // Solo mostrar errores de campos del paso actual o sus dependencias
+              if (step3FieldsAndDeps.includes(fieldName as keyof EncuestaFormValues)) {
+                hasRelevantError = true;
+                form.setError(fieldName as any, {
+                  type: 'manual',
+                  message: err.message,
+                });
+              }
             }
           });
+          
+          // Si hay errores relevantes al paso actual, retornar false
+          // Si solo hay errores de otros pasos, ignorarlos y continuar
+          return !hasRelevantError;
         }
         return false;
       }
