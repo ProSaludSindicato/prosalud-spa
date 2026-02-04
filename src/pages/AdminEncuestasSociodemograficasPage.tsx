@@ -673,6 +673,14 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
+                <label className="text-sm font-medium">Número de Documento</label>
+                <Input
+                  placeholder="Buscar por número"
+                  value={numeroDocumentoFilter}
+                  onChange={(e) => setNumeroDocumentoFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Hospital</label>
                 <Input
                   placeholder="Buscar por hospital"
@@ -692,14 +700,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                     <SelectItem value="bulk_entry">Ingreso Masivo</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Número de Documento</label>
-                <Input
-                  placeholder="Buscar por número"
-                  value={numeroDocumentoFilter}
-                  onChange={(e) => setNumeroDocumentoFilter(e.target.value)}
-                />
               </div>
               <div className="flex items-end gap-2">
                 {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter) && (

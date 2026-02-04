@@ -1966,7 +1966,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                           <FormControl>
                             <Input
                               type="text"
-                              placeholder="Ej: Juan Pérez"
+                              placeholder="Ej: Juan Pérez García"
                               {...field}
                               onChange={(e) => {
                                 handleUppercaseInput(e, (value) => {
@@ -1976,6 +1976,9 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               }}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Ingrese el nombre completo (nombres y apellidos) de la persona de contacto
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

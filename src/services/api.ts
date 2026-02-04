@@ -15,7 +15,7 @@ let isRedirecting = false;
 const api = axios.create({
     baseURL: API_CONFIG.PUBLIC_BASE_URL,
     withCredentials: false,
-    timeout: 20000, // 20 segundos - timeout para peticiones públicas (envío de solicitudes por afiliados)
+    timeout: 90000, // 90 segundos - timeout para peticiones públicas (autenticación de afiliados puede tomar más de 30 segundos en el backend)
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

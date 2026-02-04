@@ -1,6 +1,6 @@
 import React from 'react';
 import { Control, FieldValues, useWatch } from 'react-hook-form';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User } from 'lucide-react';
@@ -395,13 +395,13 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Nombre
+                  Nombre completo
                   {camposRequeridosPorVacios?.has('nombreContactoEmergencia') && <span className="text-red-500 ml-1">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
                     type="text"
-                    placeholder="Ej: Juan Pérez"
+                    placeholder="Ej: Juan Pérez García"
                     {...field}
                     onChange={(e) => {
                       // Security: Sanitize name input
@@ -411,6 +411,9 @@ const DatosPersonalesSection = <TFieldValues extends FieldValues>({
                     className={modifiedFields?.has('nombreContactoEmergencia') ? 'border-green-500 bg-green-50' : ''}
                   />
                 </FormControl>
+                <FormDescription>
+                  Ingrese el nombre completo (nombres y apellidos) de la persona de contacto
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

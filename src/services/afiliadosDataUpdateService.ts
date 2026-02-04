@@ -5,7 +5,7 @@ import { API_CONFIG } from '@/config/api';
 const dataUpdateApi = axios.create({
   baseURL: API_CONFIG.PUBLIC_BASE_URL,
   withCredentials: false,
-  timeout: 15000, // 15 segundos timeout
+  timeout: 90000, // 90 segundos timeout - el proceso en el backend puede tomar más de 30 segundos (consulta Excel)
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
