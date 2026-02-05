@@ -1613,14 +1613,14 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
               <div>
                 <label className="text-sm font-medium text-slate-600">Consumo de Licor</label>
                 <p className="text-base">{formatSiNo(survey.datos_consumo.consumoLicor)}</p>
-                {survey.datos_consumo.consumoLicor === 'si' && survey.datos_consumo.frecuenciaLicor && (
+                {survey.datos_consumo.consumoLicor?.toLowerCase() === 'si' && survey.datos_consumo.frecuenciaLicor && (
                   <p className="text-sm text-slate-500 mt-1">Frecuencia: {getFrecuenciaDisplayName(survey.datos_consumo.frecuenciaLicor)}</p>
                 )}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-600">Consumo de Cigarrillo</label>
                 <p className="text-base">{formatSiNo(survey.datos_consumo.consumoCigarrillo)}</p>
-                {survey.datos_consumo.consumoCigarrillo === 'si' && survey.datos_consumo.frecuenciaCigarrillo && (
+                {survey.datos_consumo.consumoCigarrillo?.toLowerCase() === 'si' && survey.datos_consumo.frecuenciaCigarrillo && (
                   <p className="text-sm text-slate-500 mt-1">Frecuencia: {getFrecuenciaDisplayName(survey.datos_consumo.frecuenciaCigarrillo)}</p>
                 )}
               </div>
@@ -1659,62 +1659,62 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
               </div>
               
               {/* Detalles de condiciones específicas */}
-              {(survey.condiciones_salud.problemasPulmonares === 'si' && survey.condiciones_salud.tipoProblemaPulmonar) ||
-               (survey.condiciones_salud.alergias === 'si' && survey.condiciones_salud.tipoAlergia) ||
-               (survey.condiciones_salud.problemasVisuales === 'si' && survey.condiciones_salud.tipoProblemaVisual) ||
-               (survey.condiciones_salud.doloresArticulares === 'si' && survey.condiciones_salud.tipoDolorArticular) ||
-               (survey.condiciones_salud.trasplante === 'si' && survey.condiciones_salud.tipoTrasplante) ||
-               (survey.condiciones_salud.medicamentoPermanente === 'si' && survey.condiciones_salud.tipoMedicamento) ||
-               (survey.condiciones_salud.otraEnfermedad === 'si' && survey.condiciones_salud.tipoOtraEnfermedad) ||
-               (survey.condiciones_salud.cirugias === 'si') ||
-               (survey.condiciones_salud.accidenteLaboral === 'si') ||
-               (survey.condiciones_salud.accidenteTransitoCasero === 'si') ? (
+              {(survey.condiciones_salud.problemasPulmonares?.toLowerCase() === 'si' && survey.condiciones_salud.tipoProblemaPulmonar) ||
+               (survey.condiciones_salud.alergias?.toLowerCase() === 'si' && survey.condiciones_salud.tipoAlergia) ||
+               (survey.condiciones_salud.problemasVisuales?.toLowerCase() === 'si' && survey.condiciones_salud.tipoProblemaVisual) ||
+               (survey.condiciones_salud.doloresArticulares?.toLowerCase() === 'si' && survey.condiciones_salud.tipoDolorArticular) ||
+               (survey.condiciones_salud.trasplante?.toLowerCase() === 'si' && survey.condiciones_salud.tipoTrasplante) ||
+               (survey.condiciones_salud.medicamentoPermanente?.toLowerCase() === 'si' && survey.condiciones_salud.tipoMedicamento) ||
+               (survey.condiciones_salud.otraEnfermedad?.toLowerCase() === 'si' && survey.condiciones_salud.tipoOtraEnfermedad) ||
+               (survey.condiciones_salud.cirugias?.toLowerCase() === 'si') ||
+               (survey.condiciones_salud.accidenteLaboral?.toLowerCase() === 'si') ||
+               (survey.condiciones_salud.accidenteTransitoCasero?.toLowerCase() === 'si') ? (
                 <div className="mt-6 pt-6 border-t">
                   <h3 className="text-sm font-medium text-slate-600 mb-4">Detalles Adicionales</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {survey.condiciones_salud.problemasPulmonares === 'si' && survey.condiciones_salud.tipoProblemaPulmonar && (
+                    {survey.condiciones_salud.problemasPulmonares?.toLowerCase() === 'si' && survey.condiciones_salud.tipoProblemaPulmonar && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Tipo de Problema Pulmonar</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoProblemaPulmonar}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.alergias === 'si' && survey.condiciones_salud.tipoAlergia && (
+                    {survey.condiciones_salud.alergias?.toLowerCase() === 'si' && survey.condiciones_salud.tipoAlergia && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Tipo de Alergia</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoAlergia}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.problemasVisuales === 'si' && survey.condiciones_salud.tipoProblemaVisual && (
+                    {survey.condiciones_salud.problemasVisuales?.toLowerCase() === 'si' && survey.condiciones_salud.tipoProblemaVisual && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Tipo de Problema Visual</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoProblemaVisual}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.doloresArticulares === 'si' && survey.condiciones_salud.tipoDolorArticular && (
+                    {survey.condiciones_salud.doloresArticulares?.toLowerCase() === 'si' && survey.condiciones_salud.tipoDolorArticular && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Tipo de Dolor Articular</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoDolorArticular}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.trasplante === 'si' && survey.condiciones_salud.tipoTrasplante && (
+                    {survey.condiciones_salud.trasplante?.toLowerCase() === 'si' && survey.condiciones_salud.tipoTrasplante && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Tipo de Trasplante</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoTrasplante}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.medicamentoPermanente === 'si' && survey.condiciones_salud.tipoMedicamento && (
+                    {survey.condiciones_salud.medicamentoPermanente?.toLowerCase() === 'si' && survey.condiciones_salud.tipoMedicamento && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Medicamento Permanente</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoMedicamento}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.otraEnfermedad === 'si' && survey.condiciones_salud.tipoOtraEnfermedad && (
+                    {survey.condiciones_salud.otraEnfermedad?.toLowerCase() === 'si' && survey.condiciones_salud.tipoOtraEnfermedad && (
                       <div>
                         <label className="text-sm font-medium text-slate-600">Otra Enfermedad</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoOtraEnfermedad}</p>
                       </div>
                     )}
-                    {survey.condiciones_salud.cirugias === 'si' && (
+                    {survey.condiciones_salud.cirugias?.toLowerCase() === 'si' && (
                       <div className="md:col-span-2 lg:col-span-1">
                         <label className="text-sm font-medium text-slate-600">Cirugías</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoCirugia || 'No especificado'}</p>
@@ -1723,7 +1723,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                         )}
                       </div>
                     )}
-                    {survey.condiciones_salud.accidenteLaboral === 'si' && (
+                    {survey.condiciones_salud.accidenteLaboral?.toLowerCase() === 'si' && (
                       <div className="md:col-span-2 lg:col-span-1">
                         <label className="text-sm font-medium text-slate-600">Accidente Laboral</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoAccidenteLaboral || 'No especificado'}</p>
@@ -1732,7 +1732,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                         )}
                       </div>
                     )}
-                    {survey.condiciones_salud.accidenteTransitoCasero === 'si' && (
+                    {survey.condiciones_salud.accidenteTransitoCasero?.toLowerCase() === 'si' && (
                       <div className="md:col-span-2 lg:col-span-1">
                         <label className="text-sm font-medium text-slate-600">Accidente de Tránsito o Casero</label>
                         <p className="text-base mt-1">{survey.condiciones_salud.tipoAccidenteTransito || 'No especificado'}</p>
@@ -1791,7 +1791,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                 </CardTitle>
               </CardHeader>
               <CardContent>
-            {survey.recomendacion_restriccion_laboral === 'si' && survey.detalle_recomendacion_laboral ? (
+            {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' && survey.detalle_recomendacion_laboral ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-slate-600">¿Tiene recomendación o restricción laboral?</label>
