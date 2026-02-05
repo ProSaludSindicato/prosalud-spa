@@ -53,7 +53,6 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { tiposDocumentoCompletos, tiposDocumento, estadosCiviles, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, normalizePais } from '@/components/actualizar-datos-personales/paises';
-import { surveyConfigApi } from '@/services/surveyConfigApi';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -226,10 +225,12 @@ const getGeneroIcon = (genero: string | null | undefined) => {
 
 // Función para obtener el nombre de visualización del tipo de encuesta
 const getSurveyTypeDisplayName = (surveyType: string | null | undefined): string => {
+  // null se trata como active_affiliate por compatibilidad
   if (!surveyType) return 'Afiliados Activos';
   const map: Record<string, string> = {
-    'active_affiliate': 'Afiliados Activos',
-    'bulk_entry': 'Ingreso Masivo',
+    'active_affiliate': 'Afiliado Activo',
+    'new_entry': 'Nuevo Ingreso',
+    'bulk_entry': 'Nuevo Ingreso',
   };
   return map[surveyType] || surveyType;
 };
@@ -238,10 +239,13 @@ const getSurveyTypeDisplayName = (surveyType: string | null | undefined): string
 const getSurveyTypeBadgeClasses = (surveyType: string | null | undefined): string => {
   const normalizedType = surveyType || 'active_affiliate';
   if (normalizedType === 'bulk_entry') {
-    return 'text-xs bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200';
+    return 'text-xs bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200 whitespace-nowrap';
   }
-  // active_affiliate por defecto
-  return 'text-xs bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+  if (normalizedType === 'new_entry') {
+    return 'text-xs bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200 whitespace-nowrap';
+  }
+  // active_affiliate por defecto (incluye null)
+  return 'text-xs bg-green-100 text-green-800 border-green-300 hover:bg-green-200 whitespace-nowrap';
 };
 
 const AdminEncuestasSociodemograficasPage: React.FC = () => {
@@ -388,33 +392,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const surveys = paginatedSurveys;
   const metrics = surveysResponse?.metrics;
 
-  // Obtener configuración de encuestas
-  const { data: config, isLoading: isLoadingConfig } = useQuery({
-    queryKey: ['survey-config'],
-    queryFn: () => surveyConfigApi.getConfig(),
-    enabled: can('socio_demographic_surveys.config.manage') && !id,
-    retry: 2,
-  });
-
-  // Mutación para actualizar configuración
-  const updateConfigMutation = useMutation({
-    mutationFn: (allowBulkEntry: boolean) =>
-      surveyConfigApi.updateConfig({ allow_bulk_entry_mode: allowBulkEntry }),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['survey-config'], data);
-      toast.success('Configuración actualizada exitosamente');
-    },
-    onError: (error: any) => {
-      const errorMessage =
-        error.response?.data?.message ||
-        'Error al actualizar la configuración de encuestas';
-      toast.error(errorMessage);
-    },
-  });
-
-  const handleConfigToggle = (checked: boolean) => {
-    updateConfigMutation.mutate(checked);
-  };
 
   // Verificar permisos (después de todos los hooks)
   if (!can('socio_demographic_surveys.view')) {
@@ -558,22 +535,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                         <span className="sm:hidden">Exportar</span>
                       </Button>
                     )}
-                    {can('socio_demographic_surveys.config.manage') && (
-                      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Settings className="h-4 w-4 text-slate-600" />
-                          <Label htmlFor="bulk-entry-mode" className="text-sm font-medium text-slate-700 cursor-pointer">
-                            Modo Ingreso Masivo
-                          </Label>
-                        </div>
-                        <Switch
-                          id="bulk-entry-mode"
-                          checked={config?.data?.allow_bulk_entry_mode ?? false}
-                          onCheckedChange={handleConfigToggle}
-                          disabled={updateConfigMutation.isPending || isLoadingConfig}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -617,7 +578,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                       <CardContent>
                         <div className="text-2xl font-bold">{metrics.current_month.total}</div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Afiliados: {metrics.current_month.by_type.active_affiliate} • Masivo: {metrics.current_month.by_type.bulk_entry}
+                          Activos: {metrics.current_month.by_type.active_affiliate} • Nuevos: {(metrics.current_month.by_type as any).new_entry || 0} • Legacy: {metrics.current_month.by_type.bulk_entry}
                         </div>
                       </CardContent>
                     </Card>
@@ -634,7 +595,17 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                     <Card>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-slate-600">
-                          Para Ingreso Masivo
+                          Para Nuevo Ingreso
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{(metrics.by_type as any).new_entry || 0}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Para Ingreso Masivo (legacy)
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -697,7 +668,8 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
-                    <SelectItem value="bulk_entry">Ingreso Masivo</SelectItem>
+                    <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
+                    <SelectItem value="bulk_entry">Ingreso Masivo (legacy)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

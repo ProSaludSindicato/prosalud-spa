@@ -11,12 +11,9 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { submitSurvey } from '@/services/socioDemographicSurveyService';
-import RequireAfiliadoDataUpdateAuth from '@/components/auth/RequireAfiliadoDataUpdateAuth';
-import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
-import { surveyConfigApi } from '@/services/surveyConfigApi';
-import { useQuery } from '@tanstack/react-query';
+import { authenticateForDataUpdate } from '@/services/afiliadosDataUpdateService';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
-import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase } from 'lucide-react';
+import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase, Loader2 } from 'lucide-react';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
 import { logger } from '@/utils/logger';
@@ -27,7 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, X } from 'lucide-react';
-import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
+import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tallasUniforme, nivelesEducativos } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, getDefaultPais, normalizePais } from '@/components/actualizar-datos-personales/paises';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
@@ -266,6 +263,64 @@ const normalizeRelacionContactoEmergencia = (value: string | null | undefined): 
   return mapping[normalized] || normalized.replace(/\s+/g, '_');
 };
 
+// Función para normalizar estado civil del API al formato del formulario
+const normalizeEstadoCivil = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  const mapping: Record<string, string> = {
+    'soltero': 'soltero',
+    'soltera': 'soltero',
+    'casado': 'casado',
+    'casada': 'casado',
+    'divorciado': 'divorciado',
+    'divorciada': 'divorciado',
+    'viudo': 'viudo',
+    'viuda': 'viudo',
+    'union libre': 'union_libre',
+    'unión libre': 'union_libre',
+  };
+  return mapping[normalized] || normalized.replace(/\s+/g, '_');
+};
+
+// Función para normalizar sexo del API (F/M) al formato del formulario (femenino/masculino)
+const normalizeSexo = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toUpperCase().trim();
+  const mapping: Record<string, string> = {
+    'F': 'femenino',
+    'FEMENINO': 'femenino',
+    'M': 'masculino',
+    'MASCULINO': 'masculino',
+  };
+  return mapping[normalized] || '';
+};
+
+// Función para normalizar nivel educativo del API al formato del formulario
+const normalizeNivelEducacion = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const normalized = value.toLowerCase().trim();
+  const mapping: Record<string, string> = {
+    'bachiller': 'bachiller',
+    'bachillerato': 'bachiller',
+    'secundaria': 'bachiller',
+    'primaria': 'primaria',
+    'técnico': 'tecnico',
+    'tecnico': 'tecnico',
+    'técnologo': 'tecnologo',
+    'tecnologo': 'tecnologo',
+    'universitario': 'profesional',
+    'pregrado': 'profesional',
+    'profesional': 'profesional',
+    'especialización': 'especialista',
+    'especializacion': 'especialista',
+    'especialista': 'especialista',
+    'maestría': 'maestria',
+    'maestria': 'maestria',
+    'doctorado': 'doctorado',
+  };
+  return mapping[normalized] || normalized.replace(/\s+/g, '_');
+};
+
 // Mapa de hospitales: valor interno => nombre legible para el afiliado
 const hospitalMap: Record<string, string> = {
   'ABEJORRAL': 'E.S.E. Hospital San Juan de Dios - Abejorral',
@@ -385,6 +440,14 @@ const hospitalMap: Record<string, string> = {
 // Función para obtener el nombre legible del hospital
 const getHospitalDisplayName = (hospitalValue: string | null | undefined): string => {
   if (!hospitalValue) return '';
+  
+  // Primero verificar si es uno de los hospitales permitidos
+  const hospitalPermitido = hospitalesPermitidos.find(h => h.key === hospitalValue || h.key === hospitalValue.trim());
+  if (hospitalPermitido) {
+    return hospitalPermitido.displayName;
+  }
+  
+  // Si no está en la lista permitida, usar el mapa original
   let displayName = '';
   // Buscar coincidencia exacta primero
   if (hospitalMap[hospitalValue]) {
@@ -420,24 +483,90 @@ const hijoSchema = z.object({
     }, { message: 'La fecha de nacimiento no puede ser futura' }),
 });
 
-// Función para crear el schema dinámicamente según el modo
-const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
+// Lista de profesiones disponibles
+const profesiones = [
+  'ANESTESIOLOGO(A)',
+  'APH',
+  'AUDITOR(A) MEDICO(A)',
+  'AUXILIAR ADMINISTRATIVO',
+  'AUXILIAR CENTRAL ESTERILIZACION',
+  'AUXILIAR DE ENFERMERIA',
+  'AUXILIAR DE FARMACIA',
+  'AUXILIAR EN SALUD PUBLICA',
+  'BACTERIOLOGO(A)',
+  'CAMILLERO(A)',
+  'CIRUJANO(A)',
+  'CONDUCTOR(A)',
+  'COORDINADOR DE ENFERMERIA',
+  'ENDOSCOPISTA',
+  'ENFERMERO(A) PROFESIONAL',
+  'FISIOTERAPEUTA',
+  'FONOAUDIOLOGO(A)',
+  'GESIS',
+  'GINECOLOGO(A)',
+  'INGENIERO BIOMEDICO',
+  'INSTRUMENTADOR QUIRURGICO',
+  'MEDICO(A) GENERAL',
+  'MEDICO(A) INTERNISTA',
+  'NUTRICIONISTA',
+  'ODONTOLOGO(A)',
+  'ORTOPEDISTA',
+  'PEDIATRA',
+  'PSICOLOGO(A)',
+  'PSIQUIATRA',
+  'QUIMICO FARMACEUTICO',
+  'REGENTE DE FARMACIA',
+  'TECNICO(A) EN RAYOS X',
+  'TECNOLOGO EN RAYOS X',
+  'TERAPEUTA RESPIRATORIO',
+  'TESIS',
+  'TOXICOLOGO(A)',
+  'TRABAJO SOCIAL',
+  'UROLOGO(A)',
+  'OTRO',
+];
+
+// Lista de hospitales permitidos para el select (solo estos 5)
+const hospitalesPermitidos = [
+  {
+    displayName: 'E.S.E. Hospital Marco Fidel Suarez de Bello',
+    key: 'BELLO'
+  },
+  {
+    displayName: 'E.S.E. Hospital La María',
+    key: 'LA MARIA'
+  },
+  {
+    displayName: 'E.S.E. Hospital Carisma',
+    key: 'E.S.ECARISMA'
+  },
+  {
+    displayName: 'E.S.E. Hospital San Juan de Dios - Rionegro',
+    key: 'HSJDRionegro'
+  },
+  {
+    displayName: 'Sede Administrativa Caldas',
+    key: 'CALDAS'
+  }
+];
+
+// Función para obtener la clave interna desde el nombre legible
+const getHospitalKeyFromDisplay = (displayName: string): string => {
+  const hospital = hospitalesPermitidos.find(h => h.displayName.toUpperCase().trim() === displayName.toUpperCase().trim());
+  return hospital?.key || displayName;
+};
+
+// Función para crear el schema - siempre en modo público (sin requerir hospital y profesion)
+const createEncuestaSchema = () => z.object({
   // Autocompletados
-  nombres: isBulkEntryMode 
-    ? z.string().min(1, 'Nombres es requerido')
-    : z.string().optional(),
-  apellidos: isBulkEntryMode
-    ? z.string().min(1, 'Apellidos es requerido')
-    : z.string().optional(),
+  nombres: z.string().min(1, 'Nombres es requerido'),
+  apellidos: z.string().min(1, 'Apellidos es requerido'),
   correo: z.string().email('Correo inválido').min(1, 'Correo es requerido'),
   tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
   numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
-  hospital: isBulkEntryMode 
-    ? z.string().optional()
-    : z.string().min(1, 'Hospital es requerido'),
-  profesion: isBulkEntryMode
-    ? z.string().optional()
-    : z.string().min(1, 'Proceso es requerido'),
+  hospital: z.string().optional(),
+  profesion: z.string().optional(),
+  profesionOtro: z.string().optional(), // Campo para especificar "Otro"
   // Campos adicionales de datos básicos - todos requeridos menos hospital y proceso
   rh: z.string({ required_error: 'RH es requerido' }).min(1, 'RH es requerido'),
   fechaExpedicion: z.string({ required_error: 'Fecha de expedición es requerida' })
@@ -487,6 +616,7 @@ const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
   fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida'),
   genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
   raza: z.string({ required_error: 'Grupo étnico es requerido' }).min(1, 'Grupo étnico es requerido'),
+  nivelEducativo: z.string({ required_error: 'Nivel educativo es requerido' }).min(1, 'Nivel educativo es requerido'),
   numeroHijos: z.string().optional(),
   hijos: z.array(hijoSchema).optional(),
   numeroPersonasDependientes: z.string().optional(),
@@ -594,6 +724,16 @@ const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
   // Firma - solo se valida al enviar, no en validación de pasos
   firma: z.string().optional(),
   numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
+})
+.refine((data) => {
+  // Si profesion es "OTRO", entonces profesionOtro es requerido
+  if (data.profesion === 'OTRO' && (!data.profesionOtro || data.profesionOtro.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Debe especificar la profesión cuando selecciona "Otro"',
+  path: ['profesionOtro'],
 })
 .refine((data) => {
   // Validar campos condicionales cuando la respuesta es "si"
@@ -752,40 +892,44 @@ const createEncuestaSchema = (isBulkEntryMode: boolean) => z.object({
 type EncuestaFormValuesBase = z.infer<ReturnType<typeof createEncuestaSchema>>;
 type EncuestaFormValues = EncuestaFormValuesBase;
 
-interface EncuestaBienestarPageContentProps {
-  isBulkEntryMode: boolean;
-}
-
-const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> = ({ isBulkEntryMode }) => {
+const EncuestaBienestarPageContent: React.FC = () => {
   const navigate = useNavigate();
-  const { afiliado, getActiveConvenio, fechaExpedicion } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const signaturePadRef = useRef<SignaturePadRef>(null);
   const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
   const [hasSignature, setHasSignature] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const TOTAL_STEPS = 5;
+  const [currentStep, setCurrentStep] = useState(0); // Paso 0 es autenticación
+  const TOTAL_STEPS = 6; // 0: autenticación, 1-5: pasos del formulario
+  
+  // Estado para autenticación inicial
+  const [authData, setAuthData] = useState<{
+    tipoDocumento: string;
+    numeroDocumento: string;
+    fechaExpedicion: string;
+  } | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [afiliadoData, setAfiliadoData] = useState<any>(null);
+  const [activeConvenio, setActiveConvenio] = useState<any>(null);
+  const [beneficiarios, setBeneficiarios] = useState<any[]>([]);
+  const [isAfiliadoActivo, setIsAfiliadoActivo] = useState<boolean>(false);
 
-  const activeConvenio = getActiveConvenio();
-  const hospitalValue = activeConvenio?.cliente || '';
-  const profesionValue = activeConvenio?.proceso || '';
-
-  // Crear schema dinámico según el modo
+  // Crear schema - siempre en modo público
   const encuestaSchema = React.useMemo(
-    () => createEncuestaSchema(isBulkEntryMode),
-    [isBulkEntryMode]
+    () => createEncuestaSchema(),
+    []
   );
 
   const form = useForm<EncuestaFormValues>({
     resolver: zodResolver(encuestaSchema),
     defaultValues: {
-      nombres: afiliado?.nombres || '',
-      apellidos: afiliado?.apellidos || '',
-      correo: afiliado?.correo_personal || '',
-      tipoDocumento: afiliado?.tipo_documento || '',
-      numeroDocumento: afiliado?.documento || '',
-      hospital: hospitalValue || '',
-      profesion: profesionValue || '',
+      nombres: '',
+      apellidos: '',
+      correo: '',
+      tipoDocumento: '',
+      numeroDocumento: '',
+      hospital: '',
+      profesion: '',
+      profesionOtro: '',
       rh: '',
       fechaExpedicion: '',
       lugarNacimiento: '',
@@ -882,73 +1026,302 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
     },
   });
 
-  // Actualizar valores cuando cambian los datos del afiliado (solo si están vacíos)
+  // Función para autenticar y obtener datos del afiliado
+  const handleAuthenticate = async (tipoDoc: string, numDoc: string, fechaExp: string) => {
+    setIsAuthenticating(true);
+    try {
+      const response = await authenticateForDataUpdate({
+        tipo_documento: tipoDoc,
+        documento: numDoc,
+        fecha_expedicion: fechaExp,
+      });
+      
+      const afiliado = response.data.afiliado;
+      
+      // Verificar si el afiliado está activo (case-insensitive)
+      const afiliadoActivo = afiliado.estado && afiliado.estado.toUpperCase() === 'ACTIVO';
+      setIsAfiliadoActivo(afiliadoActivo);
+      
+      // Solo buscar convenio activo si el afiliado está activo
+      let convenioActivo = null;
+      if (afiliadoActivo) {
+        // Guardar datos del afiliado activo para prediligenciamiento
+        setAfiliadoData(afiliado);
+        convenioActivo = response.data.convenios?.find((c: any) => 
+          c.estado && c.estado.toUpperCase() === 'ACTIVO'
+        );
+        if (convenioActivo) {
+          setActiveConvenio(convenioActivo);
+        }
+        // Guardar beneficiarios para prediligenciar hijos
+        setBeneficiarios(response.data.beneficiarios || []);
+      } else {
+        // Si el afiliado NO está activo (Retirado, Suspendido, etc),
+        // se debe tratar como si no existiera para efectos del formulario.
+        // No guardamos sus datos para evitar cualquier prediligenciamiento.
+        setAfiliadoData(null);
+        setActiveConvenio(null);
+        setBeneficiarios([]);
+      }
+      
+      // Solo prediligenciar si el afiliado está activo
+      if (!afiliadoActivo) {
+        // Si no está activo, tratarlo como nuevo - solo establecer datos básicos
+        form.setValue('tipoDocumento', tipoDoc);
+        form.setValue('numeroDocumento', numDoc);
+        form.setValue('fechaExpedicion', fechaExp);
+        form.setValue('departamento', 'antioquia');
+        form.setValue('paisNacimiento', getDefaultPais());
+        
+        // Guardar datos de autenticación
+        setAuthData({ tipoDocumento: tipoDoc, numeroDocumento: numDoc, fechaExpedicion: fechaExp });
+        
+        // Avanzar al siguiente paso (formulario)
+        setCurrentStep(1);
+        setIsAuthenticating(false);
+        return;
+      }
+      
+      // Prediligenciar formulario con datos del afiliado (solo si está activo)
+      form.setValue('nombres', (afiliado.nombres || '').toUpperCase());
+      form.setValue('apellidos', (afiliado.apellidos || '').toUpperCase());
+      form.setValue('correo', afiliado.correo_personal || '');
+      form.setValue('tipoDocumento', afiliado.tipo_documento || '');
+      form.setValue('numeroDocumento', afiliado.documento || '');
+      form.setValue('fechaExpedicion', fechaExp);
+      form.setValue('rh', (afiliado as any).rh || '');
+      form.setValue('lugarNacimiento', ((afiliado as any).lugar_nacimiento || '').toUpperCase());
+      form.setValue('departamento', 'antioquia');
+      form.setValue('celular', afiliado.celular || '');
+      form.setValue('direccion', (afiliado.direccion || '').toUpperCase());
+      if (afiliado.municipio) {
+        form.setValue('municipio', normalizeMunicipio(afiliado.municipio));
+      }
+      form.setValue('tallaCalzado', afiliado.talla_calzado || '');
+      if ((afiliado as any).talla_vestimenta || afiliado.talla_uniforme) {
+        form.setValue('tallaVestimenta', normalizeTallaUniforme((afiliado as any).talla_vestimenta || afiliado.talla_uniforme || ''));
+      }
+      if ((afiliado as any).pais_nacimiento) {
+        form.setValue('paisNacimiento', normalizePais((afiliado as any).pais_nacimiento));
+      } else {
+        form.setValue('paisNacimiento', getDefaultPais());
+      }
+      
+      // Prellenar contacto de emergencia
+      if (afiliado.contacto_emergencia && !afiliado.telefono_contacto_emergencia) {
+        const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+        form.setValue('nombreContactoEmergencia', (parsed.nombre || '').toUpperCase());
+        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(parsed.relacion));
+        form.setValue('telefonoContactoEmergencia', parsed.telefono);
+      } else {
+        form.setValue('nombreContactoEmergencia', (afiliado.nombre_contacto_emergencia || '').toUpperCase());
+        form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliado.relacion_contacto_emergencia));
+        form.setValue('telefonoContactoEmergencia', afiliado.telefono_contacto_emergencia || '');
+      }
+      
+      // Prellenar hospital y profesion si hay convenio activo
+      if (convenioActivo) {
+        form.setValue('hospital', convenioActivo.cliente || '');
+        form.setValue('profesion', (convenioActivo.proceso || '').toUpperCase());
+      }
+      
+      // Prellenar fecha de nacimiento, estado civil, género y nivel educativo
+      if ((afiliado as any).fecha_nacimiento) {
+        form.setValue('fechaNacimiento', (afiliado as any).fecha_nacimiento);
+      }
+      if ((afiliado as any).estado_civil) {
+        form.setValue('estadoCivil', normalizeEstadoCivil((afiliado as any).estado_civil));
+      }
+      if ((afiliado as any).sexo) {
+        form.setValue('genero', normalizeSexo((afiliado as any).sexo));
+      }
+      if ((afiliado as any).nivel_educacion) {
+        form.setValue('nivelEducativo', normalizeNivelEducacion((afiliado as any).nivel_educacion));
+      }
+      
+      // Prellenar hijos basándose en beneficiarios
+      if (response.data.beneficiarios && response.data.beneficiarios.length > 0) {
+        // Función para identificar si un beneficiario es hijo/hija
+        const esHijo = (parentesco: string | null | undefined): boolean => {
+          if (!parentesco) return false;
+          const parentescoUpper = parentesco.toUpperCase().trim();
+          // Identificar variaciones de HIJO/HIJA
+          return parentescoUpper === 'HIJO' || 
+                 parentescoUpper === 'HIJA' || 
+                 parentescoUpper.startsWith('HIJO') || 
+                 parentescoUpper.startsWith('HIJA');
+        };
+        
+        // Filtrar beneficiarios que son hijos
+        const hijosBeneficiarios = response.data.beneficiarios.filter((b: any) => esHijo(b.parentesco));
+        
+        if (hijosBeneficiarios.length > 0) {
+          // Establecer número de hijos
+          form.setValue('numeroHijos', String(hijosBeneficiarios.length));
+          
+          // Prediligenciar información de cada hijo
+          const hijosData = hijosBeneficiarios.map((b: any) => ({
+            tipoDocumento: b.tipo_documento || '',
+            numeroDocumento: b.documento || '',
+            nombre: (b.nombres || '').toUpperCase(),
+            genero: normalizeSexo(b.sexo) || '',
+            fechaNacimiento: b.fecha_nacimiento || '',
+          }));
+          
+          form.setValue('hijos', hijosData);
+        }
+      }
+      
+      // Guardar datos de autenticación
+      setAuthData({ tipoDocumento: tipoDoc, numeroDocumento: numDoc, fechaExpedicion: fechaExp });
+      
+      // Avanzar al siguiente paso (formulario)
+      setCurrentStep(1);
+    } catch (error: any) {
+      // Si no se encuentra el afiliado, no mostrar error, simplemente continuar
+      // El usuario deberá diligenciar toda la información manualmente
+      logger.info('Afiliado no encontrado, continuando con diligenciamiento manual');
+      
+      // Marcar que no hay afiliado activo
+      setIsAfiliadoActivo(false);
+      setAfiliadoData(null);
+      setBeneficiarios([]);
+      
+      // Guardar datos de autenticación para usar en el formulario
+      setAuthData({ tipoDocumento: tipoDoc, numeroDocumento: numDoc, fechaExpedicion: fechaExp });
+      
+      // Prellenar solo los datos básicos ingresados
+      form.setValue('tipoDocumento', tipoDoc);
+      form.setValue('numeroDocumento', numDoc);
+      form.setValue('fechaExpedicion', fechaExp);
+      form.setValue('departamento', 'antioquia');
+      form.setValue('paisNacimiento', getDefaultPais());
+      
+      // Avanzar al siguiente paso (formulario)
+      setCurrentStep(1);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  // Actualizar valores cuando cambian los datos del afiliado ACTIVO (solo si están vacíos)
   useEffect(() => {
-    if (afiliado) {
+    // Si no hay afiliado activo, no hacer ningún prediligenciamiento
+    if (!afiliadoData || !isAfiliadoActivo) {
+      return;
+    }
+
+    if (afiliadoData) {
       const currentValues = form.getValues();
       
       // Solo establecer valores si están vacíos para no sobrescribir cambios del usuario
-      if (!currentValues.nombres) form.setValue('nombres', afiliado.nombres || '');
-      if (!currentValues.apellidos) form.setValue('apellidos', afiliado.apellidos || '');
-      if (!currentValues.correo) form.setValue('correo', afiliado.correo_personal || '');
-      if (!currentValues.tipoDocumento) form.setValue('tipoDocumento', afiliado.tipo_documento || '');
-      if (!currentValues.numeroDocumento) form.setValue('numeroDocumento', afiliado.documento || '');
+      if (!currentValues.nombres) form.setValue('nombres', (afiliadoData.nombres || '').toUpperCase());
+      if (!currentValues.apellidos) form.setValue('apellidos', (afiliadoData.apellidos || '').toUpperCase());
+      if (!currentValues.correo) form.setValue('correo', afiliadoData.correo_personal || '');
+      if (!currentValues.tipoDocumento) form.setValue('tipoDocumento', afiliadoData.tipo_documento || '');
+      if (!currentValues.numeroDocumento) form.setValue('numeroDocumento', afiliadoData.documento || '');
       
       // Prellenar campos adicionales solo si están vacíos
-      if (!currentValues.fechaExpedicion) {
-        const fechaExp = fechaExpedicion || afiliado.fecha_expedicion || '';
-        form.setValue('fechaExpedicion', fechaExp);
+      if (!currentValues.fechaExpedicion && authData) {
+        form.setValue('fechaExpedicion', authData.fechaExpedicion);
       }
-      if (!currentValues.rh) form.setValue('rh', afiliado.rh || '');
-      if (!currentValues.lugarNacimiento) form.setValue('lugarNacimiento', afiliado.lugar_nacimiento || '');
+      if (!currentValues.rh) form.setValue('rh', (afiliadoData as any).rh || '');
+      if (!currentValues.lugarNacimiento) form.setValue('lugarNacimiento', ((afiliadoData as any).lugar_nacimiento || '').toUpperCase());
       // Departamento siempre es Antioquia
       form.setValue('departamento', 'antioquia');
-      if (!currentValues.celular) form.setValue('celular', afiliado.celular || '');
-      if (!currentValues.direccion) form.setValue('direccion', afiliado.direccion || '');
-      if (!currentValues.municipio && afiliado.municipio) {
-        form.setValue('municipio', normalizeMunicipio(afiliado.municipio));
+      if (!currentValues.celular) form.setValue('celular', afiliadoData.celular || '');
+      if (!currentValues.direccion) form.setValue('direccion', (afiliadoData.direccion || '').toUpperCase());
+      if (!currentValues.municipio && afiliadoData.municipio) {
+        form.setValue('municipio', normalizeMunicipio(afiliadoData.municipio));
       }
-      if (!currentValues.tallaCalzado) form.setValue('tallaCalzado', afiliado.talla_calzado || '');
+      if (!currentValues.tallaCalzado) form.setValue('tallaCalzado', afiliadoData.talla_calzado || '');
       if (!currentValues.tallaVestimenta) {
-        const tallaVest = afiliado.talla_vestimenta || afiliado.talla_uniforme || '';
+        const tallaVest = (afiliadoData as any).talla_vestimenta || afiliadoData.talla_uniforme || '';
         if (tallaVest) {
           form.setValue('tallaVestimenta', normalizeTallaUniforme(tallaVest));
         }
       }
       if (!currentValues.paisNacimiento) {
-        if (afiliado.pais_nacimiento) {
-          form.setValue('paisNacimiento', normalizePais(afiliado.pais_nacimiento));
+        if ((afiliadoData as any).pais_nacimiento) {
+          form.setValue('paisNacimiento', normalizePais((afiliadoData as any).pais_nacimiento));
         } else {
           form.setValue('paisNacimiento', getDefaultPais());
         }
       }
       
+      // Prellenar fecha de nacimiento, estado civil, género y nivel educativo solo si están vacíos
+      if (!currentValues.fechaNacimiento && (afiliadoData as any).fecha_nacimiento) {
+        form.setValue('fechaNacimiento', (afiliadoData as any).fecha_nacimiento);
+      }
+      if (!currentValues.estadoCivil && (afiliadoData as any).estado_civil) {
+        form.setValue('estadoCivil', normalizeEstadoCivil((afiliadoData as any).estado_civil));
+      }
+      if (!currentValues.genero && (afiliadoData as any).sexo) {
+        form.setValue('genero', normalizeSexo((afiliadoData as any).sexo));
+      }
+      if (!currentValues.nivelEducativo && (afiliadoData as any).nivel_educacion) {
+        form.setValue('nivelEducativo', normalizeNivelEducacion((afiliadoData as any).nivel_educacion));
+      }
+      
+      // Prellenar hijos basándose en beneficiarios
+      if (beneficiarios.length > 0 && (!currentValues.numeroHijos || currentValues.numeroHijos === '0')) {
+        // Función para identificar si un beneficiario es hijo/hija
+        const esHijo = (parentesco: string | null | undefined): boolean => {
+          if (!parentesco) return false;
+          const parentescoUpper = parentesco.toUpperCase().trim();
+          // Identificar variaciones de HIJO/HIJA
+          return parentescoUpper === 'HIJO' || 
+                 parentescoUpper === 'HIJA' || 
+                 parentescoUpper.startsWith('HIJO') || 
+                 parentescoUpper.startsWith('HIJA');
+        };
+        
+        // Filtrar beneficiarios que son hijos
+        const hijosBeneficiarios = beneficiarios.filter((b: any) => esHijo(b.parentesco));
+        
+        if (hijosBeneficiarios.length > 0) {
+          // Establecer número de hijos
+          form.setValue('numeroHijos', String(hijosBeneficiarios.length));
+          
+          // Prediligenciar información de cada hijo
+          const hijosData = hijosBeneficiarios.map((b: any) => ({
+            tipoDocumento: b.tipo_documento || '',
+            numeroDocumento: b.documento || '',
+            nombre: (b.nombres || '').toUpperCase(),
+            genero: normalizeSexo(b.sexo) || '',
+            fechaNacimiento: b.fecha_nacimiento || '',
+          }));
+          
+          form.setValue('hijos', hijosData);
+        }
+      }
+      
       // Prellenar contacto de emergencia solo si están vacíos
       if (!currentValues.nombreContactoEmergencia || !currentValues.telefonoContactoEmergencia) {
-        if (afiliado?.contacto_emergencia && !afiliado?.telefono_contacto_emergencia) {
+        if (afiliadoData?.contacto_emergencia && !afiliadoData?.telefono_contacto_emergencia) {
           // Si viene en formato combinado, parsearlo
-          const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
-          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', parsed.nombre);
+          const parsed = parseContactoEmergencia(afiliadoData.contacto_emergencia);
+          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', (parsed.nombre || '').toUpperCase());
           if (!currentValues.relacionContactoEmergencia) form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(parsed.relacion));
           if (!currentValues.telefonoContactoEmergencia) form.setValue('telefonoContactoEmergencia', parsed.telefono);
         } else {
           // Si viene separado, usarlo directamente
-          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', afiliado.nombre_contacto_emergencia || '');
-          if (!currentValues.relacionContactoEmergencia) form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliado.relacion_contacto_emergencia));
-          if (!currentValues.telefonoContactoEmergencia) form.setValue('telefonoContactoEmergencia', afiliado.telefono_contacto_emergencia || '');
+          if (!currentValues.nombreContactoEmergencia) form.setValue('nombreContactoEmergencia', (afiliadoData.nombre_contacto_emergencia || '').toUpperCase());
+          if (!currentValues.relacionContactoEmergencia) form.setValue('relacionContactoEmergencia', normalizeRelacionContactoEmergencia(afiliadoData.relacion_contacto_emergencia));
+          if (!currentValues.telefonoContactoEmergencia) form.setValue('telefonoContactoEmergencia', afiliadoData.telefono_contacto_emergencia || '');
         }
       }
     }
     if (activeConvenio) {
       const currentValues = form.getValues();
       if (!currentValues.hospital) form.setValue('hospital', activeConvenio.cliente || '');
-      if (!currentValues.profesion) form.setValue('profesion', activeConvenio.proceso || '');
+      if (!currentValues.profesion) form.setValue('profesion', (activeConvenio.proceso || '').toUpperCase());
     }
-    if (afiliado?.documento) {
+    if (afiliadoData?.documento) {
       const currentValues = form.getValues();
-      if (!currentValues.numeroDocumentoFirma) form.setValue('numeroDocumentoFirma', afiliado.documento);
+      if (!currentValues.numeroDocumentoFirma) form.setValue('numeroDocumentoFirma', afiliadoData.documento);
     }
-  }, [afiliado, activeConvenio, form, fechaExpedicion]);
+  }, [afiliadoData, activeConvenio, form, authData, isAfiliadoActivo, beneficiarios]);
 
   // Asegurar que numeroDocumentoFirma siempre tenga valor cuando se está en el paso 5
   useEffect(() => {
@@ -961,26 +1334,26 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
     }
   }, [currentStep, form]);
 
-  // Watch values para ofuscación
-  const watchValues = useWatch({ control: form.control });
-  
-  // Obtener teléfono de contacto de emergencia (puede venir parseado)
+  // Valores iniciales para ofuscación
   const getTelefonoContactoEmergencia = (): string => {
-    if (afiliado?.telefono_contacto_emergencia) {
-      return afiliado.telefono_contacto_emergencia;
+    if (afiliadoData?.telefono_contacto_emergencia) {
+      return afiliadoData.telefono_contacto_emergencia;
     }
-    if (afiliado?.contacto_emergencia) {
-      const parsed = parseContactoEmergencia(afiliado.contacto_emergencia);
+    if (afiliadoData?.contacto_emergencia) {
+      const parsed = parseContactoEmergencia(afiliadoData.contacto_emergencia);
       return parsed.telefono || '';
     }
     return '';
   };
+
+  // Watch values para ofuscación
+  const watchValues = useWatch({ control: form.control });
   
   // Valores iniciales para ofuscación
   const initialValues = {
-    correo: afiliado?.correo_personal || '',
-    direccion: afiliado?.direccion || '',
-    celular: afiliado?.celular || '',
+    correo: afiliadoData?.correo_personal || '',
+    direccion: afiliadoData?.direccion || '',
+    celular: afiliadoData?.celular || '',
     telefonoContactoEmergencia: getTelefonoContactoEmergencia(),
   };
 
@@ -1037,6 +1410,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
       'tallaCalzado',
       'tallaVestimenta',
       'paisNacimiento',
+      'fechaNacimiento',
       'nombreContactoEmergencia',
       'relacionContactoEmergencia',
       'telefonoContactoEmergencia',
@@ -1044,7 +1418,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
     2: [
       'tienePersonasACargo',
       'estadoCivil',
-      'fechaNacimiento',
+      'nivelEducativo',
       'estatura',
       'peso',
       'genero',
@@ -1112,7 +1486,37 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 
   // Validar paso actual antes de avanzar
   const validateStep = async (step: number): Promise<boolean> => {
+    // Paso 0 es autenticación, se maneja por separado
+    if (step === 0) return true;
+    
     const fields = stepFields[step] || [];
+    
+    // Si estamos en el paso 1 y no hay afiliado activo, validar que hospital y profesion estén llenos
+    if (step === 1 && !isAfiliadoActivo) {
+      const currentValues = form.getValues();
+      if (!currentValues.hospital || currentValues.hospital.trim() === '') {
+        form.setError('hospital', {
+          type: 'manual',
+          message: 'El hospital es requerido',
+        });
+        return false;
+      }
+      if (!currentValues.profesion || currentValues.profesion.trim() === '') {
+        form.setError('profesion', {
+          type: 'manual',
+          message: 'La profesión es requerida',
+        });
+        return false;
+      }
+      // Si profesion es "OTRO", validar que profesionOtro esté lleno
+      if (currentValues.profesion === 'OTRO' && (!currentValues.profesionOtro || currentValues.profesionOtro.trim() === '')) {
+        form.setError('profesionOtro', {
+          type: 'manual',
+          message: 'Debe especificar la profesión',
+        });
+        return false;
+      }
+    }
     
     // Si estamos en el paso 3 (condiciones de salud), validar el objeto completo
     // para ejecutar las validaciones condicionales con superRefine
@@ -1181,7 +1585,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
   const handleNext = async () => {
     const isValid = await validateStep(currentStep);
     if (isValid) {
-      if (currentStep < TOTAL_STEPS) {
+      if (currentStep < TOTAL_STEPS - 1) {
         setCurrentStep(currentStep + 1);
         // Scroll al inicio del formulario
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1193,27 +1597,27 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 
   // Navegar al paso anterior
   const handlePrevious = () => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       // Scroll al inicio del formulario
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  // Calcular progreso
-  const progress = (currentStep / TOTAL_STEPS) * 100;
+  // Calcular progreso (excluyendo paso 0 de autenticación)
+  const progress = currentStep === 0 ? 0 : ((currentStep) / (TOTAL_STEPS - 1)) * 100;
 
   const onSubmit = async (data: EncuestaFormValues) => {
     console.log('onSubmit llamado', { 
-      hasAfiliado: !!afiliado,
+      hasAfiliadoData: !!afiliadoData,
       hasSignature,
       firmaLength: data.firma?.length || 0,
-      isBulkEntryMode,
+      authData: !!authData,
     });
 
-    // En modo afiliados activos, se requiere autenticación
-    if (!isBulkEntryMode && !afiliado) {
-      toast.error('No se encontró información del afiliado');
+    // Validar que se haya ingresado al menos el documento
+    if (!authData) {
+      toast.error('Debe ingresar sus datos de documento primero');
       return;
     }
 
@@ -1252,8 +1656,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
       }
 
       console.log('Llamando a submitSurvey...');
-      // Determinar survey_type según el modo
-      const surveyType = isBulkEntryMode ? 'bulk_entry' : 'active_affiliate';
+      // Determinar survey_type: si el afiliado está activo, es 'active_affiliate', si no, es 'bulk_entry'
+      const surveyType = isAfiliadoActivo ? 'active_affiliate' : 'bulk_entry';
       
       // Preparar datos para envío
       const surveyDataWithType: any = {
@@ -1261,10 +1665,27 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
         survey_type: surveyType,
       };
       
-      // En modo masivo, no enviar hospital y profesion (son campos internos)
-      if (isBulkEntryMode) {
+      // Si profesion es "OTRO", usar el valor de profesionOtro
+      if (surveyDataWithType.profesion === 'OTRO' && surveyDataWithType.profesionOtro) {
+        surveyDataWithType.profesion = surveyDataWithType.profesionOtro.toUpperCase();
+      }
+      
+      // Eliminar profesionOtro del envío (solo se usa internamente)
+      delete surveyDataWithType.profesionOtro;
+      
+      // Si no hay hospital o profesion (afiliado nuevo), no enviarlos
+      if (!surveyDataWithType.hospital || !surveyDataWithType.profesion) {
         delete surveyDataWithType.hospital;
         delete surveyDataWithType.profesion;
+      } else {
+        // Si el afiliado no está activo (nuevo ingreso), convertir el código de hospital a nombre legible
+        // Para afiliados activos, mantener el código como viene del API
+        if (!isAfiliadoActivo && surveyDataWithType.hospital) {
+          const hospitalSeleccionado = hospitalesPermitidos.find(h => h.key === surveyDataWithType.hospital);
+          if (hospitalSeleccionado) {
+            surveyDataWithType.hospital = hospitalSeleccionado.displayName;
+          }
+        }
       }
       
       const response = await submitSurvey(
@@ -1280,7 +1701,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 
       form.reset();
       toast.success('Encuesta enviada correctamente', {
-        description: 'Gracias por participar en la encuesta de bienestar.',
+        description: 'Haz completado correctamente la encuesta sociodemográfica y se ha registrado tu respuesta',
       });
 
       setTimeout(() => {
@@ -1314,9 +1735,9 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-slate-50 py-8">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Breadcrumb className="mb-6">
+      <div className={`bg-slate-50 ${currentStep === 0 ? 'pt-8 pb-32' : 'min-h-screen py-8'}`}>
+        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${currentStep === 0 ? 'max-w-3xl' : 'max-w-5xl'}`}>
+          <Breadcrumb className={currentStep === 0 ? 'mb-4' : 'mb-6'}>
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink href="/" className="flex items-center gap-1">
@@ -1331,31 +1752,143 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
             </BreadcrumbList>
           </Breadcrumb>
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+          <div className={currentStep === 0 ? 'mb-5' : 'mb-8'}>
+            <h1 className={`${currentStep === 0 ? 'text-2xl mb-1' : 'text-3xl mb-2'} font-bold text-slate-900`}>
               Encuesta Sociodemográfica y Diagnóstico de Condiciones de Salud
             </h1>
-            <p className="text-slate-600 mb-4">
-              {isBulkEntryMode ? (
-                <>Yo, con autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
-              ) : (
-                <>Yo, {afiliado?.nombres} {afiliado?.apellidos}, con {afiliado?.tipo_documento} {afiliado?.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
-              )}
-            </p>
-            
-            {/* Barra de progreso y contador de secciones */}
-            <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">
-                  Sección {currentStep} de {TOTAL_STEPS}
-                </span>
-                <span className="text-sm font-medium text-slate-700">
-                  {Math.round(progress)}%
-                </span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
+            {currentStep === 0 ? (
+              <p className="text-slate-600 text-sm mb-3">
+                Para continuar, por favor ingrese sus datos de identificación.
+              </p>
+            ) : (
+              <>
+                <p className="text-slate-600 mb-4">
+                  {afiliadoData ? (
+                    <>Yo, {afiliadoData.nombres} {afiliadoData.apellidos}, con {afiliadoData.tipo_documento} {afiliadoData.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+                  ) : (
+                    <>Yo, con autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+                  )}
+                </p>
+                
+                {/* Barra de progreso y contador de secciones */}
+                <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-700">
+                      Sección {currentStep} de {TOTAL_STEPS - 1}
+                    </span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {Math.round(progress)}%
+                    </span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Paso 0: Autenticación */}
+          {currentStep === 0 && (
+            <Card className="max-w-3xl mx-auto mb-8">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <User className="h-5 w-5 text-primary-prosalud" />
+                  Verificación de Identidad
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Por favor, ingrese su tipo de documento, número de documento y fecha de expedición para continuar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const tipoDoc = formData.get('tipoDocumento') as string;
+                    const numDoc = formData.get('numeroDocumento') as string;
+                    const fechaExp = formData.get('fechaExpedicion') as string;
+                    
+                    if (!tipoDoc || !numDoc || !fechaExp) {
+                      toast.error('Todos los campos son requeridos');
+                      return;
+                    }
+                    
+                    // Validar que la fecha de expedición no sea futura
+                    const fechaSeleccionada = new Date(fechaExp);
+                    const hoy = new Date();
+                    hoy.setHours(23, 59, 59, 999);
+                    
+                    if (fechaSeleccionada > hoy) {
+                      toast.error('La fecha de expedición no puede ser futura');
+                      return;
+                    }
+                    
+                    handleAuthenticate(tipoDoc, numDoc, fechaExp);
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Tipo de Documento</label>
+                      <Select name="tipoDocumento" defaultValue="CC" required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                          <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                          <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                          <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Número de Documento</label>
+                      <Input
+                        name="numeroDocumento"
+                        type="text"
+                        required
+                        placeholder="Ingrese su número de documento"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Fecha de Expedición</label>
+                      <Input
+                        name="fechaExpedicion"
+                        type="date"
+                        required
+                        max={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/')}
+                      size="sm"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isAuthenticating}
+                      className="bg-primary-prosalud"
+                      size="sm"
+                    >
+                      {isAuthenticating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Consultando información...
+                        </>
+                      ) : (
+                        'Continuar'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
           <Form {...form}>
             <form 
@@ -1382,9 +1915,9 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                     Datos Básicos
                   </CardTitle>
                   <CardDescription>
-                    {isBulkEntryMode 
-                      ? 'Por favor, diligencie todos los campos requeridos'
-                      : 'Esta información se ha autocompletado con sus datos personales'
+                    {afiliadoData 
+                      ? 'Esta información se ha autocompletado con sus datos personales'
+                      : 'Por favor, diligencie todos los campos requeridos'
                     }
                   </CardDescription>
                 </CardHeader>
@@ -1400,8 +1933,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                             <Input 
                               {...field} 
                               value={field.value || ''} 
-                              readOnly={!isBulkEntryMode} 
-                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              readOnly={!!afiliadoData} 
+                              className={!!afiliadoData ? "bg-slate-100" : ""}
                               onChange={(e) => {
                                 handleUppercaseInput(e, (value) => {
                                   field.onChange(value);
@@ -1425,8 +1958,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                             <Input 
                               {...field} 
                               value={field.value || ''} 
-                              readOnly={!isBulkEntryMode} 
-                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              readOnly={!!afiliadoData} 
+                              className={!!afiliadoData ? "bg-slate-100" : ""}
                               onChange={(e) => {
                                 handleUppercaseInput(e, (value) => {
                                   field.onChange(value);
@@ -1445,8 +1978,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                       name="tipoDocumento"
                       render={({ field }) => {
                         const displayValue = getTipoDocumentoDisplayName(field.value);
-                        if (isBulkEntryMode) {
-                          // En modo masivo, mostrar como Select editable
+                        if (!afiliadoData) {
+                          // Si no hay afiliado, mostrar como Select editable
                           return (
                             <FormItem>
                               <FormLabel className="text-base font-semibold text-slate-900">3. Tipo de documento</FormLabel>
@@ -1496,8 +2029,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                           <FormControl>
                             <Input 
                               {...field} 
-                              readOnly={!isBulkEntryMode} 
-                              className={!isBulkEntryMode ? "bg-slate-100" : ""}
+                              readOnly={!!afiliadoData} 
+                              className={!!afiliadoData ? "bg-slate-100" : ""}
                               onChange={(e) => {
                                 field.onChange(e);
                                 form.clearErrors('numeroDocumento');
@@ -1509,22 +2042,23 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                       )}
                     />
 
-                    {/* Hospital y Profesión solo se muestran en modo afiliados activos */}
-                    {!isBulkEntryMode && (
+                    {/* Hospital y Profesión - read-only si afiliado activo, selects si no */}
+                    {isAfiliadoActivo && (
                       <>
                         <FormField
                           control={form.control}
                           name="hospital"
                           render={({ field }) => {
-                            const displayValue = getHospitalDisplayName(field.value);
+                            const displayValue = getHospitalDisplayName(field.value || '');
                             return (
                               <FormItem>
                                 <FormLabel className="text-base font-semibold text-slate-900">5. Hospital</FormLabel>
                                 <FormControl>
                                   <Input 
-                                    value={displayValue} 
+                                    value={displayValue}
                                     readOnly 
-                                    className="bg-slate-100" 
+                                    className="bg-slate-100"
+                                    onChange={() => {}} // No-op para evitar warnings
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1549,6 +2083,103 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                       </>
                     )}
 
+                    {/* Hospital y Profesión - selects cuando no hay afiliado activo */}
+                    {!isAfiliadoActivo && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="hospital"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">5. Hospital</FormLabel>
+                              <Select
+                                value={field.value || ''}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('hospital');
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione el hospital" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {hospitalesPermitidos.map((hospital) => (
+                                    <SelectItem key={hospital.key} value={hospital.key}>
+                                      {hospital.displayName}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="profesion"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-900">6. Proceso</FormLabel>
+                              <Select
+                                value={field.value || ''}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  form.clearErrors('profesion');
+                                  // Si no es "OTRO", limpiar el campo profesionOtro
+                                  if (value !== 'OTRO') {
+                                    form.setValue('profesionOtro', '');
+                                  }
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione la profesión" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {profesiones.map((profesion) => (
+                                    <SelectItem key={profesion} value={profesion}>
+                                      {profesion}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Campo condicional para "Otro" en profesión */}
+                        {form.watch('profesion') === 'OTRO' && (
+                          <FormField
+                            control={form.control}
+                            name="profesionOtro"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold text-slate-900">Especifique la profesión</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="Ingrese la profesión"
+                                    onChange={(e) => {
+                                      handleUppercaseInput(e, (value) => {
+                                        field.onChange(value);
+                                        form.clearErrors('profesionOtro');
+                                      });
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </>
+                    )}
+
                     <FormField
                       control={form.control}
                       name="correo"
@@ -1564,7 +2195,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">
-                              {isBulkEntryMode ? '5. Dirección de correo electrónico' : '7. Dirección de correo electrónico'}
+                              {!isAfiliadoActivo ? '7. Correo electrónico' : '7. Correo electrónico'}
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -1618,7 +2249,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                           return (
                               <FormItem>
                                 <FormLabel className="text-base font-semibold text-slate-900">
-                                  {isBulkEntryMode ? '6. Celular' : '8. Celular'}
+                                  {!isAfiliadoActivo ? '8. Celular' : '8. Celular'}
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -1690,7 +2321,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">
-                              {isBulkEntryMode ? '7. Fecha de expedición' : '9. Fecha de expedición'}
+                              {!isAfiliadoActivo ? '9. Fecha de expedición' : '9. Fecha de expedición'}
                             </FormLabel>
                             <FormControl>
                               <Input 
@@ -1700,8 +2331,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                 onChange={handleDateChange}
                                 min={minDate}
                                 max={maxDate}
-                                readOnly={!!afiliado?.fecha_expedicion} 
-                                className={afiliado?.fecha_expedicion ? 'bg-slate-100' : ''} 
+                                readOnly={!!afiliadoData?.fecha_expedicion} 
+                                className={afiliadoData?.fecha_expedicion ? 'bg-slate-100' : ''} 
                               />
                             </FormControl>
                             <FormMessage />
@@ -1718,7 +2349,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">
-                              {isBulkEntryMode ? '8. País de nacimiento' : '10. País de nacimiento'}
+                              {!isAfiliadoActivo ? '10. País de nacimiento' : '10. País de nacimiento'}
                             </FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
@@ -1756,14 +2387,14 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-base font-semibold text-slate-900">
-                                {isBulkEntryMode ? '9. Lugar de nacimiento' : '11. Lugar de nacimiento'}
+                                {!isAfiliadoActivo ? '11. Lugar de nacimiento' : '11. Lugar de nacimiento'}
                               </FormLabel>
                               <FormControl>
                                 <Input 
                                   {...field} 
                                   value={field.value || ''} 
-                                  readOnly={!!afiliado?.lugar_nacimiento} 
-                                  className={afiliado?.lugar_nacimiento ? 'bg-slate-100' : ''} 
+                                  readOnly={!!afiliadoData?.lugar_nacimiento} 
+                                  className={afiliadoData?.lugar_nacimiento ? 'bg-slate-100' : ''} 
                                   placeholder="Ej: Medellín"
                                   onChange={(e) => {
                                     handleUppercaseInput(e, field.onChange);
@@ -1773,6 +2404,30 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                               <FormMessage />
                             </FormItem>
                         )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fechaNacimiento"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">12. Fecha de nacimiento</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              value={field.value || ''} 
+                              readOnly={!!(afiliadoData as any)?.fecha_nacimiento}
+                              className={!!(afiliadoData as any)?.fecha_nacimiento ? 'bg-slate-100' : ''}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                form.clearErrors('fechaNacimiento');
+                              }} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
 
                     <FormField
@@ -1787,7 +2442,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                           return (
                               <FormItem>
                                 <FormLabel className="text-base font-semibold text-slate-900">
-                                  {isBulkEntryMode ? '10. Departamento de residencia' : '12. Departamento de residencia'}
+                                  {!isAfiliadoActivo ? '13. Departamento de residencia' : '13. Departamento de residencia'}
                                 </FormLabel>
                                 <FormControl>
                                   <Input
@@ -1808,7 +2463,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-base font-semibold text-slate-900">
-                                {isBulkEntryMode ? '11. Municipio de residencia' : '13. Municipio de residencia'}
+                                {!isAfiliadoActivo ? '14. Municipio de residencia' : '14. Municipio de residencia'}
                               </FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
@@ -1844,7 +2499,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">
-                              {isBulkEntryMode ? '12. Dirección de residencia' : '14. Dirección de residencia'}
+                              {!isAfiliadoActivo ? '15. Dirección de residencia' : '15. Dirección de residencia'}
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -1889,10 +2544,10 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         name="rh"
                         render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">15 RH</FormLabel>
+                              <FormLabel className="text-base font-semibold text-slate-900">15. RH</FormLabel>
                               <FormControl>
-                                <Select onValueChange={field.onChange} value={field.value} disabled={!!afiliado?.rh}>
-                                  <SelectTrigger className={afiliado?.rh ? 'bg-slate-100' : ''}>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={!!(afiliadoData as any)?.rh}>
+                                  <SelectTrigger className={(afiliadoData as any)?.rh ? 'bg-slate-100' : ''}>
                                     <SelectValue placeholder="Seleccione el tipo de sangre" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1969,6 +2624,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                         </FormItem>
                       )}
                     />
+
                   </div>
                 </CardContent>
               </Card>
@@ -2168,16 +2824,27 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 
                   <FormField
                     control={form.control}
-                    name="fechaNacimiento"
+                    name="nivelEducativo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">18. Fecha de nacimiento</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} onChange={(e) => {
-                            field.onChange(e);
-                            form.clearErrors('fechaNacimiento');
-                          }} />
-                        </FormControl>
+                        <FormLabel className="text-base font-semibold text-slate-900">18. Nivel educativo</FormLabel>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          form.clearErrors('nivelEducativo');
+                        }} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione su nivel educativo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {nivelesEducativos.map((nivel) => (
+                              <SelectItem key={nivel.value} value={nivel.value}>
+                                {nivel.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2239,11 +2906,11 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="genero"
-                    render={({ field }) => (
-                      <FormItem>
+                    <FormField
+                        control={form.control}
+                        name="genero"
+                        render={({ field }) => (
+                            <FormItem>
                         <FormLabel className="text-base font-semibold text-slate-900">21. Género</FormLabel>
                         <FormControl>
                           <RadioGroup onValueChange={(value) => {
@@ -2269,12 +2936,12 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="raza"
+                    <FormField
+                        control={form.control}
+                        name="raza"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold text-slate-900">22. Grupo étnico</FormLabel>
+                        <FormLabel className="text-base font-semibold text-slate-900">23. Grupo étnico</FormLabel>
                         <Select onValueChange={(value) => {
                           field.onChange(value);
                           form.clearErrors('raza');
@@ -2302,7 +2969,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                     name="numeroHijos"
                     render={({ field }) => (
                       <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">23. Número de hijos</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">24. Número de hijos</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" {...field} onChange={(e) => {
                             field.onChange(e);
@@ -2340,9 +3007,12 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
-                                      <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
-                                      <SelectItem value="RC">Registro Civil</SelectItem>
+                                      <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                                      <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                                      <SelectItem value="RC">Registro Civil (RC)</SelectItem>
+                                      <SelectItem value="NUIP">Número Único de Identificación Personal (NUIP)</SelectItem>
+                                      <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                                      <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
@@ -2875,21 +3545,115 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                           )}
                         />
                       )}
-                      {question.additionalField && form.watch(question.name as any) === 'si' && (
-                        <FormField
-                          control={form.control}
-                          name={question.additionalField as any}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">{question.additionalLabel}</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="Especifique tiempo..." />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
+                      {question.additionalField && form.watch(question.name as any) === 'si' && (() => {
+                        // Componente interno para manejar tiempo con cantidad y unidad
+                        const TimeInputField = () => {
+                          const fieldName = question.additionalField as any;
+                          const currentValue = form.watch(fieldName) || '';
+                          
+                          // Parsear el valor existente si viene en formato "X días", "X meses" o "X años"
+                          const parseTimeValue = (value: string) => {
+                            if (!value) return { cantidad: '', unidad: 'meses' };
+                            const match = value.match(/^(\d+)\s+(días?|dias?|meses?|años?)$/i);
+                            if (match) {
+                              const unidadMatch = match[2].toLowerCase();
+                              let unidad = 'meses';
+                              if (unidadMatch.startsWith('año')) {
+                                unidad = 'años';
+                              } else if (unidadMatch.startsWith('día') || unidadMatch.startsWith('dia')) {
+                                unidad = 'días';
+                              } else if (unidadMatch.startsWith('mes')) {
+                                unidad = 'meses';
+                              }
+                              return {
+                                cantidad: match[1],
+                                unidad: unidad
+                              };
+                            }
+                            // Si no tiene formato, intentar extraer número
+                            const numMatch = value.match(/(\d+)/);
+                            if (numMatch) {
+                              return { cantidad: numMatch[1], unidad: 'meses' };
+                            }
+                            return { cantidad: '', unidad: 'meses' };
+                          };
+
+                          const parsed = parseTimeValue(currentValue);
+                          const [cantidad, setCantidad] = useState(parsed.cantidad);
+                          const [unidad, setUnidad] = useState(parsed.unidad);
+
+                          // Sincronizar con el valor del formulario cuando cambia externamente
+                          useEffect(() => {
+                            const newParsed = parseTimeValue(currentValue);
+                            if (newParsed.cantidad !== cantidad || newParsed.unidad !== unidad) {
+                              setCantidad(newParsed.cantidad);
+                              setUnidad(newParsed.unidad);
+                            }
+                          }, [currentValue]);
+
+                          // Actualizar el valor del formulario cuando cambian cantidad o unidad
+                          const updateFormValue = (newCantidad: string, newUnidad: string) => {
+                            if (newCantidad && newUnidad) {
+                              const formattedValue = `${newCantidad} ${newUnidad}`;
+                              form.setValue(fieldName, formattedValue);
+                              form.clearErrors(fieldName);
+                            } else if (!newCantidad) {
+                              form.setValue(fieldName, '');
+                            }
+                          };
+
+                          return (
+                            <FormField
+                              control={form.control}
+                              name={fieldName}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold text-slate-900">{question.additionalLabel}</FormLabel>
+                                  <div className="flex gap-2 items-start">
+                                    <FormControl className="w-32">
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={cantidad}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          if (value === '' || /^\d+$/.test(value)) {
+                                            setCantidad(value);
+                                            updateFormValue(value, unidad);
+                                          }
+                                        }}
+                                        placeholder="Ej: 3"
+                                        className="w-full"
+                                      />
+                                    </FormControl>
+                                    <FormControl className="w-24">
+                                      <Select
+                                        value={unidad}
+                                        onValueChange={(value) => {
+                                          setUnidad(value);
+                                          updateFormValue(cantidad, value);
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="días">Días</SelectItem>
+                                          <SelectItem value="meses">Meses</SelectItem>
+                                          <SelectItem value="años">Años</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </FormControl>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          );
+                        };
+
+                        return <TimeInputField />;
+                      })()}
                     </div>
                   );
                   })}
@@ -3031,7 +3795,7 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                 <CardContent className="space-y-6">
                   <div className="rounded-lg border border-primary-prosalud/40 bg-primary-prosalud/5 p-4 text-sm text-slate-700">
                     <p className="mb-2">
-                      De acuerdo a la ley 1581 de 2012, que aplica para el tratamiento de datos personales, con el diligenciamiento de esta encuesta, usted autoriza a la empresa, al acceso de esta información personal para efectos del área de Recursos Humanos y SST.
+                      De acuerdo a la ley 1581 de 2012, que aplica para el tratamiento de datos personales, con el diligenciamiento de esta encuesta, usted autoriza al sindicato de profesionales de la salud ProSalud, al acceso de esta información personal para efectos del área de Recursos Humanos y SST.
                     </p>
                   </div>
 
@@ -3081,21 +3845,23 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
               )}
 
               {/* Botones de navegación */}
-              <div className="flex gap-4 justify-between pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => navigate('/')}>
-                  Cancelar
-                </Button>
-                <div className="flex gap-4">
+              {currentStep > 0 && (
+                <div className="flex gap-4 justify-between pt-4 border-t">
+                  <Button type="button" variant="outline" onClick={() => navigate('/')}>
+                    Cancelar
+                  </Button>
+                  <div className="flex gap-4">
                   {currentStep > 1 && (
                     <Button type="button" variant="outline" onClick={handlePrevious}>
                       ← Anterior
                     </Button>
                   )}
-                  {currentStep < TOTAL_STEPS ? (
+                  {currentStep > 0 && currentStep < TOTAL_STEPS - 1 && (
                     <Button type="button" onClick={handleNext} className="bg-primary-prosalud">
                       Siguiente →
                     </Button>
-                  ) : (
+                  )}
+                  {currentStep === TOTAL_STEPS - 1 && (
                     <Button 
                       type="submit" 
                       disabled={isSubmitting} 
@@ -3109,8 +3875,9 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
                       )}
                     </Button>
                   )}
+                  </div>
                 </div>
-              </div>
+              )}
               
               {/* reCAPTCHA invisible */}
               <InvisibleRecaptcha
@@ -3133,42 +3900,8 @@ const EncuestaBienestarPageContent: React.FC<EncuestaBienestarPageContentProps> 
 };
 
 const EncuestaBienestarPage: React.FC = () => {
-  // Verificar modo de configuración antes de renderizar
-  const { data: config, isLoading } = useQuery({
-    queryKey: ['survey-config-public'],
-    queryFn: () => surveyConfigApi.getPublicConfig(),
-    retry: 2,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-  });
-
-  const isBulkEntryMode = config?.data?.allow_bulk_entry_mode ?? false;
-
-  if (isLoading) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-prosalud mx-auto mb-4"></div>
-              <p className="text-slate-600">Cargando configuración...</p>
-            </div>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  // Si está en modo ingreso masivo, no requiere autenticación
-  if (isBulkEntryMode) {
-    return <EncuestaBienestarPageContent isBulkEntryMode={isBulkEntryMode} />;
-  }
-
-  // Si está en modo afiliados activos, requiere autenticación
-  return (
-    <RequireAfiliadoDataUpdateAuth>
-      <EncuestaBienestarPageContent isBulkEntryMode={isBulkEntryMode} />
-    </RequireAfiliadoDataUpdateAuth>
-  );
+  // La encuesta siempre es pública, no requiere verificación de configuración
+  return <EncuestaBienestarPageContent />;
 };
 
 export default EncuestaBienestarPage;
