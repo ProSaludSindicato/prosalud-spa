@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { AlertCircle } from 'lucide-react';
 import { AffiliateDeliveryPanel } from '@/components/admin/sst/AffiliateDeliveryPanel';
 import { AffiliateReturnPanel } from '@/components/admin/sst/AffiliateReturnPanel';
@@ -94,6 +95,39 @@ const getDeliveryTypeLabel = (type?: SstDeliveryType): string => {
   if (type === 'first_time') return 'Primera vez';
   if (type === 'periodic') return 'Periódica';
   return 'No especificado';
+};
+
+const getAffiliateStatusInfo = (status?: string): { label: string; className: string } => {
+  if (!status) {
+    return {
+      label: 'Activo',
+      className: 'bg-green-100 text-green-800 border-green-300',
+    };
+  }
+  
+  const statusUpper = status.toUpperCase().trim();
+  
+  // Normalizar estados comunes
+  if (statusUpper === 'ACTIVO' || statusUpper === 'ACTIVE') {
+    return {
+      label: 'Activo',
+      className: 'bg-green-100 text-green-800 border-green-300',
+    };
+  }
+  
+  if (statusUpper === 'RETIRADO' || statusUpper === 'RETIRED') {
+    return {
+      label: 'Retirado',
+      className: 'bg-amber-100 text-amber-800 border-amber-300',
+    };
+  }
+  
+  // Para otros estados, capitalizar la primera letra y el resto en minúsculas
+  const normalizedLabel = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  return {
+    label: normalizedLabel,
+    className: 'bg-slate-100 text-slate-800 border-slate-300',
+  };
 };
 
 const formatTimeElapsed = (dateString: string): string => {
@@ -542,6 +576,12 @@ const AdminSstPage: React.FC = () => {
     setSelectedAffiliate(affiliate);
     setSearchTerm(affiliate.documentNumber);
     setShowAffiliateList(false);
+
+    // Si el afiliado está retirado, cambiar automáticamente a modo devolución
+    const isRetired = affiliate.status?.toUpperCase() === 'RETIRADO';
+    if (isRetired) {
+      setViewMode('return');
+    }
 
     // Scroll to delivery panel
     setTimeout(() => {
@@ -1622,53 +1662,84 @@ const AdminSstPage: React.FC = () => {
                 <CardHeader className="pb-3 p-4 sm:p-6">
                   <div className="flex flex-col gap-4">
                     <div>
-                      <CardTitle className="text-lg sm:text-xl mb-2 break-words">
-                        Registro para {selectedAffiliate.firstName} {selectedAffiliate.lastName}
-                      </CardTitle>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <CardTitle className="text-lg sm:text-xl break-words">
+                          Registro para {selectedAffiliate.firstName} {selectedAffiliate.lastName}
+                        </CardTitle>
+                        {(() => {
+                          const statusInfo = getAffiliateStatusInfo(selectedAffiliate.status);
+                          return (
+                            <Badge className={statusInfo.className}>
+                              {statusInfo.label}
+                            </Badge>
+                          );
+                        })()}
+                      </div>
                       <CardDescription className="text-sm">
                         Selecciona el tipo de operación que deseas realizar.
                       </CardDescription>
                     </div>
-                    <Tabs 
-                      value={viewMode} 
-                      onValueChange={(value) => setViewMode(value as 'delivery' | 'return')}
-                      className="w-full"
-                    >
-                      <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1">
-                        <TabsTrigger 
-                          value="delivery" 
-                          className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm"
+                    {(() => {
+                      const isRetired = selectedAffiliate.status?.toUpperCase() === 'RETIRADO';
+                      return (
+                        <Tabs 
+                          value={viewMode} 
+                          onValueChange={(value) => {
+                            // Prevenir cambiar a entregas si el afiliado está retirado
+                            if (value === 'delivery' && isRetired) {
+                              return;
+                            }
+                            setViewMode(value as 'delivery' | 'return');
+                          }}
+                          className="w-full"
                         >
-                          <Package className="h-4 w-4" />
-                          Entrega
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="return"
-                          className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          Devolución
-                        </TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="delivery" className="mt-4">
-                        <Alert className="border-green-200 bg-green-50">
-                          <Package className="h-4 w-4 text-green-600" />
-                          <AlertTitle className="text-green-900">Modo: Registro de Entrega</AlertTitle>
-                          <AlertDescription className="text-green-800">
-                            Completa la selección de elementos de protección y captura la firma del afiliado como constancia.
-                          </AlertDescription>
-                        </Alert>
-                      </TabsContent>
-                      <TabsContent value="return" className="mt-4">
-                        <Alert className="border-orange-200 bg-orange-50">
-                          <RotateCcw className="h-4 w-4 text-orange-600" />
-                          <AlertTitle className="text-orange-900">Modo: Registro de Devolución</AlertTitle>
-                          <AlertDescription className="text-orange-800">
-                            Selecciona los elementos que el afiliado está devolviendo. El sistema comparará con el historial de entregas.
-                          </AlertDescription>
-                        </Alert>
-                      </TabsContent>
-                    </Tabs>
+                          <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1">
+                            <TabsTrigger 
+                              value="delivery" 
+                              disabled={isRetired}
+                              className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Package className="h-4 w-4" />
+                              Entrega
+                            </TabsTrigger>
+                            <TabsTrigger 
+                              value="return"
+                              className="gap-2 font-semibold data-[state=active]:bg-white data-[state=active]:text-primary-prosalud data-[state=active]:shadow-sm"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Devolución
+                            </TabsTrigger>
+                          </TabsList>
+                          {isRetired && (
+                            <Alert className="mt-4 border-amber-200 bg-amber-50">
+                              <AlertCircle className="h-4 w-4 text-amber-600" />
+                              <AlertTitle className="text-amber-900">Afiliado Retirado</AlertTitle>
+                              <AlertDescription className="text-amber-800">
+                                Este afiliado tiene estado "Retirado". Solo se pueden registrar devoluciones, no entregas.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          <TabsContent value="delivery" className="mt-4">
+                            <Alert className="border-green-200 bg-green-50">
+                              <Package className="h-4 w-4 text-green-600" />
+                              <AlertTitle className="text-green-900">Modo: Registro de Entrega</AlertTitle>
+                              <AlertDescription className="text-green-800">
+                                Completa la selección de elementos de protección y captura la firma del afiliado como constancia.
+                              </AlertDescription>
+                            </Alert>
+                          </TabsContent>
+                          <TabsContent value="return" className="mt-4">
+                            <Alert className="border-orange-200 bg-orange-50">
+                              <RotateCcw className="h-4 w-4 text-orange-600" />
+                              <AlertTitle className="text-orange-900">Modo: Registro de Devolución</AlertTitle>
+                              <AlertDescription className="text-orange-800">
+                                Selecciona los elementos que el afiliado está devolviendo. El sistema comparará con el historial de entregas.
+                              </AlertDescription>
+                            </Alert>
+                          </TabsContent>
+                        </Tabs>
+                      );
+                    })()}
                   </div>
                   {viewMode === 'delivery' && deliveryHistory.length > 0 && (() => {
                     const lastDelivery = deliveryHistory[0]; // Most recent delivery is first
