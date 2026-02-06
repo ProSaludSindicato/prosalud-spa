@@ -3,7 +3,7 @@ import axios, { AxiosError } from 'axios';
 
 export interface SocioDemographicSurveyData {
   // Tipo de encuesta
-  survey_type?: 'active_affiliate' | 'bulk_entry';
+  survey_type?: 'active_affiliate' | 'new_entry';
   
   // Datos Básicos
   nombres?: string;

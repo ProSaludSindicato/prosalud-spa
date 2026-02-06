@@ -233,20 +233,19 @@ const getGeneroIcon = (genero: string | null | undefined) => {
 const getSurveyTypeDisplayName = (surveyType: string | null | undefined): string => {
   // null se trata como active_affiliate por compatibilidad
   if (!surveyType) return 'Afiliados Activos';
+  // Mapear 'bulk_entry' legacy a 'new_entry' para visualización
+  const normalizedType = surveyType === 'bulk_entry' ? 'new_entry' : surveyType;
   const map: Record<string, string> = {
     'active_affiliate': 'Afiliado Activo',
     'new_entry': 'Nuevo Ingreso',
-    'bulk_entry': 'Nuevo Ingreso',
   };
-  return map[surveyType] || surveyType;
+  return map[normalizedType] || normalizedType;
 };
 
 // Función para obtener las clases CSS del badge según el tipo de encuesta
 const getSurveyTypeBadgeClasses = (surveyType: string | null | undefined): string => {
-  const normalizedType = surveyType || 'active_affiliate';
-  if (normalizedType === 'bulk_entry') {
-    return 'text-xs bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200 whitespace-nowrap';
-  }
+  // Mapear 'bulk_entry' legacy a 'new_entry' para visualización
+  const normalizedType = surveyType === 'bulk_entry' ? 'new_entry' : (surveyType || 'active_affiliate');
   if (normalizedType === 'new_entry') {
     return 'text-xs bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200 whitespace-nowrap';
   }
@@ -584,7 +583,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                       <CardContent>
                         <div className="text-2xl font-bold">{metrics.current_month.total}</div>
                         <div className="text-xs text-slate-500 mt-1">
-                          Activos: {metrics.current_month.by_type.active_affiliate} • Nuevos: {(metrics.current_month.by_type as any).new_entry || 0} • Legacy: {metrics.current_month.by_type.bulk_entry}
+                          Activos: {metrics.current_month.by_type.active_affiliate} • Nuevos: {(metrics.current_month.by_type as any).new_entry || 0}
                         </div>
                       </CardContent>
                     </Card>
@@ -606,16 +605,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">{(metrics.by_type as any).new_entry || 0}</div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-slate-600">
-                          Para Ingreso Masivo (legacy)
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{metrics.by_type.bulk_entry}</div>
                       </CardContent>
                     </Card>
                   </>
@@ -675,7 +664,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
                     <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
-                    <SelectItem value="bulk_entry">Ingreso Masivo (legacy)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

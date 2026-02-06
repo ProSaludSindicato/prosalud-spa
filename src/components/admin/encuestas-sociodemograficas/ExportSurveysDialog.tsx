@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Calendar, Filter, Building2, Loader2, CheckCircle2, AlertCircle, FileSignature } from 'lucide-react';
+import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
 import { socioDemographicSurveyApi } from '@/services/socioDemographicSurveyApi';
 import { logger } from '@/utils/logger';
@@ -30,7 +30,6 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
   });
-  const [hospital, setHospital] = useState<string>('');
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
@@ -254,7 +253,6 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
           start_date: formatDateForApi(dateRange.start),
           end_date: formatDateForApi(dateRange.end),
         },
-        hospital: hospital.trim() || undefined,
         include_signatures: includeSignatures,
       });
 
@@ -341,7 +339,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                   <SelectContent>
                     <SelectItem value="all">Todos los tipos de encuestas</SelectItem>
                     <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
-                    <SelectItem value="bulk_entry">Ingreso Masivo</SelectItem>
+                    <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -396,33 +394,6 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Hospital Filter */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <Building2 className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Hospital</h4>
-                  <p className="text-sm text-gray-600">
-                    Filtra las encuestas por hospital específico (opcional)
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Código de Hospital</label>
-                <Input
-                  type="text"
-                  placeholder="Ej: HOSP001 (dejar vacío para todos)"
-                  value={hospital}
-                  onChange={(e) => setHospital(e.target.value)}
-                  className="w-full"
-                  maxLength={255}
-                />
-              </div>
             </CardContent>
           </Card>
 

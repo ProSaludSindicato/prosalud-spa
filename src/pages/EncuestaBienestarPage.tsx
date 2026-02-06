@@ -1656,8 +1656,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
       }
 
       console.log('Llamando a submitSurvey...');
-      // Determinar survey_type: si el afiliado está activo, es 'active_affiliate', si no, es 'bulk_entry'
-      const surveyType = isAfiliadoActivo ? 'active_affiliate' : 'bulk_entry';
+      // Determinar survey_type: si el afiliado está activo, es 'active_affiliate', si no, es 'new_entry'
+      const surveyType = isAfiliadoActivo ? 'active_affiliate' : 'new_entry';
       
       // Preparar datos para envío
       const surveyDataWithType: any = {
