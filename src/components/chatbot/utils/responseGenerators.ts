@@ -6,7 +6,16 @@ import { logger } from "@/utils/logger";
 /**
  * Genera respuesta cuando no se encuentran datos
  */
-export const generateNoDataResponse = (): string => {
+export const generateNoDataResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
+
   return `ℹ️ **No se encontraron registros de incapacidad**
 
 No encontramos información de incapacidades asociadas al documento consultado.
@@ -16,8 +25,16 @@ No encontramos información de incapacidades asociadas al documento consultado.
 - La información aún no ha sido procesada en el sistema
 - Los datos ingresados no coinciden con nuestros registros
 
-**¿Necesitas ayuda?**
-Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu solicitud.
+**📋 Alternativa disponible:**
+
+Si necesitas consultar o verificar el estado de tus incapacidades, puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}).
+
+En el formulario podrás:
+- Seleccionar el tipo de pago relacionado con tu consulta (Incapacidades)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
 
 **🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
 };
@@ -25,34 +42,72 @@ Si crees que debería haber información disponible, por favor comunícate con n
 /**
  * Genera respuesta de error del servidor
  */
-export const generateServerErrorResponse = (): string => {
-  return `⚠️ **Error del servidor**
+export const generateServerErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
 
-Lo sentimos, estamos experimentando problemas técnicos temporales.
+  return `ℹ️ **No se pudo realizar la consulta en este momento**
+
+No fue posible consultar tu información de incapacidades a través de este medio en este momento.
+
+**📋 Alternativa disponible:**
+
+Puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}), donde podrás:
+
+- Seleccionar el tipo de pago relacionado con tu consulta (Incapacidades)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
 
 **¿Qué puedes hacer?**
-- Intenta nuevamente en unos minutos
-- Si el problema persiste, comunícate con nosotros
+- Intenta nuevamente la consulta rápida en unos días
+- O utiliza el [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}) como alternativa
 
-**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 };
 
 /**
  * Genera respuesta de error de validación
  */
-export const generateValidationErrorResponse = (errors: any): string => {
+export const generateValidationErrorResponse = (errors: any, formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
+
   return `❌ **Error en los datos ingresados**
 
 Los datos proporcionados no son válidos:
 
 ${errors ? `\`\`\`json\n${JSON.stringify(errors, null, 2)}\n\`\`\`` : "- Verifica que todos los campos estén completos"}
 
-**¿Qué puedes hacer?**
-- Revisa los datos ingresados
-- Asegúrate de que el formato sea correcto
-- Intenta nuevamente
+**📋 Alternativa disponible:**
 
-**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+Si tienes problemas con el formato de los datos, puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}), donde podrás:
+
+- Seleccionar el tipo de pago relacionado con tu consulta (Incapacidades)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
+
+**¿Qué puedes hacer?**
+- Revisa los datos ingresados y asegúrate de que el formato sea correcto
+- Intenta nuevamente la consulta rápida
+- O utiliza el [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}) como alternativa
+
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 };
 
 /**
@@ -92,16 +147,35 @@ Nuestro equipo revisará tu solicitud y te responderá con la información dispo
 /**
  * Genera respuesta genérica de error
  */
-export const generateGenericErrorResponse = (): string => {
-  return `❌ **Error en la consulta**
+export const generateGenericErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
 
-No pudimos procesar tu solicitud en este momento.
+  return `ℹ️ **No se pudo realizar la consulta en este momento**
+
+No fue posible consultar tu información de incapacidades a través de este medio en este momento.
+
+**📋 Alternativa disponible:**
+
+Puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}), donde podrás:
+
+- Seleccionar el tipo de pago relacionado con tu consulta (Incapacidades)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
 
 **¿Qué puedes hacer?**
-- Intenta nuevamente en unos minutos
-- Si el problema persiste, comunícate con nosotros
+- Intenta nuevamente la consulta rápida en unos días
+- O utiliza el [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}) como alternativa
 
-**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 };
 
 /**
@@ -209,49 +283,93 @@ export const generateIncapacidadResponse = (
     tituloEstado = "Pendiente por reconocer";
   }
 
-  let response = `${statusIcon} **Detalle de tu incapacidad - ${tituloEstado}**\n\n`;
+  // Determinar mensaje según el estado
+  let mensajeEstado = "";
+  if (fueReconocida) {
+    mensajeEstado = "Tu incapacidad ha sido reconocida y el pago ha sido procesado.";
+  } else if (!estadoDesconocido) {
+    mensajeEstado = "Tu incapacidad está pendiente de reconocimiento y pago.";
+  }
 
-  // Mensaje aclaratorio sobre EPS
-  response += `💡 *Cuando la EPS es Sura o Colmena, el pago se realiza a través de ProSalud, quien reconoce y transfiere la incapacidad al afiliado.*\n\n*Si la EPS es otra, el afiliado debe gestionar el trámite directamente con su EPS por los canales que esta tenga disponibles para el reconocimiento y pago de la incapacidad.*\n\n`;
+  let response = `${statusIcon} **Estado de tu Incapacidad - ${tituloEstado}**\n\n`;
+
+  if (mensajeEstado) {
+    response += `${mensajeEstado}\n\n`;
+  }
+
+  // Mensaje aclaratorio sobre EPS (más claro y directo)
+  response += `💡 **Información importante sobre el pago:**
+
+Cuando la EPS es Sura o Colmena, el pago se realiza a través de ProSalud, quien reconoce y transfiere la incapacidad al afiliado.
+
+Si la EPS es otra, el afiliado debe gestionar el trámite directamente con su EPS por los canales que esta tenga disponibles para el reconocimiento y pago de la incapacidad.
+
+`;
 
   // Datos personales (solo si se requiere)
   if (includePersonalData) {
-    response += `**👤 Datos personales:**
+    response += `**👤 Tus datos:**
+
 - Nombre: ${incapacidad.Nombres || "N/A"}
-- Tipo documento: ${incapacidad.Tipo || "N/A"}
-- Número documento: ${incapacidad["Numero Documento"] || "N/A"}
+- Documento: ${incapacidad.Tipo || "N/A"} ${incapacidad["Numero Documento"] || "N/A"}
 ${incapacidad.Cargo ? `- Proceso: ${incapacidad.Cargo}\n` : ""}
 ${incapacidad.Hospital ? `- Hospital: ${incapacidad.Hospital}\n` : ""}
+
+---
 
 `;
   }
 
   // Información de incapacidad
-  response += `**📋 Información de incapacidad:**
-${incapacidad["fecha recibido"] ? `- Fecha recibido: ${incapacidad["fecha recibido"]}\n` : ""}- Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"] || "N/A"}
+  response += `**📋 Información de tu incapacidad:**
+
+`;
+  
+  if (incapacidad["fecha recibido"]) {
+    response += `- Fecha recibido: ${incapacidad["fecha recibido"]}\n\n`;
+  }
+  
+  response += `- Fecha inicio: ${incapacidad["Fecha Incio Incapacidad"] || "N/A"}
+
 - Fecha fin: ${incapacidad["Fecha Fin Incapacidad"] || "N/A"}
+
 - Total días: ${incapacidad["Dias Incapacidad"] || "N/A"}
-${incapacidad["TIPO INCAPACIDAD"] ? `- Tipo: ${incapacidad["TIPO INCAPACIDAD"]}\n` : ""}${incapacidad.CLASIFICACION ? `- Clasificación: ${incapacidad.CLASIFICACION}\n` : ""}
-${incapacidad.ADMINISTRADORA ? `- Administradora: ${incapacidad.ADMINISTRADORA}\n` : ""}
+
 `;
 
   // Información administrativa
-  response += `**📄 Información administrativa:**
+  response += `---
+
+**📄 Información administrativa:**
+
 - N° Radicado: ${incapacidad["N° Radicado"] || "N/A"}
-${incapacidad.RADICADO ? `- Radicado adicional: ${incapacidad.RADICADO}\n` : ""}${incapacidad["FECHA ENVIO"] ? `- Fecha envío: ${incapacidad["FECHA ENVIO"]}\n` : ""}
+
 `;
+  
+  if (incapacidad.RADICADO) {
+    response += `- Radicado adicional: ${incapacidad.RADICADO}\n\n`;
+  }
+  
+  if (incapacidad["FECHA ENVIO"]) {
+    response += `- Fecha envío: ${incapacidad["FECHA ENVIO"]}\n\n`;
+  }
 
   // Información de reconocimiento de compensación (solo si el estado no es desconocido)
   if (!estadoDesconocido) {
-    response += `**💰 Estado de compensación:**
-- ${fueReconocida ? "✅ Reconocida" : "⏳ Pendiente por reconocer"}
+    response += `---
+
+**💰 Estado del pago:**
+
+${fueReconocida ? "✅ Reconocida" : "⏳ Pendiente por reconocer"}
 
 `;
   }
 
   // Nota de confidencialidad
   if (includeConfidentialNote) {
-    response += `\n**🔒 Nota:** Esta información es confidencial y solo visible para ti.`;
+    response += `---
+
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
   }
 
   return response;

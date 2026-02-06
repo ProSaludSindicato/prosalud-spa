@@ -1028,10 +1028,17 @@ export default function ChatBot() {
 
         let responseMessage: Message;
 
+        // Preparar datos del formulario para pasar a las funciones de respuesta
+        const formDataForResponse = {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion,
+        };
+
         if (!incapacidades || incapacidades.length === 0) {
           responseMessage = {
             role: "assistant",
-            content: generateNoDataResponse(),
+            content: generateNoDataResponse(formDataForResponse),
             isBot: true,
           };
         } else {
@@ -1118,13 +1125,23 @@ export default function ChatBot() {
       } catch (error) {
         logger.error("Error en consulta de incapacidad", error);
 
+        // Preparar datos del formulario para pasar a las funciones de error
+        const formDataForResponse = {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion,
+        };
+
         let errorContent;
         if ((error as { response?: { status?: number } })?.response?.status === 500) {
-          errorContent = generateServerErrorResponse();
+          errorContent = generateServerErrorResponse(formDataForResponse);
         } else if ((error as { response?: { status?: number; data?: { errors?: unknown } } })?.response?.status === 422) {
-          errorContent = generateValidationErrorResponse((error as { response?: { data?: { errors?: unknown } } })?.response?.data?.errors);
+          errorContent = generateValidationErrorResponse(
+            (error as { response?: { data?: { errors?: unknown } } })?.response?.data?.errors,
+            formDataForResponse
+          );
         } else {
-          errorContent = generateGenericErrorResponse();
+          errorContent = generateGenericErrorResponse(formDataForResponse);
         }
 
         const errorMessage = {
