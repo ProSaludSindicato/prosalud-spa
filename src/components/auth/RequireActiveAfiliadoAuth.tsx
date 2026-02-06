@@ -10,9 +10,10 @@ import AfiliadoAuthModal from './AfiliadoAuthModal';
 interface RequireActiveAfiliadoAuthProps {
   children: React.ReactNode;
   procedureName: string;
+  allowRetired?: boolean; // Permite que afiliados retirados también puedan acceder
 }
 
-const RequireActiveAfiliadoAuth: React.FC<RequireActiveAfiliadoAuthProps> = ({ children, procedureName }) => {
+const RequireActiveAfiliadoAuth: React.FC<RequireActiveAfiliadoAuthProps> = ({ children, procedureName, allowRetired = false }) => {
   const { isAuthenticated, afiliado } = useAfiliadoAuth();
   const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -44,7 +45,8 @@ const RequireActiveAfiliadoAuth: React.FC<RequireActiveAfiliadoAuthProps> = ({ c
   useEffect(() => {
     if (isAuthenticated && afiliado && !hasCheckedStatus) {
       const isRetirado = afiliado.estado?.toLowerCase() === 'retirado';
-      if (isRetirado) {
+      // Si allowRetired es true, permitir acceso incluso si está retirado
+      if (isRetirado && !allowRetired) {
         setShowErrorModal(true);
         // Solo mostrar el toast una vez
         if (!toastShownRef.current) {
@@ -58,7 +60,7 @@ const RequireActiveAfiliadoAuth: React.FC<RequireActiveAfiliadoAuthProps> = ({ c
       }
       setHasCheckedStatus(true);
     }
-  }, [isAuthenticated, afiliado, hasCheckedStatus, procedureName]);
+  }, [isAuthenticated, afiliado, hasCheckedStatus, procedureName, allowRetired]);
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);

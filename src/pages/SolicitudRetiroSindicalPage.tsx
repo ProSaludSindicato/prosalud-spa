@@ -235,7 +235,7 @@ const SolicitudRetiroSindicalPageContent: React.FC = () => {
 
 const SolicitudRetiroSindicalPage: React.FC = () => {
   return (
-    <RequireActiveAfiliadoAuth procedureName="Solicitud de Retiro Sindical">
+    <RequireActiveAfiliadoAuth procedureName="Solicitud de Retiro Sindical" allowRetired={true}>
       <SolicitudRetiroSindicalPageContent />
     </RequireActiveAfiliadoAuth>
   );

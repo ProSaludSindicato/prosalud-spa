@@ -1621,23 +1621,26 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                     Condiciones de Salud
                   </CardTitle>
                 </CardHeader>
-            <CardContent className="space-y-4">
+              <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(survey.condiciones_salud).map(([key, value]) => {
+                {Object.entries(survey.condiciones_salud)
                   // Omitir campos de detalle que se mostrarán después
-                  if (key.startsWith('tipo') || key.startsWith('tiempo')) return null;
-                  
-                  const label = key
-                    .replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, str => str.toUpperCase());
-                  
-                  return (
+                  .filter(([key]) => !key.startsWith('tipo') && !key.startsWith('tiempo'))
+                  // Enriquecer con etiqueta para poder ordenar
+                  .map(([key, value]) => {
+                    const label = key
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, str => str.toUpperCase());
+                    return { key, value, label };
+                  })
+                  // Ordenar alfabéticamente por la etiqueta mostrada
+                  .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }))
+                  .map(({ key, value, label }) => (
                     <div key={key}>
                       <label className="text-sm font-medium text-slate-600">{label}</label>
                       <p className="text-base">{formatSiNo(value as string)}</p>
                     </div>
-                  );
-                })}
+                  ))}
               </div>
               
               {/* Detalles de condiciones específicas */}

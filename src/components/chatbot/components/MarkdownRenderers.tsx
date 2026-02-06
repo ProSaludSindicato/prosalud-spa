@@ -49,7 +49,7 @@ export const markdownRenderers = {
       </a>
     );
   },
-  p: ({ children }: any) => <p className="my-1 leading-relaxed">{children}</p>,
+  p: ({ children }: any) => <p className="my-2 leading-relaxed">{children}</p>,
   br: () => <br className="my-px" />,
   ul: ({ children }: any) => <ul className="ml-4 my-2 list-disc space-y-0.5">{children}</ul>,
   ol: ({ children }: any) => <ol className="ml-4 my-2 list-decimal space-y-0.5">{children}</ol>,
@@ -62,6 +62,9 @@ export const markdownRenderers = {
     <blockquote className="border-l-4 border-gray-300 pl-3 py-1 my-2 italic dark:border-gray-600">
       {children}
     </blockquote>
+  ),
+  hr: () => (
+    <hr className="my-4 border-0 border-t border-gray-200 dark:border-gray-700" />
   ),
 };
 
