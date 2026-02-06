@@ -73,6 +73,7 @@ export interface ManejoTiempoLibre {
 export interface DatosSociodemograficos {
   tienePersonasACargo: string;
   estadoCivil: string;
+  nivelEducativo?: string;
   fechaNacimiento: string;
   estatura: string;
   peso: string;

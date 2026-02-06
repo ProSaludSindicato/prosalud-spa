@@ -51,7 +51,7 @@ import { socioDemographicSurveyApi, SocioDemographicSurveyListItem } from '@/ser
 import { usePermissions } from '@/hooks/usePermissions';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { tiposDocumentoCompletos, tiposDocumento, estadosCiviles, tallasUniforme } from '@/components/actualizar-datos-personales/formOptions';
+import { tiposDocumentoCompletos, tiposDocumento, estadosCiviles, tallasUniforme, nivelesEducativos } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, normalizePais } from '@/components/actualizar-datos-personales/paises';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Switch } from '@/components/ui/switch';
@@ -177,6 +177,12 @@ const getEstadoCivilDisplayName = (value: string | null | undefined): string => 
   if (!value) return 'No especificado';
   const estado = estadosCiviles.find(e => e.value === value.toLowerCase());
   return estado?.label || value;
+};
+
+const getNivelEducacionDisplayName = (value: string | null | undefined): string => {
+  if (!value) return 'No especificado';
+  const nivel = nivelesEducativos.find(n => n.value === value.toLowerCase());
+  return nivel?.label || value;
 };
 
 const getTallaVestimentaDisplayName = (value: string | null | undefined): string => {
@@ -1419,12 +1425,12 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                   <p className="text-base">{getGeneroDisplayName(survey.datos_sociodemograficos.genero)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-600">Grupo Étnico</label>
-                  <p className="text-base">{getRazaDisplayName(survey.datos_sociodemograficos.raza)}</p>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-slate-600">Estado Civil</label>
                   <p className="text-base">{getEstadoCivilDisplayName(survey.datos_sociodemograficos.estadoCivil)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-600">Nivel Educativo</label>
+                  <p className="text-base">{getNivelEducacionDisplayName(survey.datos_sociodemograficos.nivelEducativo)}</p>
                 </div>
               </div>
 
@@ -1485,6 +1491,10 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
 
               {/* Vivienda y condiciones */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-600">Grupo Étnico</label>
+                  <p className="text-base">{getRazaDisplayName(survey.datos_sociodemograficos.raza)}</p>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-slate-600">Tipo de Vivienda</label>
                   <p className="text-base">{getViviendaDisplayName(survey.datos_sociodemograficos.vivienda)}</p>
