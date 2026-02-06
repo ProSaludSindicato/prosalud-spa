@@ -12,16 +12,32 @@ interface AfiliadoAuthModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: {
+    tipoDocumento?: string;
+    numeroDocumento?: string;
+    fechaExpedicion?: string;
+  };
 }
 
-const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, onSuccess }) => {
+const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, onSuccess, initialData }) => {
   const { authenticate } = useAfiliadoAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    tipoDocumento: 'CC',
-    numeroDocumento: '',
-    fechaExpedicion: '',
+    tipoDocumento: initialData?.tipoDocumento || 'CC',
+    numeroDocumento: initialData?.numeroDocumento || '',
+    fechaExpedicion: initialData?.fechaExpedicion || '',
   });
+
+  // Actualizar formData cuando cambian los initialData (útil si el modal se abre con diferentes datos)
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData({
+        tipoDocumento: initialData.tipoDocumento || 'CC',
+        numeroDocumento: initialData.numeroDocumento || '',
+        fechaExpedicion: initialData.fechaExpedicion || '',
+      });
+    }
+  }, [initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -50,6 +50,7 @@ import {
   generateServerErrorResponse,
   generateValidationErrorResponse,
   generateGenericErrorResponse,
+  generateLiquidacionErrorResponse,
   generateMultipleIncapacidadesResponse,
   generateIncapacidadResponse,
   generateLiquidacionNoDataResponse,
@@ -1225,11 +1226,18 @@ export default function ChatBot() {
 
         let responseMessage: Message;
 
+        // Preparar datos del formulario para pasar a las funciones de respuesta
+        const formDataForResponse = {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion,
+        };
+
         if (!liquidacion) {
           logger.debug("🔍 Sin datos de liquidación, usando respuesta de no datos");
           responseMessage = {
             role: "assistant",
-            content: generateLiquidacionNoDataResponse(),
+            content: generateLiquidacionNoDataResponse(formDataForResponse),
             isBot: true,
           };
         } else {
@@ -1284,7 +1292,14 @@ export default function ChatBot() {
       } catch (error) {
         logger.error("Error en consulta de liquidación", error);
 
-        const errorContent = generateGenericErrorResponse();
+        // Preparar datos del formulario para pasar a la función de error
+        const formDataForResponse = {
+          tipoDocumento: formData.tipoDocumento,
+          numeroDocumento: formData.numeroDocumento,
+          fechaExpedicion: formData.fechaExpedicion,
+        };
+
+        const errorContent = generateLiquidacionErrorResponse(formDataForResponse);
         const errorMessage = {
           role: "assistant",
           content: errorContent,

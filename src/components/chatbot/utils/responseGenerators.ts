@@ -56,6 +56,40 @@ ${errors ? `\`\`\`json\n${JSON.stringify(errors, null, 2)}\n\`\`\`` : "- Verific
 };
 
 /**
+ * Genera respuesta de error específica para compensación final
+ */
+export const generateLiquidacionErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
+
+  return `ℹ️ **No se pudo realizar la consulta en este momento**
+
+No fue posible consultar tu información de compensación final a través de este medio en este momento.
+
+**📋 Alternativa disponible:**
+
+Puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}), donde podrás:
+
+- Seleccionar el tipo de pago relacionado con tu consulta (Compensación Final)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
+
+**¿Qué puedes hacer?**
+- Intenta nuevamente la consulta rápida en unos días
+- O utiliza el [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}) como alternativa
+
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
+};
+
+/**
  * Genera respuesta genérica de error
  */
 export const generateGenericErrorResponse = (): string => {
@@ -226,20 +260,36 @@ ${incapacidad.RADICADO ? `- Radicado adicional: ${incapacidad.RADICADO}\n` : ""}
 /**
  * Genera respuesta para liquidación no encontrada
  */
-export const generateLiquidacionNoDataResponse = (): string => {
-  return `ℹ️ **No se encontraron registros de compensación final**
+export const generateLiquidacionNoDataResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
+  // Construir query params si hay datos del formulario
+  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
+    ? `?${new URLSearchParams({
+        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
+        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
+        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
+      }).toString()}`
+    : '';
 
-No encontramos información de compensación final asociada al documento consultado.
+  return `ℹ️ **No se encontró información de compensación final**
 
-**Posibles razones:**
-- No hay solicitud de compensación registrada con estos datos
-- La información aún no ha sido procesada en el sistema
-- Los datos ingresados no coinciden con nuestros registros
+No tenemos información registrada de compensación final asociada al documento consultado en nuestro sistema.
 
-**¿Necesitas ayuda?**
-Si crees que debería haber información disponible, por favor comunícate con nosotros para verificar el estado de tu solicitud.
+**¿Qué significa esto?**
 
-**🔒 Nota:** Esta consulta es confidencial y solo visible para ti.`;
+Esto no es un error del sistema. Simplemente significa que aún no se ha registrado información de compensación final para tu caso, o la información aún no ha sido procesada en el sistema.
+
+**📋 ¿Qué puedes hacer?**
+
+Si necesitas consultar o verificar el estado de tu compensación final, puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}).
+
+En el formulario podrás:
+- Seleccionar el tipo de pago relacionado con tu consulta (Compensación Final)
+- Proporcionar los detalles necesarios (mes/año, descripción, etc.)
+- Adjuntar documentos de soporte si es necesario
+
+Nuestro equipo revisará tu solicitud y te responderá con la información disponible.
+
+**🔒 Nota de privacidad:** Esta información es confidencial y solo visible para ti.`;
 };
 
 /**
