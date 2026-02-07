@@ -394,11 +394,13 @@ No tenemos información registrada de compensación final asociada al documento 
 
 **¿Qué significa esto?**
 
-Esto no es un error del sistema. Simplemente significa que aún no se ha registrado información de compensación final para tu caso, o la información aún no ha sido procesada en el sistema.
+Esto no es un error del sistema. Puede significar que:
+- Tu retiro es reciente y aún no se ha registrado información de compensación final para tu caso
+- **Ya se realizó el pago y tu caso no se encuentra pendiente**
 
 **📋 ¿Qué puedes hacer?**
 
-Si necesitas consultar o verificar el estado de tu compensación final, puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}).
+Si necesitas consultar o verificar el estado de tu compensación final, o si ya recibiste el pago y tienes dudas sobre el valor recibido, puedes realizar tu consulta a través del [servicio de verificación de pagos](/servicios/consulta-pagos${queryParams}).
 
 En el formulario podrás:
 - Seleccionar el tipo de pago relacionado con tu consulta (Compensación Final)
