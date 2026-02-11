@@ -46,6 +46,9 @@ import {
   Settings,
   IdCard,
   Hash,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 // Manual signing service (ACTIVE)
 import {
@@ -54,9 +57,15 @@ import {
   resendEmails as resendEmailsManual,
   getStatistics as getStatisticsManual,
   generateAndSendConvenio,
+  downloadGeneratedConvenio,
+  exportTemplate,
+  importBulkConvenios,
   ConvenioEmailTracking,
   EmailHistoryParams as ManualEmailHistoryParams,
   GenerateAndSendConvenioRequest,
+  GenerateAndSendConvenioResponse,
+  DownloadGeneratedConvenioResult,
+  ImportBulkConveniosResponse,
 } from '@/services/conveniosManualService';
 import {
   authenticateForDataUpdate,
@@ -223,7 +232,6 @@ const createConvenioSchema = z.object({
     return /^\d{4}-\d{2}-\d{2}$/.test(val);
   }, 'La fecha debe estar en formato YYYY-MM-DD'),
   direccion: z.string().min(1, 'La dirección es requerida').max(500, 'La dirección no puede exceder 500 caracteres'),
-  telefono: z.string().max(50, 'El teléfono no puede exceder 50 caracteres').optional(),
   celular: z.string().min(1, 'El celular es requerido').max(50, 'El celular no puede exceder 50 caracteres'),
   
   // Campos requeridos - Compensación
@@ -256,6 +264,7 @@ const createConvenioSchema = z.object({
   // Campos opcionales - Opciones de Procesamiento
   send_email: z.boolean().optional(),
   email: z.string().email('El email debe tener un formato válido').max(255, 'El email no puede exceder 255 caracteres').optional(),
+  download: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   // Validar compensación según el tipo seleccionado
   if (data.tipo_compensacion === 'redactada') {
@@ -318,6 +327,12 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [emailsMap, setEmailsMap] = useState<Record<string, string>>({}); // Mapa de documento -> email
   const [isSending, setIsSending] = useState(false);
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  
+  // Estados para importación masiva
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [bulkSendEmail, setBulkSendEmail] = useState(false);
+  const [importResult, setImportResult] = useState<ImportBulkConveniosResponse | null>(null);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
   const [resendEmail, setResendEmail] = useState('');
@@ -356,9 +371,9 @@ const AdminDocumentSigningPage: React.FC = () => {
       sede: '',
       fecha_inicio: getFirstDayOfCurrentMonth(),
       direccion: '',
-      telefono: '',
       celular: '',
       send_email: true,
+      download: true,
       tipo_compensacion: undefined,
       // tiene_techo: false, // TEMPORALMENTE COMENTADO
     },
@@ -555,10 +570,10 @@ const AdminDocumentSigningPage: React.FC = () => {
           fecha_inicio: currentFechaInicio,
           fecha_finalizacion: formatDate(convenioActivo?.fecha_fin),
           direccion: afiliado.direccion || '',
-          telefono: afiliado.telefono || '',
           celular: afiliado.celular || '',
           send_email: true,
           email: afiliado.correo_personal || '',
+          download: true,
           tipo_compensacion: undefined,
         });
         
@@ -600,12 +615,16 @@ const AdminDocumentSigningPage: React.FC = () => {
     enabled: activeTab === 'statistics' && can('document_signing.view'),
   });
 
+  // Estado para controlar descarga asíncrona
+  const [isDownloadingConvenio, setIsDownloadingConvenio] = useState(false);
+  const [lastCreateOptions, setLastCreateOptions] = useState<{ numero_documento: string; download: boolean } | null>(null);
+
   // Mutación para crear convenio
   const createConvenioMutation = useMutation({
     mutationFn: (data: GenerateAndSendConvenioRequest) => generateAndSendConvenio(data),
-    onSuccess: (response) => {
+    onSuccess: (response: GenerateAndSendConvenioResponse) => {
       toast.success('Convenio generado exitosamente', {
-        description: response.message || 'El convenio se ha generado correctamente.',
+        description: response.message || 'La generación del convenio ha sido encolada correctamente.',
         duration: 5000,
       });
       
@@ -620,11 +639,69 @@ const AdminDocumentSigningPage: React.FC = () => {
       }
       
       // Si se envió por correo, mostrar información
-      if (response.data.email) {
+      if (response.data?.email) {
         toast.info('Correo encolado', {
           description: `El correo se enviará a ${response.data.email.email}.`,
           duration: 5000,
         });
+      }
+
+      // Si el usuario activó la descarga, iniciar polling para descargar el convenio generado
+      if (lastCreateOptions?.download && lastCreateOptions.numero_documento) {
+        const numeroDocumento = lastCreateOptions.numero_documento;
+        setIsDownloadingConvenio(true);
+
+        const pollDownload = async (attempt: number = 1) => {
+          try {
+            const result: DownloadGeneratedConvenioResult = await downloadGeneratedConvenio(numeroDocumento);
+
+            if (result.status === 200 && result.blob) {
+              // Descargar archivo
+              const blobUrl = window.URL.createObjectURL(result.blob);
+              const link = document.createElement('a');
+              link.href = blobUrl;
+              link.download = `Convenio_${numeroDocumento}.docx`;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.URL.revokeObjectURL(blobUrl);
+
+              toast.success('Convenio descargado', {
+                description: 'El convenio ha sido generado y descargado correctamente.',
+              });
+              setIsDownloadingConvenio(false);
+              return;
+            }
+
+            if (result.status === 404) {
+              // Seguir intentando hasta un máximo de intentos
+              if (attempt >= 20) {
+                toast.error('No se pudo descargar el convenio', {
+                  description: 'El convenio sigue en proceso o falló. Intenta nuevamente más tarde desde el historial.',
+                });
+                setIsDownloadingConvenio(false);
+                return;
+              }
+
+              setTimeout(() => pollDownload(attempt + 1), 5000);
+              return;
+            }
+
+            // Otros errores
+            toast.error('Error al descargar el convenio', {
+              description: `El servidor respondió con estado ${result.status}.`,
+            });
+            setIsDownloadingConvenio(false);
+          } catch (error: any) {
+            toast.error('Error al descargar el convenio', {
+              description: error?.message || 'Ocurrió un error al intentar descargar el convenio generado.',
+            });
+            setIsDownloadingConvenio(false);
+          }
+        };
+
+        // Iniciar polling
+        pollDownload();
       }
       
       // Resetear formulario con valores por defecto explícitos
@@ -640,9 +717,10 @@ const AdminDocumentSigningPage: React.FC = () => {
         fecha_inicio: getFirstDayOfCurrentMonth(),
         fecha_finalizacion: '',
         direccion: '',
-        telefono: '',
         celular: '',
         send_email: true,
+        email: '',
+        download: true,
         tipo_compensacion: undefined,
       });
       
@@ -675,6 +753,12 @@ const AdminDocumentSigningPage: React.FC = () => {
   const handleCreateConvenio = (data: CreateConvenioFormValues) => {
     const toUpperTrim = (value: string) => value ? value.trim().toUpperCase() : value;
 
+    // Guardar última configuración para saber si debemos descargar automáticamente
+    setLastCreateOptions({
+      numero_documento: data.numero_documento,
+      download: data.download ?? true,
+    });
+
     // Preparar datos para el API
     const requestData: GenerateAndSendConvenioRequest = {
       numero_documento: data.numero_documento,
@@ -691,7 +775,6 @@ const AdminDocumentSigningPage: React.FC = () => {
     if (data.fecha_inicio) requestData.fecha_inicio = data.fecha_inicio;
     if (data.fecha_finalizacion) requestData.fecha_finalizacion = data.fecha_finalizacion;
     if (data.direccion) requestData.direccion = data.direccion;
-    if (data.telefono) requestData.telefono = data.telefono;
     if (data.celular) requestData.celular = data.celular;
     
     // Compensación: solo agregar según el tipo seleccionado
@@ -725,10 +808,151 @@ const AdminDocumentSigningPage: React.FC = () => {
     // }
     
     // Opciones de procesamiento
-    if (data.send_email) requestData.send_email = true;
+    if (data.send_email !== undefined) requestData.send_email = data.send_email;
     if (data.email) requestData.email = data.email;
+    // Siempre usamos flujo asíncrono desde el frontend (download=false)
+    requestData.download = false;
     
     createConvenioMutation.mutate(requestData);
+  };
+
+  // Función para descargar plantilla Excel
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const blob = await exportTemplate();
+      
+      // Generar nombre de archivo con fecha actual (YYYY-MM-DD)
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
+      const fileName = `Plantilla_Convenios_Masivos_${dateString}.xlsx`;
+      
+      // Crear URL temporal y descargar
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Plantilla descargada', {
+        description: 'El archivo Excel se ha descargado correctamente.',
+        duration: 3000,
+      });
+    } catch (error: any) {
+      toast.error('Error al descargar la plantilla', {
+        description: error.message || 'Ocurrió un error al descargar la plantilla.',
+      });
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
+
+  // Función para manejar cambio de archivo
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    // Validar tipo de archivo
+    const allowedExtensions = ['.xlsx', '.xls'];
+    const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (!allowedExtensions.includes(fileExtension)) {
+      toast.error('Archivo inválido', {
+        description: 'El archivo debe ser un Excel (.xlsx o .xls).',
+      });
+      setSelectedFile(null);
+      return;
+    }
+
+    // Validar tamaño (10MB máximo)
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSizeBytes) {
+      toast.error('Archivo muy grande', {
+        description: 'El archivo no puede ser mayor a 10MB.',
+      });
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
+    setImportResult(null); // Limpiar resultado anterior
+  };
+
+  // Mutación para importar convenios masivamente
+  const importBulkMutation = useMutation({
+    mutationFn: (data: { file: File; send_email: boolean }) => 
+      importBulkConvenios(data.file, data.send_email),
+    onSuccess: (response) => {
+      setImportResult(response);
+      toast.success('Importación procesada', {
+        description: `Se procesaron ${response.data.procesados} filas. ${response.data.exitosos} convenios encolados exitosamente.`,
+        duration: 8000,
+      });
+      
+      if (response.data.errores > 0) {
+        toast.warning('Algunos convenios tuvieron errores', {
+          description: `${response.data.errores} fila(s) tuvieron errores. Revisa los detalles abajo.`,
+          duration: 8000,
+        });
+      }
+      
+      // Limpiar archivo seleccionado
+      setSelectedFile(null);
+      const fileInput = document.getElementById('bulk-import-file') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    },
+    onError: (error: any) => {
+      if (error.isValidationError) {
+        if (error.missing_columns && error.missing_columns.length > 0) {
+          toast.error('Columnas requeridas faltantes', {
+            description: `Faltan las siguientes columnas: ${error.missing_columns.join(', ')}. Descarga la plantilla para ver el formato correcto.`,
+            duration: 10000,
+          });
+        } else if (error.errors) {
+          Object.entries(error.errors).forEach(([field, messages]) => {
+            const fieldMessages = Array.isArray(messages) ? messages : [messages];
+            fieldMessages.forEach((message: string) => {
+              toast.error(`Error en ${field}`, {
+                description: message,
+              });
+            });
+          });
+        } else {
+          toast.error('Error de validación', {
+            description: error.message || 'El archivo no cumple con los requisitos.',
+          });
+        }
+      } else {
+        toast.error('Error al importar convenios', {
+          description: error.message || 'Ocurrió un error al procesar el archivo.',
+        });
+      }
+    },
+  });
+
+  // Función para importar convenios
+  const handleImportBulk = () => {
+    if (!selectedFile) {
+      toast.error('Archivo requerido', {
+        description: 'Por favor, selecciona un archivo Excel para importar.',
+      });
+      return;
+    }
+
+    importBulkMutation.mutate({
+      file: selectedFile,
+      send_email: bulkSendEmail,
+    });
   };
 
   const handleAddDocumentNumber = () => {
@@ -976,40 +1200,51 @@ const AdminDocumentSigningPage: React.FC = () => {
   return (
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
-        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Firma de Convenios</h1>
-              <p className="text-gray-600 mt-1">
+        <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Firma de Convenios</h1>
+              <p className="text-sm sm:text-base text-gray-600 mt-1">
                 Gestiona el envío masivo de correos para firma de convenios
               </p>
             </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            <TabsList className="w-full overflow-x-auto flex-nowrap sm:flex-wrap">
               {can('document_signing.view') && (
-                <TabsTrigger value="history">
-                  <History className="h-4 w-4 mr-2" />
-                  Historial
+                <TabsTrigger value="history" className="flex-shrink-0">
+                  <History className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Historial</span>
+                  <span className="xs:hidden">Hist.</span>
                 </TabsTrigger>
               )}
               {can('document_signing.manage') && (
-                <TabsTrigger value="create">
-                  <FilePlus className="h-4 w-4 mr-2" />
-                  Crear Convenio
+                <TabsTrigger value="create" className="flex-shrink-0">
+                  <FilePlus className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Crear Convenio</span>
+                  <span className="xs:hidden">Crear</span>
                 </TabsTrigger>
               )}
               {can('document_signing.manage') && (
-                <TabsTrigger value="send">
-                  <Send className="h-4 w-4 mr-2" />
-                  Envío Masivo
+                <TabsTrigger value="bulk-import" className="flex-shrink-0">
+                  <FileSpreadsheet className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Importación Masiva</span>
+                  <span className="sm:hidden">Importar</span>
+                </TabsTrigger>
+              )}
+              {can('document_signing.manage') && (
+                <TabsTrigger value="send" className="flex-shrink-0">
+                  <Send className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Envío Masivo</span>
+                  <span className="xs:hidden">Enviar</span>
                 </TabsTrigger>
               )}
               {can('document_signing.view') && (
-                <TabsTrigger value="statistics">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Estadísticas
+                <TabsTrigger value="statistics" className="flex-shrink-0">
+                  <BarChart3 className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Estadísticas</span>
+                  <span className="xs:hidden">Estad.</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -1019,10 +1254,10 @@ const AdminDocumentSigningPage: React.FC = () => {
               <TabsContent value="history" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Historial de Envíos Manuales</CardTitle>
-                        <CardDescription>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-lg sm:text-xl">Historial de Envíos Manuales</CardTitle>
+                        <CardDescription className="text-sm">
                           Visualiza todos los correos enviados para firma manual de convenios
                         </CardDescription>
                       </div>
@@ -1031,6 +1266,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                         size="sm"
                         onClick={() => refetchHistory()}
                         disabled={isLoadingHistory}
+                        className="flex-shrink-0"
                       >
                         <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} />
                         Actualizar
@@ -1039,7 +1275,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* Filtros */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
                       <div className="space-y-2">
                         <Label>Buscar por Documento</Label>
                         <Input
@@ -1119,17 +1355,18 @@ const AdminDocumentSigningPage: React.FC = () => {
                     ) : (
                       <>
                         <div className="border rounded-lg overflow-hidden">
-                          <Table>
+                          <div className="overflow-x-auto">
+                            <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Documento</TableHead>
-                                <TableHead>Nombre del Afiliado</TableHead>
-                                <TableHead>Correo</TableHead>
-                                <TableHead>Nombre del Convenio</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Fecha de Envío</TableHead>
-                                <TableHead>Reintentos</TableHead>
-                                <TableHead>Acciones</TableHead>
+                                <TableHead className="min-w-[120px]">Documento</TableHead>
+                                <TableHead className="min-w-[150px]">Nombre del Afiliado</TableHead>
+                                <TableHead className="min-w-[180px]">Correo</TableHead>
+                                <TableHead className="min-w-[200px]">Nombre del Convenio</TableHead>
+                                <TableHead className="min-w-[100px]">Estado</TableHead>
+                                <TableHead className="min-w-[140px]">Fecha de Envío</TableHead>
+                                <TableHead className="min-w-[80px]">Reintentos</TableHead>
+                                <TableHead className="min-w-[80px]">Acciones</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1169,6 +1406,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                               ))}
                             </TableBody>
                           </Table>
+                          </div>
                         </div>
 
                         {historyData?.data && (
@@ -1197,8 +1435,8 @@ const AdminDocumentSigningPage: React.FC = () => {
               <TabsContent value="send" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Enviar Correos de Convenio Manual</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Enviar Correos de Convenio Manual</CardTitle>
+                    <CardDescription className="text-sm">
                       Ingresa los números de documento de los afiliados a los que deseas enviar el correo con el PDF del convenio adjunto.
                       El sistema buscará automáticamente el PDF y enviará el correo de forma asíncrona.
                     </CardDescription>
@@ -1207,14 +1445,14 @@ const AdminDocumentSigningPage: React.FC = () => {
                     <div className="space-y-2">
                       <Label htmlFor="documentNumber">Números de Documento *</Label>
                       <div className="space-y-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Input
                             id="documentNumber"
                             placeholder="Ingresa un número de documento y presiona Enter o haz clic en Agregar"
                             value={currentDocumentNumber}
                             onChange={(e) => setCurrentDocumentNumber(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            className="font-mono"
+                            className="font-mono flex-1"
                           />
                           <Button
                             type="button"
@@ -1327,8 +1565,8 @@ const AdminDocumentSigningPage: React.FC = () => {
               <TabsContent value="create" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Crear Nuevo Convenio</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Crear Nuevo Convenio</CardTitle>
+                    <CardDescription className="text-sm">
                       Crea un convenio completamente nuevo pasando todos los datos y valores necesarios.
                       El sistema generará automáticamente el documento Word, lo convertirá a PDF y opcionalmente lo enviará por correo electrónico.
                     </CardDescription>
@@ -1379,7 +1617,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                           </Label>
                           <Input
                             id="consultDocumento"
-                            placeholder="1000757150"
+                            placeholder="1234567890"
                             value={consultDocumento}
                             onChange={(e) => setConsultDocumento(e.target.value)}
                             disabled={isConsulting}
@@ -1533,7 +1771,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <FormItem>
                                   <FormLabel>Número de Documento *</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="1000757150" {...field} className="font-mono" />
+                                    <Input placeholder="1234567890" {...field} className="font-mono" />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1547,7 +1785,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Apellidos *</FormLabel>
                                   <FormControl>
                                     <Input
-                                      placeholder="RESTREPO RAMIREZ"
+                                      placeholder="APELLIDOS DEL AFILIADO"
                                       {...field}
                                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                                     />
@@ -1564,7 +1802,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Nombres *</FormLabel>
                                   <FormControl>
                                     <Input
-                                      placeholder="MARIANA"
+                                      placeholder="NOMBRES DEL AFILIADO"
                                       {...field}
                                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                                     />
@@ -1594,7 +1832,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Lugar de Nacimiento *</FormLabel>
                                   <FormControl>
                                     <Input
-                                      placeholder="MEDELLÍN, ANTIOQUIA"
+                                      placeholder="CIUDAD, DEPARTAMENTO"
                                       {...field}
                                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                                     />
@@ -1610,7 +1848,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <FormItem>
                                   <FormLabel>Celular *</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="3001234567" {...field} />
+                                    <Input placeholder="3000000000" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1623,20 +1861,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <FormItem className="md:col-span-2">
                                   <FormLabel>Dirección *</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="Calle 123 #45-67" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={createConvenioForm.control}
-                              name="telefono"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Teléfono</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="6041234567" {...field} />
+                                    <Input placeholder="Dirección de residencia" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1654,7 +1879,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                             <h3 className="text-lg font-semibold">Datos del Convenio</h3>
                             <Badge variant="destructive" className="ml-auto">Requerido</Badge>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <FormField
                               control={createConvenioForm.control}
                               name="proceso"
@@ -1663,7 +1888,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Proceso/Cargo *</FormLabel>
                                   <FormControl>
                                     <Input
-                                      placeholder="AUXILIAR DE ENFERMERIA - PISO"
+                                      placeholder="Cargo o proceso"
                                       {...field}
                                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                                     />
@@ -1679,7 +1904,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <FormItem>
                                   <FormLabel>Ciudad *</FormLabel>
                                   <FormControl>
-                                    <Input placeholder="Medellín" {...field} />
+                                    <Input placeholder="Ciudad" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1693,7 +1918,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Sede *</FormLabel>
                                   <FormControl>
                                     <Input
-                                      placeholder="E.S.E. HOSPITAL LA MARIA - MEDELLÍN (ANT)"
+                                      placeholder="Nombre de la sede"
                                       {...field}
                                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                                     />
@@ -1786,7 +2011,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <FormLabel>Compensación Básica Redactada *</FormLabel>
                                   <FormControl>
                                     <Textarea
-                                      placeholder="La compensación básica será de $1.500.000 mensuales, más auxilios de transporte por $100.000 y manutención por $80.000."
+                                      placeholder="Ingrese el texto completo de la compensación básica..."
                                       className="min-h-[120px]"
                                       {...field}
                                     />
@@ -1809,7 +2034,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <DollarSign className="h-4 w-4" />
                                   Salarios y Auxilios Básicos
                                 </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                   <FormField
                                     control={createConvenioForm.control}
                                     name="basico"
@@ -1817,7 +2042,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Salario Básico</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="1500000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1830,7 +2055,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilios de compensación básica</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="500000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1843,7 +2068,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Manutención</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="300000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1856,7 +2081,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Provisiones</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="200000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1869,7 +2094,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilio Especial</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="250000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1884,7 +2109,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <Clock className="h-4 w-4" />
                                   Horas y Valores por Hora
                                 </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                   <FormField
                                     control={createConvenioForm.control}
                                     name="horas"
@@ -1894,7 +2119,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         <FormControl>
                                           <Input
                                             type="number"
-                                            placeholder="48"
+                                            placeholder="0"
                                             {...field}
                                             onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
                                             value={field.value || ''}
@@ -1911,7 +2136,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Hora Diurna</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="15000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1924,7 +2149,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Hora Nocturna</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="18000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1937,7 +2162,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Hora Diurna Festiva</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="20000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1950,7 +2175,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Hora Nocturna Festiva</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="25000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1965,7 +2190,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <Mail className="h-4 w-4" />
                                   Auxilios Especiales
                                 </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                   <FormField
                                     control={createConvenioForm.control}
                                     name="auxilio_de_transporte"
@@ -1973,7 +2198,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilio de Transporte</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="100000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1986,7 +2211,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilio de Manutención</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="80000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -1999,7 +2224,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilio de Encierro</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="50000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2012,7 +2237,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Auxilio de Rodamiento</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="60000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2027,7 +2252,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <AlertCircle className="h-4 w-4" />
                                   Auxilios con Recargos
                                 </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                   <FormField
                                     control={createConvenioForm.control}
                                     name="valor_auxilio_diurno"
@@ -2035,7 +2260,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Auxilio Recargo Diurno</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="40000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2048,7 +2273,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Auxilio Recargo Nocturno</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="50000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2061,7 +2286,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Auxilio Recargo Festivo</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="60000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2074,7 +2299,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <FormItem>
                                         <FormLabel>Valor Auxilio Recargo Festivo Nocturno</FormLabel>
                                         <FormControl>
-                                          <MoneyInput field={field} placeholder="70000" />
+                                          <MoneyInput field={field} placeholder="0" />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>
@@ -2093,9 +2318,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   control={createConvenioForm.control}
                                   name="tiene_techo"
                                   render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-white">
-                                      <div className="space-y-0.5">
-                                        <FormLabel className="text-base">El convenio tiene techo</FormLabel>
+                                    <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 bg-white gap-3 sm:gap-0">
+                                      <div className="space-y-0.5 flex-1">
+                                        <FormLabel className="text-sm sm:text-base">El convenio tiene techo</FormLabel>
                                         <FormDescription>
                                           Un convenio con techo limita el pago proporcional a un monto máximo cuando se superan las horas base definidas.
                                         </FormDescription>
@@ -2128,10 +2353,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                               control={createConvenioForm.control}
                               name="send_email"
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                  <div className="space-y-0.5">
-                                    <FormLabel className="text-base">Enviar por correo electrónico</FormLabel>
-                                    <FormDescription>
+                                <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 gap-3 sm:gap-0">
+                                  <div className="space-y-0.5 flex-1">
+                                    <FormLabel className="text-sm sm:text-base">Enviar por correo electrónico</FormLabel>
+                                    <FormDescription className="text-xs sm:text-sm">
                                       Si está activado, el sistema enviará el convenio generado por correo electrónico al afiliado.
                                     </FormDescription>
                                   </div>
@@ -2154,7 +2379,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     <FormControl>
                                       <Input
                                         type="email"
-                                        placeholder="mariana.restrepo@example.com"
+                                        placeholder="correo@ejemplo.com"
                                         {...field}
                                       />
                                     </FormControl>
@@ -2166,13 +2391,34 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 )}
                               />
                             )}
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="download"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 gap-3 sm:gap-0">
+                                  <div className="space-y-0.5 flex-1">
+                                    <FormLabel className="text-sm sm:text-base">Descargar convenio generado</FormLabel>
+                                    <FormDescription className="text-xs sm:text-sm">
+                                      Si está activado, el sistema descargará automáticamente el convenio cuando esté listo. De lo contrario, solo se generará en segundo plano.
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      disabled={isDownloadingConvenio || createConvenioMutation.isPending}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         </div>
 
                         <Separator />
 
                         {/* Botones de acción */}
-                        <div className="flex justify-end gap-4">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
                           <Button
                             type="button"
                             variant="outline"
@@ -2201,6 +2447,245 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </div>
                       </form>
                     </Form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
+            {/* Tab: Importación Masiva */}
+            {can('document_signing.manage') && (
+              <TabsContent value="bulk-import" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl">Importación Masiva de Convenios</CardTitle>
+                    <CardDescription className="text-sm">
+                      Descarga la plantilla Excel, complétala con los datos de los convenios y súbela para generar múltiples convenios de forma automática.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Paso 1: Descargar plantilla */}
+                    <div className="p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 p-2 bg-blue-100 rounded-full">
+                          <Download className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-blue-900 mb-2">Paso 1: Descargar Plantilla</h3>
+                          <p className="text-sm text-blue-800 mb-4">
+                            Descarga el archivo Excel con todas las columnas necesarias para crear convenios masivamente.
+                            La plantilla incluye ejemplos y descripciones para cada campo.
+                          </p>
+                          <Button
+                            type="button"
+                            onClick={handleDownloadTemplate}
+                            disabled={isDownloadingTemplate}
+                            variant="default"
+                          >
+                            {isDownloadingTemplate ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Descargando...
+                              </>
+                            ) : (
+                              <>
+                                <Download className="mr-2 h-4 w-4" />
+                                Descargar Plantilla Excel
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Paso 2: Subir archivo */}
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 p-2 bg-green-100 rounded-full">
+                          <Upload className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <h3 className="font-semibold text-green-900 mb-2">Paso 2: Importar Archivo</h3>
+                            <p className="text-sm text-green-800 mb-4">
+                              Selecciona el archivo Excel que has completado con los datos de los convenios.
+                              El archivo debe ser .xlsx o .xls y no puede exceder 10MB.
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="bulk-import-file" className="text-base font-medium">
+                                Archivo Excel *
+                              </Label>
+                              <Input
+                                id="bulk-import-file"
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={handleFileChange}
+                                disabled={importBulkMutation.isPending}
+                                className="mt-2"
+                              />
+                              {selectedFile && (
+                                <div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200">
+                                  <div className="flex items-center gap-2">
+                                    <FileSpreadsheet className="h-4 w-4 text-slate-600" />
+                                    <span className="text-sm font-medium text-slate-900">{selectedFile.name}</span>
+                                    <span className="text-xs text-slate-500">
+                                      ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedFile(null);
+                                        const fileInput = document.getElementById('bulk-import-file') as HTMLInputElement;
+                                        if (fileInput) {
+                                          fileInput.value = '';
+                                        }
+                                      }}
+                                      className="ml-auto h-6 w-6 p-0"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 bg-slate-50 gap-3 sm:gap-0">
+                              <div className="space-y-0.5 flex-1">
+                                <Label className="text-sm sm:text-base">Enviar por correo electrónico</Label>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                  Si está activado, se enviarán correos cuando esté habilitado (actualmente deshabilitado).
+                                </p>
+                              </div>
+                              <Switch
+                                checked={bulkSendEmail}
+                                onCheckedChange={setBulkSendEmail}
+                                disabled={importBulkMutation.isPending}
+                              />
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={handleImportBulk}
+                              disabled={!selectedFile || importBulkMutation.isPending}
+                              size="lg"
+                              className="w-full"
+                            >
+                              {importBulkMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Procesando importación...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Importar y Generar Convenios
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Resultados de la importación */}
+                    {importResult && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="font-semibold text-lg">Resultados de la Importación</h3>
+                          
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-blue-600">
+                                    {importResult.data.procesados}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Filas Procesadas
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-green-600">
+                                    {importResult.data.exitosos}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Exitosos
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-red-600">
+                                    {importResult.data.errores}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Errores
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-slate-600">
+                                    {importResult.data.filas_vacias}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Filas Vacías
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {importResult.data.errors && importResult.data.errors.length > 0 && (
+                            <Card className="border-red-200 bg-red-50">
+                              <CardHeader>
+                                <CardTitle className="text-red-900 flex items-center gap-2">
+                                  <AlertCircle className="h-5 w-5" />
+                                  Errores por Fila
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <ul className="space-y-2">
+                                  {importResult.data.errors.map((error, index) => (
+                                    <li key={index} className="text-sm text-red-800">
+                                      • {error}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="text-sm text-red-700 mt-4">
+                                  Corrige estos errores en el archivo Excel y vuelve a importar.
+                                </p>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-900">
+                              <strong>Nota:</strong> Los convenios se están generando de forma asíncrona en segundo plano.
+                              Puedes consultar el historial para ver el estado de los convenios generados.
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -2286,7 +2771,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
                         {/* Gráficas */}
                         {chartData && chartData.statusData.length > 0 && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                             {/* Gráfica de Pie - Distribución por Estado */}
                             <Card>
                               <CardHeader>

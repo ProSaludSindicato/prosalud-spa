@@ -69,6 +69,7 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
   { value: 'COMPENSACIÓN SEMESTRAL', label: 'Compensación Semestral' },
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
+  { value: 'SUBSIDIOS', label: 'Subsidios' },
 ];
 
 // Tipos que tienen subtipos
@@ -181,8 +182,15 @@ const RequestAssignmentManager: React.FC = () => {
     );
   }, [searchTerm]);
 
-  // Obtener asignaciones actuales para un tipo/subtipo
-  const getCurrentAssignments = (requestType: string, subtype?: string): string[] => {
+  // Obtener asignaciones específicas de un subtipo (sin fallback a asignación general)
+  // Esta función se usa para mostrar en el UI las asignaciones reales de cada subtipo
+  const getSpecificSubtypeAssignments = (requestType: string, subtype: string): string[] => {
+    return subtypeAssignments[requestType]?.[subtype] || [];
+  };
+
+  // Obtener asignaciones efectivas para un tipo/subtipo (con fallback para validación)
+  // Esta función se usa para validar si un subtipo tiene asignación (específica o general)
+  const getEffectiveAssignments = (requestType: string, subtype?: string): string[] => {
     if (subtype) {
       // Si hay asignación específica para el subtipo, retornarla
       const specificSubtypeAssignment = subtypeAssignments[requestType]?.[subtype];
@@ -194,6 +202,9 @@ const RequestAssignmentManager: React.FC = () => {
     }
     return assignments[requestType] || [];
   };
+
+  // Alias para compatibilidad con código existente que usa getCurrentAssignments
+  const getCurrentAssignments = getEffectiveAssignments;
 
   // Obtener asignaciones iniciales para un tipo/subtipo
   const getInitialAssignments = (requestType: string, subtype?: string): string[] => {
@@ -532,9 +543,9 @@ const RequestAssignmentManager: React.FC = () => {
       .filter((user): user is User => !!user && user.isActive);
   };
 
-  // Verificar si un tipo/subtipo tiene asignación
+  // Verificar si un tipo/subtipo tiene asignación (usa fallback para validación)
   const hasAssignment = (requestType: string, subtype?: string): boolean => {
-    const currentAssignments = getCurrentAssignments(requestType, subtype);
+    const currentAssignments = getEffectiveAssignments(requestType, subtype);
     return currentAssignments.length > 0;
   };
 
@@ -647,7 +658,7 @@ const RequestAssignmentManager: React.FC = () => {
               // Verificar si algún subtipo tiene usuarios inactivos
               const hasInactiveInSubtypes = hasSubtypes
                 ? hasSubtypes.some((subtype) => {
-                    const subtypeAssignments = getCurrentAssignments(requestType.value, subtype.value);
+                    const subtypeAssignments = getSpecificSubtypeAssignments(requestType.value, subtype.value);
                     return hasInactiveUsers(subtypeAssignments);
                   })
                   : false;
@@ -774,11 +785,13 @@ const RequestAssignmentManager: React.FC = () => {
                           <div className="space-y-4">
                             <Label className="text-base font-semibold">Asignación por motivo:</Label>
                             {hasSubtypes.map((subtype) => {
-                              const subtypeAssignments = getCurrentAssignments(
+                              // Usar getSpecificSubtypeAssignments para mostrar solo las asignaciones específicas del subtipo
+                              const subtypeAssignments = getSpecificSubtypeAssignments(
                                 requestType.value,
                                 subtype.value
                               );
                               const subtypeUsers = getAssignedUsers(subtypeAssignments);
+                              // Para validación, usar getEffectiveAssignments que incluye fallback
                               const hasSubtypeAssignment = hasAssignment(requestType.value, subtype.value);
                               const hasInactiveInSubtype = hasInactiveUsers(subtypeAssignments);
 

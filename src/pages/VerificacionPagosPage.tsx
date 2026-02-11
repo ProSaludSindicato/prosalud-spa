@@ -40,6 +40,7 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'VIATICOS', label: 'Viáticos' },
   { value: 'Ceiisas', label: 'Ceiisas' },
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
+  { value: 'SUBSIDIOS', label: 'Subsidios' },
 ];
 
 const formSchema = z.object({

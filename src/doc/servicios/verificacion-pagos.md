@@ -63,6 +63,7 @@ Debes responder directamente dirigiendo al usuario al servicio de verificación 
     - Compensación Mensual
     - Compensación Semestral
     - Incapacidades
+    - Subsidios
 
 - **Detalle de la novedad:** Descripción detallada de la consulta o problema
   - Mínimo 10 caracteres
@@ -116,6 +117,7 @@ R: En el formulario de verificación de pagos encontrará un campo donde podrá 
 - **Compensación Mensual**: Diferencias en montos de compensación mensual
 - **Compensación Semestral**: Primas (navidad, servicios, etc.)
 - **Incapacidades**: Estado de pagos de incapacidades
+- **Subsidios**: Consultas relacionadas con subsidios
 - Cualquier otra novedad relacionada con pagos y compensaciones
 
 Todas estas opciones están disponibles en el formulario y puede seleccionar la que corresponda a su consulta específica.

@@ -348,7 +348,6 @@ export interface GenerateAndSendConvenioRequest {
   fecha_nacimiento?: string; // YYYY-MM-DD
   lugar_nacimiento?: string;
   direccion?: string;
-  telefono?: string;
   celular?: string;
   
   // Campos opcionales - Compensación
@@ -380,27 +379,18 @@ export interface GenerateAndSendConvenioRequest {
   // Campos opcionales - Opciones de Procesamiento
   send_email?: boolean;
   email?: string;
+  // Nuevo flag de control para modo síncrono/asíncrono (por ahora usamos siempre asíncrono desde el frontend)
+  download?: boolean;
 }
 
 /**
  * Response de generación y envío de convenio
  */
+// Response genérica de generación de convenio (puede ser síncrona o asíncrona)
 export interface GenerateAndSendConvenioResponse {
-  success: true;
+  success: boolean;
   message: string;
-  data: {
-    nombre_archivo: string;
-    ruta: string;
-    tipo: string;
-    pdf?: {
-      nombre_archivo: string;
-      ruta: string;
-    };
-    email?: {
-      status: string;
-      email: string;
-    };
-  };
+  data?: any;
   warnings?: string[];
 }
 
@@ -444,6 +434,172 @@ export const generateAndSendConvenio = async (
     throw {
       success: false,
       message: 'Error desconocido al generar el convenio',
+      errors: {},
+    };
+  }
+};
+
+export interface DownloadGeneratedConvenioResult {
+  status: number;
+  blob?: Blob;
+}
+
+/**
+ * Descarga un convenio generado de forma asíncrona (si ya existe archivo)
+ * GET /api/convenios-manual/download-generated?numero_documento=...
+ */
+export const downloadGeneratedConvenio = async (
+  numero_documento: string
+): Promise<DownloadGeneratedConvenioResult> => {
+  const response = await authenticatedApi.get(
+    '/api/convenios-manual/download-generated',
+    {
+      params: { numero_documento },
+      responseType: 'blob',
+      // Aceptar cualquier status para poder manejar 404 sin lanzar excepción automática
+      validateStatus: () => true,
+    }
+  );
+
+  if (response.status === 200) {
+    return { status: 200, blob: response.data as Blob };
+  }
+
+  return { status: response.status };
+};
+
+/**
+ * Response de importación masiva
+ */
+export interface ImportBulkConveniosResponse {
+  success: true;
+  message: string;
+  data: {
+    procesados: number;
+    exitosos: number;
+    errores: number;
+    filas_vacias: number;
+    send_email: boolean;
+    errors?: string[];
+  };
+}
+
+/**
+ * Descarga la plantilla Excel para importación masiva
+ * GET /api/convenios-manual/export-template
+ */
+export const exportTemplate = async (): Promise<Blob> => {
+  try {
+    const response = await authenticatedApi.get(
+      '/api/convenios-manual/export-template',
+      {
+        responseType: 'blob',
+      }
+    );
+
+    return response.data as Blob;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ 
+        success: false; 
+        message: string; 
+      }>;
+      
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al descargar la plantilla',
+      };
+    }
+    
+    throw {
+      success: false,
+      message: 'Error desconocido al descargar la plantilla',
+    };
+  }
+};
+
+/**
+ * Importa y genera convenios masivamente desde un archivo Excel
+ * POST /api/convenios-manual/import-bulk
+ */
+export const importBulkConvenios = async (
+  file: File,
+  send_email?: boolean
+): Promise<ImportBulkConveniosResponse> => {
+  try {
+    // Validar tipo de archivo
+    const allowedExtensions = ['.xlsx', '.xls'];
+    const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (!allowedExtensions.includes(fileExtension)) {
+      throw {
+        success: false,
+        message: 'El archivo debe ser un Excel (.xlsx o .xls)',
+        isValidationError: true,
+      };
+    }
+
+    // Validar tamaño (10MB máximo)
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSizeBytes) {
+      throw {
+        success: false,
+        message: 'El archivo no puede ser mayor a 10MB',
+        isValidationError: true,
+      };
+    }
+
+    // Crear FormData
+    const formData = new FormData();
+    formData.append('file', file);
+    if (send_email !== undefined) {
+      formData.append('send_email', send_email.toString());
+    }
+
+    const response = await authenticatedApi.post<ImportBulkConveniosResponse>(
+      '/api/convenios-manual/import-bulk',
+      formData,
+      {
+        headers: {
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ 
+        success: false; 
+        message: string; 
+        errors?: Record<string, string[]>;
+        missing_columns?: string[];
+      }>;
+      
+      if (axiosError.response?.status === 422) {
+        throw {
+          success: false,
+          message: axiosError.response.data?.message || 'Error de validación',
+          errors: axiosError.response.data?.errors || {},
+          missing_columns: axiosError.response.data?.missing_columns,
+          isValidationError: true,
+        };
+      }
+      
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al importar convenios',
+        errors: {},
+      };
+    }
+    
+    // Si el error ya tiene la estructura esperada, re-lanzarlo
+    if (typeof error === 'object' && error !== null && 'success' in error) {
+      throw error;
+    }
+    
+    throw {
+      success: false,
+      message: 'Error desconocido al importar convenios',
       errors: {},
     };
   }

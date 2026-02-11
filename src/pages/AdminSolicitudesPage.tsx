@@ -88,6 +88,7 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
   { value: 'COMPENSACIÓN SEMESTRAL', label: 'Compensación Semestral' },
   { value: 'INCAPACIDADES', label: 'Incapacidades' },
+  { value: 'SUBSIDIOS', label: 'Subsidios' },
 ];
 
 // Helper para normalizar/parsear el subtipo de verificación de pagos
