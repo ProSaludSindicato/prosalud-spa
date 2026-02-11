@@ -1,5 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,9 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 import {
   FileSignature,
@@ -31,6 +39,13 @@ import {
   X,
   Plus,
   FileText,
+  FilePlus,
+  User,
+  Building2,
+  DollarSign,
+  Settings,
+  IdCard,
+  Hash,
 } from 'lucide-react';
 // Manual signing service (ACTIVE)
 import {
@@ -38,9 +53,17 @@ import {
   getEmailHistory as getEmailHistoryManual,
   resendEmails as resendEmailsManual,
   getStatistics as getStatisticsManual,
+  generateAndSendConvenio,
   ConvenioEmailTracking,
   EmailHistoryParams as ManualEmailHistoryParams,
+  GenerateAndSendConvenioRequest,
 } from '@/services/conveniosManualService';
+import {
+  authenticateForDataUpdate,
+  AuthenticateForDataUpdateRequest,
+  AfiliadoDataForUpdate,
+  ConvenioDataForUpdate,
+} from '@/services/afiliadosDataUpdateService';
 // DocuSign service (TEMPORARILY DISABLED - preserved for future use)
 // El servicio documentSigningService.ts contiene toda la funcionalidad de DocuSign
 // y está preservado para reactivación futura. Las rutas del backend están comentadas
@@ -52,6 +75,240 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
+
+// Opciones de hospitales / sedes para mapear códigos internos a nombres legibles
+const HOSPITAL_OPTIONS = [
+  { value: 'ABEJORRAL', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - ADMON', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - ADMON ', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - ASIST', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - BUEN COMIENZO', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - CBA', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL - SALUD P', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ABEJORRAL SP', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'ADMON', label: 'Sede Administrativa' },
+  { value: 'ADMON-HSJDRionegro', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'BARBOSA', label: 'E.S.E. Hospital San Vicente de Paul' },
+  { value: 'BELLO', label: 'E.S.E. Hospital Marco Fidel Suarez' },
+  { value: 'BETANIA', label: 'E.S.E. Hospital San Antonio de Betania' },
+  { value: 'CALDAS', label: 'E.S.E. Hospital San Vicente de Paúls' },
+  { value: 'CENTRO NEUROLOGICO', label: 'Centro Neurológico' },
+  { value: 'CISNEROS', label: 'E.S.E. Hospital San Antonio - Cisneros (Ant)' },
+  { value: 'CIUDAD BOLIVAR', label: 'E.S.E. Hospital La Merced - Ciudad Bolivar (Ant)' },
+  { value: 'CIUDADBOLIVAR', label: 'E.S.E. Hospital La Merced - Ciudad Bolivar (Ant)' },
+  { value: 'COPACABANA', label: 'E.S.E. Hospital Santa Margarita' },
+  { value: 'COPACABANA ', label: 'E.S.E. Hospital Santa Margarita' },
+  { value: 'E.S.E CARISMA ADMON ', label: 'E.S.E. Hospital Carisma' },
+  { value: 'E.S.E CARISMA ASISTENCIAL', label: 'E.S.E. Hospital Carisma' },
+  { value: 'E.S.ECARISMA', label: 'E.S.E. Hospital Carisma' },
+  { value: 'FREDONIA', label: 'E.S.E. Hospital Santa Lucia - Fredonia (Ant)' },
+  { value: 'HGM SEDE 80 ADMON', label: 'E.S.E. Hospital General de Medellín - Sede 80' },
+  { value: 'HGM SEDE 80 ASISTENCIAL', label: 'E.S.E. Hospital General de Medellín - Sede 80' },
+  { value: 'HGM SEDE 80 ASISTENCIAL ', label: 'E.S.E. Hospital General de Medellín - Sede 80' },
+  { value: 'HLM - GRUPO 1', label: 'E.S.E. Hospital La María' },
+  { value: 'HLM - GRUPO 2', label: 'E.S.E. Hospital La María' },
+  { value: 'HLM - GRUPO 3', label: 'E.S.E. Hospital La María' },
+  { value: 'HMFS - BELLO', label: 'E.S.E. Hospital Marco Fidel Suarez' },
+  { value: 'HSJD Rionegro - ADMON', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'HSJD Rionegro - ASISTENCIAL', label: 'Centro Neurológico' },
+  { value: 'HSJD Rionegro - PIC ', label: 'E.S.E. Hospital San Antonio - Cisneros (Ant)' },
+  { value: 'HSJDRionegro', label: 'E.S.E. Hospital San Juan de Dios' },
+  { value: 'HSRI', label: 'E.S.E. Hospital San Rafael de Itagüí' },
+  { value: 'HSRI ', label: 'E.S.E. Hospital San Rafael de Itagüí' },
+  { value: 'JARDIN', label: 'E.S.E. Hospital Gabriel Peláez Montoya' },
+  { value: 'LA MARIA', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - 000065-2021', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - 262-2021', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - COOSALUD', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - ENTERRITORIO', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - ENTERRITORIO 1 - 044', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - ENTERRITORIO 2', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - ENTERRITORIO 2 - 045', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - INFECCIOSA PS 268', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - ITS 257', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - PROGRAMA ESPECIAL SAVIA SALUD EPS - VIH-SIDA', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - TRANSMISIBLES', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - TRANSMISIBLES - 122 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - TRANSMISIBLES 176', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - UNION TEMPORAL', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - UNION TEMPORAL 020 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - VIH', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA - VIH - 1', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA 216 - 2021', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA 317 COOSALUD', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA COOSALUD - 046', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA COOSALUD 191', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA COOSALUD 36-2022', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ENTERRITORIO - 287', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ENTERRITORIO 038', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ENTERRITORIO 238', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA- INFECCIOSA PS 268', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ITS ', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ITS 127', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA ITS- 376', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA PAI ', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TB 137', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TB Y LEPRA  319-2021', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TBC', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TRANSMISIBLES - 122', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TRANSMISIBLES - 275', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA TRANSMISIBLES 234', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI - 0028 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI - 140 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI - 271', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI 0028 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI 245', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA UPAI 35', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH - 158', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH 037', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH 131', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH 131 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH 158', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH 188', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH N°043', label: 'E.S.E. Hospital La María' },
+  { value: 'LA MARIA VIH UT ', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIACOOSALUD36', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIAENTERRITORIO038', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIAITS127', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIATB2022', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIAUPAI35', label: 'E.S.E. Hospital La María' },
+  { value: 'LAMARIAVIH037', label: 'E.S.E. Hospital La María' },
+  { value: 'POLICLINICO', label: 'POLICLINICO' },
+  { value: 'PROMOTORA MEDICA Y ODONTOLOGICA DE ANTIOQUIA S.A.', label: 'PROMOTORA MEDICA Y ODONTOLOGICA DE ANTIOQUIA S.A.' },
+  { value: 'PUERTO BERRIO', label: 'E.S.E. Hospital La Cruz' },
+  { value: 'SOMER', label: 'SOMER' },
+  { value: 'STA GERTRUDIS', label: 'E.S.E. Santa Gertrudis' },
+  { value: 'UNION TEMPORAL - 020 - 2023', label: 'E.S.E. Hospital La María' },
+  { value: 'VENANCIO', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO -  SALUD MENTAL ', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - ADMON', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - ASIST', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - ASIST ', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - PIC ', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - SALUD MENTAL ', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - SALUD P.', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO - UCI', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENANCIO ADMON - APH', label: 'E.S.E. Hospital Venancio Diaz Diaz' },
+  { value: 'VENECIA', label: 'ESE Hospital San Rafael de Venecia' },
+] as const;
+
+// Mapa de label de hospital a ciudad para prediligenciar ciudad cuando aplique
+const HOSPITAL_CITY_MAP: Record<string, string> = {
+  'E.S.E. Hospital La María': 'MEDELLÍN (ANT)',
+  'E.S.E. HOSPITAL MARCO FIDEL SUÁREZ': 'BELLO (ANT)',
+  'E.S.E. HOSPITAL SAN JUAN DE DIOS': 'RIONEGRO (ANT)',
+  'E.S.E. Hospital Carisma': 'MEDELLÍN (ANT)',
+};
+
+// Schema de validación para el formulario de crear convenio
+const createConvenioSchema = z.object({
+  // Campos requeridos
+  numero_documento: z.string().min(1, 'El número de documento es requerido').max(50, 'El número de documento no puede exceder 50 caracteres'),
+  apellidos: z.string().min(1, 'Los apellidos son requeridos').max(255, 'Los apellidos no pueden exceder 255 caracteres'),
+  nombres: z.string().min(1, 'Los nombres son requeridos').max(255, 'Los nombres no pueden exceder 255 caracteres'),
+  fecha_nacimiento: z.string().min(1, 'La fecha de nacimiento es requerida').refine((val) => {
+    return /^\d{4}-\d{2}-\d{2}$/.test(val);
+  }, 'La fecha de nacimiento debe estar en formato YYYY-MM-DD'),
+  lugar_nacimiento: z.string().min(1, 'El lugar de nacimiento es requerido').max(255, 'El lugar de nacimiento no puede exceder 255 caracteres'),
+  
+  // Campos requeridos - Datos del Convenio
+  proceso: z.string().min(1, 'El proceso es requerido').max(255, 'El proceso no puede exceder 255 caracteres'),
+  ciudad: z.string().min(1, 'La ciudad es requerida').max(255, 'La ciudad no puede exceder 255 caracteres'),
+  sede: z.string().min(1, 'La sede es requerida').max(255, 'La sede no puede exceder 255 caracteres'),
+  fecha_inicio: z.string().min(1, 'La fecha de inicio es requerida').refine((val) => {
+    return /^\d{4}-\d{2}-\d{2}$/.test(val);
+  }, 'La fecha debe estar en formato YYYY-MM-DD'),
+  fecha_finalizacion: z.string().optional().refine((val) => {
+    if (!val) return true;
+    return /^\d{4}-\d{2}-\d{2}$/.test(val);
+  }, 'La fecha debe estar en formato YYYY-MM-DD'),
+  direccion: z.string().min(1, 'La dirección es requerida').max(500, 'La dirección no puede exceder 500 caracteres'),
+  telefono: z.string().max(50, 'El teléfono no puede exceder 50 caracteres').optional(),
+  celular: z.string().min(1, 'El celular es requerido').max(50, 'El celular no puede exceder 50 caracteres'),
+  
+  // Campos requeridos - Compensación
+  tipo_compensacion: z.enum(['redactada', 'valores'], { required_error: 'Selecciona un tipo de compensación' }),
+  compensacion_basica_redactada: z.string().optional(),
+  
+  // Campos opcionales - Valores de Compensación
+  basico: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilios: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilio_especial: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  manutencion: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  provisiones: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  horas: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_hora_diurna: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_hora_nocturna: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_hora_diurna_festiva: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_hora_nocturna_festiva: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilio_de_transporte: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilio_de_manutencion: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilio_de_encierro: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  auxilio_de_rodamiento: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_auxilio_diurno: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_auxilio_recargo_nocturno: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_auxilio_recargo_festivo: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  valor_auxilio_recargo_festivo_nocturno: z.number().min(0, 'El valor debe ser mayor o igual a 0').optional(),
+  
+  // Campos opcionales - Techo (TEMPORALMENTE COMENTADO)
+  // tiene_techo: z.boolean().optional(),
+  
+  // Campos opcionales - Opciones de Procesamiento
+  send_email: z.boolean().optional(),
+  email: z.string().email('El email debe tener un formato válido').max(255, 'El email no puede exceder 255 caracteres').optional(),
+}).superRefine((data, ctx) => {
+  // Validar compensación según el tipo seleccionado
+  if (data.tipo_compensacion === 'redactada') {
+    if (!data.compensacion_basica_redactada || data.compensacion_basica_redactada.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La compensación redactada es requerida',
+        path: ['compensacion_basica_redactada'],
+      });
+    }
+  } else if (data.tipo_compensacion === 'valores') {
+    // Validar que al menos un valor de compensación haya sido diligenciado
+    const hasAnyValue =
+      data.basico != null ||
+      data.auxilios != null ||
+      data.auxilio_especial != null ||
+      data.manutencion != null ||
+      data.provisiones != null ||
+      data.valor_hora_diurna != null ||
+      data.valor_hora_nocturna != null ||
+      data.valor_hora_diurna_festiva != null ||
+      data.valor_hora_nocturna_festiva != null ||
+      data.auxilio_de_transporte != null ||
+      data.auxilio_de_manutencion != null ||
+      data.auxilio_de_encierro != null ||
+      data.auxilio_de_rodamiento != null ||
+      data.valor_auxilio_diurno != null ||
+      data.valor_auxilio_recargo_nocturno != null ||
+      data.valor_auxilio_recargo_festivo != null ||
+      data.valor_auxilio_recargo_festivo_nocturno != null;
+
+    if (!hasAnyValue) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debes diligenciar al menos un valor de compensación cuando se usan valores individuales',
+        path: ['tipo_compensacion'],
+      });
+    }
+  }
+  
+  // Validar email si send_email está activado
+  if (data.send_email) {
+    if (!data.email || data.email.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El correo electrónico es requerido cuando se activa el envío por correo',
+        path: ['email'],
+      });
+    }
+  }
+});
+
+type CreateConvenioFormValues = z.infer<typeof createConvenioSchema>;
 
 const AdminDocumentSigningPage: React.FC = () => {
   const { can } = usePermissions();
@@ -66,6 +323,259 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [resendEmail, setResendEmail] = useState('');
   const [resendEmailSubject, setResendEmailSubject] = useState('');
   const [isResending, setIsResending] = useState(false);
+  
+  // Estado para consulta de afiliado
+  const [consultTipoDocumento, setConsultTipoDocumento] = useState<string>('CC');
+  const [consultDocumento, setConsultDocumento] = useState<string>('');
+  const [consultFechaExpedicion, setConsultFechaExpedicion] = useState<string>('');
+  const [isConsulting, setIsConsulting] = useState(false);
+  const [consultedData, setConsultedData] = useState<{
+    afiliado: AfiliadoDataForUpdate;
+    convenios: ConvenioDataForUpdate[];
+  } | null>(null);
+  
+  // Función para obtener el primer día del mes actual
+  const getFirstDayOfCurrentMonth = (): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-01`;
+  };
+
+  // Form para crear convenio
+  const createConvenioForm = useForm<CreateConvenioFormValues>({
+    resolver: zodResolver(createConvenioSchema),
+    defaultValues: {
+      numero_documento: '',
+      apellidos: '',
+      nombres: '',
+      fecha_nacimiento: '',
+      lugar_nacimiento: '',
+      proceso: '',
+      ciudad: '',
+      sede: '',
+      fecha_inicio: getFirstDayOfCurrentMonth(),
+      direccion: '',
+      telefono: '',
+      celular: '',
+      send_email: true,
+      tipo_compensacion: undefined,
+      // tiene_techo: false, // TEMPORALMENTE COMENTADO
+    },
+  });
+  
+  // Observar el tipo de compensación seleccionado
+  const tipoCompensacion = createConvenioForm.watch('tipo_compensacion');
+  
+  // Componente helper para input monetario
+  const MoneyInput = ({ field, placeholder, ...props }: { field: any; placeholder?: string; [key: string]: any }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [localValue, setLocalValue] = useState<string>(() => 
+      field.value !== undefined && field.value !== null ? field.value.toString() : ''
+    );
+    const isFocusedRef = useRef(false);
+    const hasInitializedRef = useRef(false);
+    
+    // Función para formatear número con separadores de miles
+    const formatNumber = (value: string): string => {
+      if (!value || value === '') return '';
+      // Remover cualquier formato existente
+      const numericValue = value.replace(/\./g, '');
+      // Formatear con puntos como separadores de miles
+      return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    };
+    
+    // Función para remover formato (solo números)
+    const unformatNumber = (value: string): string => {
+      return value.replace(/\./g, '');
+    };
+    
+    // Inicializar el valor local solo una vez al montar o cuando cambia externamente (no desde el input)
+    useEffect(() => {
+      if (!isFocusedRef.current && !hasInitializedRef.current) {
+        const newValue = field.value !== undefined && field.value !== null ? field.value.toString() : '';
+        setLocalValue(newValue);
+        hasInitializedRef.current = true;
+      }
+    }, []);
+    
+    // Sincronizar solo cuando el valor cambia externamente (reset del formulario, prediligenciado, etc.)
+    // pero NO cuando el input está enfocado
+    useEffect(() => {
+      if (!isFocusedRef.current) {
+        const newValue = field.value !== undefined && field.value !== null ? field.value.toString() : '';
+        if (newValue !== localValue) {
+          setLocalValue(newValue);
+        }
+      }
+    }, [field.value]);
+    
+    // Valor formateado para mostrar (con puntos como separadores de miles)
+    const displayValue = isFocusedRef.current 
+      ? localValue // Mientras está enfocado, mostrar sin formato para facilitar edición
+      : formatNumber(localValue); // Cuando no está enfocado, mostrar formateado
+    
+    return (
+      <div className="flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+        <div className="shrink-0 text-base text-muted-foreground select-none">$</div>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          placeholder={placeholder}
+          value={displayValue}
+          onFocus={() => {
+            isFocusedRef.current = true;
+            // Al enfocar, mostrar el valor sin formato para facilitar edición
+            setLocalValue(unformatNumber(localValue));
+          }}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            // Remover formato y permitir solo números
+            const unformatted = unformatNumber(newValue);
+            if (unformatted === '' || /^\d+$/.test(unformatted)) {
+              setLocalValue(unformatted);
+              // NO actualizar el formulario aquí para evitar re-renders
+              // Solo actualizar en onBlur
+            }
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+            // Actualizar el formulario solo cuando se pierde el foco
+            const unformatted = unformatNumber(localValue);
+            if (unformatted === '') {
+              field.onChange(undefined);
+            } else {
+              const numValue = Number(unformatted);
+              if (!isNaN(numValue)) {
+                field.onChange(numValue);
+              } else {
+                field.onChange(undefined);
+              }
+            }
+          }}
+          className="block min-w-0 grow bg-background py-1.5 pr-3 pl-1 text-base text-foreground placeholder:text-muted-foreground focus:outline-none sm:text-sm"
+          {...props}
+        />
+        <div className="shrink-0 text-base text-muted-foreground select-none">COP</div>
+      </div>
+    );
+  };
+  
+  // Función para consultar datos del afiliado
+  const handleConsultAffiliate = async () => {
+    if (!consultDocumento.trim() || !consultFechaExpedicion) {
+      toast.error('Datos incompletos', {
+        description: 'Por favor, ingresa el número de documento y la fecha de expedición.',
+      });
+      return;
+    }
+
+    setIsConsulting(true);
+    try {
+      const requestData: AuthenticateForDataUpdateRequest = {
+        tipo_documento: consultTipoDocumento,
+        documento: consultDocumento.trim(),
+        fecha_expedicion: consultFechaExpedicion,
+      };
+
+      const response = await authenticateForDataUpdate(requestData);
+      
+      if (response.success && response.data) {
+        setConsultedData({
+          afiliado: response.data.afiliado,
+          convenios: response.data.convenios,
+        });
+        
+        // Prediligenciar formulario
+        const afiliado = response.data.afiliado;
+        const convenioActivo = response.data.convenios.find(c => c.estado === 'ACTIVO') || response.data.convenios[0];
+        
+        // Función helper para formatear fecha
+        const formatDate = (dateString: string | null | undefined): string => {
+          if (!dateString) return '';
+          // Si ya está en formato YYYY-MM-DD, retornar directamente
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
+          // Si tiene formato ISO con T, extraer solo la fecha
+          if (dateString.includes('T')) return dateString.split('T')[0];
+          // Intentar parsear y formatear
+          try {
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+              return date.toISOString().split('T')[0];
+            }
+          } catch {
+            // Si falla, retornar vacío
+          }
+          return '';
+        };
+
+        const toUpperSafe = (value: string | null | undefined) => (value || '').toUpperCase();
+
+        // Función para normalizar texto (mayúsculas y sin acentos) para comparación
+        const normalizeForComparison = (text: string): string => {
+          return text
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, ''); // Elimina acentos
+        };
+
+        // Buscar label legible de la sede a partir del código del convenio
+        const rawSedeCode = convenioActivo?.cliente || '';
+        const sedeOption = HOSPITAL_OPTIONS.find((opt) => opt.value === rawSedeCode);
+        const sedeLabel = sedeOption?.label || rawSedeCode || '';
+        
+        // Buscar ciudad en el mapa usando comparación case-insensitive y sin acentos
+        let ciudadDesdeSede = '';
+        if (sedeLabel) {
+          const normalizedSedeLabel = normalizeForComparison(sedeLabel);
+          const matchingKey = Object.keys(HOSPITAL_CITY_MAP).find(
+            key => normalizeForComparison(key) === normalizedSedeLabel
+          );
+          if (matchingKey) {
+            ciudadDesdeSede = HOSPITAL_CITY_MAP[matchingKey];
+          }
+        }
+        
+        // Importante: no sobrescribir fecha_inicio.
+        // Conservamos el valor actual del formulario (que por defecto es el primer día del mes en curso).
+        const currentFechaInicio = createConvenioForm.getValues('fecha_inicio') || getFirstDayOfCurrentMonth();
+        const currentFechaNacimiento = createConvenioForm.getValues('fecha_nacimiento') || '';
+        const currentLugarNacimiento = createConvenioForm.getValues('lugar_nacimiento') || '';
+
+        createConvenioForm.reset({
+          numero_documento: afiliado.documento || '',
+          apellidos: toUpperSafe(afiliado.apellidos),
+          nombres: toUpperSafe(afiliado.nombres),
+          fecha_nacimiento: (afiliado as any).fecha_nacimiento ? formatDate((afiliado as any).fecha_nacimiento) : currentFechaNacimiento,
+          lugar_nacimiento: (afiliado as any).lugar_nacimiento ? toUpperSafe((afiliado as any).lugar_nacimiento) : currentLugarNacimiento,
+          proceso: convenioActivo?.proceso ? toUpperSafe(convenioActivo.proceso) : '',
+          ciudad: ciudadDesdeSede,
+          sede: sedeLabel ? toUpperSafe(sedeLabel) : '',
+          fecha_inicio: currentFechaInicio,
+          fecha_finalizacion: formatDate(convenioActivo?.fecha_fin),
+          direccion: afiliado.direccion || '',
+          telefono: afiliado.telefono || '',
+          celular: afiliado.celular || '',
+          send_email: true,
+          email: afiliado.correo_personal || '',
+          tipo_compensacion: undefined,
+        });
+        
+        toast.success('Datos consultados exitosamente', {
+          description: `Se encontraron los datos de ${afiliado.nombres} ${afiliado.apellidos}. El formulario ha sido prediligenciado.`,
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      toast.error('Error al consultar', {
+        description: error.message || 'No se pudo consultar los datos del afiliado. Verifica que el afiliado exista en el sistema.',
+      });
+      setConsultedData(null);
+    } finally {
+      setIsConsulting(false);
+    }
+  };
   
   // Filtros para historial (Manual)
   const [historyFilters, setHistoryFilters] = useState<ManualEmailHistoryParams>({
@@ -89,6 +599,137 @@ const AdminDocumentSigningPage: React.FC = () => {
     queryFn: () => getStatisticsManual(statsFilters),
     enabled: activeTab === 'statistics' && can('document_signing.view'),
   });
+
+  // Mutación para crear convenio
+  const createConvenioMutation = useMutation({
+    mutationFn: (data: GenerateAndSendConvenioRequest) => generateAndSendConvenio(data),
+    onSuccess: (response) => {
+      toast.success('Convenio generado exitosamente', {
+        description: response.message || 'El convenio se ha generado correctamente.',
+        duration: 5000,
+      });
+      
+      // Mostrar warnings si existen
+      if (response.warnings && response.warnings.length > 0) {
+        response.warnings.forEach((warning) => {
+          toast.warning('Advertencia', {
+            description: warning,
+            duration: 8000,
+          });
+        });
+      }
+      
+      // Si se envió por correo, mostrar información
+      if (response.data.email) {
+        toast.info('Correo encolado', {
+          description: `El correo se enviará a ${response.data.email.email}.`,
+          duration: 5000,
+        });
+      }
+      
+      // Resetear formulario con valores por defecto explícitos
+      createConvenioForm.reset({
+        numero_documento: '',
+        apellidos: '',
+        nombres: '',
+        fecha_nacimiento: '',
+        lugar_nacimiento: '',
+        proceso: '',
+        ciudad: '',
+        sede: '',
+        fecha_inicio: getFirstDayOfCurrentMonth(),
+        fecha_finalizacion: '',
+        direccion: '',
+        telefono: '',
+        celular: '',
+        send_email: true,
+        tipo_compensacion: undefined,
+      });
+      
+      // Cambiar a historial para ver el nuevo convenio
+      setTimeout(() => {
+        setActiveTab('history');
+        refetchHistory();
+      }, 2000);
+    },
+    onError: (error: any) => {
+      if (error.isValidationError && error.errors) {
+        // Mostrar errores de validación
+        Object.entries(error.errors).forEach(([field, messages]) => {
+          const fieldMessages = Array.isArray(messages) ? messages : [messages];
+          fieldMessages.forEach((message: string) => {
+            toast.error(`Error en ${field}`, {
+              description: message,
+            });
+          });
+        });
+      } else {
+        toast.error('Error al generar el convenio', {
+          description: error.message || 'Ocurrió un error al generar el convenio.',
+        });
+      }
+    },
+  });
+  
+  // Handler para crear convenio
+  const handleCreateConvenio = (data: CreateConvenioFormValues) => {
+    const toUpperTrim = (value: string) => value ? value.trim().toUpperCase() : value;
+
+    // Preparar datos para el API
+    const requestData: GenerateAndSendConvenioRequest = {
+      numero_documento: data.numero_documento,
+      apellidos: toUpperTrim(data.apellidos),
+      nombres: toUpperTrim(data.nombres),
+      fecha_nacimiento: data.fecha_nacimiento,
+      lugar_nacimiento: toUpperTrim(data.lugar_nacimiento),
+    };
+    
+    // Agregar campos opcionales solo si tienen valor
+    if (data.proceso) requestData.proceso = toUpperTrim(data.proceso);
+    if (data.ciudad) requestData.ciudad = data.ciudad;
+    if (data.sede) requestData.sede = toUpperTrim(data.sede);
+    if (data.fecha_inicio) requestData.fecha_inicio = data.fecha_inicio;
+    if (data.fecha_finalizacion) requestData.fecha_finalizacion = data.fecha_finalizacion;
+    if (data.direccion) requestData.direccion = data.direccion;
+    if (data.telefono) requestData.telefono = data.telefono;
+    if (data.celular) requestData.celular = data.celular;
+    
+    // Compensación: solo agregar según el tipo seleccionado
+    if (data.tipo_compensacion === 'redactada' && data.compensacion_basica_redactada) {
+      requestData.compensacion_basica_redactada = data.compensacion_basica_redactada;
+    } else if (data.tipo_compensacion === 'valores') {
+      // Solo agregar valores si el tipo es 'valores'
+      if (data.basico !== undefined) requestData.basico = data.basico;
+      if (data.auxilios !== undefined) requestData.auxilios = data.auxilios;
+      if (data.auxilio_especial !== undefined) requestData.auxilio_especial = data.auxilio_especial;
+      if (data.manutencion !== undefined) requestData.manutencion = data.manutencion;
+      if (data.provisiones !== undefined) requestData.provisiones = data.provisiones;
+      if (data.horas !== undefined) requestData.horas = data.horas;
+      if (data.valor_hora_diurna !== undefined) requestData.valor_hora_diurna = data.valor_hora_diurna;
+      if (data.valor_hora_nocturna !== undefined) requestData.valor_hora_nocturna = data.valor_hora_nocturna;
+      if (data.valor_hora_diurna_festiva !== undefined) requestData.valor_hora_diurna_festiva = data.valor_hora_diurna_festiva;
+      if (data.valor_hora_nocturna_festiva !== undefined) requestData.valor_hora_nocturna_festiva = data.valor_hora_nocturna_festiva;
+      if (data.auxilio_de_transporte !== undefined) requestData.auxilio_de_transporte = data.auxilio_de_transporte;
+      if (data.auxilio_de_manutencion !== undefined) requestData.auxilio_de_manutencion = data.auxilio_de_manutencion;
+      if (data.auxilio_de_encierro !== undefined) requestData.auxilio_de_encierro = data.auxilio_de_encierro;
+      if (data.auxilio_de_rodamiento !== undefined) requestData.auxilio_de_rodamiento = data.auxilio_de_rodamiento;
+      if (data.valor_auxilio_diurno !== undefined) requestData.valor_auxilio_diurno = data.valor_auxilio_diurno;
+      if (data.valor_auxilio_recargo_nocturno !== undefined) requestData.valor_auxilio_recargo_nocturno = data.valor_auxilio_recargo_nocturno;
+      if (data.valor_auxilio_recargo_festivo !== undefined) requestData.valor_auxilio_recargo_festivo = data.valor_auxilio_recargo_festivo;
+      if (data.valor_auxilio_recargo_festivo_nocturno !== undefined) requestData.valor_auxilio_recargo_festivo_nocturno = data.valor_auxilio_recargo_festivo_nocturno;
+    }
+    
+    // Techo (TEMPORALMENTE COMENTADO)
+    // if (data.tiene_techo) {
+    //   requestData.tiene_techo = true;
+    // }
+    
+    // Opciones de procesamiento
+    if (data.send_email) requestData.send_email = true;
+    if (data.email) requestData.email = data.email;
+    
+    createConvenioMutation.mutate(requestData);
+  };
 
   const handleAddDocumentNumber = () => {
     const trimmed = currentDocumentNumber.trim();
@@ -354,6 +995,12 @@ const AdminDocumentSigningPage: React.FC = () => {
                 </TabsTrigger>
               )}
               {can('document_signing.manage') && (
+                <TabsTrigger value="create">
+                  <FilePlus className="h-4 w-4 mr-2" />
+                  Crear Convenio
+                </TabsTrigger>
+              )}
+              {can('document_signing.manage') && (
                 <TabsTrigger value="send">
                   <Send className="h-4 w-4 mr-2" />
                   Envío Masivo
@@ -533,6 +1180,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                             onPageChange={(page) =>
                               setHistoryFilters({ ...historyFilters, page })
                             }
+                            onItemsPerPageChange={(perPage) =>
+                              setHistoryFilters({ ...historyFilters, per_page: perPage, page: 1 })
+                            }
                           />
                         )}
                       </>
@@ -667,6 +1317,890 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </>
                       )}
                     </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
+            {/* Tab: Crear Convenio */}
+            {can('document_signing.manage') && (
+              <TabsContent value="create" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Crear Nuevo Convenio</CardTitle>
+                    <CardDescription>
+                      Crea un convenio completamente nuevo pasando todos los datos y valores necesarios.
+                      El sistema generará automáticamente el documento Word, lo convertirá a PDF y opcionalmente lo enviará por correo electrónico.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Sección de Consulta de Afiliado */}
+                    <div className="mb-8 p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="flex-shrink-0 p-2 bg-blue-100 rounded-full">
+                          <Search className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-blue-900 mb-1">Consultar Datos del Afiliado</h3>
+                          <p className="text-sm text-blue-800 mb-4">
+                            Consulta los datos del afiliado para prediligenciar el formulario automáticamente. 
+                            Si el afiliado existe en el sistema, se cargarán sus datos y el convenio activo.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="consultTipoDocumento" className="text-sm font-medium">
+                            <IdCard className="h-4 w-4 inline mr-1" />
+                            Tipo de Documento
+                          </Label>
+                          <Select
+                            value={consultTipoDocumento}
+                            onValueChange={setConsultTipoDocumento}
+                            disabled={isConsulting}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
+                              <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
+                              <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
+                              <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="consultDocumento" className="text-sm font-medium">
+                            <Hash className="h-4 w-4 inline mr-1" />
+                            Número de Documento
+                          </Label>
+                          <Input
+                            id="consultDocumento"
+                            placeholder="1000757150"
+                            value={consultDocumento}
+                            onChange={(e) => setConsultDocumento(e.target.value)}
+                            disabled={isConsulting}
+                            className="font-mono"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !isConsulting) {
+                                e.preventDefault();
+                                handleConsultAffiliate();
+                              }
+                            }}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="consultFechaExpedicion" className="text-sm font-medium">
+                            <Calendar className="h-4 w-4 inline mr-1" />
+                            Fecha de Expedición
+                          </Label>
+                          <Input
+                            id="consultFechaExpedicion"
+                            type="date"
+                            value={consultFechaExpedicion}
+                            onChange={(e) => setConsultFechaExpedicion(e.target.value)}
+                            disabled={isConsulting}
+                            max={new Date().toISOString().split('T')[0]}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium opacity-0">Acción</Label>
+                          <Button
+                            type="button"
+                            onClick={handleConsultAffiliate}
+                            disabled={isConsulting || !consultDocumento.trim() || !consultFechaExpedicion}
+                            className="w-full"
+                            variant="default"
+                          >
+                            {isConsulting ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Consultando...
+                              </>
+                            ) : (
+                              <>
+                                <Search className="mr-2 h-4 w-4" />
+                                Consultar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {consultedData && (
+                        <div className={`mt-4 p-4 border rounded-lg ${
+                          consultedData.afiliado.estado?.toUpperCase() === 'RETIRADO' || 
+                          consultedData.afiliado.estado?.toUpperCase() === 'RETIRO'
+                            ? 'bg-yellow-50 border-yellow-300' 
+                            : 'bg-green-50 border-green-200'
+                        }`}>
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className={`h-5 w-5 mt-0.5 ${
+                              consultedData.afiliado.estado?.toUpperCase() === 'RETIRADO' || 
+                              consultedData.afiliado.estado?.toUpperCase() === 'RETIRO'
+                                ? 'text-yellow-600' 
+                                : 'text-green-600'
+                            }`} />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  Datos consultados: {consultedData.afiliado.nombres} {consultedData.afiliado.apellidos}
+                                </p>
+                                {consultedData.afiliado.estado && (
+                                  <Badge 
+                                    variant={
+                                      consultedData.afiliado.estado.toUpperCase() === 'RETIRADO' || 
+                                      consultedData.afiliado.estado.toUpperCase() === 'RETIRO'
+                                        ? 'destructive'
+                                        : consultedData.afiliado.estado.toUpperCase() === 'ACTIVO'
+                                        ? 'default'
+                                        : 'secondary'
+                                    }
+                                    className={
+                                      consultedData.afiliado.estado.toUpperCase() === 'RETIRADO' || 
+                                      consultedData.afiliado.estado.toUpperCase() === 'RETIRO'
+                                        ? 'bg-red-500 hover:bg-red-600'
+                                        : ''
+                                    }
+                                  >
+                                    {consultedData.afiliado.estado.toUpperCase()}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className={`text-xs mt-1 ${
+                                consultedData.afiliado.estado?.toUpperCase() === 'RETIRADO' || 
+                                consultedData.afiliado.estado?.toUpperCase() === 'RETIRO'
+                                  ? 'text-yellow-800' 
+                                  : 'text-green-700'
+                              }`}>
+                                El formulario ha sido prediligenciado con los datos encontrados. 
+                                {consultedData.convenios.length > 0 && (
+                                  <span> Se encontró {consultedData.convenios.length} convenio(s).</span>
+                                )}
+                                {(consultedData.afiliado.estado?.toUpperCase() === 'RETIRADO' || 
+                                  consultedData.afiliado.estado?.toUpperCase() === 'RETIRO') && (
+                                  <span className="block mt-1 font-semibold">
+                                    ⚠️ Atención: Este afiliado está RETIRADO.
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setConsultedData(null);
+                                setConsultDocumento('');
+                                setConsultFechaExpedicion('');
+                                createConvenioForm.reset();
+                              }}
+                              className={
+                                consultedData.afiliado.estado?.toUpperCase() === 'RETIRADO' || 
+                                consultedData.afiliado.estado?.toUpperCase() === 'RETIRO'
+                                  ? 'text-yellow-700 hover:text-yellow-900'
+                                  : 'text-green-700 hover:text-green-900'
+                              }
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Separator className="my-6" />
+                    
+                    <Form {...createConvenioForm}>
+                      <form onSubmit={createConvenioForm.handleSubmit(handleCreateConvenio)} className="space-y-8">
+                        {/* Sección 1: Datos del Afiliado (Requeridos) */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b">
+                            <User className="h-5 w-5 text-primary-prosalud" />
+                            <h3 className="text-lg font-semibold">Datos del Afiliado</h3>
+                            <Badge variant="destructive" className="ml-auto">Requerido</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="numero_documento"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Número de Documento *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="1000757150" {...field} className="font-mono" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="apellidos"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Apellidos *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="RESTREPO RAMIREZ"
+                                      {...field}
+                                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="nombres"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Nombres *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="MARIANA"
+                                      {...field}
+                                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="fecha_nacimiento"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Fecha de Nacimiento *</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="lugar_nacimiento"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Lugar de Nacimiento *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="MEDELLÍN, ANTIOQUIA"
+                                      {...field}
+                                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="celular"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Celular *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="3001234567" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="direccion"
+                              render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                  <FormLabel>Dirección *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Calle 123 #45-67" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="telefono"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Teléfono</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="6041234567" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Sección 2: Datos del Convenio (Requeridos) */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b">
+                            <Building2 className="h-5 w-5 text-primary-prosalud" />
+                            <h3 className="text-lg font-semibold">Datos del Convenio</h3>
+                            <Badge variant="destructive" className="ml-auto">Requerido</Badge>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="proceso"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Proceso/Cargo *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="AUXILIAR DE ENFERMERIA - PISO"
+                                      {...field}
+                                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="ciudad"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Ciudad *</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Medellín" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="sede"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Sede *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="E.S.E. HOSPITAL LA MARIA - MEDELLÍN (ANT)"
+                                      {...field}
+                                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="fecha_inicio"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Fecha de Inicio *</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="fecha_finalizacion"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Fecha de Finalización</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Sección 3: Compensación (Requerida) */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b">
+                            <DollarSign className="h-5 w-5 text-primary-prosalud" />
+                            <h3 className="text-lg font-semibold">Compensación</h3>
+                            <Badge variant="destructive" className="ml-auto">Requerido</Badge>
+                          </div>
+                          
+                          {/* Selector de tipo de compensación */}
+                          <FormField
+                            control={createConvenioForm.control}
+                            name="tipo_compensacion"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tipo de Compensación *</FormLabel>
+                                <FormControl>
+                                  <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    className="flex gap-6"
+                                  >
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="valores" id="compensacion-valores" />
+                                      <label htmlFor="compensacion-valores" className="text-sm font-normal cursor-pointer">
+                                        Valores Individuales
+                                      </label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="redactada" id="compensacion-redactada" />
+                                      <label htmlFor="compensacion-redactada" className="text-sm font-normal cursor-pointer">
+                                        Compensación Redactada
+                                      </label>
+                                    </div>
+                                  </RadioGroup>
+                                </FormControl>
+                                <FormDescription>
+                                  Selecciona si deseas ingresar la compensación como texto redactado o mediante valores individuales.
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Compensación Redactada */}
+                          {tipoCompensacion === 'redactada' && (
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="compensacion_basica_redactada"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Compensación Básica Redactada *</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="La compensación básica será de $1.500.000 mensuales, más auxilios de transporte por $100.000 y manutención por $80.000."
+                                      className="min-h-[120px]"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Ingresa el texto completo de la compensación básica. El backend puede generarlo automáticamente si no se proporciona.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {/* Valores Individuales - Agrupados */}
+                          {tipoCompensacion === 'valores' && (
+                            <div className="space-y-6">
+                              {/* Grupo 1: Salarios y Auxilios Básicos */}
+                              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                  <DollarSign className="h-4 w-4" />
+                                  Salarios y Auxilios Básicos
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="basico"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Salario Básico</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="1500000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilios"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilios de compensación básica</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="500000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="manutencion"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Manutención</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="300000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="provisiones"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Provisiones</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="200000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilio_especial"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilio Especial</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="250000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Grupo 2: Horas y Valores por Hora */}
+                              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                  <Clock className="h-4 w-4" />
+                                  Horas y Valores por Hora
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="horas"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Horas</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type="number"
+                                            placeholder="48"
+                                            {...field}
+                                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                            value={field.value || ''}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_hora_diurna"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Hora Diurna</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="15000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_hora_nocturna"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Hora Nocturna</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="18000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_hora_diurna_festiva"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Hora Diurna Festiva</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="20000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_hora_nocturna_festiva"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Hora Nocturna Festiva</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="25000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Grupo 3: Auxilios Especiales */}
+                              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                  <Mail className="h-4 w-4" />
+                                  Auxilios Especiales
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilio_de_transporte"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilio de Transporte</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="100000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilio_de_manutencion"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilio de Manutención</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="80000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilio_de_encierro"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilio de Encierro</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="50000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="auxilio_de_rodamiento"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Auxilio de Rodamiento</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="60000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Grupo 4: Auxilios con Recargos */}
+                              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  Auxilios con Recargos
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_auxilio_diurno"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Auxilio Recargo Diurno</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="40000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_auxilio_recargo_nocturno"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Auxilio Recargo Nocturno</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="50000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_auxilio_recargo_festivo"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Auxilio Recargo Festivo</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="60000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createConvenioForm.control}
+                                    name="valor_auxilio_recargo_festivo_nocturno"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor Auxilio Recargo Festivo Nocturno</FormLabel>
+                                        <FormControl>
+                                          <MoneyInput field={field} placeholder="70000" />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Grupo 5: Techo (TEMPORALMENTE COMENTADO) */}
+                              {/* <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                  <AlertCircle className="h-4 w-4" />
+                                  Techo del Convenio
+                                </h4>
+                                <FormField
+                                  control={createConvenioForm.control}
+                                  name="tiene_techo"
+                                  render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-white">
+                                      <div className="space-y-0.5">
+                                        <FormLabel className="text-base">El convenio tiene techo</FormLabel>
+                                        <FormDescription>
+                                          Un convenio con techo limita el pago proporcional a un monto máximo cuando se superan las horas base definidas.
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div> */}
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Sección 4: Opciones (Opcional) */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pb-2 border-b">
+                            <Settings className="h-5 w-5 text-primary-prosalud" />
+                            <h3 className="text-lg font-semibold">Opciones de Procesamiento</h3>
+                            <Badge variant="secondary" className="ml-auto">Opcional</Badge>
+                          </div>
+                          <div className="space-y-4">
+                            <FormField
+                              control={createConvenioForm.control}
+                              name="send_email"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                  <div className="space-y-0.5">
+                                    <FormLabel className="text-base">Enviar por correo electrónico</FormLabel>
+                                    <FormDescription>
+                                      Si está activado, el sistema enviará el convenio generado por correo electrónico al afiliado.
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            {createConvenioForm.watch('send_email') && (
+                              <FormField
+                                control={createConvenioForm.control}
+                                name="email"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Correo Electrónico *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="email"
+                                        placeholder="mariana.restrepo@example.com"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      El correo electrónico es requerido cuando se activa el envío por correo.
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Botones de acción */}
+                        <div className="flex justify-end gap-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => createConvenioForm.reset()}
+                            disabled={createConvenioMutation.isPending}
+                          >
+                            Limpiar Formulario
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={createConvenioMutation.isPending}
+                            size="lg"
+                          >
+                            {createConvenioMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generando convenio...
+                              </>
+                            ) : (
+                              <>
+                                <FilePlus className="mr-2 h-4 w-4" />
+                                Generar Convenio
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
                   </CardContent>
                 </Card>
               </TabsContent>

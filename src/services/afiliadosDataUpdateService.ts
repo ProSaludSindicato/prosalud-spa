@@ -30,6 +30,8 @@ export interface AfiliadoDataForUpdate {
   estado: string;
   celular: string;
   correo_personal: string;
+  fecha_nacimiento?: string | null;
+  lugar_nacimiento?: string | null;
   estado_civil?: string | null;
   direccion?: string | null;
   municipio?: string | null;

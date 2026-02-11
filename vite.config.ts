@@ -8,8 +8,8 @@ import fs from "fs";
 export default defineConfig(({ mode }) => {
   // Configuración HTTPS para desarrollo
   const httpsConfig = mode === 'development' ? {
-    key: fs.readFileSync('./192.168.1.52+3-key.pem'),
-    cert: fs.readFileSync('./192.168.1.52+3.pem'),
+    key: fs.readFileSync('./192.168.1.119-key.pem'),
+    cert: fs.readFileSync('./192.168.1.119.pem'),
   } : undefined;
 
   return {

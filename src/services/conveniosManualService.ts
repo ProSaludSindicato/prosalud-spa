@@ -330,3 +330,122 @@ export const getStatistics = async (
   }
 };
 
+/**
+ * Request para generar y enviar convenio manual
+ */
+export interface GenerateAndSendConvenioRequest {
+  // Campos requeridos
+  numero_documento: string;
+  apellidos: string;
+  nombres: string;
+  
+  // Campos opcionales - Datos del Afiliado y Convenio
+  proceso?: string;
+  ciudad?: string;
+  sede?: string;
+  fecha_inicio?: string; // YYYY-MM-DD
+  fecha_finalizacion?: string; // YYYY-MM-DD
+  fecha_nacimiento?: string; // YYYY-MM-DD
+  lugar_nacimiento?: string;
+  direccion?: string;
+  telefono?: string;
+  celular?: string;
+  
+  // Campos opcionales - Compensación
+  compensacion_basica_redactada?: string;
+  
+  // Campos opcionales - Valores de Compensación
+  basico?: number;
+  auxilios?: number;
+  auxilio_especial?: number;
+  manutencion?: number;
+  provisiones?: number;
+  horas?: number;
+  valor_hora_diurna?: number;
+  valor_hora_nocturna?: number;
+  valor_hora_diurna_festiva?: number;
+  valor_hora_nocturna_festiva?: number;
+  auxilio_de_transporte?: number;
+  auxilio_de_manutencion?: number;
+  auxilio_de_encierro?: number;
+  auxilio_de_rodamiento?: number;
+  valor_auxilio_diurno?: number;
+  valor_auxilio_recargo_nocturno?: number;
+  valor_auxilio_recargo_festivo?: number;
+  valor_auxilio_recargo_festivo_nocturno?: number;
+  
+  // Campos opcionales - Techo (TEMPORALMENTE COMENTADO)
+  // tiene_techo?: boolean;
+  
+  // Campos opcionales - Opciones de Procesamiento
+  send_email?: boolean;
+  email?: string;
+}
+
+/**
+ * Response de generación y envío de convenio
+ */
+export interface GenerateAndSendConvenioResponse {
+  success: true;
+  message: string;
+  data: {
+    nombre_archivo: string;
+    ruta: string;
+    tipo: string;
+    pdf?: {
+      nombre_archivo: string;
+      ruta: string;
+    };
+    email?: {
+      status: string;
+      email: string;
+    };
+  };
+  warnings?: string[];
+}
+
+/**
+ * Genera y envía un convenio manual
+ */
+export const generateAndSendConvenio = async (
+  requestData: GenerateAndSendConvenioRequest
+): Promise<GenerateAndSendConvenioResponse> => {
+  try {
+    const response = await authenticatedApi.post<GenerateAndSendConvenioResponse>(
+      '/api/convenios-manual/generate-and-send',
+      requestData
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ 
+        success: false; 
+        message: string; 
+        errors?: Record<string, string[]> 
+      }>;
+      
+      if (axiosError.response?.status === 422) {
+        throw {
+          success: false,
+          message: axiosError.response.data?.message || 'Error de validación',
+          errors: axiosError.response.data?.errors || {},
+          isValidationError: true,
+        };
+      }
+      
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al generar el convenio',
+        errors: {},
+      };
+    }
+    
+    throw {
+      success: false,
+      message: 'Error desconocido al generar el convenio',
+      errors: {},
+    };
+  }
+};
+
