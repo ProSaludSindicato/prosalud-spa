@@ -491,7 +491,6 @@ const requiresAdicionarActividades = (solicitud: Request): boolean => {
 const REQUEST_TYPES_REQUIRING_VALIDATION: Request['request_type'][] = [
   'descanso-laboral', // Compensación por Descanso
   'compensacion-anual', // Compensación Anual Diferida
-  'certificado-convenio', // Certificado de Convenio (solo pendientes, verificado en requiresManualValidation)
   'verificacion-pagos', // Verificación de Pagos
 ];
 

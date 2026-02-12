@@ -110,6 +110,8 @@ const VerificacionPagosPageContent: React.FC = () => {
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
         payload: {
+          // Proceso y dondeRealizaProceso SIEMPRE se toman del convenio activo,
+          // no se piden al usuario
           proceso: activeConvenio?.proceso || '',
           dondeRealizaProceso: activeConvenio?.cliente || '',
           mesAnoNovedad: data.mesAnoNovedad,
