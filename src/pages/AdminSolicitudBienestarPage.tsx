@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
+import { formatDateReadable, formatTime12Hour } from '@/utils/dateFormatter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -147,7 +148,9 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   can,
 }) => {
   const canEditSolicitud = (s: WellnessRequest): boolean => {
-    return s.estado === 'pending' || s.estado === 'in_progress';
+    return s.estado === 'pending' || 
+           s.estado === 'in_progress' || 
+           (can('wellness_requests.update_status') && s.estado === 'resolved');
   };
 
   const hasActivityRealized = !!solicitud.actividad_realizada;
@@ -620,13 +623,15 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   };
 
   const canEditSolicitud = (solicitud: WellnessRequest): boolean => {
-    return solicitud.estado === 'pending' || solicitud.estado === 'in_progress';
+    return solicitud.estado === 'pending' || 
+           solicitud.estado === 'in_progress' || 
+           (can('wellness_requests.update_status') && solicitud.estado === 'resolved');
   };
 
   const handleEdit = React.useCallback((solicitud: WellnessRequest) => {
     if (!canEditSolicitud(solicitud)) {
       toast.error('No se puede editar', {
-        description: 'Solo se pueden editar solicitudes pendientes o en revisión.',
+        description: 'Solo se pueden editar solicitudes pendientes, en revisión o aprobadas (con permiso de actualizar estado).',
       });
       return;
     }
@@ -1332,7 +1337,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 <div className="flex items-center gap-2 text-sm">
                                   <Calendar className="h-4 w-4 text-gray-400" />
                                   {solicitud.fechaPropuesta
-                                    ? new Date(solicitud.fechaPropuesta).toLocaleDateString('es-ES')
+                                    ? formatDateReadable(solicitud.fechaPropuesta)
                                     : 'N/A'}
                                 </div>
                               </TableCell>
@@ -1379,7 +1384,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 {/* Botones de acción en móvil - En lugar del menú flotante */}
                                 {(() => {
                                   const canEditSolicitud = (s: WellnessRequest): boolean => {
-                                    return s.estado === 'pending' || s.estado === 'in_progress';
+                                    return s.estado === 'pending' || 
+                                           s.estado === 'in_progress' || 
+                                           (can('wellness_requests.update_status') && s.estado === 'resolved');
                                   };
                                   const hasActivityRealized = !!solicitud.actividad_realizada;
                                   const canAddActivity = solicitud.estado === 'resolved';
@@ -1542,7 +1549,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                       <Calendar className="h-4 w-4 text-gray-400" />
                                       <span className="text-gray-900">
                                         {solicitud.fechaPropuesta
-                                          ? new Date(solicitud.fechaPropuesta).toLocaleDateString('es-ES')
+                                          ? formatDateReadable(solicitud.fechaPropuesta)
                                           : 'N/A'}
                                       </span>
                                     </div>
@@ -2092,20 +2099,20 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         <label className="text-sm font-medium text-gray-700">Fecha Propuesta</label>
                         <p className="mt-1 text-sm text-gray-900">
                           {selectedSolicitud.fechaPropuesta
-                            ? new Date(selectedSolicitud.fechaPropuesta).toLocaleDateString('es-ES')
+                            ? formatDateReadable(selectedSolicitud.fechaPropuesta)
                             : 'N/A'}
                         </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Hora Inicio</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {selectedSolicitud.horaInicio || 'N/A'}
+                          {formatTime12Hour(selectedSolicitud.horaInicio)}
                         </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Hora Fin</label>
                         <p className="mt-1 text-sm text-gray-900">
-                          {selectedSolicitud.horaFin || 'N/A'}
+                          {formatTime12Hour(selectedSolicitud.horaFin)}
                         </p>
                       </div>
                     </div>
@@ -2199,7 +2206,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           <label className="text-sm font-medium text-gray-700">Fecha Realizada</label>
                           <p className="mt-1 text-sm text-gray-900">
                             {selectedSolicitud.actividad_realizada.fecha_realizada
-                              ? new Date(selectedSolicitud.actividad_realizada.fecha_realizada).toLocaleDateString('es-ES')
+                              ? formatDateReadable(selectedSolicitud.actividad_realizada.fecha_realizada)
                               : 'N/A'}
                           </p>
                         </div>
@@ -2442,6 +2449,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
             setEditingSolicitud(null);
           }}
           solicitud={editingSolicitud}
+          canUpdateStatus={can('wellness_requests.update_status')}
           onSuccess={async () => {
             // Invalidar queries y refetch para actualizar la vista
             await queryClient.invalidateQueries({ queryKey: ['wellness-requests'] });

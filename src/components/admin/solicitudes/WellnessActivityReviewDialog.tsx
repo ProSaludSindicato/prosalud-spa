@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { formatDateReadable } from '@/utils/dateFormatter';
 import { 
   Image as ImageIcon, 
   FileText, 
@@ -386,7 +387,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
                     <label className="text-sm font-medium text-gray-700">Fecha Realizada</label>
                     <p className="mt-1 text-sm text-gray-900">
                       {actividadRealizada.fecha_realizada 
-                        ? new Date(actividadRealizada.fecha_realizada).toLocaleDateString('es-ES')
+                        ? formatDateReadable(actividadRealizada.fecha_realizada)
                         : 'N/A'}
                     </p>
                   </div>

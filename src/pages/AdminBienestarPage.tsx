@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { wellnessEventsApi } from '@/services/wellnessEventsApi';
 import { BienestarEvent } from '@/types/admin';
 import BienestarEventForm from '@/components/admin/bienestar/BienestarEventForm';
+import { formatDateReadable } from '@/utils/dateFormatter';
 import { logger } from '@/utils/logger';
 
 const AdminBienestarPage: React.FC = () => {
@@ -318,7 +319,7 @@ const AdminBienestarPage: React.FC = () => {
                           <div className="space-y-1 text-sm text-text-gray mb-4">
                             <p className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
-                              {new Date(event.date).toLocaleDateString('es-ES')}
+                              {formatDateReadable(event.date)}
                             </p>
                             {event.location && (
                               <p className="truncate">{event.location}</p>
@@ -340,7 +341,7 @@ const AdminBienestarPage: React.FC = () => {
                                   </div>
                                   {event.reviewedAt && (
                                     <div className="text-blue-600 mt-1">
-                                      {new Date(event.reviewedAt).toLocaleDateString('es-ES')}
+                                      {formatDateReadable(event.reviewedAt)}
                                     </div>
                                   )}
                                   {event.rejectionReason && (

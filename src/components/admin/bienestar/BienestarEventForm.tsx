@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { wellnessEventsApi, CreateWellnessEventData, UpdateWellnessEventData } from "@/services/wellnessEventsApi";
 import { wellnessRequestsService, WellnessRequest } from "@/services/wellnessRequestsApi";
 import { BienestarEvent, CreateBienestarEventData } from "@/types/admin";
+import { formatDateReadable } from '@/utils/dateFormatter';
 import { logger } from "@/utils/logger";
 import { optimizeImages, isImageFile } from "@/utils/imageOptimizer";
 import { useSanitizedInput } from "@/hooks/useSanitizedInput";
@@ -817,7 +818,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                                   <div className="flex flex-col">
                                     <span className="font-medium">{request.nombreActividad}</span>
                                     <span className="text-xs text-slate-500">
-                                      {request.centroCostos} • {new Date(request.fechaPropuesta).toLocaleDateString('es-ES')}
+                                      {request.centroCostos} • {formatDateReadable(request.fechaPropuesta)}
                                     </span>
                                   </div>
                                 </SelectItem>

@@ -26,16 +26,7 @@ const wellnessRequestSchema = z.object({
   descripcionActividad: z.string().max(300, 'La descripción no puede exceder 300 caracteres').optional(),
   centroCostos: z.string().min(1, 'Debe seleccionar un centro de costos'),
   sedes: z.array(z.string()), // Se validará condicionalmente en el onSubmit
-  fechaPropuesta: z.string().min(1, 'La fecha propuesta es obligatoria').refine((date) => {
-    if (!date) return false;
-    const selectedDate = new Date(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    selectedDate.setHours(0, 0, 0, 0);
-    return selectedDate >= today;
-  }, {
-    message: 'La fecha propuesta no puede ser anterior a hoy',
-  }),
+  fechaPropuesta: z.string().min(1, 'La fecha propuesta es obligatoria'),
   horaInicio: z.string().optional(),
   horaFin: z.string().optional(),
   numeroParticipantes: z.number().refine((val) => val === undefined || (val > 0 && val <= 10000), {
@@ -74,6 +65,7 @@ interface WellnessRequestFormProps {
   onClose: () => void;
   onSuccess?: () => void;
   solicitud?: WellnessRequest | null;
+  canUpdateStatus?: boolean; // Nuevo prop para permiso de actualizar estado
 }
 
 // Centros de costos disponibles
@@ -93,7 +85,7 @@ const SEDES_POR_CENTRO_COSTOS: Record<string, string[]> = {
 // Límite máximo de detalles/souvenirs
 const MAX_DETALLES = 5;
 
-const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose, onSuccess, solicitud }) => {
+const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose, onSuccess, solicitud, canUpdateStatus = false }) => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detalles, setDetalles] = useState<DetalleItem[]>([]);
@@ -101,8 +93,12 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
   // Security: Use centralized sanitization hook
   const { sanitizeText, sanitizeGeneral, sanitizeNumeric } = useSanitizedInput();
 
-  // Validar que solo se puede editar si el estado es pending o in_progress
-  const canEdit = !solicitud || solicitud.estado === 'pending' || solicitud.estado === 'in_progress';
+  // Validar que solo se puede editar si el estado es pending o in_progress,
+  // o si tiene permiso de actualizar estado (puede editar solicitudes aprobadas)
+  const canEdit = !solicitud || 
+    solicitud.estado === 'pending' || 
+    solicitud.estado === 'in_progress' || 
+    (canUpdateStatus && solicitud.estado === 'resolved');
 
   const form = useForm<WellnessRequestFormValues>({
     resolver: zodResolver(wellnessRequestSchema),
@@ -314,7 +310,7 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-gray-900">
             {isEditing ? 'Editar Solicitud de Bienestar' : 'Nueva Solicitud de Bienestar'}
@@ -361,8 +357,8 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                           placeholder="Ej: Taller de Mindfulness, Actividad Recreativa..."
                           {...field}
                           onChange={(e) => {
-                            // Security: Sanitize activity name input
-                            const sanitized = sanitizeText(e.target.value, { maxLength: 200, allowSpaces: true });
+                            // Security: Sanitize activity name input - allow more characters for activity names
+                            const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200 });
                             field.onChange(sanitized);
                           }}
                         />
@@ -541,7 +537,7 @@ const WellnessRequestForm: React.FC<WellnessRequestFormProps> = ({ open, onClose
                 <Alert className="mb-4 bg-blue-50 border-blue-200">
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-sm text-blue-800">
-                    Se recuerda que las actividades se deben pedir con entre 10 a 15 días hábiles de anticipación para su gestión y programación con el proveedor.
+                    Se recuerda que las actividades deben solicitarse con una anticipación de 10 a 15 días hábiles para su adecuada gestión y programación.                  
                   </AlertDescription>
                 </Alert>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
