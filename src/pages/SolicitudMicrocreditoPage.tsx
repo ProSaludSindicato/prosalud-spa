@@ -90,6 +90,13 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
         // No bloquear al usuario - permitir continuar
       }
 
+      const payload: Record<string, any> = {
+        proceso: (afiliado as any)?.convenios?.[0]?.proceso || "",
+        dondeRealizaProceso: (afiliado as any)?.convenios?.[0]?.cliente || "",
+        montoSolicitado: data.montoSolicitado,
+        numeroCuotas: data.numeroCuotas,
+      };
+
       const requestData = {
         request_type: "microcredito",
         id_type: afiliado.tipo_documento || '',
@@ -98,11 +105,7 @@ const SolicitudMicrocreditoPageContent: React.FC = () => {
         last_name: afiliado.apellidos || '',
         email: afiliado.correo_personal || '',
         phone_number: afiliado.celular || '',
-        payload: {
-          sedeProceso: (afiliado as any)?.convenios?.[0]?.cliente || "",
-          montoSolicitado: data.montoSolicitado,
-          numeroCuotas: data.numeroCuotas,
-        },
+        payload,
         ...(recaptchaToken && { recaptcha_token: recaptchaToken })
       };
 
