@@ -45,6 +45,7 @@ export interface Request {
   payload: Record<string, any>;
   status: 'pending' | 'in_progress' | 'resolved' | 'rejected';
   rejection_reason?: string | null;
+  has_bank_info_update?: boolean;
   // Razón opcional asociada al último cambio de estado (por ejemplo, cuando pasa a En Revisión)
   status_reason?: string | null;
   // Información del último cambio de estado, proveniente del backend

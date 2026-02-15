@@ -69,6 +69,7 @@ import { parentescos, estadosCiviles, relacionesContactoEmergencia } from '@/com
 import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
 import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpdates";
 import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
+import { BankInfoUpdateBadge } from "@/components/admin/solicitudes/BankInfoUpdateBadge";
 import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/UpdateAfiliadosReminderDialog";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, ChevronDown, ClipboardPaste } from "lucide-react";
@@ -199,6 +200,8 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
     phone_number: apiRequest.phone_number || '',
     payload: apiRequest.payload || {},
     status: mapApiStatusToFrontendStatus(apiRequest.status),
+    rejection_reason: apiRequest.rejection_reason || null,
+    has_bank_info_update: apiRequest.has_bank_info_update || false,
     created_at: apiRequest.created_at || '',
     processed_at: apiRequest.processed_at,
     resolved_at: (apiRequest.status === 'COMPLETED' || apiRequest.status === 'REJECTED') 
@@ -2654,6 +2657,16 @@ const AdminSolicitudesPage: React.FC = () => {
                                     )}
                                   </p>
                                   <p className="text-sm text-gray-500">ID: {solicitud.id}</p>
+                                  <div className="mt-1">
+                                    {console.log('Debug - has_bank_info_update:', solicitud.id, solicitud.has_bank_info_update)}
+                                    <BankInfoUpdateBadge 
+                                      hasBankInfoUpdate={
+                                        solicitud.has_bank_info_update || 
+                                        (solicitud.request_type === 'actualizar-datos-personales' && 
+                                         solicitud.payload?.banco)
+                                      } 
+                                    />
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -2874,6 +2887,15 @@ const AdminSolicitudesPage: React.FC = () => {
                                     getRequestTypeLabel(solicitud.request_type)
                                   )}
                                 </p>
+                                <div className="mt-1">
+                                  <BankInfoUpdateBadge 
+                                    hasBankInfoUpdate={
+                                      solicitud.has_bank_info_update || 
+                                      (solicitud.request_type === 'actualizar-datos-personales' && 
+                                       solicitud.payload?.banco)
+                                    } 
+                                  />
+                                </div>
                               </div>
 
                               {/* Process and Hospital */}
@@ -3285,6 +3307,15 @@ const AdminSolicitudesPage: React.FC = () => {
                                   getRequestTypeLabel(selectedSolicitud.request_type)
                                 )}
                               </p>
+                              <div className="mt-2">
+                                <BankInfoUpdateBadge 
+                                  hasBankInfoUpdate={
+                                    selectedSolicitud.has_bank_info_update || 
+                                    (selectedSolicitud.request_type === 'actualizar-datos-personales' && 
+                                     selectedSolicitud.payload?.banco)
+                                  } 
+                                />
+                              </div>
                             </div>
                           </div>
                           <div className="space-y-2">

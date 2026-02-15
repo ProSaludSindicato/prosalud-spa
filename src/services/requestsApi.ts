@@ -54,6 +54,7 @@ export interface ApiRequest {
   payload: Record<string, any>;
   status: "PENDING" | "IN_REVIEW" | "REJECTED" | "COMPLETED";
   rejection_reason?: string | null;
+  has_bank_info_update?: boolean;
   // Optional reason provided by the admin when changing the status (especially for IN_REVIEW)
   status_reason?: string | null;
   // Information about the last status change, provided by the backend
