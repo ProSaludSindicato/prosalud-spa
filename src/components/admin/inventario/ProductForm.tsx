@@ -804,8 +804,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                     placeholder="Ej: Uniforme Quirúrgico"
                     className="bg-gray-50 border-gray-300"
                     onChange={(e) => {
-                      // Security: Sanitize product name input
-                      const sanitized = sanitizeText(e.target.value, { maxLength: 200, allowSpaces: true });
+                      // Security: Sanitize product name input (allow letters, numbers, and spaces)
+                      const sanitized = sanitizeGeneral(e.target.value, { maxLength: 200, allowSpaces: true });
                       form.setValue('name', sanitized, { shouldValidate: true });
                     }}
                   />
