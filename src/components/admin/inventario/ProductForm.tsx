@@ -196,6 +196,39 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
     maxStock: firstVariant?.maxStock,
   }));
 
+  // Initialize selectedSizesByCategory from existing product
+  const [selectedSizesByCategory, setSelectedSizesByCategory] = useState<{
+    clothing: Set<string>;
+    footwear: Set<string>;
+    menPants: Set<string>;
+    womenPants: Set<string>;
+  }>(() => {
+    const initial = {
+      clothing: new Set<string>(),
+      footwear: new Set<string>(),
+      menPants: new Set<string>(),
+      womenPants: new Set<string>(),
+    };
+
+    if (product?.variants) {
+      product.variants.forEach((variant) => {
+        if (variant.size) {
+          if (clothingSizes.includes(variant.size as any)) {
+            initial.clothing.add(variant.size);
+          } else if (footwearSizes.includes(variant.size as any)) {
+            initial.footwear.add(variant.size);
+          } else if (menPantsSizes.includes(variant.size as any)) {
+            initial.menPants.add(variant.size);
+          } else if (womenPantsSizes.includes(variant.size as any)) {
+            initial.womenPants.add(variant.size);
+          }
+        }
+      });
+    }
+
+    return initial;
+  });
+
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -257,50 +290,44 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
  
    const handleToggleSize = useCallback(
     (size: string, category: 'clothing' | 'footwear' | 'menPants' | 'womenPants') => {
-      const isClothing = clothingSizes.includes(size as InventorySize);
-      const isFootwear = footwearSizes.includes(size as InventorySize);
-      const isMenPants = menPantsSizes.includes(size as any);
-      const isWomenPants = womenPantsSizes.includes(size as any);
-      const current = new Set(selectedSizes);
+      setSelectedSizesByCategory((prev) => {
+        const newCategories = { ...prev };
+        
+        // Clear other main categories when selecting from a different main category
+        // But allow mixing within pants categories (men + women)
+        if (category === 'clothing') {
+          newCategories.footwear.clear();
+          newCategories.menPants.clear();
+          newCategories.womenPants.clear();
+        }
+        if (category === 'footwear') {
+          newCategories.clothing.clear();
+          newCategories.menPants.clear();
+          newCategories.womenPants.clear();
+        }
+        if (category === 'menPants') {
+          // Only clear clothing and footwear, allow mixing with women's pants
+          newCategories.clothing.clear();
+          newCategories.footwear.clear();
+        }
+        if (category === 'womenPants') {
+          // Only clear clothing and footwear, allow mixing with men's pants
+          newCategories.clothing.clear();
+          newCategories.footwear.clear();
+        }
 
-      // Check if size exists in multiple categories
-      const existsInMultiple = [
-        (isClothing ? 1 : 0) + (isFootwear ? 1 : 0) + (isMenPants ? 1 : 0) + (isWomenPants ? 1 : 0)
-      ].filter(Boolean).length > 1;
+        // Toggle the size in the specific category
+        const categorySet = newCategories[category];
+        if (categorySet.has(size)) {
+          categorySet.delete(size);
+        } else {
+          categorySet.add(size);
+        }
 
-      // Clear other main categories when selecting from a different main category
-      // But allow mixing within pants categories (men + women)
-      if (category === 'clothing' && (selectedFootwearSizes.length > 0 || selectedMenPantsSizes.length > 0 || selectedWomenPantsSizes.length > 0)) {
-        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
-        menPantsSizes.forEach((menPantsSize) => current.delete(menPantsSize));
-        womenPantsSizes.forEach((womenPantsSize) => current.delete(womenPantsSize));
-      }
-      if (category === 'footwear' && (selectedClothingSizes.length > 0 || selectedMenPantsSizes.length > 0 || selectedWomenPantsSizes.length > 0)) {
-        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
-        menPantsSizes.forEach((menPantsSize) => current.delete(menPantsSize));
-        womenPantsSizes.forEach((womenPantsSize) => current.delete(womenPantsSize));
-      }
-      if (category === 'menPants' && (selectedClothingSizes.length > 0 || selectedFootwearSizes.length > 0)) {
-        // Only clear clothing and footwear, allow mixing with women's pants
-        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
-        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
-      }
-      if (category === 'womenPants' && (selectedClothingSizes.length > 0 || selectedFootwearSizes.length > 0)) {
-        // Only clear clothing and footwear, allow mixing with men's pants
-        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
-        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
-      }
-
-      if (current.has(size)) {
-        current.delete(size);
-      } else {
-        current.add(size);
-      }
-
-      const nextSizes = Array.from(current);
-      form.setValue('selectedSizes', nextSizes, { shouldDirty: true, shouldValidate: true });
+        return newCategories;
+      });
     },
-    [clothingSizes, footwearSizes, menPantsSizes, womenPantsSizes, form, selectedSizes, selectedClothingSizes.length, selectedFootwearSizes.length, selectedMenPantsSizes.length, selectedWomenPantsSizes.length],
+    [],
   );
 
   const selectedCategory = useMemo(
@@ -308,6 +335,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
     [categories, selectedCategoryId],
   );
   const subcategoryOptions = selectedCategory?.subcategories ?? [];
+
+  // Sync selectedSizesByCategory with form selectedSizes
+  useEffect(() => {
+    const allSizes = [
+      ...selectedSizesByCategory.clothing,
+      ...selectedSizesByCategory.footwear,
+      ...selectedSizesByCategory.menPants,
+      ...selectedSizesByCategory.womenPants,
+    ];
+    form.setValue('selectedSizes', Array.from(allSizes), { shouldDirty: true, shouldValidate: true });
+  }, [selectedSizesByCategory, form]);
 
   useEffect(() => {
     if (!selectedCategory) {
@@ -933,7 +971,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ropa / Vestuario</p>
                   <div className="flex flex-wrap gap-2">
                     {clothingSizes.map((size) => {
-                      const isActive = selectedClothingSizes.includes(size as InventorySize);
+                      const isActive = selectedSizesByCategory.clothing.has(size as string);
                       return (
                         <button
                           key={size}
@@ -957,7 +995,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Calzado</p>
                   <div className="flex flex-wrap gap-2">
                     {footwearSizes.map((size) => {
-                      const isActive = selectedFootwearSizes.includes(size as InventorySize);
+                      const isActive = selectedSizesByCategory.footwear.has(size as string);
                       return (
                         <button
                           key={size}
@@ -981,7 +1019,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pantalones Hombre</p>
                   <div className="flex flex-wrap gap-2">
                     {menPantsSizes.map((size) => {
-                      const isActive = selectedMenPantsSizes.includes(size);
+                      const isActive = selectedSizesByCategory.menPants.has(size);
                       return (
                         <button
                           key={size}
@@ -1005,7 +1043,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pantalones Mujer</p>
                   <div className="flex flex-wrap gap-2">
                     {womenPantsSizes.map((size) => {
-                      const isActive = selectedWomenPantsSizes.includes(size);
+                      const isActive = selectedSizesByCategory.womenPants.has(size);
                       return (
                         <button
                           key={size}

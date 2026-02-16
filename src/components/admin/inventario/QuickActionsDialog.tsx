@@ -15,6 +15,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '@/context/InventoryContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { InventoryProduct } from '@/types/inventory';
 
 interface QuickActionsDialogProps {
   open: boolean;
@@ -23,6 +24,8 @@ interface QuickActionsDialogProps {
 
 const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenChange }) => {
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
   const navigate = useNavigate();
   const { products, categories } = useInventory();
   const { canDoAction, can } = usePermissions();
@@ -125,7 +128,14 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
       action.onSelect();
       return;
     }
-    setSelectedAction(actionId);
+    
+    if (actionId === 'add-product') {
+      setSelectedProduct(null);
+      setIsProductDialogOpen(true);
+      onOpenChange(false);
+    } else {
+      setSelectedAction(actionId);
+    }
   };
 
   const handleClose = () => {
@@ -135,14 +145,6 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
 
   const renderActionForm = () => {
     switch (selectedAction) {
-      case 'add-product':
-        return (
-          <Dialog open={true} onOpenChange={handleClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
-              <ProductForm onClose={handleClose} />
-            </DialogContent>
-          </Dialog>
-        );
       case 'view-low-stock':
         return <LowStockDialog open={true} onOpenChange={() => handleClose()} items={lowStockItems} />;
       default:
@@ -151,7 +153,7 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
   };
 
   if (selectedAction) {
-    if (selectedAction === 'add-product' || selectedAction === 'view-low-stock') {
+    if (selectedAction === 'view-low-stock') {
       return renderActionForm();
     }
     
@@ -164,51 +166,76 @@ const QuickActionsDialog: React.FC<QuickActionsDialogProps> = ({ open, onOpenCha
     );
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-white">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary-prosalud">Acciones Rápidas</DialogTitle>
-          <DialogDescription>
-            Selecciona una acción para realizar rápidamente
-          </DialogDescription>
-        </DialogHeader>
+  const handleProductDialogClose = () => {
+    setIsProductDialogOpen(false);
+    setSelectedProduct(null);
+  };
 
-        <div className="grid gap-4 py-4">
-          {actions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <motion.div
-                key={action.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card 
-                  className="cursor-pointer hover:shadow-md transition-all duration-200 border-2 hover:border-primary-prosalud/30"
-                  onClick={() => handleActionSelect(action.id)}
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-primary-prosalud">Acciones Rápidas</DialogTitle>
+            <DialogDescription>
+              Selecciona una acción para realizar rápidamente
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {actions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <motion.div
+                  key={action.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className={`p-3 rounded-lg ${action.color} bg-opacity-10`}>
-                          <Icon className={`h-6 w-6 ${action.textColor}`} />
+                  <Card 
+                    className="cursor-pointer hover:shadow-md transition-all duration-200 border-2 hover:border-primary-prosalud/30"
+                    onClick={() => handleActionSelect(action.id)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-3 rounded-lg ${action.color} bg-opacity-10`}>
+                            <Icon className={`h-6 w-6 ${action.textColor}`} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{action.title}</h3>
+                            <p className="text-sm text-gray-600">{action.description}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{action.title}</h3>
-                          <p className="text-sm text-gray-600">{action.description}</p>
-                        </div>
+                        <ArrowRight className="h-5 w-5 text-gray-400" />
                       </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
-      </DialogContent>
-    </Dialog>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Dialog - Same pattern as ProductManagement */}
+      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+        <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle>Nuevo Producto</DialogTitle>
+            <DialogDescription>
+              Completa los campos para agregar un nuevo producto al inventario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-0">
+            <ProductForm 
+              product={selectedProduct}
+              onClose={handleProductDialogClose}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
