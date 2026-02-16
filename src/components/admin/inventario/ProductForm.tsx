@@ -191,6 +191,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const defaultSelectedSizes = extractSelectedSizes(product);
   const defaultSelectedColors = extractSelectedColors(product);
 
+  // Define size arrays before using them in state initialization
+  const clothingSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_CLOTHING_SIZES.includes(size as any)), []);
+  const footwearSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_FOOTWEAR_SIZES.includes(size as any)), []);
+  const menPantsSizes = useMemo(() => INVENTORY_MEN_PANTS_SIZES, []);
+  const womenPantsSizes = useMemo(() => INVENTORY_WOMEN_PANTS_SIZES, []);
+
   const firstVariant = product?.variants?.[0];
   const [defaultVariantValues, setDefaultVariantValues] = useState<{ stock?: number; minStock?: number; maxStock?: number }>(() => ({
     stock: firstVariant?.stock,
@@ -281,10 +287,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const selectedColors = useWatch({ control: form.control, name: 'selectedColors' }) ?? [];
   const genderValue = useWatch({ control: form.control, name: 'gender' }) as InventoryGender | undefined;
   const genderSelectValue = (genderValue ?? '__none__') as InventoryGender | '__none__';
-  const clothingSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_CLOTHING_SIZES.includes(size as any)), []);
-  const footwearSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_FOOTWEAR_SIZES.includes(size as any)), []);
-  const menPantsSizes = useMemo(() => INVENTORY_MEN_PANTS_SIZES, []);
-  const womenPantsSizes = useMemo(() => INVENTORY_WOMEN_PANTS_SIZES, []);
+  
   const selectedClothingSizes = selectedSizes.filter((size) => clothingSizes.includes(size as InventorySize)) as InventorySize[];
   const selectedFootwearSizes = selectedSizes.filter((size) => footwearSizes.includes(size as InventorySize)) as InventorySize[];
   const selectedMenPantsSizes = selectedSizes.filter((size) => menPantsSizes.includes(size as any));
