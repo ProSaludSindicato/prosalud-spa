@@ -43,6 +43,27 @@ export const INVENTORY_FOOTWEAR_SIZES = [
   '43 - 44',
 ] as const;
 
+export const INVENTORY_MEN_PANTS_SIZES = [
+  '28',
+  '30',
+  '32',
+  '34',
+  '36',
+  '38',
+  '40',
+  '42',
+] as const;
+
+export const INVENTORY_WOMEN_PANTS_SIZES = [
+  '6',
+  '8',
+  '10',
+  '12',
+  '14',
+  '16',
+  '18',
+] as const;
+
 export type InventorySize = typeof INVENTORY_SIZES[number];
 
 export const INVENTORY_GENDERS = ['Hombre', 'Mujer', 'Mixto'] as const;
@@ -106,7 +127,7 @@ export interface InventoryCategory {
 
 export interface ProductVariant {
   id: string;
-  size?: InventorySize;
+  size?: string; // Changed from InventorySize to string to allow numeric sizes
   colorId?: string;
   color?: InventoryColorOption; // Added for API response
   stock: number;

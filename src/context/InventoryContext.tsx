@@ -14,6 +14,8 @@ import {
   ApiPaginatedResponse,
   DashboardData,
   INVENTORY_SIZES,
+  INVENTORY_MEN_PANTS_SIZES,
+  INVENTORY_WOMEN_PANTS_SIZES,
 } from '@/types/inventory';
 import { inventoryApiService } from '@/services/inventoryApiService';
 import { logger } from '@/utils/logger';
@@ -106,7 +108,7 @@ interface InventoryContextValue {
 
 const InventoryContext = createContext<InventoryContextValue | undefined>(undefined);
 
-const sizeOptions = [...INVENTORY_SIZES];
+const sizeOptions = [...INVENTORY_SIZES, ...INVENTORY_MEN_PANTS_SIZES, ...INVENTORY_WOMEN_PANTS_SIZES];
 
 // Initial static data for fallback
 const initialColorOptions: InventoryColorOption[] = [
