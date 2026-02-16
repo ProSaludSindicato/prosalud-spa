@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useInventory } from '@/context/InventoryContext';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
@@ -775,6 +777,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   return (
     <div className="space-y-6">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Alert className="border-amber-200 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800">
+              <strong>Importante:</strong> Para que este producto sea visible en el sistema de entregas/devoluciones de dotación y EPP que se realiza a los afiliados, 
+              debes seleccionar como Categoría: <strong>Dotación</strong> o Categoría: <strong>EPP</strong>. 
+              Los productos con otras categorías no aparecerán en el módulo de Dotación y EPP.
+            </AlertDescription>
+          </Alert>
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
               <CardTitle className="text-lg font-semibold text-gray-900">Información Básica</CardTitle>
