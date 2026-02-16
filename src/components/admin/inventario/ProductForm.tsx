@@ -22,6 +22,8 @@ import {
   INVENTORY_GENDERS,
   INVENTORY_CLOTHING_SIZES,
   INVENTORY_FOOTWEAR_SIZES,
+  INVENTORY_MEN_PANTS_SIZES,
+  INVENTORY_WOMEN_PANTS_SIZES,
 } from '@/types/inventory';
 
 type NumericVariantField = 'stock' | 'minStock' | 'maxStock';
@@ -76,7 +78,7 @@ const productSchema = z
     variants: z.array(
       z.object({
         id: z.string(),
-        size: z.enum(INVENTORY_SIZES).optional(),
+        size: z.string().optional(), // Changed from enum to string
         colorId: z.string().optional(),
         stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
         minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0'),
@@ -246,33 +248,60 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
   const genderSelectValue = (genderValue ?? '__none__') as InventoryGender | '__none__';
   const clothingSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_CLOTHING_SIZES.includes(size as any)), []);
   const footwearSizes = useMemo(() => INVENTORY_SIZES.filter((size) => INVENTORY_FOOTWEAR_SIZES.includes(size as any)), []);
+  const menPantsSizes = useMemo(() => INVENTORY_MEN_PANTS_SIZES, []);
+  const womenPantsSizes = useMemo(() => INVENTORY_WOMEN_PANTS_SIZES, []);
   const selectedClothingSizes = selectedSizes.filter((size) => clothingSizes.includes(size as InventorySize)) as InventorySize[];
   const selectedFootwearSizes = selectedSizes.filter((size) => footwearSizes.includes(size as InventorySize)) as InventorySize[];
+  const selectedMenPantsSizes = selectedSizes.filter((size) => menPantsSizes.includes(size as any));
+  const selectedWomenPantsSizes = selectedSizes.filter((size) => womenPantsSizes.includes(size as any));
  
    const handleToggleSize = useCallback(
-     (size: InventorySize) => {
-       const isClothing = clothingSizes.includes(size);
-       const isFootwear = footwearSizes.includes(size);
-       const current = new Set(selectedSizes);
- 
-       if (isClothing && selectedFootwearSizes.length > 0) {
-         footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
-       }
-       if (isFootwear && selectedClothingSizes.length > 0) {
-         clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
-       }
+    (size: string, category: 'clothing' | 'footwear' | 'menPants' | 'womenPants') => {
+      const isClothing = clothingSizes.includes(size as InventorySize);
+      const isFootwear = footwearSizes.includes(size as InventorySize);
+      const isMenPants = menPantsSizes.includes(size as any);
+      const isWomenPants = womenPantsSizes.includes(size as any);
+      const current = new Set(selectedSizes);
 
-       if (current.has(size)) {
-         current.delete(size);
-       } else {
-         current.add(size);
-       }
- 
-       const nextSizes = Array.from(current);
-       form.setValue('selectedSizes', nextSizes, { shouldDirty: true, shouldValidate: true });
-     },
-     [clothingSizes, footwearSizes, form, selectedSizes, selectedClothingSizes.length, selectedFootwearSizes.length],
-   );
+      // Check if size exists in multiple categories
+      const existsInMultiple = [
+        (isClothing ? 1 : 0) + (isFootwear ? 1 : 0) + (isMenPants ? 1 : 0) + (isWomenPants ? 1 : 0)
+      ].filter(Boolean).length > 1;
+
+      // Clear other main categories when selecting from a different main category
+      // But allow mixing within pants categories (men + women)
+      if (category === 'clothing' && (selectedFootwearSizes.length > 0 || selectedMenPantsSizes.length > 0 || selectedWomenPantsSizes.length > 0)) {
+        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
+        menPantsSizes.forEach((menPantsSize) => current.delete(menPantsSize));
+        womenPantsSizes.forEach((womenPantsSize) => current.delete(womenPantsSize));
+      }
+      if (category === 'footwear' && (selectedClothingSizes.length > 0 || selectedMenPantsSizes.length > 0 || selectedWomenPantsSizes.length > 0)) {
+        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
+        menPantsSizes.forEach((menPantsSize) => current.delete(menPantsSize));
+        womenPantsSizes.forEach((womenPantsSize) => current.delete(womenPantsSize));
+      }
+      if (category === 'menPants' && (selectedClothingSizes.length > 0 || selectedFootwearSizes.length > 0)) {
+        // Only clear clothing and footwear, allow mixing with women's pants
+        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
+        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
+      }
+      if (category === 'womenPants' && (selectedClothingSizes.length > 0 || selectedFootwearSizes.length > 0)) {
+        // Only clear clothing and footwear, allow mixing with men's pants
+        clothingSizes.forEach((clothingSize) => current.delete(clothingSize));
+        footwearSizes.forEach((footwearSize) => current.delete(footwearSize));
+      }
+
+      if (current.has(size)) {
+        current.delete(size);
+      } else {
+        current.add(size);
+      }
+
+      const nextSizes = Array.from(current);
+      form.setValue('selectedSizes', nextSizes, { shouldDirty: true, shouldValidate: true });
+    },
+    [clothingSizes, footwearSizes, menPantsSizes, womenPantsSizes, form, selectedSizes, selectedClothingSizes.length, selectedFootwearSizes.length, selectedMenPantsSizes.length, selectedWomenPantsSizes.length],
+  );
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId),
@@ -330,14 +359,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
       return;
     }
 
-    const combos: Array<{ size?: InventorySize; colorId?: string }> = [];
+    const combos: Array<{ size?: string; colorId?: string }> = [];
     if (variantMode === 'size') {
-      selectedSizes.forEach((size) => combos.push({ size: size as InventorySize }));
+      selectedSizes.forEach((size) => combos.push({ size }));
     } else if (variantMode === 'color') {
       selectedColors.forEach((colorId) => combos.push({ colorId }));
     } else if (variantMode === 'size_color') {
       selectedSizes.forEach((size) => {
-        selectedColors.forEach((colorId) => combos.push({ size: size as InventorySize, colorId }));
+        selectedColors.forEach((colorId) => combos.push({ size, colorId }));
       });
     }
 
@@ -909,7 +938,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                         <button
                           key={size}
                           type="button"
-                          onClick={() => handleToggleSize(size as InventorySize)}
+                          onClick={() => handleToggleSize(size as string, 'clothing')}
                           className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                             isActive
                               ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
@@ -933,7 +962,55 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
                         <button
                           key={size}
                           type="button"
-                          onClick={() => handleToggleSize(size as InventorySize)}
+                          onClick={() => handleToggleSize(size as string, 'footwear')}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                              : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                          }`}
+                          aria-pressed={isActive}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pantalones Hombre</p>
+                  <div className="flex flex-wrap gap-2">
+                    {menPantsSizes.map((size) => {
+                      const isActive = selectedMenPantsSizes.includes(size);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleToggleSize(size, 'menPants')}
+                          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
+                              : 'border-gray-200 hover:border-primary-prosalud/40 hover:bg-primary-prosalud/5'
+                          }`}
+                          aria-pressed={isActive}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pantalones Mujer</p>
+                  <div className="flex flex-wrap gap-2">
+                    {womenPantsSizes.map((size) => {
+                      const isActive = selectedWomenPantsSizes.includes(size);
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => handleToggleSize(size, 'womenPants')}
                           className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                             isActive
                               ? 'border-primary-prosalud bg-primary-prosalud/10 text-primary-prosalud'
