@@ -270,6 +270,9 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const [numeroDocumentoFilter, setNumeroDocumentoFilter] = useState<string>(
     searchParams.get('numero_documento') || ''
   );
+  const [nombreFilter, setNombreFilter] = useState<string>(
+    searchParams.get('nombre') || ''
+  );
   const [perPage, setPerPage] = useState<number>(
     parseInt(searchParams.get('per_page') || '15', 10)
   );
@@ -283,6 +286,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     searchParams.get('numero_documento') || ''
   );
   
+  // Debounce para el filtro de nombre
+  const [nombreFilterDebounced, setNombreFilterDebounced] = useState<string>(
+    searchParams.get('nombre') || ''
+  );
+  
   // Sincronizar el estado debounced cuando cambia el input
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -292,11 +300,20 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [numeroDocumentoFilter]);
 
+  // Sincronizar el estado debounced cuando cambia el input de nombre
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setNombreFilterDebounced(nombreFilter);
+    }, 500); // 500ms de debounce
+    
+    return () => clearTimeout(timer);
+  }, [nombreFilter]);
+
   // Resetear página a 1 cuando cambian los filtros (excepto perPage y currentPage)
   useEffect(() => {
     if (id) return;
     setCurrentPage(1);
-  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, id]);
+  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, id]);
 
   // Sincronizar filtros con searchParams automáticamente (reactivo)
   useEffect(() => {
@@ -310,6 +327,9 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (numeroDocumentoFilterDebounced.trim()) {
       newParams.set('numero_documento', numeroDocumentoFilterDebounced.trim());
     }
+    if (nombreFilterDebounced.trim()) {
+      newParams.set('nombre', nombreFilterDebounced.trim());
+    }
     newParams.set('per_page', perPage.toString());
     newParams.set('page', currentPage.toString());
     
@@ -319,7 +339,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (currentParams !== newParamsString) {
       setSearchParams(newParams, { replace: true });
     }
-  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, perPage, currentPage, id]);
+  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
 
   // Construir parámetros de consulta (ejecutar siempre, incluso si hay id)
   // NOTA: numero_documento se filtra en frontend temporalmente
@@ -337,6 +357,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
       params.survey_type = surveyTypeFilter;
     }
     
+    const nombreTrimmed = nombreFilterDebounced.trim();
+    if (nombreTrimmed) {
+      params.nombre = nombreTrimmed;
+    }
+    
     // NO enviar numero_documento al backend, se filtra en frontend
     // const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
     // if (documentoTrimmed) {
@@ -344,7 +369,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     // }
     
     return params;
-  }, [id, hospitalFilter, surveyTypeFilter]);
+  }, [id, hospitalFilter, surveyTypeFilter, nombreFilterDebounced]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -429,6 +454,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     setHospitalFilter('');
     setSurveyTypeFilter('all');
     setNumeroDocumentoFilter('');
+    setNombreFilter('');
     setCurrentPage(1);
     setSearchParams({});
   };
@@ -637,7 +663,15 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Buscar por nombre</label>
+                <Input
+                  placeholder="Nombre o apellido"
+                  value={nombreFilter}
+                  onChange={(e) => setNombreFilter(e.target.value)}
+                />
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Número de Documento</label>
                 <Input
@@ -667,9 +701,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end gap-2">
-                {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter) && (
-                  <Button variant="outline" onClick={handleClearFilters} className="flex-1">
+              <div className="space-y-2">
+                <label className="text-sm font-medium invisible">Acciones</label>
+                {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter || nombreFilter) && (
+                  <Button variant="outline" onClick={handleClearFilters} className="w-full">
+                    <Filter className="h-4 w-4 mr-2" />
                     Limpiar
                   </Button>
                 )}

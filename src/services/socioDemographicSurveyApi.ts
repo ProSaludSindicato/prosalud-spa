@@ -190,6 +190,7 @@ export interface GetSurveysParams {
   hospital?: string;
   survey_type?: string;
   numero_documento?: string;
+  nombre?: string;
   per_page?: number;
   page?: number;
 }
@@ -209,6 +210,9 @@ class SocioDemographicSurveyApi {
     }
     if (params?.numero_documento) {
       queryParams.append('numero_documento', params.numero_documento);
+    }
+    if (params?.nombre) {
+      queryParams.append('nombre', params.nombre);
     }
     if (params?.per_page) {
       queryParams.append('per_page', params.per_page.toString());
