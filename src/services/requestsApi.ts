@@ -745,6 +745,8 @@ export const requestsApiService = {
   // Export bulk response template
   async exportBulkResponseTemplate(filters?: {
     request_type?: string;
+    status?: string;
+    subtype?: string;
     date_range?: {
       include_all?: boolean;
       start_date?: string;
@@ -757,6 +759,14 @@ export const requestsApiService = {
       
       if (filters?.request_type) {
         params.request_type = filters.request_type;
+      }
+      
+      if (filters?.status) {
+        params.status = filters.status;
+      }
+      
+      if (filters?.subtype) {
+        params.subtype = filters.subtype;
       }
       
       // Construir date_range con el formato que Laravel espera

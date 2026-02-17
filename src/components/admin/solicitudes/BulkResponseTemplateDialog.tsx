@@ -11,6 +11,22 @@ import { requestsApiService } from '@/services/requestsApi';
 import { logger } from '@/utils/logger';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 
+// Subtipos válidos para verificación de pagos
+// Estos valores deben coincidir exactamente con los valores del backend (case-sensitive)
+const VERIFICACION_PAGOS_SUBTIPOS = [
+  { value: 'COMPENSACIÓN. FINAL (LIQUIDACIÓN)', label: 'Compensación Final' },
+  { value: 'COMPENSACIÓN ANUAL DIFERIDA Y/O DESCANSO', label: 'Compensación Anual Diferida' },
+  { value: 'COMPENSACIÓN POR DESCANSO', label: 'Compensación por Descanso' },
+  { value: 'DESCUENTOS SEGURIDAD SOCIAL', label: 'Descuentos Seguridad Social' },
+  { value: 'DUPLICADO COLILLAS', label: 'Duplicado Colillas' },
+  { value: 'VIATICOS', label: 'Viáticos' },
+  { value: 'Ceiisas', label: 'Ceiisas' },
+  { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
+  { value: 'COMPENSACIÓN SEMESTRAL', label: 'Compensación Semestral' },
+  { value: 'INCAPACIDADES', label: 'Incapacidades' },
+  { value: 'SUBSIDIOS', label: 'Subsidios' },
+];
+
 interface BulkResponseTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -31,6 +47,8 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
   getRequestTypeLabel
 }) => {
   const [requestType, setRequestType] = useState<string>('all');
+  const [status, setStatus] = useState<string>('all');
+  const [subtype, setSubtype] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
   });
@@ -75,6 +93,8 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
       // Build filters
       const filters: {
         request_type?: string;
+        status?: string;
+        subtype?: string;
         date_range?: {
           include_all?: boolean;
           start_date?: string;
@@ -84,6 +104,15 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
 
       if (requestType !== 'all') {
         filters.request_type = requestType;
+      }
+
+      if (status !== 'all') {
+        filters.status = status;
+      }
+
+      // Solo incluir subtype si request_type es 'verificacion-pagos' y subtype no es 'all'
+      if (requestType === 'verificacion-pagos' && subtype !== 'all') {
+        filters.subtype = subtype;
       }
 
       if (!dateRange.includeAll) {
@@ -178,7 +207,13 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
-                <Select value={requestType} onValueChange={setRequestType}>
+                <Select value={requestType} onValueChange={(value) => {
+                  setRequestType(value);
+                  // Reset subtype cuando cambia el tipo de solicitud
+                  if (value !== 'verificacion-pagos') {
+                    setSubtype('all');
+                  }
+                }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Todos los tipos de solicitudes" />
                   </SelectTrigger>
@@ -195,108 +230,59 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
             </CardContent>
           </Card>
 
-          {/* Date Range Selector */}
+          {/* Status Filter */}
           <Card className="border border-gray-200">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center space-x-3">
-                <Calendar className="h-5 w-5 text-gray-600" />
+                <Filter className="h-5 w-5 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-900">Rango de Fechas</h4>
+                  <h4 className="font-medium text-gray-900">Estado de Solicitud</h4>
                   <p className="text-sm text-gray-600">
-                    Filtra las solicitudes por período específico (opcional)
+                    Filtra las solicitudes por estado (opcional). Por defecto se incluyen PENDING e IN_REVIEW.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Incluir todas las solicitudes disponibles
-                </label>
-                <Switch
-                  checked={dateRange.includeAll}
-                  onCheckedChange={handleIncludeAllChange}
-                />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Seleccionar estado</label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos los estados (PENDING e IN_REVIEW por defecto)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="PENDING">Pendiente</SelectItem>
+                    <SelectItem value="IN_REVIEW">En Revisión</SelectItem>
+                    <SelectItem value="COMPLETED">Completada</SelectItem>
+                    <SelectItem value="REJECTED">Rechazada</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </CardContent>
+          </Card>
 
-              {!dateRange.includeAll && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Fecha Desde</label>
-                    <Input
-                      type="date"
-                      value={formatDateForInput(dateRange.start)}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      max={dateRange.end ? formatDateForInput(dateRange.end) : today}
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Fecha Hasta</label>
-                    <Input
-                      type="date"
-                      value={formatDateForInput(dateRange.end)}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      min={dateRange.start ? formatDateForInput(dateRange.start) : undefined}
-                      max={today}
-                      className="w-full"
-                    />
+          {/* Subtype Filter - Solo para verificacion-pagos */}
+          {requestType === 'verificacion-pagos' && (
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Filter className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Subtipo de Solicitud</h4>
+                    <p className="text-sm text-gray-600">
+                      Filtra las solicitudes de verificación de pagos por subtipo específico (opcional)
+                    </p>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Template Info */}
-          <Card className="border border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <h4 className="font-medium text-blue-900 mb-3">INSTRUCCIONES:</h4>
-              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-                <li>
-                  Complete las columnas <strong>"Nuevo Estado"</strong>, <strong>"Asunto Correo"</strong> y <strong>"Cuerpo Correo"</strong> para cada solicitud.
-                </li>
-                <li>
-                  Los estados válidos son: <strong>Pendiente</strong>, <strong>En Revisión</strong>, <strong>Completada</strong>, <strong>Rechazada</strong>
-                </li>
-                <li>
-                  No modifique las columnas de identificación (<strong>ID Solicitud</strong>, <strong>Tipo Documento</strong>, etc.)
-                </li>
-                <li>
-                  Puede dejar filas vacías si no desea procesarlas
-                </li>
-                <li className="font-semibold text-blue-900">
-                  IMPORTANTE: Las respuestas masivas NO permiten agregar archivos como anexos del correo. Si requiere anexos en la respuesta, debe hacerlo manualmente desde el panel de administración.
-                </li>
-              </ol>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end space-x-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDownloading}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleDownload}
-              disabled={isDownloading || (!dateRange.includeAll && (!dateRange.start || !dateRange.end))}
-              className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Descargando...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Descargar Plantilla
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-export default BulkResponseTemplateDialog;
-
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Seleccionar subtipo</label>
+                  <Select value={subtype} onValueChange={setSubtype}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los subtipos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los subtipos</SelectItem>
+                      {VERIFICACION_PAGOS_SUBTIPOS.map((subtypeOption) => (
+                        <SelectItem key={subtypeOption.value} value={subtypeOption.value}>
+                          {subt
