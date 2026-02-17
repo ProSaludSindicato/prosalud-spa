@@ -43,12 +43,13 @@ const Header: React.FC = () => {
             <Link to="/admin" className="flex-shrink-0">
               {/*<Link to="/auth/login" className="flex-shrink-0">*/ }
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="border-primary-prosalud text-primary-prosalud hover:bg-primary-prosalud hover:text-white focus:ring-primary-prosalud flex items-center gap-2 transition-all duration-200"
+                className="text-gray-500 hover:text-primary-prosalud hover:bg-gray-50 focus:ring-primary-prosalud flex items-center gap-2 transition-all duration-200 text-xs"
+                title="Acceso para personal autorizado"
               >
                 <LogIn size={16} />
-                <span>Acceder</span>
+                <span>Administrativo</span>
               </Button>
             </Link>
 

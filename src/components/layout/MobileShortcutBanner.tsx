@@ -67,7 +67,7 @@ const MobileShortcutBanner: React.FC = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium leading-tight">
-                Instala ProSalud como app y accede más rápido
+                Instala ProSalud como aplicación y accede más rápido al sitio web desde tu celular
               </p>
             </div>
           </div>
