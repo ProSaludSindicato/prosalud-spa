@@ -265,6 +265,83 @@ class SocioDemographicSurveyApi {
   }
 
   /**
+   * Exportar encuestas sociodemográficas a PDF (descarga masiva)
+   * Genera un único PDF con todas las encuestas que coincidan con los filtros
+   */
+  async exportToPdf(filters: {
+    survey_type?: string;
+    date_range: {
+      include_all: boolean;
+      start_date?: string;
+      end_date?: string;
+    };
+    hospital?: string;
+    profesion?: string;
+  }): Promise<{ blob: Blob; filename: string }> {
+    try {
+      const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/pdf');
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/pdf',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          survey_type: filters.survey_type || 'all',
+          date_range: filters.date_range,
+          hospital: filters.hospital,
+          profesion: filters.profesion,
+        }),
+      });
+
+      // Manejar errores
+      if (!response.ok) {
+        let errorMessage = 'Error al generar el PDF';
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            // Si no se puede parsear, usar el mensaje por defecto
+          }
+        } else if (response.status === 404) {
+          errorMessage = 'No se encontraron encuestas con los filtros especificados.';
+        } else if (response.status === 422) {
+          errorMessage = 'Los filtros proporcionados no son válidos.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Obtener el blob del PDF
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'Encuestas_Sociodemograficas_ProSalud.pdf';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      return {
+        blob,
+        filename,
+      };
+    } catch (error: any) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Error al exportar encuestas a PDF');
+    }
+  }
+
+  /**
    * Exportar encuestas sociodemográficas a Excel
    * Si include_signatures es true, retorna job_id para proceso asíncrono
    * Si include_signatures es false, retorna blob directamente (síncrono)

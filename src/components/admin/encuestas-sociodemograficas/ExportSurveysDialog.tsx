@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature } from 'lucide-react';
+import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { socioDemographicSurveyApi } from '@/services/socioDemographicSurveyApi';
 import { logger } from '@/utils/logger';
@@ -26,10 +26,13 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
   open, 
   onOpenChange,
 }) => {
+  const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
   const [surveyType, setSurveyType] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
   });
+  const [hospital, setHospital] = useState<string>('');
+  const [profesion, setProfesion] = useState<string>('');
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
@@ -58,6 +61,9 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
       setExportJobId(null);
       setIsGenerating(false);
       setIncludeSignatures(false);
+      setExportFormat('excel');
+      setHospital('');
+      setProfesion('');
     }
   }, [open]);
 
@@ -244,52 +250,91 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
     setIsGenerating(true);
     
     try {
-      logger.debug('Iniciando exportación de encuestas sociodemográficas desde backend');
+      logger.debug('Iniciando exportación de encuestas sociodemográficas desde backend', { format: exportFormat });
       
-      const result = await socioDemographicSurveyApi.exportToExcel({
-        survey_type: surveyType !== 'all' ? surveyType : undefined,
-        date_range: {
-          include_all: dateRange.includeAll,
-          start_date: formatDateForApi(dateRange.start),
-          end_date: formatDateForApi(dateRange.end),
-        },
-        include_signatures: includeSignatures,
-      });
-
-      // Si incluye firmas, es asíncrono (retorna job_id)
-      if ('job_id' in result) {
-        setExportJobId(result.job_id);
-        setExportStatus('processing');
-        startPolling(result.job_id);
-        toast.info('Generando reporte', {
-          description: 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo.',
+      if (exportFormat === 'pdf') {
+        // Exportar a PDF (síncrono)
+        const result = await socioDemographicSurveyApi.exportToPdf({
+          survey_type: surveyType !== 'all' ? surveyType : undefined,
+          date_range: {
+            include_all: dateRange.includeAll,
+            start_date: formatDateForApi(dateRange.start),
+            end_date: formatDateForApi(dateRange.end),
+          },
+          hospital: hospital.trim() || undefined,
+          profesion: profesion.trim() || undefined,
         });
-        return; // Don't close dialog, keep it open to show progress
+
+        const { blob, filename } = result;
+        logger.debug('Reporte PDF recibido del backend', { filename, size: blob.size });
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        
+        toast.success('Reporte PDF Generado', {
+          description: 'El reporte de encuestas sociodemográficas en PDF se ha descargado exitosamente',
+        });
+
+        logger.debug('Exportación de encuestas a PDF completada');
+        setIsGenerating(false);
+        onOpenChange(false);
+      } else {
+        // Exportar a Excel
+        const result = await socioDemographicSurveyApi.exportToExcel({
+          survey_type: surveyType !== 'all' ? surveyType : undefined,
+          date_range: {
+            include_all: dateRange.includeAll,
+            start_date: formatDateForApi(dateRange.start),
+            end_date: formatDateForApi(dateRange.end),
+          },
+          hospital: hospital.trim() || undefined,
+          include_signatures: includeSignatures,
+        });
+
+        // Si incluye firmas, es asíncrono (retorna job_id)
+        if ('job_id' in result) {
+          setExportJobId(result.job_id);
+          setExportStatus('processing');
+          startPolling(result.job_id);
+          toast.info('Generando reporte', {
+            description: 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo.',
+          });
+          return; // Don't close dialog, keep it open to show progress
+        }
+
+        // Si no incluye firmas, es síncrono (retorna blob)
+        const { blob, filename } = result;
+        logger.debug('Reporte Excel recibido del backend', { filename, size: blob.size });
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        
+        toast.success('Reporte Excel Generado', {
+          description: 'El reporte de encuestas sociodemográficas en Excel se ha descargado exitosamente',
+        });
+
+        logger.debug('Exportación de encuestas completada');
+        setIsGenerating(false);
+        onOpenChange(false);
       }
-
-      // Si no incluye firmas, es síncrono (retorna blob)
-      const { blob, filename } = result;
-      logger.debug('Reporte Excel recibido del backend', { filename, size: blob.size });
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-      
-      toast.success('Reporte Excel Generado', {
-        description: 'El reporte de encuestas sociodemográficas en Excel se ha descargado exitosamente',
-      });
-
-      logger.debug('Exportación de encuestas completada');
-      setIsGenerating(false);
-      onOpenChange(false);
     } catch (error) {
       logger.error('Error al exportar encuestas', error instanceof Error ? error.message : error);
       const message = error instanceof Error ? error.message : 'No se pudo conectar con el servidor. Verifique su conexión.';
@@ -312,11 +357,44 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
             Exportar Reporte de Encuestas
           </DialogTitle>
           <DialogDescription>
-            Genera un reporte en Excel de todas las encuestas sociodemográficas y de salud
+            Genera un reporte en Excel o PDF de todas las encuestas sociodemográficas y de salud
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Export Format Selector */}
+          <Card className="border border-gray-200">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center space-x-3">
+                <FileText className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Formato de Exportación</h4>
+                  <p className="text-sm text-gray-600">
+                    Selecciona el formato del reporte a generar
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Formato</label>
+                <Select value={exportFormat} onValueChange={(value: 'excel' | 'pdf') => setExportFormat(value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar formato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excel">Excel (.xlsx)</SelectItem>
+                    <SelectItem value="pdf">PDF (.pdf)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {exportFormat === 'pdf' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    El PDF incluirá todas las encuestas en páginas separadas con el mismo diseño que el PDF individual.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Survey Type Filter */}
           <Card className="border border-gray-200">
             <CardContent className="p-4 space-y-4">
@@ -397,32 +475,78 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
             </CardContent>
           </Card>
 
-          {/* Include Signatures Option */}
+          {/* Additional Filters (Hospital and Profesion) */}
           <Card className="border border-gray-200">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center space-x-3">
-                <FileSignature className="h-5 w-5 text-gray-600" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">Incluir Firmas Digitales</h4>
+                <Filter className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Filtros Adicionales</h4>
                   <p className="text-sm text-gray-600">
-                    Si está activado, el proceso tomará más tiempo (se ejecuta en segundo plano)
+                    Filtra por hospital o proceso (opcional)
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label htmlFor="include-signatures" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  Incluir firmas digitales embebidas en el reporte
-                </Label>
-                <Switch
-                  id="include-signatures"
-                  checked={includeSignatures}
-                  onCheckedChange={(checked) => setIncludeSignatures(checked === true)}
-                  disabled={isGenerating}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Hospital</label>
+                  <Input
+                    type="text"
+                    placeholder="Ej: LA MARIA, VENANCIO"
+                    value={hospital}
+                    onChange={(e) => setHospital(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Búsqueda exacta (case-sensitive)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Proceso/Profesión</label>
+                  <Input
+                    type="text"
+                    placeholder="Ej: Enfermería, Médico"
+                    value={profesion}
+                    onChange={(e) => setProfesion(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Búsqueda exacta (case-sensitive)
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Include Signatures Option (only for Excel) */}
+          {exportFormat === 'excel' && (
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <FileSignature className="h-5 w-5 text-gray-600" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900">Incluir Firmas Digitales</h4>
+                    <p className="text-sm text-gray-600">
+                      Si está activado, el proceso tomará más tiempo (se ejecuta en segundo plano)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="include-signatures" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Incluir firmas digitales embebidas en el reporte
+                  </Label>
+                  <Switch
+                    id="include-signatures"
+                    checked={includeSignatures}
+                    onCheckedChange={(checked) => setIncludeSignatures(checked === true)}
+                    disabled={isGenerating}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Processing Status */}
           {exportStatus === 'processing' && (
@@ -468,7 +592,9 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                   <li>• Recomendaciones laborales</li>
                   <li>• Información de contacto de emergencia</li>
                   <li>• Trazabilidad por tipo de encuesta</li>
-                  {includeSignatures && <li>• Firmas digitales embebidas</li>}
+                  {exportFormat === 'pdf' && <li>• Cada encuesta en una página separada</li>}
+                  {exportFormat === 'pdf' && <li>• Firmas digitales incluidas automáticamente</li>}
+                  {exportFormat === 'excel' && includeSignatures && <li>• Firmas digitales embebidas</li>}
                 </ul>
               </CardContent>
             </Card>
@@ -504,7 +630,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
               ) : (
                 <>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar Reporte
+                  Exportar {exportFormat === 'pdf' ? 'PDF' : 'Excel'}
                 </>
               )}
             </Button>
