@@ -656,7 +656,7 @@ const AdminDocumentSigningPage: React.FC = () => {
             const result: DownloadGeneratedConvenioResult = await downloadGeneratedConvenio(numeroDocumento);
 
             if (result.status === 200 && result.blob) {
-              // Descargar archivo
+              // Archivo listo, descargar
               const blobUrl = window.URL.createObjectURL(result.blob);
               const link = document.createElement('a');
               link.href = blobUrl;
@@ -673,28 +673,42 @@ const AdminDocumentSigningPage: React.FC = () => {
               return;
             }
 
-            if (result.status === 404) {
-              // Seguir intentando hasta un máximo de intentos
+            // Si es 404 y está en proceso, continuar polling
+            if (result.status === 404 && result.processing === true) {
+              // Máximo 20 intentos = ~1 minuto (cada 3 segundos)
               if (attempt >= 20) {
-                toast.error('No se pudo descargar el convenio', {
-                  description: 'El convenio sigue en proceso o falló. Intenta nuevamente más tarde desde el historial.',
+                toast.error('Tiempo de espera agotado', {
+                  description: 'El convenio está tardando más de lo esperado. Por favor, intente nuevamente más tarde desde el historial.',
+                  duration: 8000,
                 });
                 setIsDownloadingConvenio(false);
                 return;
               }
 
-              setTimeout(() => pollDownload(attempt + 1), 5000);
+              // Mostrar mensaje informativo cada 5 intentos (cada 15 segundos)
+              if (attempt % 5 === 1 && attempt > 1) {
+                toast.info('Generando convenio...', {
+                  description: `El convenio está en proceso. Intentando descargar... (${attempt}/20)`,
+                  duration: 3000,
+                });
+              }
+
+              // Esperar 3 segundos antes del siguiente intento
+              setTimeout(() => pollDownload(attempt + 1), 3000);
               return;
             }
 
-            // Otros errores
+            // Si es 404 pero no está en proceso, o cualquier otro error
+            const errorMessage = result.message || `El servidor respondió con estado ${result.status}`;
             toast.error('Error al descargar el convenio', {
-              description: `El servidor respondió con estado ${result.status}.`,
+              description: errorMessage,
+              duration: 8000,
             });
             setIsDownloadingConvenio(false);
           } catch (error: any) {
             toast.error('Error al descargar el convenio', {
               description: error?.message || 'Ocurrió un error al intentar descargar el convenio generado.',
+              duration: 8000,
             });
             setIsDownloadingConvenio(false);
           }

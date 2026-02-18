@@ -252,6 +252,19 @@ class SocioDemographicSurveyApi {
   }
 
   /**
+   * Descargar PDF con el detalle de una encuesta sociodemográfica
+   */
+  async downloadPdf(id: string): Promise<Blob> {
+    const response = await authenticatedApi.get(
+      `/api/socio-demographic-surveys/${id}/pdf`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  }
+
+  /**
    * Exportar encuestas sociodemográficas a Excel
    * Si include_signatures es true, retorna job_id para proceso asíncrono
    * Si include_signatures es false, retorna blob directamente (síncrono)

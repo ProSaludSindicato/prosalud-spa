@@ -978,6 +978,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
   // Todos los hooks deben estar al inicio, antes de cualquier return condicional
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null);
   const [isLoadingSignature, setIsLoadingSignature] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const signatureUrlRef = useRef<string | null>(null);
   
   const { data: surveyResponse, isLoading, error } = useQuery({
@@ -1039,6 +1040,35 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
     } catch (error) {
       console.error('Error descargando firma:', error);
       // Aquí podrías mostrar un toast de error
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!survey) return;
+    
+    setIsDownloadingPdf(true);
+    try {
+      const blob = await socioDemographicSurveyApi.downloadPdf(surveyId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // El nombre del archivo debe ser: Encuesta_Sociodemografica_{surveyId}_{documento}.pdf
+      const filename = `Encuesta_Sociodemografica_${surveyId}_${survey.numero_documento}.pdf`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('PDF descargado', {
+        description: 'El PDF de la encuesta se ha descargado correctamente.',
+      });
+    } catch (error) {
+      console.error('Error descargando PDF:', error);
+      toast.error('Error al descargar PDF', {
+        description: 'No se pudo descargar el PDF de la encuesta. Por favor, intente nuevamente.',
+      });
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
@@ -1247,7 +1277,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="mt-4 sm:mt-0">
+                  <div className="mt-4 sm:mt-0 flex items-center gap-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-slate-500" />
@@ -1257,6 +1287,24 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                         </div>
                       </div>
                     </div>
+                    <Button
+                      variant="default"
+                      onClick={handleDownloadPdf}
+                      disabled={isDownloadingPdf}
+                      className="flex-shrink-0"
+                    >
+                      {isDownloadingPdf ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Descargando...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          Descargar PDF
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>

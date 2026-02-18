@@ -442,30 +442,100 @@ export const generateAndSendConvenio = async (
 export interface DownloadGeneratedConvenioResult {
   status: number;
   blob?: Blob;
+  processing?: boolean; // true si el API indica que está en proceso
+  message?: string; // Mensaje del API en caso de error
 }
 
 /**
  * Descarga un convenio generado de forma asíncrona (si ya existe archivo)
  * GET /api/convenios-manual/download-generated?numero_documento=...
+ * 
+ * Respuestas esperadas:
+ * - 200: Archivo listo, devuelve el blob
+ * - 404 con { status: 'processing' }: Aún en proceso, continuar polling
+ * - 404 con otro mensaje: Error (directorio no existe, etc.)
+ * - 500: Error del servidor
  */
 export const downloadGeneratedConvenio = async (
   numero_documento: string
 ): Promise<DownloadGeneratedConvenioResult> => {
-  const response = await authenticatedApi.get(
-    '/api/convenios-manual/download-generated',
-    {
-      params: { numero_documento },
-      responseType: 'blob',
-      // Aceptar cualquier status para poder manejar 404 sin lanzar excepción automática
-      validateStatus: () => true,
+  try {
+    // Primero intentar como blob (si está listo)
+    const response = await authenticatedApi.get(
+      '/api/convenios-manual/download-generated',
+      {
+        params: { numero_documento },
+        responseType: 'blob',
+        // Aceptar cualquier status para poder manejar 404 sin lanzar excepción automática
+        validateStatus: () => true,
+      }
+    );
+
+    if (response.status === 200) {
+      return { status: 200, blob: response.data as Blob };
     }
-  );
 
-  if (response.status === 200) {
-    return { status: 200, blob: response.data as Blob };
+    // Si es 404, intentar leer el JSON para ver si está en proceso
+    if (response.status === 404) {
+      try {
+        // Convertir el blob a texto y parsear como JSON
+        const text = await (response.data as Blob).text();
+        const jsonData = JSON.parse(text);
+        
+        if (jsonData.status === 'processing') {
+          return { 
+            status: 404, 
+            processing: true,
+            message: jsonData.message || 'El convenio está en proceso'
+          };
+        }
+        
+        return { 
+          status: 404, 
+          processing: false,
+          message: jsonData.message || 'El convenio no está disponible'
+        };
+      } catch (parseError) {
+        // Si no se puede parsear, asumir que es un error
+        return { 
+          status: 404, 
+          processing: false,
+          message: 'El convenio no está disponible'
+        };
+      }
+    }
+
+    // Otros errores (500, etc.)
+    try {
+      const text = await (response.data as Blob).text();
+      const jsonData = JSON.parse(text);
+      return { 
+        status: response.status, 
+        processing: false,
+        message: jsonData.message || `Error del servidor (${response.status})`
+      };
+    } catch {
+      return { 
+        status: response.status, 
+        processing: false,
+        message: `Error del servidor (${response.status})`
+      };
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      return { 
+        status: error.response?.status || 500, 
+        processing: false,
+        message: error.message || 'Error al consultar el estado del convenio'
+      };
+    }
+    
+    return { 
+      status: 500, 
+      processing: false,
+      message: 'Error desconocido al consultar el estado del convenio'
+    };
   }
-
-  return { status: response.status };
 };
 
 /**
