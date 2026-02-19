@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature, FileText } from 'lucide-react';
+import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature, FileText, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { socioDemographicSurveyApi } from '@/services/socioDemographicSurveyApi';
 import { logger } from '@/utils/logger';
@@ -128,7 +128,112 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
     window.URL.revokeObjectURL(downloadUrl);
   };
 
-  // Polling function for async report generation
+  // Polling for PDF export (separate endpoint from Excel)
+  const startPollingPdf = (jobId: string, maxAttempts: number = 360): void => {
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+
+      try {
+        const statusResult = await socioDemographicSurveyApi.checkPdfExportStatus(jobId);
+
+        if (!statusResult.success && statusResult.message) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setExportError(statusResult.message);
+          setIsGenerating(false);
+          toast.error('Error al generar PDF', { description: statusResult.message });
+          return;
+        }
+
+        if (statusResult.status === 'completed') {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          try {
+            const { blob, filename } = await socioDemographicSurveyApi.downloadPdfExport(
+              jobId,
+              statusResult.file_name
+            );
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+            setExportStatus('completed');
+            setIsGenerating(false);
+            toast.success('Reporte PDF generado', {
+              description: statusResult.count != null
+                ? `Se descargaron ${statusResult.count} encuestas.`
+                : 'El PDF se ha descargado correctamente.',
+            });
+            onOpenChange(false);
+          } catch (error) {
+            setExportStatus('failed');
+            setIsGenerating(false);
+            const msg = error instanceof Error ? error.message : 'Error al descargar el PDF';
+            setExportError(msg);
+            toast.error('Error al descargar', { description: msg });
+          }
+          return;
+        }
+
+        if (statusResult.status === 'failed') {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setIsGenerating(false);
+          const errMsg = statusResult.error || 'Error al generar el PDF';
+          setExportError(errMsg);
+          toast.error('Error al generar PDF', { description: errMsg });
+          return;
+        }
+
+        setExportStatus('processing');
+        if (attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setIsGenerating(false);
+          setExportError('El PDF está tardando más de lo esperado. Intente de nuevo más tarde.');
+          toast.error('Tiempo agotado', {
+            description: 'El PDF está tardando más de lo esperado. Puede solicitar uno nuevo.',
+          });
+        }
+      } catch (error) {
+        logger.error('Error al verificar estado del PDF', error instanceof Error ? error.message : error);
+        if (attempts >= maxAttempts) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setExportStatus('failed');
+          setIsGenerating(false);
+          const msg = error instanceof Error ? error.message : 'Error al verificar el estado del PDF';
+          setExportError(msg);
+          toast.error('Error', { description: msg });
+        }
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    pollingIntervalRef.current = interval;
+  };
+
+  // Polling function for async report generation (Excel with signatures)
   const startPolling = (jobId: string, maxAttempts: number = 60): void => {
     let attempts = 0;
     
@@ -253,7 +358,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
       logger.debug('Iniciando exportación de encuestas sociodemográficas desde backend', { format: exportFormat });
       
       if (exportFormat === 'pdf') {
-        // Exportar a PDF (síncrono)
+        // Exportar a PDF (asíncrono: POST devuelve job_id, luego polling y descarga)
         const result = await socioDemographicSurveyApi.exportToPdf({
           survey_type: surveyType !== 'all' ? surveyType : undefined,
           date_range: {
@@ -265,28 +370,13 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
           profesion: profesion.trim() || undefined,
         });
 
-        const { blob, filename } = result;
-        logger.debug('Reporte PDF recibido del backend', { filename, size: blob.size });
-
-        // Create download link
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(link);
-        
-        toast.success('Reporte PDF Generado', {
-          description: 'El reporte de encuestas sociodemográficas en PDF se ha descargado exitosamente',
+        setExportJobId(result.job_id);
+        setExportStatus('processing');
+        startPollingPdf(result.job_id);
+        toast.info('Generando PDF', {
+          description: 'El PDF se está generando en segundo plano. Se descargará automáticamente cuando esté listo.',
         });
-
-        logger.debug('Exportación de encuestas a PDF completada');
-        setIsGenerating(false);
-        onOpenChange(false);
+        return;
       } else {
         // Exportar a Excel
         const result = await socioDemographicSurveyApi.exportToExcel({
@@ -351,129 +441,185 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-3xl bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-gray-900">
+          <DialogTitle className="text-lg sm:text-xl font-semibold text-gray-900">
             Exportar Reporte de Encuestas
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Genera un reporte en Excel o PDF de todas las encuestas sociodemográficas y de salud
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Export Format Selector */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Formato de Exportación</h4>
-                  <p className="text-sm text-gray-600">
-                    Selecciona el formato del reporte a generar
-                  </p>
+          {/* Export Format Selector - Visual Cards */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <FileText className="h-5 w-5 text-gray-600" />
+              <h4 className="font-medium text-gray-900">Formato de Exportación</h4>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Selecciona el formato del reporte a generar
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setExportFormat('excel')}
+                disabled={isGenerating}
+                className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-all ${
+                  exportFormat === 'excel'
+                    ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                } ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <div className="flex items-center space-x-3 w-full">
+                  <div className={`p-2 rounded-lg ${
+                    exportFormat === 'excel'
+                      ? 'bg-emerald-100'
+                      : 'bg-gray-100'
+                  }`}>
+                    <FileSpreadsheet className={`h-6 w-6 ${
+                      exportFormat === 'excel'
+                        ? 'text-emerald-600'
+                        : 'text-gray-600'
+                    }`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-semibold text-gray-900">Excel (.xlsx)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Ideal para análisis de datos
+                    </div>
+                  </div>
+                  {exportFormat === 'excel' && (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                  )}
                 </div>
-              </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setExportFormat('pdf')}
+                disabled={isGenerating}
+                className={`relative flex flex-col items-start p-4 rounded-lg border-2 transition-all ${
+                  exportFormat === 'pdf'
+                    ? 'border-red-500 bg-red-50 shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                } ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <div className="flex items-center space-x-3 w-full">
+                  <div className={`p-2 rounded-lg ${
+                    exportFormat === 'pdf'
+                      ? 'bg-red-100'
+                      : 'bg-gray-100'
+                  }`}>
+                    <FileText className={`h-6 w-6 ${
+                      exportFormat === 'pdf'
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-semibold text-gray-900">PDF (.pdf)</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Formato visual completo
+                    </div>
+                  </div>
+                  {exportFormat === 'pdf' && (
+                    <CheckCircle2 className="h-5 w-5 text-red-600 flex-shrink-0" />
+                  )}
+                </div>
+              </button>
+            </div>
+            {exportFormat === 'pdf' && (
+              <p className="text-xs text-gray-500 mt-2">
+                El PDF incluirá todas las encuestas en páginas separadas con el mismo diseño que el PDF individual. 
+                La generación puede tardar varios minutos si hay muchas encuestas; no cierres esta ventana mientras se procesa.
+              </p>
+            )}
+          </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Formato</label>
-                <Select value={exportFormat} onValueChange={(value: 'excel' | 'pdf') => setExportFormat(value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar formato" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="excel">Excel (.xlsx)</SelectItem>
-                    <SelectItem value="pdf">PDF (.pdf)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {exportFormat === 'pdf' && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    El PDF incluirá todas las encuestas en páginas separadas con el mismo diseño que el PDF individual.
-                  </p>
+          {/* Filters Grid - Two Columns on larger screens */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Survey Type Filter */}
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Filter className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Tipo de Encuesta</h4>
+                    <p className="text-sm text-gray-600">
+                      Filtra por tipo específico
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
+                  <Select value={surveyType} onValueChange={setSurveyType}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los tipos de encuestas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los tipos de encuestas</SelectItem>
+                      <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
+                      <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Date Range Selector */}
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Calendar className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Rango de Fechas</h4>
+                    <p className="text-sm text-gray-600">
+                      Filtra por período específico
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">
+                    Incluir todas las encuestas
+                  </label>
+                  <Switch
+                    checked={dateRange.includeAll}
+                    onCheckedChange={handleIncludeAllChange}
+                  />
+                </div>
+
+                {!dateRange.includeAll && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Desde</label>
+                      <Input
+                        type="date"
+                        value={formatDateForInput(dateRange.start)}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        max={dateRange.end ? formatDateForInput(dateRange.end) : today}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Hasta</label>
+                      <Input
+                        type="date"
+                        value={formatDateForInput(dateRange.end)}
+                        onChange={(e) => handleEndDateChange(e.target.value)}
+                        min={dateRange.start ? formatDateForInput(dateRange.start) : undefined}
+                        max={today}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Survey Type Filter */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <Filter className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Tipo de Encuesta</h4>
-                  <p className="text-sm text-gray-600">
-                    Filtra las encuestas por tipo específico
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
-                <Select value={surveyType} onValueChange={setSurveyType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos los tipos de encuestas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los tipos de encuestas</SelectItem>
-                    <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
-                    <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Date Range Selector */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <Calendar className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Rango de Fechas</h4>
-                  <p className="text-sm text-gray-600">
-                    Filtra las encuestas por período específico
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">
-                  Incluir todas las encuestas disponibles
-                </label>
-                <Switch
-                  checked={dateRange.includeAll}
-                  onCheckedChange={handleIncludeAllChange}
-                />
-              </div>
-
-              {!dateRange.includeAll && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Fecha Desde</label>
-                    <Input
-                      type="date"
-                      value={formatDateForInput(dateRange.start)}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      max={dateRange.end ? formatDateForInput(dateRange.end) : today}
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Fecha Hasta</label>
-                    <Input
-                      type="date"
-                      value={formatDateForInput(dateRange.end)}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      min={dateRange.start ? formatDateForInput(dateRange.start) : undefined}
-                      max={today}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Additional Filters (Hospital and Profesion) */}
           <Card className="border border-gray-200">
@@ -488,7 +634,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Hospital</label>
                   <Input
@@ -499,7 +645,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                     disabled={isGenerating}
                   />
                   <p className="text-xs text-gray-500">
-                    Búsqueda exacta (case-sensitive)
+                    Usa el nombre tal como está registrado (respetando mayúsculas, tildes y espacios).
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -512,7 +658,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                     disabled={isGenerating}
                   />
                   <p className="text-xs text-gray-500">
-                    Búsqueda exacta (case-sensitive)
+                    Escribe el proceso exactamente como aparece en los reportes (mayúsculas y tildes incluidas).
                   </p>
                 </div>
               </div>
@@ -555,9 +701,13 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                 <div className="flex items-center space-x-3">
                   <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
                   <div className="flex-1">
-                    <h4 className="font-medium text-blue-900">Generando reporte...</h4>
+                    <h4 className="font-medium text-blue-900">
+                      {exportFormat === 'pdf' ? 'Generando PDF...' : 'Generando reporte...'}
+                    </h4>
                     <p className="text-sm text-blue-800 mt-1">
-                      El reporte se está generando en segundo plano. Te notificaremos cuando esté listo para descargar.
+                      {exportFormat === 'pdf'
+                        ? 'El PDF se está generando en segundo plano. Se descargará automáticamente cuando esté listo.'
+                        : 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo para descargar.'}
                     </p>
                   </div>
                 </div>
@@ -580,7 +730,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
             </Card>
           )}
 
-          {/* Report Info */}
+          {/* Report Info
           {exportStatus === 'idle' && (
             <Card className="border border-blue-200 bg-blue-50">
               <CardContent className="p-4">
@@ -598,7 +748,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                 </ul>
               </CardContent>
             </Card>
-          )}
+          )} */}
 
           <div className="flex justify-end space-x-2 pt-4 border-t">
             <Button 

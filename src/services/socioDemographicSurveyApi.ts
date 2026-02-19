@@ -265,8 +265,8 @@ class SocioDemographicSurveyApi {
   }
 
   /**
-   * Exportar encuestas sociodemográficas a PDF (descarga masiva)
-   * Genera un único PDF con todas las encuestas que coincidan con los filtros
+   * Iniciar generación asíncrona del PDF masivo de encuestas sociodemográficas.
+   * Respuesta 202 Accepted con job_id; usar checkPdfExportStatus y downloadPdfExport para estado y descarga.
    */
   async exportToPdf(filters: {
     survey_type?: string;
@@ -277,68 +277,135 @@ class SocioDemographicSurveyApi {
     };
     hospital?: string;
     profesion?: string;
-  }): Promise<{ blob: Blob; filename: string }> {
-    try {
-      const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/pdf');
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/pdf',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          survey_type: filters.survey_type || 'all',
-          date_range: filters.date_range,
-          hospital: filters.hospital,
-          profesion: filters.profesion,
-        }),
-      });
+  }): Promise<{ job_id: string; status: string; check_status_url: string }> {
+    const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/pdf');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        survey_type: filters.survey_type || 'all',
+        date_range: filters.date_range,
+        hospital: filters.hospital ?? undefined,
+        profesion: filters.profesion ?? undefined,
+      }),
+    });
 
-      // Manejar errores
-      if (!response.ok) {
-        let errorMessage = 'Error al generar el PDF';
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch {
-            // Si no se puede parsear, usar el mensaje por defecto
-          }
-        } else if (response.status === 404) {
-          errorMessage = 'No se encontraron encuestas con los filtros especificados.';
-        } else if (response.status === 422) {
-          errorMessage = 'Los filtros proporcionados no son válidos.';
-        }
-        
-        throw new Error(errorMessage);
+    if (response.status === 202) {
+      const data = await response.json();
+      if (!data.success || !data.job_id) {
+        throw new Error(data.message || 'Error al iniciar la generación del PDF');
       }
-
-      // Obtener el blob del PDF
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'Encuestas_Sociodemograficas_ProSalud.pdf';
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-        }
-      }
-
       return {
-        blob,
-        filename,
+        job_id: data.job_id,
+        status: data.status || 'processing',
+        check_status_url: data.check_status_url || '',
       };
-    } catch (error: any) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error('Error al exportar encuestas a PDF');
     }
+
+    let errorMessage = 'Error al generar el PDF';
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.errors ? 'Los filtros proporcionados no son válidos.' : errorMessage;
+      } catch {
+        // use default
+      }
+    } else if (response.status === 404) {
+      errorMessage = 'No se encontraron encuestas con los filtros especificados.';
+    } else if (response.status === 422) {
+      errorMessage = 'Los filtros proporcionados no son válidos.';
+    }
+    throw new Error(errorMessage);
+  }
+
+  /**
+   * Consultar estado del job de exportación PDF masivo.
+   */
+  async checkPdfExportStatus(jobId: string): Promise<{
+    success: boolean;
+    job_id: string;
+    status: 'processing' | 'completed' | 'failed';
+    download_url?: string;
+    file_name?: string;
+    error?: string;
+    message?: string;
+    count?: number;
+  }> {
+    const url = buildAdminApiUrl(`/api/socio-demographic-surveys/export/pdf/status/${jobId}`);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (response.status === 404) {
+      try {
+        const data = await response.json();
+        return {
+          success: false,
+          job_id: jobId,
+          status: 'failed',
+          message: data.message || 'Job no encontrado o expirado',
+        };
+      } catch {
+        return {
+          success: false,
+          job_id: jobId,
+          status: 'failed',
+          message: 'Job no encontrado o expirado',
+        };
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(`Error al verificar estado: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Descargar el PDF generado (cuando el estado del job es completed).
+   * Usa autenticación (credentials) para obtener el blob.
+   */
+  async downloadPdfExport(jobId: string, suggestedFileName?: string): Promise<{ blob: Blob; filename: string }> {
+    const url = buildAdminApiUrl(`/api/socio-demographic-surveys/export/pdf/download/${jobId}`);
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Job no encontrado o expirado');
+      }
+      if (response.status === 400) {
+        try {
+          const data = await response.json();
+          throw new Error(data.message || 'El PDF aún no está listo');
+        } catch (e) {
+          if (e instanceof Error) throw e;
+          throw new Error('El PDF aún no está listo');
+        }
+      }
+      throw new Error(`Error al descargar PDF: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = suggestedFileName || 'Encuestas_Sociodemograficas.pdf';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    }
+    return { blob, filename };
   }
 
   /**
