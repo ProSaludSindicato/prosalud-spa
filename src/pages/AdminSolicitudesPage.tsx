@@ -137,6 +137,7 @@ const REJECTION_REASON_OPTIONS = [
   { value: 'sin_capacidad_endeudamiento', label: 'No tiene capacidad de endeudamiento' },
   { value: 'sin_evidencias', label: 'No anexa evidencias de la solicitud' },
   { value: 'sin_tiempo_provisionado', label: 'No cuenta con el tiempo provisionado' },
+  { value: 'retiro_sindical', label: 'Retiro sindical' },
   { value: 'solicitud_repetida', label: 'Solicitud repetida' },
   { value: 'otros', label: 'Otros' },
 ];
@@ -271,7 +272,7 @@ const responseFormSchema = z.object({
     .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
-  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'retiro_sindical', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
   rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
   actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
   attachments: z.any().optional().refine((files) => {
@@ -359,7 +360,7 @@ const responseWithCompensacionesFormSchema = z.object({
     .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
-  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
+  rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'por_retiro', 'retiro_sindical', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
   rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
