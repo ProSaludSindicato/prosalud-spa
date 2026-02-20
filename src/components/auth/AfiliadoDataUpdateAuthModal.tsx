@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
+import { AfiliadoAuthFailureError } from '@/services/afiliadosDataUpdateService';
 import { toast } from 'sonner';
 import { Loader2, X, IdCard, Hash, Calendar } from 'lucide-react';
 import { logger } from '@/utils/logger';
@@ -18,6 +20,7 @@ interface AfiliadoDataUpdateAuthModalProps {
 const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = ({ open, onClose, onSuccess }) => {
   const { authenticateForDataUpdate, afiliado, isAuthenticated, fechaExpedicion } = useAfiliadoAuth();
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState<{ reason: string; message: string } | null>(null);
   const [formData, setFormData] = useState({
     tipoDocumento: 'CC',
     numeroDocumento: '',
@@ -28,6 +31,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
   // Si también tiene fecha de expedición guardada, usarla y autenticar automáticamente
   React.useEffect(() => {
     if (open) {
+      setAuthError(null);
       if (isAuthenticated && afiliado) {
         // Si tiene fecha de expedición guardada, autenticar automáticamente
         if (fechaExpedicion) {
@@ -83,7 +87,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setAuthError(null);
     if (!formData.tipoDocumento || !formData.numeroDocumento || !formData.fechaExpedicion) {
       toast.error('Todos los campos son obligatorios');
       return;
@@ -116,15 +120,23 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
         onSuccess();
       }, 500);
     } catch (error: any) {
-      toast.error('Error al autenticar', {
-        description: error.message || 'No se pudo autenticar. Verifica tus datos e intenta nuevamente.',
-      });
+      const authFailureReason = error instanceof AfiliadoAuthFailureError ? error.authFailureReason : (error?.authFailureReason as string | undefined);
+      const message = error?.message || 'No se pudo autenticar. Verifica tus datos e intenta nuevamente.';
+      setAuthError({ reason: authFailureReason || 'unknown', message });
+      if (authFailureReason === 'affiliate_data_mismatch') {
+        toast.error('Verifica tus datos');
+      } else if (authFailureReason === 'affiliate_not_found') {
+        toast.error('Afiliado no encontrado');
+      } else {
+        toast.error('Error al autenticar');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
+    setAuthError(null);
     // Si el usuario está autenticado, mantener sus datos; si no, resetear todo
     if (isAuthenticated && afiliado) {
       setFormData({
@@ -181,6 +193,18 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="px-6 pb-6 pt-4">
+          {authError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>
+                {authError.reason === 'affiliate_data_mismatch' ? 'Verifica tus datos' : authError.reason === 'affiliate_not_found' ? 'Afiliado no encontrado' : 'Error al autenticar'}
+              </AlertTitle>
+              <AlertDescription className="mt-1">
+                {authError.reason === 'affiliate_data_mismatch'
+                  ? 'El número de documento existe en nuestro archivo, pero el tipo de documento o la fecha de expedición no coinciden. Verifica la información e intenta nuevamente. Si el problema persiste o consideras que tus datos son correctos, comunícate con ProSalud para revisar tu caso.'
+                  : authError.message}
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-5">
             {isAuthenticated && afiliado ? (
               // Si ya está autenticado, mostrar información y solo pedir fecha de expedición

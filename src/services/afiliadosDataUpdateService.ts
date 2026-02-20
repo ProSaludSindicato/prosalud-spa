@@ -86,6 +86,26 @@ export interface ApiErrorResponse {
   errors?: Record<string, string[]>;
 }
 
+/** Razón de fallo de autenticación (401) según el API */
+export type AuthFailureReason = 'affiliate_not_found' | 'affiliate_data_mismatch';
+
+export interface AuthFailureErrorResponse {
+  success?: boolean;
+  message: string;
+  auth_failure_reason?: AuthFailureReason;
+  afiliado?: null;
+}
+
+/** Error con razón de fallo para que el UI diferencie el comportamiento */
+export class AfiliadoAuthFailureError extends Error {
+  authFailureReason?: AuthFailureReason;
+  constructor(message: string, authFailureReason?: AuthFailureReason) {
+    super(message);
+    this.name = 'AfiliadoAuthFailureError';
+    this.authFailureReason = authFailureReason;
+  }
+}
+
 /**
  * Autentica un afiliado para actualización de datos personales
  * Devuelve información completa sin requerir validación OTP
@@ -100,16 +120,21 @@ export const authenticateForDataUpdate = async (
     );
 
     return response.data;
-  } catch (error: any) {
+    } catch (error: any) {
     if (error.response) {
       const status = error.response.status;
-      const errorData: ApiErrorResponse = error.response.data || {};
+      const errorData: ApiErrorResponse & AuthFailureErrorResponse = error.response.data || {};
 
       if (status === 400) {
         const message = errorData.message || 'Los datos proporcionados no son válidos.';
         throw new Error(message);
       } else if (status === 401) {
-        throw new Error('Credenciales incorrectas o afiliado no encontrado');
+        const reason = errorData.auth_failure_reason;
+        const message =
+          reason === 'affiliate_data_mismatch'
+            ? errorData.message || 'El número de documento existe pero el tipo de documento o la fecha de expedición no coinciden. Verifica los datos.'
+            : errorData.message || 'No existe un afiliado con ese número de documento.';
+        throw new AfiliadoAuthFailureError(message, reason);
       } else if (status === 422) {
         const message = errorData.message || 'Datos de entrada inválidos';
         throw new Error(message);

@@ -109,7 +109,8 @@ const AppRoutes = () => {
             <Route path="/servicios/incapacidades-licencias" element={<IncapacidadesLicenciasPage />} />
             <Route path="/servicios/incapacidad-maternidad" element={<Navigate to="/servicios/incapacidades-licencias" replace />} /> {/* Redirect legacy URL */}
             <Route path="/servicios/sst" element={<SstPage />} />
-            <Route path="/servicios/encuesta-bienestar" element={<EncuestaBienestarPage />} />
+            <Route path="/servicios/encuesta-sociodemografica" element={<EncuestaBienestarPage />} />
+            <Route path="/servicios/encuesta-bienestar" element={<EncuestaBienestarPage />} /> {/* Ruta legacy, misma página */}
             <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />
             <Route path="/servicios/galeria-bienestar/:eventId" element={<EventoDetallePage />} />
             <Route path="/servicios/permisos-turnos" element={<SolicitudPermisosCambioTurnosPage />} />

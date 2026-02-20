@@ -9,9 +9,10 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { submitSurvey } from '@/services/socioDemographicSurveyService';
-import { authenticateForDataUpdate } from '@/services/afiliadosDataUpdateService';
+import { authenticateForDataUpdate, AfiliadoAuthFailureError } from '@/services/afiliadosDataUpdateService';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase, Loader2 } from 'lucide-react';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
@@ -908,6 +909,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
     fechaExpedicion: string;
   } | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState<{ reason: 'affiliate_data_mismatch' | 'affiliate_not_found'; message: string } | null>(null);
   const [afiliadoData, setAfiliadoData] = useState<any>(null);
   const [activeConvenio, setActiveConvenio] = useState<any>(null);
   const [beneficiarios, setBeneficiarios] = useState<any[]>([]);
@@ -1028,6 +1030,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
   // Función para autenticar y obtener datos del afiliado
   const handleAuthenticate = async (tipoDoc: string, numDoc: string, fechaExp: string) => {
+    setAuthError(null);
     setIsAuthenticating(true);
     try {
       const response = await authenticateForDataUpdate({
@@ -1178,8 +1181,18 @@ const EncuestaBienestarPageContent: React.FC = () => {
       // Avanzar al siguiente paso (formulario)
       setCurrentStep(1);
     } catch (error: any) {
-      // Si no se encuentra el afiliado, no mostrar error, simplemente continuar
-      // El usuario deberá diligenciar toda la información manualmente
+      // Si el documento existe pero tipo o fecha de expedición no coinciden, no permitir continuar
+      const authFailureReason = error instanceof AfiliadoAuthFailureError ? error.authFailureReason : (error?.authFailureReason as string | undefined);
+      if (authFailureReason === 'affiliate_data_mismatch') {
+        setAuthError({
+          reason: 'affiliate_data_mismatch',
+          message: 'La información ingresada no coincide con nuestros registros. Verifica los datos e intenta nuevamente. Si el problema persiste o consideras que tus datos son correctos, comunícate con ProSalud para recibir asistencia.',
+        });
+        toast.error('Datos no coinciden');
+        return;
+      }
+
+      // affiliate_not_found o error genérico: tratar como usuario nuevo (diligenciamiento manual)
       logger.info('Afiliado no encontrado, continuando con diligenciamiento manual');
       
       // Marcar que no hay afiliado activo
@@ -1736,7 +1749,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
   return (
     <MainLayout>
       <div className={`bg-slate-50 ${currentStep === 0 ? 'pt-8 pb-32' : 'min-h-screen py-8'}`}>
-        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${currentStep === 0 ? 'max-w-3xl' : 'max-w-5xl'}`}>
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
           <Breadcrumb className={currentStep === 0 ? 'mb-4' : 'mb-6'}>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -1747,7 +1760,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbPage>Encuesta de Bienestar</BreadcrumbPage>
+                <BreadcrumbPage>Encuesta Sociodemográfica</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -1788,7 +1801,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
           {/* Paso 0: Autenticación */}
           {currentStep === 0 && (
-            <Card className="max-w-3xl mx-auto mb-8">
+            <Card className="mb-8">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <User className="h-5 w-5 text-primary-prosalud" />
@@ -1799,6 +1812,14 @@ const EncuestaBienestarPageContent: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
+                {authError?.reason === 'affiliate_data_mismatch' && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertTitle><strong>Datos no coinciden</strong></AlertTitle>
+                    <AlertDescription className="mt-1">
+                      {authError.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();

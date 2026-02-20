@@ -114,7 +114,7 @@ const newServices: Service[] = [
     icon: Poll, 
     title: 'Encuesta sociodemográfica y salud', 
     description: 'Completa la encuesta de diagnóstico de condiciones de salud y actualiza tu información de contacto de emergencia.', 
-    linkTo: '/servicios/encuesta-bienestar', 
+    linkTo: '/servicios/encuesta-sociodemografica', 
     category: 'Bienestar y SST',
     keywords: ['encuesta', 'sociodemografica', 'salud', 'diagnostico', 'condiciones', 'contacto', 'emergencia', 'actualizar', 'informacion']
   },
