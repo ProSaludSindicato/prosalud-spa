@@ -632,14 +632,23 @@ export const requestsApiService = {
         }
       );
 
-      // Extract filename from Content-Disposition header
+      // Nombre del archivo con fecha y hora de generación (formato 12h con AM/PM)
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const h = now.getHours();
+      const hour12 = h % 12 || 12;
+      const ampm = h < 12 ? 'AM' : 'PM';
+      const dateTimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(hour12)}-${pad(now.getMinutes())}-${ampm}`;
+      let filename = `Reporte_Solicitudes_ProSalud_${dateTimeStr}.xlsx`;
+
       const contentDisposition = response.headers['content-disposition'];
-      let filename = 'Reporte_Solicitudes_ProSalud.xlsx';
-      
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
+          const serverName = filenameMatch[1].replace(/['"]/g, '');
+          // Si el servidor envía nombre, usar base del servidor + fecha/hora
+          const base = serverName.replace(/\.xlsx$/i, '');
+          filename = `${base}_${dateTimeStr}.xlsx`;
         }
       }
 
