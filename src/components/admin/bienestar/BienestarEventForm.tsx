@@ -41,13 +41,20 @@ const formSchema = z.object({
     .min(1, "La ubicación es obligatoria")
     .max(255, "La ubicación no puede exceder 255 caracteres")
     .trim(),
-  attendees: z
-    .number()
-    .int("El número de asistentes debe ser un número entero")
-    .refine((val) => val === undefined || val >= 0, {
-      message: "El número de asistentes no puede ser negativo",
-    })
-    .optional(),
+  attendees: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      if (typeof val === "number" && isNaN(val)) return undefined;
+      return val;
+    },
+    z
+      .number()
+      .int("El número de asistentes debe ser un número entero")
+      .refine((val) => val >= 0, {
+        message: "El número de asistentes no puede ser negativo",
+      })
+      .optional()
+  ),
   gift: z.string().max(255, "El obsequio no puede exceder 255 caracteres").optional(),
   provider: z
     .string()

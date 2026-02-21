@@ -324,7 +324,7 @@ const AdminBienestarPage: React.FC = () => {
                             {event.location && (
                               <p className="truncate">{event.location}</p>
                             )}
-                            {event.attendees && (
+                            {event.attendees != null && event.attendees !== 0 && (
                               <p>{event.attendees} asistentes</p>
                             )}
                           </div>
