@@ -4319,9 +4319,9 @@ const AdminSolicitudesPage: React.FC = () => {
                                 className="w-full"
                               >
                                 <TabsList className="grid w-full grid-cols-3">
-                                  <TabsTrigger value="C">C – Totales</TabsTrigger>
-                                  <TabsTrigger value="A">A – Mensaje redactado</TabsTrigger>
-                                  <TabsTrigger value="B">B – Valores individuales</TabsTrigger>
+                                  <TabsTrigger value="C">A – Totales</TabsTrigger>
+                                  <TabsTrigger value="A">B – Mensaje redactado</TabsTrigger>
+                                  <TabsTrigger value="B">C – Valores individuales</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="C" className="mt-4">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
