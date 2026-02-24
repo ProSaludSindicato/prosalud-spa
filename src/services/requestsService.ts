@@ -191,7 +191,7 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
           // Don't set Content-Type - let axios set it automatically with boundary
         },
         withCredentials: false,
-        timeout: 30000, // 30 segundos - timeout para envío de solicitudes por afiliados (puede incluir archivos)
+        timeout: 90000, // 90 segundos - timeout para envío de solicitudes por afiliados (el API puede demorar; evita fallo en frontend cuando la solicitud sí se creó en backend)
       }
     );
 

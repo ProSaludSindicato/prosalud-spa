@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,6 +39,8 @@ import {
   Upload,
   FileSpreadsheet,
   Clipboard,
+  DollarSign,
+  Mail,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion } from "framer-motion";
@@ -74,6 +76,7 @@ import { UpdateAfiliadosReminderDialog } from "@/components/admin/solicitudes/Up
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, ChevronDown, ClipboardPaste } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Subtipos válidos para verificación de pagos
 // Estos valores deben coincidir exactamente con los valores del backend (case-sensitive)
@@ -359,9 +362,11 @@ const responseWithCompensacionesFormSchema = z.object({
     .max(200, "La razón no puede exceder 200 caracteres")
     .optional(),
   emailSubject: z.string().max(100, "El asunto no puede exceder 100 caracteres").optional(),
-  emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
+  emailBody: z.string().max(1500, "El cuerpo del correo no puede exceder 1500 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'por_retiro', 'retiro_sindical', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
-  rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
+  rejection_reason_otros: z.string().max(1000, "La razón de rechazo no puede exceder 1000 caracteres").optional(),
+  compensacionesOpcion: z.enum(['A', 'B', 'C'], { required_error: "Seleccione una opción de compensaciones" }),
+  mensaje_compensaciones_parte1: z.string().max(1000, "El mensaje de compensaciones no puede exceder 1000 caracteres").optional(),
   t_basicos: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.union([
@@ -380,6 +385,26 @@ const responseWithCompensacionesFormSchema = z.object({
       z.undefined()
     ])
   ),
+  // Opción B: valores individuales (todos opcionales, numéricos >= 0)
+  basico: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilios: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  manutencion: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  provisiones: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  horas: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_hora_diurna: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_hora_nocturna: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_hora_diurna_festiva: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_hora_nocturna_festiva: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_de_transporte: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_de_manutencion: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_de_encierro: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_de_rodamiento: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_especial: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  auxilio_prosalud: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_auxilio_diurno: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_auxilio_recargo_nocturno: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_auxilio_recargo_festivo: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
+  valor_auxilio_recargo_festivo_nocturno: z.preprocess((v) => (v === '' || v === null || v === undefined ? undefined : Number(v)), z.union([z.number().min(0), z.undefined()])),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
     
@@ -714,6 +739,8 @@ const AdminSolicitudesPage: React.FC = () => {
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
   const [useCompensacionesForm, setUseCompensacionesForm] = useState(false);
+  /** Error del backend al no poder resolver compensaciones (422); se muestra en el modal además del toast */
+  const [compensacionesApiError, setCompensacionesApiError] = useState<{ message: string; errors: string[]; sugerencia?: string } | null>(null);
   const [requiresFondoPensionesAnnex, setRequiresFondoPensionesAnnex] = useState(false);
   const [requiresActividadesForm, setRequiresActividadesForm] = useState(false);
   const [isTransitioningRequest, setIsTransitioningRequest] = useState(false);
@@ -792,11 +819,92 @@ const AdminSolicitudesPage: React.FC = () => {
       emailSubject: "",
       emailBody: "",
       rejection_reason: undefined,
+      rejection_reason_otros: "",
+      compensacionesOpcion: 'C',
+      mensaje_compensaciones_parte1: "",
       t_basicos: undefined,
       t_auxilios: undefined,
+      basico: undefined,
+      auxilios: undefined,
+      manutencion: undefined,
+      provisiones: undefined,
+      horas: undefined,
+      valor_hora_diurna: undefined,
+      valor_hora_nocturna: undefined,
+      valor_hora_diurna_festiva: undefined,
+      valor_hora_nocturna_festiva: undefined,
+      auxilio_de_transporte: undefined,
+      auxilio_de_manutencion: undefined,
+      auxilio_de_encierro: undefined,
+      auxilio_de_rodamiento: undefined,
+      auxilio_especial: undefined,
+      auxilio_prosalud: undefined,
+      valor_auxilio_diurno: undefined,
+      valor_auxilio_recargo_nocturno: undefined,
+      valor_auxilio_recargo_festivo: undefined,
+      valor_auxilio_recargo_festivo_nocturno: undefined,
       attachments: undefined,
     },
   });
+
+  // Input monetario con $ y COP y separador de miles (puntos)
+  const CompensacionMoneyInput = ({ field, placeholder = "0", ...props }: { field: { value?: number | null; onChange: (v: number | undefined) => void }; placeholder?: string; [key: string]: unknown }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [localValue, setLocalValue] = useState<string>(() =>
+      field.value !== undefined && field.value !== null ? String(field.value) : ""
+    );
+    const isFocusedRef = useRef(false);
+
+    const formatNumber = (value: string): string => {
+      if (!value || value === "") return "";
+      const numericValue = value.replace(/\./g, "");
+      return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    };
+    const unformatNumber = (value: string): string => value.replace(/\./g, "");
+
+    useEffect(() => {
+      if (!isFocusedRef.current) {
+        const newVal = field.value !== undefined && field.value !== null ? String(field.value) : "";
+        if (newVal !== localValue) setLocalValue(newVal);
+      }
+    }, [field.value]);
+
+    const displayValue = isFocusedRef.current ? localValue : formatNumber(localValue);
+
+    return (
+      <div className="flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+        <span className="shrink-0 text-muted-foreground select-none pr-1">$</span>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          placeholder={placeholder}
+          value={displayValue}
+          onFocus={() => {
+            isFocusedRef.current = true;
+            setLocalValue(unformatNumber(localValue));
+          }}
+          onChange={(e) => {
+            const unformatted = unformatNumber(e.target.value);
+            if (unformatted === "" || /^\d+$/.test(unformatted)) setLocalValue(unformatted);
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+            const unformatted = unformatNumber(localValue);
+            if (unformatted === "") {
+              field.onChange(undefined);
+            } else {
+              const num = Number(unformatted);
+              field.onChange(Number.isNaN(num) ? undefined : num);
+            }
+          }}
+          className="block min-w-0 grow bg-background py-1.5 pr-2 pl-1 text-sm placeholder:text-muted-foreground focus:outline-none"
+          {...props}
+        />
+        <span className="shrink-0 text-muted-foreground select-none pl-1">COP</span>
+      </div>
+    );
+  };
 
   const {
     data: allSolicitudes = [],
@@ -1426,8 +1534,31 @@ const AdminSolicitudesPage: React.FC = () => {
         newStatus: defaultStatus,
         emailSubject,
         emailBody,
+        rejection_reason: undefined,
+        rejection_reason_otros: "",
+        compensacionesOpcion: 'C',
+        mensaje_compensaciones_parte1: "",
         t_basicos: undefined,
         t_auxilios: undefined,
+        basico: undefined,
+        auxilios: undefined,
+        manutencion: undefined,
+        provisiones: undefined,
+        horas: undefined,
+        valor_hora_diurna: undefined,
+        valor_hora_nocturna: undefined,
+        valor_hora_diurna_festiva: undefined,
+        valor_hora_nocturna_festiva: undefined,
+        auxilio_de_transporte: undefined,
+        auxilio_de_manutencion: undefined,
+        auxilio_de_encierro: undefined,
+        auxilio_de_rodamiento: undefined,
+        auxilio_especial: undefined,
+        auxilio_prosalud: undefined,
+        valor_auxilio_diurno: undefined,
+        valor_auxilio_recargo_nocturno: undefined,
+        valor_auxilio_recargo_festivo: undefined,
+        valor_auxilio_recargo_festivo_nocturno: undefined,
         attachments: undefined,
       });
       // Asegurar que el valor del estado se establezca correctamente después del reset
@@ -1502,10 +1633,11 @@ const AdminSolicitudesPage: React.FC = () => {
   };
 
   const handleCloseResponseDialog = () => {
-    setIsSubmittingResponse(false); // Resetear estado de envío al cerrar
+    setIsSubmittingResponse(false);
     setResponseDialogOpen(false);
     setSolicitudToRespond(null);
     setUseCompensacionesForm(false);
+    setCompensacionesApiError(null);
     setRequiresFondoPensionesAnnex(false);
     setRequiresActividadesForm(false);
     responseForm.reset();
@@ -1940,17 +2072,46 @@ const AdminSolicitudesPage: React.FC = () => {
             : data.rejection_reason)
         : undefined;
       
-      // Convertir ID a string de 10 dígitos (con ceros a la izquierda si es necesario)
+      // Enviar solo los datos de la opción de compensaciones seleccionada (A, B o C)
+      const opcion = data.compensacionesOpcion;
+      const isRejected = data.newStatus === 'rejected';
+      const compensacionesPayload = isRejected
+        ? {}
+        : opcion === 'A'
+          ? { mensaje_compensaciones_parte1: data.mensaje_compensaciones_parte1?.trim() || undefined }
+          : opcion === 'B'
+            ? {
+                basico: data.basico,
+                auxilios: data.auxilios,
+                manutencion: data.manutencion,
+                provisiones: data.provisiones,
+                horas: data.horas,
+                valor_hora_diurna: data.valor_hora_diurna,
+                valor_hora_nocturna: data.valor_hora_nocturna,
+                valor_hora_diurna_festiva: data.valor_hora_diurna_festiva,
+                valor_hora_nocturna_festiva: data.valor_hora_nocturna_festiva,
+                auxilio_de_transporte: data.auxilio_de_transporte,
+                auxilio_de_manutencion: data.auxilio_de_manutencion,
+                auxilio_de_encierro: data.auxilio_de_encierro,
+                auxilio_de_rodamiento: data.auxilio_de_rodamiento,
+                auxilio_especial: data.auxilio_especial,
+                auxilio_prosalud: data.auxilio_prosalud,
+                valor_auxilio_diurno: data.valor_auxilio_diurno,
+                valor_auxilio_recargo_nocturno: data.valor_auxilio_recargo_nocturno,
+                valor_auxilio_recargo_festivo: data.valor_auxilio_recargo_festivo,
+                valor_auxilio_recargo_festivo_nocturno: data.valor_auxilio_recargo_festivo_nocturno,
+              }
+            : { t_basicos: data.t_basicos, t_auxilios: data.t_auxilios };
+
       const solicitudIdString = String(solicitudId).padStart(10, '0');
+      setCompensacionesApiError(null); // Limpiar error previo al intentar de nuevo
       const updatedRequest = await requestsService.sendResponseWithCompensaciones(solicitudIdString, {
         newStatus: data.newStatus,
         emailSubject: data.emailSubject!,
         emailBody: data.emailBody!,
         rejection_reason: rejectionReasonToSend,
         status_reason: data.statusReason,
-        // No enviar compensaciones si el estado es "rejected" (no se genera certificado)
-        t_basicos: data.newStatus !== 'rejected' ? data.t_basicos : undefined,
-        t_auxilios: data.newStatus !== 'rejected' ? data.t_auxilios : undefined,
+        ...compensacionesPayload,
         attachments: data.attachments,
       });
 
@@ -1967,12 +2128,15 @@ const AdminSolicitudesPage: React.FC = () => {
           duration: 5000,
         });
       } else {
-      // Calcular Total Ingresos para el mensaje (usar 0 si son undefined)
-      const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
-      toast.success("Certificado generado y respuesta enviada exitosamente", {
-        description: `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`,
-        duration: 5000,
-      });
+        const opcion = data.compensacionesOpcion;
+        const t_ingresos = (data.t_basicos ?? 0) + (data.t_auxilios ?? 0);
+        const tieneTotales = opcion === 'C' && (t_ingresos > 0);
+        toast.success("Certificado generado y respuesta enviada exitosamente", {
+          description: tieneTotales
+            ? `El certificado con compensaciones (Total Ingresos: $${t_ingresos.toLocaleString('es-CO')}) ha sido generado y enviado al afiliado.`
+            : "El certificado con compensaciones ha sido generado y enviado al afiliado.",
+          duration: 5000,
+        });
       }
 
       // Cerrar el modal después de un pequeño delay para que el usuario vea el toast
@@ -2037,21 +2201,24 @@ const AdminSolicitudesPage: React.FC = () => {
         
         // Verificar si hay errores de compensaciones
         if (originalData?.errors?.compensaciones && Array.isArray(originalData.errors.compensaciones)) {
-          // Usar el mensaje principal del error si está disponible
           errorTitle = originalData.message || "Este certificado requiere valores de compensaciones";
-          
-          // Construir descripción con los mensajes de error de compensaciones
           const compensacionesMessages = originalData.errors.compensaciones;
-          const description = compensacionesMessages.length > 0 
+          const description = compensacionesMessages.length > 0
             ? compensacionesMessages.join('\n\n')
             : originalData.sugerencia || errorMessage;
-          
-          // Mostrar toast de error con mensaje detallado
+
+          // Mostrar en el modal para feedback directo en la vista
+          setCompensacionesApiError({
+            message: originalData.message || errorTitle,
+            errors: compensacionesMessages,
+            sugerencia: originalData.sugerencia,
+          });
+
           toast.error(errorTitle, {
             description: description,
-            duration: 8000, // Más tiempo para leer el mensaje detallado
+            duration: 8000,
           });
-          return; // Salir temprano para no mostrar el toast genérico
+          return;
         }
       }
       
@@ -4136,89 +4303,212 @@ const AdminSolicitudesPage: React.FC = () => {
                     {/* Campos de compensaciones - Solo visible cuando el estado NO es "rejected" */}
                     {responseWithCompensacionesForm.watch('newStatus') !== 'rejected' && (
                     <div className="border-t border-gray-200 pt-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Valores de Compensaciones</h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Total Basicos */}
-                        <FormField
-                          control={responseWithCompensacionesForm.control}
-                          name="t_basicos"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Total Basicos</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  placeholder="Ingrese el valor"
-                                  {...field}
-                                  onChange={(e) => {
-                                    const value = e.target.value === '' ? undefined : (e.target.value === '-' ? undefined : parseInt(e.target.value, 10));
-                                    field.onChange(value === undefined || isNaN(value) ? undefined : value);
-                                  }}
-                                  value={field.value === undefined || field.value === null ? '' : field.value}
-                                  min={0}
-                                  step={1}
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Valor de compensación básica (número entero). Si no se ingresa, el sistema consultará si tiene el dato disponible.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Total Auxilios */}
-                        <FormField
-                          control={responseWithCompensacionesForm.control}
-                          name="t_auxilios"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Total Auxilios</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  placeholder="Ingrese el valor"
-                                  {...field}
-                                  onChange={(e) => {
-                                    const value = e.target.value === '' ? undefined : (e.target.value === '-' ? undefined : parseInt(e.target.value, 10));
-                                    field.onChange(value === undefined || isNaN(value) ? undefined : value);
-                                  }}
-                                  value={field.value === undefined || field.value === null ? '' : field.value}
-                                  min={0}
-                                  step={1}
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Valor de auxilios (número entero). Si no se ingresa, el sistema consultará si tiene el dato disponible.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      {/* Mostrar Total Ingresos calculado */}
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">Total Ingresos (calculado automáticamente):</span>
-                          <span className="text-lg font-bold text-primary-prosalud">
-                            {(() => {
-                              const t_basicos = responseWithCompensacionesForm.watch('t_basicos');
-                              const t_auxilios = responseWithCompensacionesForm.watch('t_auxilios');
-                              // Si ambos están vacíos, no mostrar $0
-                              if ((t_basicos === undefined || t_basicos === null) && (t_auxilios === undefined || t_auxilios === null)) {
-                                return <span className="text-gray-500">—</span>;
-                              }
-                              const total = (t_basicos ?? 0) + (t_auxilios ?? 0);
-                              return `$${total.toLocaleString('es-CO')}`;
-                            })()}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Total Ingresos = Total Basicos + Total Auxilios
-                        </p>
-                      </div>
+                      <h3 className="text-base font-semibold text-gray-900 mb-3">Compensaciones</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Elija una opción. Solo se usará la que seleccione.
+                      </p>
+                      <FormField
+                        control={responseWithCompensacionesForm.control}
+                        name="compensacionesOpcion"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Tabs
+                                value={field.value}
+                                onValueChange={(v) => field.onChange(v as 'A' | 'B' | 'C')}
+                                className="w-full"
+                              >
+                                <TabsList className="grid w-full grid-cols-3">
+                                  <TabsTrigger value="C">C – Totales</TabsTrigger>
+                                  <TabsTrigger value="A">A – Mensaje redactado</TabsTrigger>
+                                  <TabsTrigger value="B">B – Valores individuales</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="C" className="mt-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={responseWithCompensacionesForm.control}
+                                      name="t_basicos"
+                                      render={({ field: f }) => (
+                                        <FormItem>
+                                          <FormLabel>Total Basicos</FormLabel>
+                                          <FormControl>
+                                            <CompensacionMoneyInput field={f} placeholder="Ingrese el valor" />
+                                          </FormControl>
+                                          <FormDescription>
+                                            Valor de compensación básica. Si no se ingresa, el sistema consultará si tiene el dato disponible.
+                                          </FormDescription>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={responseWithCompensacionesForm.control}
+                                      name="t_auxilios"
+                                      render={({ field: f }) => (
+                                        <FormItem>
+                                          <FormLabel>Total Auxilios</FormLabel>
+                                          <FormControl>
+                                            <CompensacionMoneyInput field={f} placeholder="Ingrese el valor" />
+                                          </FormControl>
+                                          <FormDescription>
+                                            Valor de auxilios. Si no se ingresa, el sistema consultará si tiene el dato disponible.
+                                          </FormDescription>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-medium text-gray-700">Total Ingresos:</span>
+                                      <span className="text-lg font-bold text-primary-prosalud">
+                                        {(() => {
+                                          const t_basicos = responseWithCompensacionesForm.watch('t_basicos');
+                                          const t_auxilios = responseWithCompensacionesForm.watch('t_auxilios');
+                                          if ((t_basicos === undefined || t_basicos === null) && (t_auxilios === undefined || t_auxilios === null)) {
+                                            return <span className="text-gray-500">—</span>;
+                                          }
+                                          const total = (t_basicos ?? 0) + (t_auxilios ?? 0);
+                                          return `$${total.toLocaleString('es-CO')}`;
+                                        })()}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1">Total Ingresos = Total Basicos + Total Auxilios</p>
+                                  </div>
+                                </TabsContent>
+                                <TabsContent value="A" className="mt-4">
+                                  <FormField
+                                    control={responseWithCompensacionesForm.control}
+                                    name="mensaje_compensaciones_parte1"
+                                    render={({ field: f }) => {
+                                      const len = f.value?.length ?? 0;
+                                      return (
+                                        <FormItem>
+                                          <FormLabel>Texto del mensaje de compensaciones (máx. 1000 caracteres)</FormLabel>
+                                          <FormControl>
+                                            <Textarea
+                                              placeholder="Escriba el texto completo que aparecerá en el certificado..."
+                                              className="min-h-[100px]"
+                                              {...f}
+                                              value={f.value ?? ''}
+                                              maxLength={1000}
+                                            />
+                                          </FormControl>
+                                          <FormDescription>
+                                            Se usará tal cual en el certificado.
+                                          </FormDescription>
+                                          <span className="text-xs text-gray-500">{len}/1000</span>
+                                          <FormMessage />
+                                        </FormItem>
+                                      );
+                                    }}
+                                  />
+                                </TabsContent>
+                                <TabsContent value="B" className="mt-4">
+                                  <div className="space-y-6">
+                                    {/* Grupo 1: Salarios y Auxilios Básicos */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                      <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4" />
+                                        Salarios y Auxilios Básicos
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                        <FormField control={responseWithCompensacionesForm.control} name="basico" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Salario Básico</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilios" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilios</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="manutencion" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Manutención</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="provisiones" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Provisiones</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_especial" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio Especial</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_prosalud" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio Prosalud</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                      </div>
+                                    </div>
+                                    {/* Grupo 2: Horas y Valores por Hora */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                      <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        Horas y Valores por Hora
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                        <FormField control={responseWithCompensacionesForm.control} name="horas" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Horas</FormLabel><FormControl>
+                                            <Input type="number" placeholder="0" min={0} step={1} {...f} value={f.value === undefined || f.value === null ? '' : f.value} onChange={(e) => { const v = e.target.value === '' ? undefined : Number(e.target.value); f.onChange(v === undefined || Number.isNaN(v) ? undefined : v); }} />
+                                          </FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_hora_diurna" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Hora Diurna</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_hora_nocturna" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Hora Nocturna</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_hora_diurna_festiva" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Hora Diurna Festiva</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_hora_nocturna_festiva" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Hora Nocturna Festiva</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                      </div>
+                                    </div>
+                                    {/* Grupo 3: Auxilios Especiales */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                      <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                        <Mail className="h-4 w-4" />
+                                        Auxilios Especiales
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_de_transporte" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio de Transporte</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_de_manutencion" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio de Manutención</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_de_encierro" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio de Encierro</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="auxilio_de_rodamiento" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Auxilio de Rodamiento</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                      </div>
+                                    </div>
+                                    {/* Grupo 4: Auxilios con Recargos */}
+                                    <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                                      <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Auxilios con Recargos
+                                      </h4>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_auxilio_diurno" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Auxilio Recargo Diurno</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_auxilio_recargo_nocturno" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Auxilio Recargo Nocturno</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_auxilio_recargo_festivo" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Auxilio Recargo Festivo</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={responseWithCompensacionesForm.control} name="valor_auxilio_recargo_festivo_nocturno" render={({ field: f }) => (
+                                          <FormItem><FormLabel>Valor Auxilio Recargo Festivo Nocturno</FormLabel><FormControl><CompensacionMoneyInput field={f} placeholder="0" /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                     )}
 
@@ -4338,7 +4628,7 @@ const AdminSolicitudesPage: React.FC = () => {
                             name="rejection_reason_otros"
                             render={({ field }) => {
                               const currentLength = field.value?.length || 0;
-                              const maxLength = 200;
+                              const maxLength = 1000;
                               const isNearLimit = currentLength > maxLength * 0.8;
                               const isOverLimit = currentLength > maxLength;
                               
@@ -4469,7 +4759,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         render={({ field }) => {
                       const [pasteError, setPasteError] = useState<string | null>(null);
                       
-                      const maxLength = 5000;
+                      const maxLength = 1500;
                       
                       // Separar el texto normal del HTML de tablas
                       const emailBodyValue = field.value || '';
@@ -4912,6 +5202,16 @@ const AdminSolicitudesPage: React.FC = () => {
                       );
                     }}
                       />
+                    )}
+
+                    {/* Mensaje cuando el backend no pudo obtener compensaciones */}
+                    {compensacionesApiError && (
+                      <Alert variant="destructive" className="border-red-200 bg-red-50 text-sm">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          No se pudieron obtener los valores de compensación. Complete una de las opciones de arriba: <strong>Totales</strong> (T. Básicos y T. Auxilios), <strong>Mensaje redactado</strong>, o <strong>Valores individuales</strong>.
+                        </AlertDescription>
+                      </Alert>
                     )}
 
                     {/* Botones de acción */}

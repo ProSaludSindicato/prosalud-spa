@@ -143,6 +143,62 @@ const handleApiError = (error: any) => {
   throw new Error(error.message || "Error desconocido en la API");
 };
 
+/** Compensaciones: prioridad A (mensaje) > B (valores individuales) > C (t_basicos/t_auxilios). Solo se envía un grupo. */
+function buildCompensacionesPayload(data: {
+  mensaje_compensaciones_parte1?: string | null;
+  t_basicos?: number;
+  t_auxilios?: number;
+  basico?: number;
+  auxilios?: number;
+  manutencion?: number;
+  provisiones?: number;
+  horas?: number;
+  valor_hora_diurna?: number;
+  valor_hora_nocturna?: number;
+  valor_hora_diurna_festiva?: number;
+  valor_hora_nocturna_festiva?: number;
+  auxilio_de_transporte?: number;
+  auxilio_de_manutencion?: number;
+  auxilio_de_encierro?: number;
+  auxilio_de_rodamiento?: number;
+  auxilio_especial?: number;
+  auxilio_prosalud?: number;
+  valor_auxilio_diurno?: number;
+  valor_auxilio_recargo_nocturno?: number;
+  valor_auxilio_recargo_festivo?: number;
+  valor_auxilio_recargo_festivo_nocturno?: number;
+}): Record<string, string | number> {
+  const msg = data.mensaje_compensaciones_parte1?.trim();
+  if (msg && msg.length > 0) {
+    return { mensaje_compensaciones_parte1: msg };
+  }
+  const individualKeys = [
+    'basico', 'auxilios', 'manutencion', 'provisiones', 'horas',
+    'valor_hora_diurna', 'valor_hora_nocturna', 'valor_hora_diurna_festiva', 'valor_hora_nocturna_festiva',
+    'auxilio_de_transporte', 'auxilio_de_manutencion', 'auxilio_de_encierro', 'auxilio_de_rodamiento',
+    'auxilio_especial', 'auxilio_prosalud', 'valor_auxilio_diurno', 'valor_auxilio_recargo_nocturno',
+    'valor_auxilio_recargo_festivo', 'valor_auxilio_recargo_festivo_nocturno',
+  ] as const;
+  const hasAnyIndividual = individualKeys.some(
+    (k) => data[k] !== undefined && data[k] !== null && Number(data[k]) >= 0
+  );
+  if (hasAnyIndividual) {
+    const out: Record<string, number> = {};
+    individualKeys.forEach((k) => {
+      const v = data[k];
+      if (v !== undefined && v !== null) {
+        const n = Number(v);
+        if (!Number.isNaN(n) && n >= 0) out[k] = n;
+      }
+    });
+    return Object.keys(out).length ? out : {};
+  }
+  const out: Record<string, number> = {};
+  if (data.t_basicos !== undefined && data.t_basicos !== null) out.t_basicos = data.t_basicos;
+  if (data.t_auxilios !== undefined && data.t_auxilios !== null) out.t_auxilios = data.t_auxilios;
+  return out;
+}
+
 export const requestsApiService = {
   // Get all requests
   async getAllRequests(): Promise<ApiRequest[]> {
@@ -420,6 +476,7 @@ export const requestsApiService = {
   },
 
   // Respond to request with manual compensaciones (for certificado-convenio)
+  // Compensaciones: prioridad Opción A (mensaje) > B (valores individuales) > C (t_basicos/t_auxilios) > Excel en backend
   async respondWithCompensaciones(
     id: string,
     data: {
@@ -427,8 +484,32 @@ export const requestsApiService = {
       email_subject: string;
       email_body: string;
       rejection_reason?: string | null;
+      status_reason?: string | null;
+      /** Opción A: texto redactado para compensaciones (máx. 1000 caracteres) */
+      mensaje_compensaciones_parte1?: string | null;
+      /** Opción C: totales */
       t_basicos?: number;
       t_auxilios?: number;
+      /** Opción B: valores individuales (todos numéricos >= 0) */
+      basico?: number;
+      auxilios?: number;
+      manutencion?: number;
+      provisiones?: number;
+      horas?: number;
+      valor_hora_diurna?: number;
+      valor_hora_nocturna?: number;
+      valor_hora_diurna_festiva?: number;
+      valor_hora_nocturna_festiva?: number;
+      auxilio_de_transporte?: number;
+      auxilio_de_manutencion?: number;
+      auxilio_de_encierro?: number;
+      auxilio_de_rodamiento?: number;
+      auxilio_especial?: number;
+      auxilio_prosalud?: number;
+      valor_auxilio_diurno?: number;
+      valor_auxilio_recargo_nocturno?: number;
+      valor_auxilio_recargo_festivo?: number;
+      valor_auxilio_recargo_festivo_nocturno?: number;
       attachments?: FileList;
     }
   ): Promise<ApiRequest> {
@@ -446,27 +527,26 @@ export const requestsApiService = {
         throw new Error('t_auxilios debe ser un número entero no negativo');
       }
 
+      const compensacionesPayload = buildCompensacionesPayload(data);
+
       // Si hay archivos adjuntos, usar FormData
       if (data.attachments && data.attachments.length > 0) {
         const formData = new FormData();
         formData.append('status', data.status);
         formData.append('email_subject', data.email_subject);
         formData.append('email_body', data.email_body);
-        
-        // Agregar rejection_reason si el estado es REJECTED
+
         if (data.status === "REJECTED" && data.rejection_reason) {
           formData.append('rejection_reason', data.rejection_reason);
         }
-        
-        // Solo agregar t_basicos y t_auxilios si están definidos
-        if (data.t_basicos !== undefined) {
-          formData.append('t_basicos', data.t_basicos.toString());
+        if (data.status_reason && data.status_reason.trim().length > 0) {
+          formData.append('status_reason', data.status_reason.trim());
         }
-        if (data.t_auxilios !== undefined) {
-          formData.append('t_auxilios', data.t_auxilios.toString());
-        }
-        
-        // Agregar archivos como attachments[0], attachments[1], etc.
+
+        Object.entries(compensacionesPayload).forEach(([key, value]) => {
+          formData.append(key, typeof value === 'number' ? value.toString() : value);
+        });
+
         Array.from(data.attachments).forEach((file, index) => {
           formData.append(`attachments[${index}]`, file);
         });
@@ -478,74 +558,69 @@ export const requestsApiService = {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
-            timeout: 240000, // 4 minutos - proceso largo que genera certificado con compensaciones y envía email (puede requerir conexiones con proveedores externos)
+            timeout: 240000,
           }
         );
 
         if (!response.data.success) {
-          // Si hay errores de validación, construir mensaje detallado
-          if (response.data.errors) {
-            const errorMessages = Object.entries(response.data.errors)
-              .flatMap(([field, messages]) => 
-                Array.isArray(messages) 
-                  ? messages.map(msg => `${field}: ${msg}`)
+          const apiData = response.data as ApiResponse<ApiRequest> & { sugerencia?: string };
+          let msg = apiData.message || "Error al enviar la respuesta con compensaciones";
+          if (apiData.errors) {
+            const errorMessages = Object.entries(apiData.errors)
+              .flatMap(([field, messages]) =>
+                Array.isArray(messages)
+                  ? messages.map(m => `${field}: ${m}`)
                   : [`${field}: ${messages}`]
               )
               .join('\n');
-            throw new Error(`Errores de validación:\n${errorMessages}`);
+            msg = `Errores de validación:\n${errorMessages}`;
           }
-          throw new Error(response.data.message || "Error al enviar la respuesta con compensaciones");
+          if (apiData.sugerencia) msg += `\n\nSugerencia: ${apiData.sugerencia}`;
+          throw new Error(msg);
         }
 
         return response.data.data;
       } else {
-        // Sin archivos, usar JSON
         const requestBody: any = {
           status: data.status,
           email_subject: data.email_subject,
           email_body: data.email_body,
+          ...compensacionesPayload,
         };
-        
-        // Solo incluir rejection_reason si el estado es REJECTED
+
         if (data.status === "REJECTED" && data.rejection_reason) {
           requestBody.rejection_reason = data.rejection_reason;
         }
-        
-        // Solo incluir t_basicos y t_auxilios si están definidos
-        if (data.t_basicos !== undefined) {
-          requestBody.t_basicos = data.t_basicos;
+        if (data.status_reason && data.status_reason.trim().length > 0) {
+          requestBody.status_reason = data.status_reason.trim();
         }
-        if (data.t_auxilios !== undefined) {
-          requestBody.t_auxilios = data.t_auxilios;
-        }
-        
+
         const response = await requestsApi.post<ApiResponse<ApiRequest>>(
           `/api/requests/${id}/respond-with-compensaciones`,
           requestBody,
-          {
-            timeout: 240000, // 4 minutos - proceso largo que genera certificado con compensaciones y envía email (puede requerir conexiones con proveedores externos)
-          }
+          { timeout: 240000 }
         );
 
         if (!response.data.success) {
-          // Si hay errores de validación, construir mensaje detallado
-          if (response.data.errors) {
-            const errorMessages = Object.entries(response.data.errors)
-              .flatMap(([field, messages]) => 
-                Array.isArray(messages) 
-                  ? messages.map(msg => `${field}: ${msg}`)
+          const apiData = response.data as ApiResponse<ApiRequest> & { sugerencia?: string };
+          let msg = apiData.message || "Error al enviar la respuesta con compensaciones";
+          if (apiData.errors) {
+            const errorMessages = Object.entries(apiData.errors)
+              .flatMap(([field, messages]) =>
+                Array.isArray(messages)
+                  ? messages.map(m => `${field}: ${m}`)
                   : [`${field}: ${messages}`]
               )
               .join('\n');
-            throw new Error(`Errores de validación:\n${errorMessages}`);
+            msg = `Errores de validación:\n${errorMessages}`;
           }
-          throw new Error(response.data.message || "Error al enviar la respuesta con compensaciones");
+          if (apiData.sugerencia) msg += `\n\nSugerencia: ${apiData.sugerencia}`;
+          throw new Error(msg);
         }
 
         return response.data.data;
       }
     } catch (error: any) {
-      // Sanitizar el error para evitar exponer información técnica al usuario
       const sanitizedMessage = getErrorMessage(error);
       
       // Crear un nuevo error con el mensaje sanitizado

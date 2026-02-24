@@ -212,12 +212,31 @@ export const requestsService = {
       emailBody: string;
       rejection_reason?: string | null;
       status_reason?: string | null;
+      mensaje_compensaciones_parte1?: string | null;
       t_basicos?: number;
       t_auxilios?: number;
+      basico?: number;
+      auxilios?: number;
+      manutencion?: number;
+      provisiones?: number;
+      horas?: number;
+      valor_hora_diurna?: number;
+      valor_hora_nocturna?: number;
+      valor_hora_diurna_festiva?: number;
+      valor_hora_nocturna_festiva?: number;
+      auxilio_de_transporte?: number;
+      auxilio_de_manutencion?: number;
+      auxilio_de_encierro?: number;
+      auxilio_de_rodamiento?: number;
+      auxilio_especial?: number;
+      auxilio_prosalud?: number;
+      valor_auxilio_diurno?: number;
+      valor_auxilio_recargo_nocturno?: number;
+      valor_auxilio_recargo_festivo?: number;
+      valor_auxilio_recargo_festivo_nocturno?: number;
       attachments?: FileList;
     }
   ): Promise<Request> {
-    // Validar que el ID es un string de 10 dígitos (preserva ceros iniciales)
     if (!id || typeof id !== 'string' || !/^\d{10}$/.test(id)) {
       throw new Error('ID inválido - debe ser un string de 10 dígitos');
     }
@@ -229,11 +248,31 @@ export const requestsService = {
       email_body: data.emailBody,
       rejection_reason: data.rejection_reason,
       status_reason: data.status_reason,
+      mensaje_compensaciones_parte1: data.mensaje_compensaciones_parte1,
       t_basicos: data.t_basicos,
       t_auxilios: data.t_auxilios,
+      basico: data.basico,
+      auxilios: data.auxilios,
+      manutencion: data.manutencion,
+      provisiones: data.provisiones,
+      horas: data.horas,
+      valor_hora_diurna: data.valor_hora_diurna,
+      valor_hora_nocturna: data.valor_hora_nocturna,
+      valor_hora_diurna_festiva: data.valor_hora_diurna_festiva,
+      valor_hora_nocturna_festiva: data.valor_hora_nocturna_festiva,
+      auxilio_de_transporte: data.auxilio_de_transporte,
+      auxilio_de_manutencion: data.auxilio_de_manutencion,
+      auxilio_de_encierro: data.auxilio_de_encierro,
+      auxilio_de_rodamiento: data.auxilio_de_rodamiento,
+      auxilio_especial: data.auxilio_especial,
+      auxilio_prosalud: data.auxilio_prosalud,
+      valor_auxilio_diurno: data.valor_auxilio_diurno,
+      valor_auxilio_recargo_nocturno: data.valor_auxilio_recargo_nocturno,
+      valor_auxilio_recargo_festivo: data.valor_auxilio_recargo_festivo,
+      valor_auxilio_recargo_festivo_nocturno: data.valor_auxilio_recargo_festivo_nocturno,
       attachments: data.attachments,
     });
-    
+
     return mapApiRequestToFrontendRequest(updatedApiRequest);
   },
 
