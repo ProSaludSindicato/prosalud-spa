@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2, FileText, Download, ExternalLink, Link2, CheckCircle2, XCircle } from "lucide-react";
+import { Upload, X, Plus, Star, Image as ImageIcon, MapPin, Loader2, FileText, Download, ExternalLink, Link2, CheckCircle2, XCircle, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +81,8 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const [selectedWellnessRequestId, setSelectedWellnessRequestId] = useState<number | null>(null);
   const [pendingReviewAction, setPendingReviewAction] = useState<'approve' | 'reject' | null>(null);
   const [pendingReviewData, setPendingReviewData] = useState<{ isVisible?: boolean; reason?: string } | null>(null);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { can } = usePermissions();
   // Security: Use centralized sanitization hook
@@ -450,6 +452,28 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       setMainImageIndex(0);
     } else if (mainImageIndex > index) {
       setMainImageIndex((prev) => prev - 1);
+    }
+  };
+
+  const handleViewImage = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageViewerOpen(true);
+  };
+
+  const handleCloseImageViewer = () => {
+    setIsImageViewerOpen(false);
+    setSelectedImageIndex(null);
+  };
+
+  const handlePreviousImage = () => {
+    if (selectedImageIndex !== null && selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (selectedImageIndex !== null && selectedImageIndex < imagePreviews.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1);
     }
   };
 
@@ -1117,8 +1141,19 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                                   variant={mainImageIndex === index ? "default" : "outline"}
                                   onClick={() => setMainImageIndex(index)}
                                   className="h-7 w-7 p-0"
+                                  title={mainImageIndex === index ? "Imagen principal" : "Marcar como imagen principal"}
                                 >
                                   <Star className={`h-3 w-3 ${mainImageIndex === index ? "fill-current" : ""}`} />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleViewImage(index)}
+                                  className="h-7 w-7 p-0"
+                                  title="Ver en pantalla completa"
+                                >
+                                  <Maximize2 className="h-3 w-3" />
                                 </Button>
                                 <Button
                                   type="button"
@@ -1126,6 +1161,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                                   variant="destructive"
                                   onClick={() => removeImage(index)}
                                   className="h-7 w-7 p-0"
+                                  title="Eliminar imagen"
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
@@ -1219,6 +1255,60 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
               </div>
             </div>
           </form>
+
+          {/* Diálogo de visualización de imagen en pantalla completa */}
+          <Dialog open={isImageViewerOpen} onOpenChange={(open) => { setIsImageViewerOpen(open); if (!open) setSelectedImageIndex(null); }}>
+            <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-4xl lg:max-w-6xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
+              <DialogTitle className="sr-only">
+                Visualización de imagen {selectedImageIndex !== null ? selectedImageIndex + 1 : ''}
+              </DialogTitle>
+              {selectedImageIndex !== null && imagePreviews[selectedImageIndex] && (
+                <div className="relative w-full h-[95vh] flex items-center justify-center">
+                  <img
+                    src={imagePreviews[selectedImageIndex]}
+                    alt={`Imagen ${selectedImageIndex + 1}`}
+                    className="max-w-full max-h-[90vh] object-contain"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCloseImageViewer}
+                    className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white h-10 w-10 z-50"
+                  >
+                    <X className="h-6 w-6" />
+                  </Button>
+                  {selectedImageIndex > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePreviousImage}
+                      className="fixed left-4 top-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50 transition-colors"
+                      style={{ transform: 'translateY(-50%)' }}
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                  )}
+                  {selectedImageIndex < imagePreviews.length - 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleNextImage}
+                      className="fixed right-4 top-1/2 bg-black/50 hover:bg-black/70 text-white h-12 w-12 z-50 transition-colors"
+                      style={{ transform: 'translateY(-50%)' }}
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  )}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                    Imagen {selectedImageIndex + 1} de {imagePreviews.length}
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </DialogContent>
     </Dialog>

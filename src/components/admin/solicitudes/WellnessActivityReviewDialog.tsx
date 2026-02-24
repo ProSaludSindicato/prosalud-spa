@@ -361,7 +361,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-gray-900">
             Revisar y Publicar Actividad Realizada
@@ -810,7 +810,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
 
         {/* Diálogo de Visualización de Imágenes en Pantalla Completa */}
         <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
-          <DialogContent className="max-w-7xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
+          <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-4xl lg:max-w-6xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
             <DialogTitle className="sr-only">
               Visualización de Evidencia {selectedImageIndex !== null ? selectedImageIndex + 1 : ''}
             </DialogTitle>

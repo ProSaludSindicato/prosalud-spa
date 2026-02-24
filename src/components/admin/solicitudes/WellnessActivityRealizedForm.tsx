@@ -750,7 +750,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
 
         {/* Diálogo de Visualización de Imágenes */}
         <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
-          <DialogContent className="max-w-7xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
+          <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-4xl lg:max-w-6xl max-h-[95vh] p-0 bg-black/95 border-none [&>button]:hidden">
             <DialogTitle className="sr-only">
               Visualización de Evidencia {selectedImageIndex !== null ? selectedImageIndex + 1 : ''}
             </DialogTitle>
