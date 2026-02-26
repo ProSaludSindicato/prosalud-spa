@@ -65,10 +65,13 @@ const ConveniosSection: React.FC = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {isVisible ? (
           <>
-            <div className="bg-primary-prosalud text-text-light p-8 rounded-lg shadow-lg mb-12 md:mb-16 text-center">
+            <div className="bg-primary-prosalud text-text-light p-8 rounded-lg shadow-lg mb-8 text-center">
               <h2 className="text-2xl md:text-4xl font-semibold leading-tight max-w-4xl mx-auto">
                 A lo largo de nuestra trayectoria hemos tenido convenios con diferentes entidades en Antioquia
               </h2>
+              <p className="mt-4 text-lg opacity-95 max-w-3xl mx-auto">
+                ProSalud es el Sindicato de Profesionales de la Salud. A continuación se muestran instituciones con las que tenemos o hemos tenido convenio.
+              </p>
             </div>
 
             {(
@@ -97,9 +100,10 @@ const ConveniosSection: React.FC = () => {
                             <p className="text-base font-medium text-text-dark">{convenio.name}</p>
                           </div>
 
-                          {/* Cara trasera */}
+                          {/* Cara trasera: data-nosnippet evita que buscadores usen este texto como descripción del sitio */}
                           <div
-                              className="absolute inset-0 backface-hidden rotate-y-180 bg-primary-prosalud text-white p-6 rounded-lg shadow-md border border-prosalud-border flex flex-col justify-center">
+                              className="absolute inset-0 backface-hidden rotate-y-180 bg-primary-prosalud text-white p-6 rounded-lg shadow-md border border-prosalud-border flex flex-col justify-center"
+                              data-nosnippet>
                             <h3 className="text-sm font-semibold mb-2 line-clamp-2">{convenio.name}</h3>
                             <p className="text-sm leading-relaxed line-clamp-5">{convenio.description}</p>
                           </div>

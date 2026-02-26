@@ -74,6 +74,44 @@ const MODULE_LABELS: Record<string, string> = {
   view_dashboard: 'Dashboard',
 };
 
+const ACTION_LABELS: Record<string, string> = {
+  view: 'Ver',
+  create: 'Crear',
+  edit: 'Editar',
+  delete: 'Eliminar',
+  manage: 'Gestionar',
+  respond: 'Responder',
+  update_status: 'Actualizar Estado',
+  download_files: 'Descargar Archivos',
+  statistics: 'Ver estadísticas',
+  hospital_statistics: 'Ver estadísticas hospitalarias',
+  audit: 'Auditoría',
+  export_all: 'Exportar todo',
+  publish: 'Publicar',
+  change_status: 'Cambiar estado',
+};
+
+const translatePermission = (permissionName: string): string => {
+  const parts = permissionName.split('.');
+  if (parts.length === 2) {
+    const [module, action] = parts;
+    if (module === 'inventory' && action === 'view_dashboard') {
+      return 'Dashboard de Inventario';
+    }
+    const translatedModule = MODULE_LABELS[module] || module;
+    const translatedAction = ACTION_LABELS[action] || action;
+    return `${translatedAction} ${translatedModule}`;
+  }
+  if (parts.length === 3) {
+    const [module, , action] = parts;
+    const translatedModule = MODULE_LABELS[module] || module;
+    const translatedAction = ACTION_LABELS[action] || action;
+    return `${translatedAction} ${translatedModule}`;
+  }
+  const lastPart = parts[parts.length - 1];
+  return ACTION_LABELS[lastPart] || permissionName;
+};
+
 const AdminRolesListPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -565,7 +603,7 @@ const AdminRolesListPage: React.FC = () => {
                                     htmlFor={`create-permission-${permission.id}`}
                                     className="text-sm cursor-pointer flex-1"
                                   >
-                                    {permission.description || permission.name}
+                                    {permission.description || translatePermission(permission.name)}
                                   </Label>
                                 </div>
                               );

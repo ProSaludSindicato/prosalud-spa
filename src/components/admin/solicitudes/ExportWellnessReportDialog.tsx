@@ -11,6 +11,7 @@ import { wellnessRequestsService } from '@/services/wellnessRequestsApi';
 import { logger } from '@/utils/logger';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/services/adminApi';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ExportWellnessReportDialogProps {
   open: boolean;
@@ -55,11 +56,14 @@ const ExportWellnessReportDialog: React.FC<ExportWellnessReportDialogProps> = ({
   const [includeImages, setIncludeImages] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Obtener usuarios para el filtro de solicitante
+  const { can } = usePermissions();
+  const canViewUsers = can('users.view');
+
+  // Obtener usuarios para el filtro de solicitante solo si el usuario tiene permiso de consulta
   const { data: usersResponse } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersApi.getUsers(1, 1000, '', ''),
-    enabled: open, // Solo cargar cuando el modal está abierto
+    enabled: open && canViewUsers, // Solo cargar cuando el modal está abierto y tiene permiso de ver usuarios
     staleTime: 5 * 60 * 1000,
   });
 
@@ -223,37 +227,39 @@ const ExportWellnessReportDialog: React.FC<ExportWellnessReportDialogProps> = ({
             </CardContent>
           </Card>
 
-          {/* Requester Filter */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <User className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Solicitante</h4>
-                  <p className="text-sm text-gray-600">
-                    Filtra las solicitudes por usuario solicitante
-                  </p>
+          {/* Requester Filter: solo visible si tiene permiso de consulta de usuarios */}
+          {canViewUsers && (
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <User className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Solicitante</h4>
+                    <p className="text-sm text-gray-600">
+                      Filtra las solicitudes por usuario solicitante
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Seleccionar solicitante</label>
-                <Select value={requesterId} onValueChange={setRequesterId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Todos los solicitantes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los solicitantes</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Seleccionar solicitante</label>
+                  <Select value={requesterId} onValueChange={setRequesterId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los solicitantes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los solicitantes</SelectItem>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Status Filter */}
           <Card className="border border-gray-200">

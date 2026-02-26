@@ -32,7 +32,7 @@ const ContactoPage: React.FC = () => {
       <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Información de Contacto</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Contacto</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Estamos aquí para atenderte. Encuentra nuestros canales de comunicación y horarios de atención.
           </p>

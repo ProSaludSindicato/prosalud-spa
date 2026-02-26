@@ -18,7 +18,7 @@ export const searchData: SearchItem[] = [
   },
   {
     id: "contacto",
-    title: "Información de Contacto",
+    title: "Contacto",
     description: "Encuentra nuestros canales de comunicación, horarios y datos de contacto",
     path: "/contacto",
     category: "Información",

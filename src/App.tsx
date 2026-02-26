@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import ScrollToTop from '@/components/utils/ScrollToTop';
+import SetPageTitle from '@/components/utils/SetPageTitle';
 import { Analytics } from '@vercel/analytics/react';
 
 // Pages
@@ -78,6 +79,7 @@ const AppRoutes = () => {
   return (
     <>
       <ScrollToTop />
+      <SetPageTitle />
       <div className="App">
         <Routes>
             {/* Public Routes */}

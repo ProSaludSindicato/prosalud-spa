@@ -119,6 +119,9 @@ const ACTION_LABELS: Record<string, string> = {
   'statistics': 'Ver estadísticas',
   'hospital_statistics': 'Ver estadísticas hospitalarias',
   'audit': 'Auditoría',
+  'export_all': 'Exportar todo',
+  'publish': 'Publicar',
+  'change_status': 'Cambiar estado',
 };
 
 const translatePermission = (permissionName: string): string => {
