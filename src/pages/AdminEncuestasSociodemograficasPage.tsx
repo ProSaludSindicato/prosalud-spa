@@ -652,19 +652,19 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Buscar por nombre</label>
-                <Input
-                  placeholder="Nombre o apellido"
-                  value={nombreFilter}
-                  onChange={(e) => setNombreFilter(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
                 <label className="text-sm font-medium">Número de Documento</label>
                 <Input
                   placeholder="Buscar por número"
                   value={numeroDocumentoFilter}
                   onChange={(e) => setNumeroDocumentoFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Buscar por nombre</label>
+                <Input
+                  placeholder="Nombre o apellido"
+                  value={nombreFilter}
+                  onChange={(e) => setNombreFilter(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
