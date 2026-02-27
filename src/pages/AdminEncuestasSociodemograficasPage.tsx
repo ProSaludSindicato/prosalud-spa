@@ -342,13 +342,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
 
   // Construir parámetros de consulta (ejecutar siempre, incluso si hay id)
-  // NOTA: numero_documento se filtra en frontend temporalmente
   const queryParams = useMemo(() => {
     if (id) return {}; // Retornar objeto vacío si hay id, no se usará
     const params: any = {
-      // Obtener más registros para poder filtrar en frontend
-      per_page: 1000, // Obtener muchos registros para filtrar en frontend
-      page: 1, // Siempre obtener la primera página completa
+      // Usar la paginación del backend
+      per_page: perPage,
+      page: currentPage,
     };
     const hospitalTrimmed = hospitalFilter.trim();
     if (hospitalTrimmed) params.hospital = hospitalTrimmed;
@@ -361,15 +360,13 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (nombreTrimmed) {
       params.nombre = nombreTrimmed;
     }
-    
-    // NO enviar numero_documento al backend, se filtra en frontend
-    // const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
-    // if (documentoTrimmed) {
-    //   params.numero_documento = documentoTrimmed;
-    // }
+    const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
+    if (documentoTrimmed) {
+      params.numero_documento = documentoTrimmed;
+    }
     
     return params;
-  }, [id, hospitalFilter, surveyTypeFilter, nombreFilterDebounced]);
+  }, [id, hospitalFilter, surveyTypeFilter, nombreFilterDebounced, numeroDocumentoFilterDebounced, perPage, currentPage]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -383,7 +380,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     enabled: can('socio_demographic_surveys.view') && !id,
   });
 
-  // Filtrar por número de documento en el frontend
+  // Filtrar por número de documento en el frontend (además de backend, por compatibilidad)
   const filteredSurveys = useMemo(() => {
     let surveys = surveysResponse?.data || [];
     
@@ -398,28 +395,18 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     return surveys;
   }, [surveysResponse?.data, numeroDocumentoFilterDebounced]);
 
-  // Aplicar paginación en el frontend
-  const paginatedSurveys = useMemo(() => {
-    const startIndex = (currentPage - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    return filteredSurveys.slice(startIndex, endIndex);
-  }, [filteredSurveys, currentPage, perPage]);
-
-  // Calcular paginación para frontend
-  const totalFiltered = filteredSurveys.length;
-  const totalPages = Math.ceil(totalFiltered / perPage);
-  
+  // Usar la paginación reportada por el backend
   const pagination = useMemo(() => {
     if (!surveysResponse?.pagination) return undefined;
     return {
+      ...surveysResponse.pagination,
+      // Mantener sincronizados current_page y per_page con el estado local
       current_page: currentPage,
-      last_page: totalPages,
       per_page: perPage,
-      total: totalFiltered,
     };
-  }, [currentPage, totalPages, perPage, totalFiltered, surveysResponse?.pagination]);
+  }, [currentPage, perPage, surveysResponse?.pagination]);
 
-  const surveys = paginatedSurveys;
+  const surveys = filteredSurveys;
   const metrics = surveysResponse?.metrics;
 
 
