@@ -52,6 +52,34 @@ const normalizeMunicipio = (value: string | null | undefined): string => {
   return found?.value || normalized.replace(/\s+/g, '_');
 };
 
+// Normalizar fechas a formato ISO (YYYY-MM-DD) para inputs type="date"
+const normalizeDateToISO = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+
+  // Ya viene en formato ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Formato DD/MM/YYYY
+  const dmySlash = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmySlash) {
+    const [, day, month, year] = dmySlash;
+    return `${year}-${month}-${day}`;
+  }
+
+  // Formato DD-MM-YYYY
+  const dmyDash = trimmed.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmyDash) {
+    const [, day, month, year] = dmyDash;
+    return `${year}-${month}-${day}`;
+  }
+
+  // Dejar el valor original si no se reconoce el formato
+  return trimmed;
+};
+
 // Función helper para convertir a mayúsculas mientras se escribe (Input)
 const handleUppercaseInput = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
   const value = e.target.value.toUpperCase();
@@ -1145,7 +1173,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       
       // Prellenar fecha de nacimiento, estado civil, género y nivel educativo
       if ((afiliado as any).fecha_nacimiento) {
-        form.setValue('fechaNacimiento', (afiliado as any).fecha_nacimiento);
+        form.setValue('fechaNacimiento', normalizeDateToISO((afiliado as any).fecha_nacimiento));
       }
       if ((afiliado as any).estado_civil) {
         form.setValue('estadoCivil', normalizeEstadoCivil((afiliado as any).estado_civil));
@@ -1279,7 +1307,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       
       // Prellenar fecha de nacimiento, estado civil, género y nivel educativo solo si están vacíos
       if (!currentValues.fechaNacimiento && (afiliadoData as any).fecha_nacimiento) {
-        form.setValue('fechaNacimiento', (afiliadoData as any).fecha_nacimiento);
+        form.setValue('fechaNacimiento', normalizeDateToISO((afiliadoData as any).fecha_nacimiento));
       }
       if (!currentValues.estadoCivil && (afiliadoData as any).estado_civil) {
         form.setValue('estadoCivil', normalizeEstadoCivil((afiliadoData as any).estado_civil));
@@ -1317,7 +1345,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
             numeroDocumento: sanitizeId(b.documento || '', { maxLength: 15 }),
             nombre: (b.nombres || '').toUpperCase(),
             genero: normalizeSexo(b.sexo) || '',
-            fechaNacimiento: b.fecha_nacimiento || '',
+            fechaNacimiento: normalizeDateToISO(b.fecha_nacimiento || ''),
           }));
           
           form.setValue('hijos', hijosData);
@@ -2472,8 +2500,6 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               {...field} 
                               value={field.value || ''} 
                               max={maxFechaNacimiento}
-                              readOnly={!!(afiliadoData as any)?.fecha_nacimiento}
-                              className={!!(afiliadoData as any)?.fecha_nacimiento ? 'bg-slate-100' : ''}
                               onChange={(e) => {
                                 field.onChange(e);
                                 form.clearErrors('fechaNacimiento');
