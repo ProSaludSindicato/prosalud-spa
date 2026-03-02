@@ -146,6 +146,25 @@ export interface SuccessResponse {
 }
 
 /**
+ * Helper para guardar datos de éxito de la encuesta en localStorage.
+ * Se mostrará en un modal de éxito en la página de inicio.
+ */
+export const saveSurveySuccessData = (response: SuccessResponse): void => {
+  try {
+    const successData = {
+      id: response.data?.id || '',
+      tipo_documento: response.data?.tipo_documento || '',
+      numero_documento: response.data?.numero_documento || '',
+      created_at: response.data?.created_at || '',
+      message: response.message,
+    };
+    localStorage.setItem('prosalud-survey-success', JSON.stringify(successData));
+  } catch (error) {
+    console.error('Error saving survey success data:', error);
+  }
+};
+
+/**
  * Convertir data URI (base64) a Blob
  */
 /**

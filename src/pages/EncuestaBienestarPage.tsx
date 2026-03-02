@@ -11,7 +11,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { submitSurvey } from '@/services/socioDemographicSurveyService';
+import { submitSurvey, saveSurveySuccessData } from '@/services/socioDemographicSurveyService';
 import { authenticateForDataUpdate, AfiliadoAuthFailureError } from '@/services/afiliadosDataUpdateService';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Send, Home, FileText, User, PhoneCall, Users, Wine, HeartPulse, Activity, ClipboardCheck, FileSignature, Briefcase, Loader2 } from 'lucide-react';
@@ -29,7 +29,7 @@ import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tall
 import { paises, getDefaultPais, normalizePais } from '@/components/actualizar-datos-personales/paises';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
-import { sanitizePhone, sanitizeEmail, sanitizeGeneral } from '@/utils/inputSanitizer';
+import { sanitizePhone, sanitizeEmail, sanitizeGeneral, sanitizeId } from '@/utils/inputSanitizer';
 import { useWatch } from 'react-hook-form';
 
 // Función para obtener el nombre completo del tipo de documento
@@ -468,9 +468,12 @@ const getHospitalDisplayName = (hospitalValue: string | null | undefined): strin
 };
 
 // Esquema de validación completo
+const DOCUMENTO_SOLO_DIGITOS = 'El número de documento solo puede contener dígitos (no use puntos ni comas)';
+
 const hijoSchema = z.object({
   tipoDocumento: z.string({ required_error: 'Tipo de documento es requerido' }).min(1, 'Tipo de documento es requerido'),
-  numeroDocumento: z.string({ required_error: 'Número de documento es requerido' }).min(1, 'Número de documento es requerido'),
+  numeroDocumento: z.string({ required_error: 'Número de documento es requerido' }).min(1, 'Número de documento es requerido')
+    .refine((val) => /^[0-9]+$/.test(val), { message: DOCUMENTO_SOLO_DIGITOS }),
   nombre: z.string({ required_error: 'Nombre es requerido' }).min(1, 'Nombre es requerido'),
   genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
   fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' })
@@ -564,7 +567,8 @@ const createEncuestaSchema = () => z.object({
   apellidos: z.string().min(1, 'Apellidos es requerido'),
   correo: z.string().email('Correo inválido').min(1, 'Correo es requerido'),
   tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
-  numeroDocumento: z.string().min(1, 'Número de documento es requerido'),
+  numeroDocumento: z.string().min(1, 'Número de documento es requerido')
+    .refine((val) => /^[0-9]+$/.test(val), { message: DOCUMENTO_SOLO_DIGITOS }),
   hospital: z.string().optional(),
   profesion: z.string().optional(),
   profesionOtro: z.string().optional(), // Campo para especificar "Otro"
@@ -614,7 +618,16 @@ const createEncuestaSchema = () => z.object({
   // Sección sociodemográfica
   tienePersonasACargo: z.string({ required_error: 'Campo requerido' }).min(1, 'Campo requerido'),
   estadoCivil: z.string({ required_error: 'Estado civil es requerido' }).min(1, 'Estado civil es requerido'),
-  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida'),
+  fechaNacimiento: z.string({ required_error: 'Fecha de nacimiento es requerida' }).min(1, 'Fecha de nacimiento es requerida')
+    .refine((val) => {
+      if (!val) return false;
+      const fecha = new Date(val);
+      const hoy = new Date();
+      const hace18 = new Date(hoy.getFullYear() - 18, hoy.getMonth(), hoy.getDate());
+      fecha.setHours(0, 0, 0, 0);
+      hace18.setHours(0, 0, 0, 0);
+      return fecha <= hace18;
+    }, { message: 'Debe tener al menos 18 años para diligenciar la encuesta' }),
   genero: z.string({ required_error: 'Género es requerido' }).min(1, 'Género es requerido'),
   raza: z.string({ required_error: 'Grupo étnico es requerido' }).min(1, 'Grupo étnico es requerido'),
   nivelEducativo: z.string({ required_error: 'Nivel educativo es requerido' }).min(1, 'Nivel educativo es requerido'),
@@ -724,7 +737,8 @@ const createEncuestaSchema = () => z.object({
   
   // Firma - solo se valida al enviar, no en validación de pasos
   firma: z.string().optional(),
-  numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido'),
+  numeroDocumentoFirma: z.string().min(1, 'Número de documento es requerido')
+    .refine((val) => /^[0-9]+$/.test(val), { message: DOCUMENTO_SOLO_DIGITOS }),
 })
 .refine((data) => {
   // Si profesion es "OTRO", entonces profesionOtro es requerido
@@ -909,6 +923,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
     fechaExpedicion: string;
   } | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authNumeroDocumento, setAuthNumeroDocumento] = useState('');
   const [authError, setAuthError] = useState<{ reason: 'affiliate_data_mismatch' | 'affiliate_not_found'; message: string } | null>(null);
   const [afiliadoData, setAfiliadoData] = useState<any>(null);
   const [activeConvenio, setActiveConvenio] = useState<any>(null);
@@ -1090,7 +1105,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       form.setValue('apellidos', (afiliado.apellidos || '').toUpperCase());
       form.setValue('correo', afiliado.correo_personal || '');
       form.setValue('tipoDocumento', afiliado.tipo_documento || '');
-      form.setValue('numeroDocumento', afiliado.documento || '');
+      form.setValue('numeroDocumento', sanitizeId(afiliado.documento || '', { maxLength: 15 }));
       form.setValue('fechaExpedicion', fechaExp);
       form.setValue('rh', (afiliado as any).rh || '');
       form.setValue('lugarNacimiento', ((afiliado as any).lugar_nacimiento || '').toUpperCase());
@@ -1165,7 +1180,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
           // Prediligenciar información de cada hijo
           const hijosData = hijosBeneficiarios.map((b: any) => ({
             tipoDocumento: b.tipo_documento || '',
-            numeroDocumento: b.documento || '',
+            numeroDocumento: sanitizeId(b.documento || '', { maxLength: 15 }),
             nombre: (b.nombres || '').toUpperCase(),
             genero: normalizeSexo(b.sexo) || '',
             fechaNacimiento: b.fecha_nacimiento || '',
@@ -1232,7 +1247,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       if (!currentValues.apellidos) form.setValue('apellidos', (afiliadoData.apellidos || '').toUpperCase());
       if (!currentValues.correo) form.setValue('correo', afiliadoData.correo_personal || '');
       if (!currentValues.tipoDocumento) form.setValue('tipoDocumento', afiliadoData.tipo_documento || '');
-      if (!currentValues.numeroDocumento) form.setValue('numeroDocumento', afiliadoData.documento || '');
+      if (!currentValues.numeroDocumento) form.setValue('numeroDocumento', sanitizeId(afiliadoData.documento || '', { maxLength: 15 }));
       
       // Prellenar campos adicionales solo si están vacíos
       if (!currentValues.fechaExpedicion && authData) {
@@ -1299,7 +1314,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
           // Prediligenciar información de cada hijo
           const hijosData = hijosBeneficiarios.map((b: any) => ({
             tipoDocumento: b.tipo_documento || '',
-            numeroDocumento: b.documento || '',
+            numeroDocumento: sanitizeId(b.documento || '', { maxLength: 15 }),
             nombre: (b.nombres || '').toUpperCase(),
             genero: normalizeSexo(b.sexo) || '',
             fechaNacimiento: b.fecha_nacimiento || '',
@@ -1332,7 +1347,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
     }
     if (afiliadoData?.documento) {
       const currentValues = form.getValues();
-      if (!currentValues.numeroDocumentoFirma) form.setValue('numeroDocumentoFirma', afiliadoData.documento);
+      if (!currentValues.numeroDocumentoFirma) form.setValue('numeroDocumentoFirma', sanitizeId(afiliadoData.documento, { maxLength: 15 }));
     }
   }, [afiliadoData, activeConvenio, form, authData, isAfiliadoActivo, beneficiarios]);
 
@@ -1342,7 +1357,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       const currentValue = form.getValues('numeroDocumentoFirma');
       const numeroDocumento = form.getValues('numeroDocumento');
       if (!currentValue && numeroDocumento) {
-        form.setValue('numeroDocumentoFirma', numeroDocumento);
+        form.setValue('numeroDocumentoFirma', sanitizeId(numeroDocumento, { maxLength: 15 }));
       }
     }
   }, [currentStep, form]);
@@ -1709,6 +1724,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
       console.log('Respuesta recibida:', response);
 
+      // Guardar datos de éxito para mostrar modal en la página de inicio
+      saveSurveySuccessData(response);
+
       // Reset reCAPTCHA después del envío exitoso
       recaptchaRef.current?.reset();
 
@@ -1776,10 +1794,14 @@ const EncuestaBienestarPageContent: React.FC = () => {
             ) : (
               <>
                 <p className="text-slate-600 mb-4">
-                  {afiliadoData ? (
-                    <>Yo, {afiliadoData.nombres} {afiliadoData.apellidos}, con {afiliadoData.tipo_documento} {afiliadoData.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+                  {afiliadoData && afiliadoData.nombres && afiliadoData.apellidos && afiliadoData.tipo_documento && afiliadoData.documento ? (
+                    <>
+                      Yo, {afiliadoData.nombres} {afiliadoData.apellidos}, con {afiliadoData.tipo_documento} {afiliadoData.documento} autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.
+                    </>
                   ) : (
-                    <>Yo, con autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.</>
+                    <>
+                      Autorizo al Sindicato de Profesionales de la salud ProSalud, el suministro de esta información única y exclusivamente para fines de actividades de seguridad y salud en el trabajo.
+                    </>
                   )}
                 </p>
                 
@@ -1825,7 +1847,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     e.preventDefault();
                     const formData = new FormData(e.currentTarget);
                     const tipoDoc = formData.get('tipoDocumento') as string;
-                    const numDoc = formData.get('numeroDocumento') as string;
+                    let numDoc = (formData.get('numeroDocumento') as string) || authNumeroDocumento;
+                    numDoc = sanitizeId(numDoc, { maxLength: 15 });
                     const fechaExp = formData.get('fechaExpedicion') as string;
                     
                     if (!tipoDoc || !numDoc || !fechaExp) {
@@ -1867,8 +1890,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       <Input
                         name="numeroDocumento"
                         type="text"
+                        inputMode="numeric"
                         required
-                        placeholder="Ingrese su número de documento"
+                        value={authNumeroDocumento}
+                        onChange={(e) => setAuthNumeroDocumento(sanitizeId(e.target.value, { maxLength: 15 }))}
+                        placeholder="Solo dígitos (sin puntos ni comas)"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -2052,8 +2078,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               {...field} 
                               readOnly={!!afiliadoData} 
                               className={!!afiliadoData ? "bg-slate-100" : ""}
+                              inputMode="numeric"
+                              placeholder={afiliadoData ? undefined : 'Solo dígitos (sin puntos ni comas)'}
                               onChange={(e) => {
-                                field.onChange(e);
+                                const sanitized = sanitizeId(e.target.value, { maxLength: 15 });
+                                field.onChange(sanitized);
                                 form.clearErrors('numeroDocumento');
                               }}
                             />
@@ -2430,7 +2459,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <FormField
                       control={form.control}
                       name="fechaNacimiento"
-                      render={({ field }) => (
+                      render={({ field }) => {
+                        const hoy = new Date();
+                        const hace18 = new Date(hoy.getFullYear() - 18, hoy.getMonth(), hoy.getDate());
+                        const maxFechaNacimiento = hace18.toISOString().split('T')[0];
+                        return (
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-900">12. Fecha de nacimiento</FormLabel>
                           <FormControl>
@@ -2438,6 +2471,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               type="date" 
                               {...field} 
                               value={field.value || ''} 
+                              max={maxFechaNacimiento}
                               readOnly={!!(afiliadoData as any)?.fecha_nacimiento}
                               className={!!(afiliadoData as any)?.fecha_nacimiento ? 'bg-slate-100' : ''}
                               onChange={(e) => {
@@ -2448,7 +2482,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
                           </FormControl>
                           <FormMessage />
                         </FormItem>
-                      )}
+                        );
+                      }}
                     />
 
                     <FormField
@@ -3051,10 +3086,10 @@ const EncuestaBienestarPageContent: React.FC = () => {
                                       {...field} 
                                       type="text"
                                       inputMode="numeric"
+                                      placeholder="Solo dígitos (sin puntos ni comas)"
                                       onChange={(e) => {
-                                        // Solo permitir números
-                                        const value = e.target.value.replace(/[^0-9]/g, '');
-                                        field.onChange(value);
+                                        const sanitized = sanitizeId(e.target.value, { maxLength: 15 });
+                                        field.onChange(sanitized);
                                         form.clearErrors(`hijos.${index}.numeroDocumento` as any);
                                       }}
                                     />
