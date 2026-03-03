@@ -20,6 +20,16 @@ import { tiposDocumentoEncuestas } from '@/components/actualizar-datos-personale
 import { sanitizeId } from '@/utils/inputSanitizer';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Loader2, FileText, Home, User, AlertCircle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const normalizeDateToISO = (value: string | null | undefined): string => {
   if (!value) return '';
@@ -85,6 +95,7 @@ const EncuestaVacunacionPage: React.FC = () => {
   const [authDoc, setAuthDoc] = useState<{ tipoDocumento: string; numeroDocumento: string; fechaExpedicion: string } | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successResponse, setSuccessResponse] = useState<VaccinationSurveySuccessData | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const signaturePadRef = useRef<SignaturePadRef>(null);
 
   const authForm = useForm<AuthValues>({
@@ -350,7 +361,7 @@ const EncuestaVacunacionPage: React.FC = () => {
                     />
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t">
-                    <Button type="button" variant="outline" onClick={() => navigate('/')} size="sm">
+                    <Button type="button" variant="outline" onClick={() => setShowCancelConfirm(true)} size="sm">
                       Cancelar
                     </Button>
                     <Button type="submit" disabled={isAuthenticating} className="bg-primary-prosalud" size="sm">
@@ -498,10 +509,10 @@ const EncuestaVacunacionPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setStep(0)}
+                        onClick={() => setShowCancelConfirm(true)}
                         size="sm"
                       >
-                        Atrás
+                        Cancelar
                       </Button>
                       <Button type="submit" disabled={isSubmitting} className="bg-primary-prosalud" size="sm">
                         {isSubmitting ? (
@@ -526,6 +537,29 @@ const EncuestaVacunacionPage: React.FC = () => {
         onClose={handleSuccessModalClose}
         data={successResponse}
       />
+
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar y volver al inicio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si cancela, los datos ingresados no se guardarán y deberá volver a comenzar si desea enviar la encuesta más tarde. ¿Desea salir de todos modos?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, continuar aquí</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowCancelConfirm(false);
+                navigate('/');
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sí, volver al inicio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </>
     </MainLayout>
   );

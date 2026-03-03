@@ -10,6 +10,16 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { submitSurvey, saveSurveySuccessData } from '@/services/socioDemographicSurveyService';
 import { authenticateForDataUpdate, AfiliadoAuthFailureError } from '@/services/afiliadosDataUpdateService';
@@ -943,6 +953,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const [hasSignature, setHasSignature] = useState(false);
   const [currentStep, setCurrentStep] = useState(0); // Paso 0 es autenticación
   const TOTAL_STEPS = 6; // 0: autenticación, 1-5: pasos del formulario
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   
   // Estado para autenticación inicial
   const [authData, setAuthData] = useState<{
@@ -1940,7 +1951,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => navigate('/')}
+                      onClick={() => setShowCancelConfirm(true)}
                       size="sm"
                     >
                       Cancelar
@@ -3930,7 +3941,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
               {/* Botones de navegación */}
               {currentStep > 0 && (
                 <div className="flex gap-4 justify-between pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={() => navigate('/')}>
+                  <Button type="button" variant="outline" onClick={() => setShowCancelConfirm(true)}>
                     Cancelar
                   </Button>
                   <div className="flex gap-4">
@@ -3976,6 +3987,29 @@ const EncuestaBienestarPageContent: React.FC = () => {
               />
             </form>
           </Form>
+
+          <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Cancelar y volver al inicio?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Si cancela, los datos ingresados no se guardarán y deberá volver a comenzar si desea enviar la encuesta más tarde. ¿Desea salir de todos modos?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>No, continuar aquí</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setShowCancelConfirm(false);
+                    navigate('/');
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Sí, volver al inicio
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </MainLayout>
