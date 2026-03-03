@@ -25,6 +25,7 @@ import InformacionImportanteDescansoAlert from '@/components/solicitud-descanso/
 import RequisitosDescansoSection from '@/components/solicitud-descanso/RequisitosDescansoSection';
 import ConfirmacionCorreoSection from '@/components/solicitud-certificado/ConfirmacionCorreoSection';
 import AutorizacionDatosSection from '@/components/solicitud-certificado/AutorizacionDatosSection';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const coordinadorasPermitidas = [
   'Catalina Hoyos Martinez',
@@ -79,6 +80,8 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
   const navigate = useNavigate();
   const { afiliado, getActiveConvenio } = useAfiliadoAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [submitAttempts, setSubmitAttempts] = React.useState(0);
   const recaptchaRef = useRef<InvisibleRecaptchaRef>(null);
 
   const activeConvenio = getActiveConvenio();
@@ -96,7 +99,11 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
 
   const onSubmit = async (data: FormValues) => {
     if (!afiliado) return;
-    
+
+    if (submitAttempts >= 3) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Execute reCAPTCHA - si falla, continuar sin token (fail-open)
@@ -136,6 +143,10 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
       
       // Save success data for the modal
       saveRequestSuccessData(response);
+
+      // Reset estado de error e intentos al enviar correctamente
+      setSubmitError(null);
+      setSubmitAttempts(0);
       
       // Reset reCAPTCHA after successful submission
       recaptchaRef.current?.reset();
@@ -160,7 +171,8 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
       setTimeout(() => {
         navigate('/');
       }, 500);
-    } catch (error) {
+    } catch (error: any) {
+      setSubmitAttempts((prev) => prev + 1);
       handleError(error);
     } finally {
       setIsSubmitting(false);
@@ -168,15 +180,45 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
   };
   
   const handleError = (error: any) => {
+    setSubmitError(null);
+
+    // Verificar si ya existe una solicitud en proceso para este mismo tipo de trámite
+    const hasExistingRequestInProcessError =
+      error?.isValidationError &&
+      Array.isArray(error?.errors?.request_type) &&
+      error.errors.request_type.some((msg: string) =>
+        msg.toLowerCase().includes('actualmente ya cuenta con una solicitud en proceso')
+      );
+
+    if (hasExistingRequestInProcessError) {
+      const existingRequestMessage =
+        error.errors.request_type.find((msg: string) =>
+          msg.toLowerCase().includes('actualmente ya cuenta con una solicitud en proceso')
+        ) ?? 'Actualmente ya cuenta con una solicitud en proceso para este mismo tipo de trámite.';
+
+      setSubmitError(existingRequestMessage);
+
+      toast.error('Ya tiene una solicitud en proceso', {
+        description: existingRequestMessage,
+        duration: 7000,
+        icon: <AlertCircle className="h-5 w-5 text-amber-600" />,
+      });
+      return;
+    }
+
     // Verificar si el error es sobre un afiliado retirado
-    const isRetiradoError = error?.isValidationError && 
-      error?.errors?.request_type?.some((msg: string) => 
+    const isRetiradoError =
+      error?.isValidationError &&
+      error?.errors?.request_type?.some((msg: string) =>
         msg.toLowerCase().includes('retirado')
       );
-    
+
     if (isRetiradoError) {
-      const retiradoMessage = error.errors.request_type.find((msg: string) => 
+      const retiradoMessage = error.errors.request_type.find((msg: string) =>
         msg.toLowerCase().includes('retirado')
+      );
+      setSubmitError(
+        retiradoMessage || 'No puede realizar esta solicitud porque se encuentra retirado del sindicato.'
       );
       toast.error('Acceso restringido', {
         description: retiradoMessage || 'No puede realizar esta solicitud porque se encuentra retirado del sindicato.',
@@ -184,6 +226,7 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
         icon: <AlertCircle className="h-5 w-5 text-red-600" />,
       });
     } else {
+      setSubmitError('Por favor verifique los datos ingresados e intente nuevamente.');
       toast.error('Error al enviar el formulario', {
         description: 'Por favor verifique los datos ingresados e intente nuevamente.',
         duration: 5000,
@@ -222,7 +265,7 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
         <InformacionImportanteDescansoAlert />
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, handleError)} className="space-y-8">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <DatosPersonalesReadOnly />
             <InformacionDescansoSection control={form.control} />
             <AnexoDescansoSection control={form.control} />
@@ -238,12 +281,23 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
                 logger.warn('Error en reCAPTCHA, pero permitiendo continuar');
               }}
             />
-            
-            <div className="flex justify-center mt-10">
+
+            {submitError && (
+              <Alert
+                variant="destructive"
+                className="mt-6 bg-red-50 border-red-200 text-red-800"
+              >
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error al enviar la solicitud</AlertTitle>
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex flex-col items-center mt-10 gap-2">
               <Button 
                 type="submit" 
                 size="lg" 
-                disabled={isSubmitting}
+                disabled={isSubmitting || submitAttempts >= 3}
                 className="w-full md:w-auto bg-secondary-prosaludgreen hover:bg-secondary-prosaludgreen/90 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
@@ -258,6 +312,11 @@ const SolicitudDescansoLaboralPageContent: React.FC = () => {
                   </>
                 )}
               </Button>
+              {submitAttempts >= 3 && (
+                <p className="mt-2 text-xs text-red-600 text-center">
+                  Ha alcanzado el máximo de 3 intentos. Si el problema persiste, comuníquese con ProSalud.
+                </p>
+              )}
             </div>
           </form>
         </Form>
