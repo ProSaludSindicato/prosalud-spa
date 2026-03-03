@@ -69,6 +69,7 @@ const MODULE_LABELS: Record<string, string> = {
   assembly: 'Asamblea',
   compensaciones_files: 'Archivos de Compensaciones',
   socio_demographic_surveys: 'Encuestas Sociodemográficas',
+  vaccination_surveys: 'Encuesta de Vacunación',
   document_signing: 'Firma de Convenios',
   wellness_delivery: 'Entrega de Bienestar',
   view_dashboard: 'Dashboard',
