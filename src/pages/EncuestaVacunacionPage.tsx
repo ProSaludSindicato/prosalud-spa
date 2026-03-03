@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { authenticateForDataUpdate, AfiliadoAuthFailureError } from '@/services/afiliadosDataUpdateService';
-import type { AfiliadoDataForUpdate } from '@/services/afiliadosDataUpdateService';
+import type { AfiliadoDataForUpdate, ConvenioDataForUpdate } from '@/services/afiliadosDataUpdateService';
 import { submitVaccinationSurvey, VaccinationSurveyApiError } from '@/services/vaccinationSurveyService';
 import VaccinationSurveySuccessModal, { type VaccinationSurveySuccessData } from '@/components/home/VaccinationSurveySuccessModal';
 import { tiposDocumentoEncuestas } from '@/components/actualizar-datos-personales/formOptions';
@@ -30,6 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { getHospitalDisplayName } from '@/utils/hospitalDisplayName';
 
 const normalizeDateToISO = (value: string | null | undefined): string => {
   if (!value) return '';
@@ -57,6 +59,30 @@ function splitNames(full: string | null | undefined): { first: string; second: s
   return { first, second };
 }
 
+/** Obtiene el código de hospital del convenio activo del afiliado. */
+function getActiveHospitalCode(convenios: ConvenioDataForUpdate[] | undefined | null): string | null {
+  if (!convenios || convenios.length === 0) return null;
+
+  // Primero, buscar un convenio con estado ACTIVO
+  let active = convenios.find((c) => c.estado?.toUpperCase() === 'ACTIVO') ?? null;
+
+  // Si no hay ACTIVO, usar el más reciente según fecha_fin
+  if (!active) {
+    const conveniosConFecha = convenios.filter((c) => c.fecha_fin);
+    if (conveniosConFecha.length > 0) {
+      active = conveniosConFecha.reduce((latest, current) => {
+        if (!latest.fecha_fin || !current.fecha_fin) return latest;
+        return new Date(current.fecha_fin) > new Date(latest.fecha_fin) ? current : latest;
+      }, conveniosConFecha[0]);
+    } else {
+      // Como último recurso, tomar el primer convenio
+      active = convenios[0];
+    }
+  }
+
+  return active?.cliente ?? null;
+}
+
 const authSchema = z.object({
   tipoDocumento: z.string().min(1, 'Tipo de documento es requerido'),
   numeroDocumento: z.string().min(1, 'Número de documento es requerido').refine((v) => /^[0-9]+$/.test(v), { message: 'Solo dígitos (sin puntos ni comas)' }),
@@ -71,19 +97,48 @@ const authSchema = z.object({
   }, { message: 'Fecha no puede ser futura' }),
 });
 
-const formSchema = z.object({
-  fechaAplicacionSrp: z.string().optional(),
-  fechaAplicacionSr: z.string().optional(),
-  fechaAplicacionFiebreAmarilla: z.string().optional(),
-  firma: z.string().min(1, 'La firma es requerida como constancia'),
-});
+const formSchema = z
+  .object({
+    tieneVacunaSrp: z.enum(['si', 'no'], { required_error: 'Seleccione una opción' }),
+    tieneVacunaSr: z.enum(['si', 'no'], { required_error: 'Seleccione una opción' }),
+    tieneVacunaFiebreAmarilla: z.enum(['si', 'no'], { required_error: 'Seleccione una opción' }),
+    fechaAplicacionSrp: z.string().optional(),
+    fechaAplicacionSr: z.string().optional(),
+    fechaAplicacionFiebreAmarilla: z.string().optional(),
+    firma: z.string().min(1, 'La firma es requerida como constancia'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.tieneVacunaSrp === 'si' && !data.fechaAplicacionSrp?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debe indicar la fecha de aplicación.',
+        path: ['fechaAplicacionSrp'],
+      });
+    }
+    if (data.tieneVacunaSr === 'si' && !data.fechaAplicacionSr?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debe indicar la fecha de aplicación.',
+        path: ['fechaAplicacionSr'],
+      });
+    }
+    if (data.tieneVacunaFiebreAmarilla === 'si' && !data.fechaAplicacionFiebreAmarilla?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Debe indicar la fecha de aplicación.',
+        path: ['fechaAplicacionFiebreAmarilla'],
+      });
+    }
+  });
 
 type AuthValues = z.infer<typeof authSchema>;
 type FormValues = z.infer<typeof formSchema>;
 
-const DESCRIPTION_TEXT = `Señor afiliado participe ESE Hospital San Juan de Dios de Rionegro, por medio de la presente encuesta se dará cumplimiento al requerimiento enviado por la Coordinadora de PAI del municipio de Rionegro el cual tiene como finalidad sobre el fortalecimiento de la vacunación contra sarampión, rubéola y síndrome de rubéola congénita (SRC) en todo el territorio nacional y el inicio del plan de preparación ante eventos masivos por la Copa Mundial FIFA 2026; la Circular 012 y la Resolución 691 de 2025 relacionadas con las directrices por alerta de fiebre amarilla.`;
+const buildDescriptionText = (hospitalDisplayName: string): string =>
+  `Señor afiliado participe ${hospitalDisplayName}, por medio de la presente encuesta se dará cumplimiento al requerimiento enviado por la Coordinadora de PAI del municipio de Rionegro el cual tiene como finalidad sobre el fortalecimiento de la vacunación contra sarampión, rubéola y síndrome de rubéola congénita (SRC) en todo el territorio nacional y el inicio del plan de preparación ante eventos masivos por la Copa Mundial FIFA 2026; la Circular 012 y la Resolución 691 de 2025 relacionadas con las directrices por alerta de fiebre amarilla.`;
 
-const MANDATORY_NOTICE = 'Es de anotar que el diligenciamiento de la misma es de carácter obligatorio.';
+const MANDATORY_NOTICE =
+  'Es de anotar que el diligenciamiento de la encuesta es de carácter obligatorio. Para cada vacuna podrá indicar si la tiene aplicada o no; solo en caso afirmativo se le pedirá la fecha de aplicación. Si no cuenta con alguna de las vacunas, seleccione “No”. Solo la firma digital es obligatoria.';
 
 const EncuestaVacunacionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -96,6 +151,7 @@ const EncuestaVacunacionPage: React.FC = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [successResponse, setSuccessResponse] = useState<VaccinationSurveySuccessData | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [hospitalCode, setHospitalCode] = useState<string | null>(null);
   const signaturePadRef = useRef<SignaturePadRef>(null);
 
   const authForm = useForm<AuthValues>({
@@ -110,6 +166,9 @@ const EncuestaVacunacionPage: React.FC = () => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      tieneVacunaSrp: 'si',
+      tieneVacunaSr: 'si',
+      tieneVacunaFiebreAmarilla: 'si',
       fechaAplicacionSrp: '',
       fechaAplicacionSr: '',
       fechaAplicacionFiebreAmarilla: '',
@@ -144,6 +203,8 @@ const EncuestaVacunacionPage: React.FC = () => {
       }
 
       setAfiliado(afiliadoData);
+      const nuevoHospitalCode = getActiveHospitalCode(response.data.convenios);
+      setHospitalCode(nuevoHospitalCode);
       setAuthDoc({ tipoDocumento: tipoDoc, numeroDocumento: sanitizeId(numDoc, { maxLength: 15 }), fechaExpedicion: fechaExp });
       setStep(1);
     } catch (error: any) {
@@ -190,6 +251,7 @@ const EncuestaVacunacionPage: React.FC = () => {
         segundo_nombre: nombresSplit.second,
         primer_apellido: apellidosSplit.first,
         segundo_apellido: apellidosSplit.second,
+        hospital: hospitalCode ?? null,
         fecha_aplicacion_srp: values.fechaAplicacionSrp?.trim() || null,
         fecha_aplicacion_sr: values.fechaAplicacionSr?.trim() || null,
         fecha_aplicacion_fiebre_amarilla: values.fechaAplicacionFiebreAmarilla?.trim() || null,
@@ -266,7 +328,11 @@ const EncuestaVacunacionPage: React.FC = () => {
           ) : (
             <>
               <p className="text-slate-600 whitespace-pre-line text-base text-justify">
-                {DESCRIPTION_TEXT}
+                {buildDescriptionText(
+                  hospitalCode
+                    ? getHospitalDisplayName(hospitalCode) || 'ESE Hospital San Juan de Dios de Rionegro'
+                    : 'ESE Hospital San Juan de Dios de Rionegro'
+                )}
               </p>
               <Alert className="mt-4 border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-600">
                 <AlertCircle className="h-4 w-4" />
@@ -384,10 +450,12 @@ const EncuestaVacunacionPage: React.FC = () => {
         {step === 1 && afiliado && authDoc && (
           <Card>
             <CardContent className="pt-6 space-y-6">
-              <p className="text-sm text-muted-foreground">
-                  Solo debe completar las fechas de aplicación de las vacunas cuando corresponda.
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 rounded-lg bg-slate-50 border border-slate-200 p-4 md:p-5">
+              <p className="text-sm font-medium text-slate-800">
+                Para cada vacuna, indique primero si la tiene aplicada o no. Si responde que sí, deberá registrar la fecha
+                de aplicación correspondiente. Si no la tiene, seleccione “No”. Solo la firma digital es obligatoria para
+                enviar la encuesta.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 rounded-lg bg-slate-50 border border-slate-200 p-4 md:p-5">
                   <div>
                     <label className="text-xs font-medium text-slate-500">Primer nombre</label>
                     <p className="text-sm font-semibold text-slate-900">
@@ -424,69 +492,180 @@ const EncuestaVacunacionPage: React.FC = () => {
                       {authDoc.tipoDocumento} {authDoc.numeroDocumento}
                     </p>
                   </div>
-                </div>
+              </div>
 
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
                       <FormField
                         control={form.control}
-                        name="fechaAplicacionSrp"
+                        name="tieneVacunaSrp"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col [&_label]:min-h-12 [&_label]:flex [&_label]:items-end">
-                            <FormLabel>Fecha aplicación SRP (Sarampión, Rubéola, Parotiditis)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="date"
-                                max={new Date().toISOString().split('T')[0]}
-                                {...field}
-                                value={field.value ?? ''}
-                              />
-                            </FormControl>
+                          <FormItem>
+                            <div className="flex flex-col gap-2 min-h-[88px]">
+                              <FormLabel className="text-sm font-semibold text-slate-900">
+                                Vacuna SRP (Sarampión, Rubéola, Parotiditis)
+                              </FormLabel>
+                              <FormControl>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={field.value === 'si'}
+                                    onCheckedChange={(checked) => {
+                                      const value = checked ? 'si' : 'no';
+                                      field.onChange(value);
+                                      form.clearErrors('tieneVacunaSrp');
+                                      if (!checked) {
+                                        form.setValue('fechaAplicacionSrp', '');
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-xs text-slate-600">
+                                    {field.value === 'si' ? 'Sí, la tengo aplicada' : 'No la tengo aplicada'}
+                                  </span>
+                                </div>
+                              </FormControl>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="fechaAplicacionSr"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col [&_label]:min-h-12 [&_label]:flex [&_label]:items-end">
-                            <FormLabel>Fecha aplicación SR (Sarampión, Rubéola)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="date"
-                                max={new Date().toISOString().split('T')[0]}
-                                {...field}
-                                value={field.value ?? ''}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="fechaAplicacionFiebreAmarilla"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col [&_label]:min-h-12 [&_label]:flex [&_label]:items-end">
-                            <FormLabel>Fecha aplicación Fiebre Amarilla</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="date"
-                                max={new Date().toISOString().split('T')[0]}
-                                {...field}
-                                value={field.value ?? ''}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {form.watch('tieneVacunaSrp') === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name="fechaAplicacionSrp"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs text-slate-600">Fecha de aplicación</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  max={new Date().toISOString().split('T')[0]}
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Indique la fecha de aplicación cuando corresponda. Si no tiene alguna vacuna, deje el campo en blanco; puede enviar sin fechas y se registrará que no tiene las vacunas.
-                    </p>
+
+                    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                      <FormField
+                        control={form.control}
+                        name="tieneVacunaSr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex flex-col gap-2 min-h-[88px]">
+                              <FormLabel className="text-sm font-semibold text-slate-900">
+                                Vacuna SR (Sarampión, Rubéola)
+                              </FormLabel>
+                              <FormControl>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={field.value === 'si'}
+                                    onCheckedChange={(checked) => {
+                                      const value = checked ? 'si' : 'no';
+                                      field.onChange(value);
+                                      form.clearErrors('tieneVacunaSr');
+                                      if (!checked) {
+                                        form.setValue('fechaAplicacionSr', '');
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-xs text-slate-600">
+                                    {field.value === 'si' ? 'Sí, la tengo aplicada' : 'No la tengo aplicada'}
+                                  </span>
+                                </div>
+                              </FormControl>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {form.watch('tieneVacunaSr') === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name="fechaAplicacionSr"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs text-slate-600">Fecha de aplicación</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  max={new Date().toISOString().split('T')[0]}
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                      <FormField
+                        control={form.control}
+                        name="tieneVacunaFiebreAmarilla"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex flex-col gap-2 min-h-[88px]">
+                              <FormLabel className="text-sm font-semibold text-slate-900">
+                                Vacuna Fiebre Amarilla
+                              </FormLabel>
+                              <FormControl>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={field.value === 'si'}
+                                    onCheckedChange={(checked) => {
+                                      const value = checked ? 'si' : 'no';
+                                      field.onChange(value);
+                                      form.clearErrors('tieneVacunaFiebreAmarilla');
+                                      if (!checked) {
+                                        form.setValue('fechaAplicacionFiebreAmarilla', '');
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-xs text-slate-600">
+                                    {field.value === 'si' ? 'Sí, la tengo aplicada' : 'No la tengo aplicada'}
+                                  </span>
+                                </div>
+                              </FormControl>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {form.watch('tieneVacunaFiebreAmarilla') === 'si' && (
+                        <FormField
+                          control={form.control}
+                          name="fechaAplicacionFiebreAmarilla"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs text-slate-600">Fecha de aplicación</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  max={new Date().toISOString().split('T')[0]}
+                                  {...field}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">Recuerde:</span> si selecciona “No” para alguna vacuna, se registrará
+                    que no cuenta con ella. Si selecciona “Sí”, debe indicar la fecha de aplicación correspondiente.
+                  </p>
                     <div className="space-y-3">
                       <FormLabel className="text-base font-semibold text-slate-900">Firma Digital</FormLabel>
                       <FormDescription>Firme en el recuadro para dar constancia de la información registrada. Es obligatorio.</FormDescription>

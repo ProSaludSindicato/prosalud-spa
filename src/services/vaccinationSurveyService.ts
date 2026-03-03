@@ -21,6 +21,8 @@ export interface VaccinationSurveyPayload {
   segundo_nombre: string;
   primer_apellido: string;
   segundo_apellido: string;
+  /** Código del hospital/convenio asociado al afiliado (por ejemplo, HSJDRionegro, BELLO, LA MARIA). */
+  hospital: string | null;
   fecha_aplicacion_srp: string | null;
   fecha_aplicacion_sr: string | null;
   fecha_aplicacion_fiebre_amarilla: string | null;
