@@ -244,3 +244,10 @@ export const tiposDocumentoCompletos = [
   { value: 'PT', label: 'Permiso por Protección Temporal' },
 ];
 
+/** Tipos de documento permitidos en encuestas (sociodemográfica y vacunación). Sin TI. */
+export const tiposDocumentoEncuestas = [
+  { value: 'CC', label: 'Cédula de Ciudadanía (CC)' },
+  { value: 'CE', label: 'Cédula de Extranjería (CE)' },
+  { value: 'PT', label: 'Permiso por Protección Temporal (PT)' },
+];
+

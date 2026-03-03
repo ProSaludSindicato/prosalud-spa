@@ -53,6 +53,7 @@ import SolicitudRetiroSindicalPage from '@/pages/SolicitudRetiroSindicalPage';
 import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
+import EncuestaVacunacionPage from '@/pages/EncuestaVacunacionPage';
 import KitBienestarEscolarPage from '@/pages/KitBienestarEscolarPage';
 
 // Legal Pages
@@ -113,6 +114,7 @@ const AppRoutes = () => {
             <Route path="/servicios/sst" element={<SstPage />} />
             <Route path="/servicios/encuesta-sociodemografica" element={<EncuestaBienestarPage />} />
             <Route path="/servicios/encuesta-bienestar" element={<EncuestaBienestarPage />} /> {/* Ruta legacy, misma página */}
+            <Route path="/encuesta-vacunacion" element={<EncuestaVacunacionPage />} />
             <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />
             <Route path="/servicios/galeria-bienestar/:eventId" element={<EventoDetallePage />} />
             <Route path="/servicios/permisos-turnos" element={<SolicitudPermisosCambioTurnosPage />} />

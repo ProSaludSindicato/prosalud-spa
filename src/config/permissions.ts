@@ -188,6 +188,9 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
     icon: FileText,
     permissions: {
       view: ['socio_demographic_surveys.view'],
+      custom: {
+        exportVaccination: ['vaccination_surveys.view'],
+      },
     },
   },
 };

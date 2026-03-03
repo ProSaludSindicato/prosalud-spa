@@ -29,6 +29,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/servicios/retiro-sindical': 'Retiro sindical - ProSalud',
   '/servicios/afiliacion-comfenalco': 'Afiliación Comfenalco - ProSalud',
   '/servicios/eps-sura': 'EPS Sura - ProSalud',
+  '/encuesta-vacunacion': 'Encuesta de vacunación - ProSalud',
 };
 
 const SetPageTitle = () => {

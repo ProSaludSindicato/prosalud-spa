@@ -58,6 +58,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import ExportSurveysDialog from '@/components/admin/encuestas-sociodemograficas/ExportSurveysDialog';
+import { exportVaccinationSurveyToExcel } from '@/services/vaccinationSurveyAdminApi';
 
 // Función para obtener el nombre completo del tipo de documento
 const getTipoDocumentoDisplayName = (tipoDocumento: string | null | undefined): string => {
@@ -280,6 +281,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     parseInt(searchParams.get('page') || '1', 10)
   );
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [isExportingVaccination, setIsExportingVaccination] = useState(false);
 
   // Debounce para el filtro de número de documento
   const [numeroDocumentoFilterDebounced, setNumeroDocumentoFilterDebounced] = useState<string>(
@@ -544,13 +546,56 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                   <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                     {can('socio_demographic_surveys.view') && (
                       <Button
-                        variant="outline"
                         onClick={() => setExportDialogOpen(true)}
-                        className="w-full sm:w-auto"
+                        className="w-full sm:w-auto bg-primary-prosalud hover:bg-primary-prosalud-dark"
                       >
                         <Download className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Exportar Reporte</span>
                         <span className="sm:hidden">Exportar</span>
+                      </Button>
+                    )}
+                    {can('vaccination_surveys.view') && (
+                      <Button
+                        variant="outline"
+                        disabled={isExportingVaccination}
+                        onClick={async () => {
+                          setIsExportingVaccination(true);
+                          try {
+                            const { blob } = await exportVaccinationSurveyToExcel({});
+                            const now = new Date();
+                            const dateStr = now.toISOString().slice(0, 10);
+                            const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+                            const filename = `Reporte_Encuesta_Vacunacion_ProSalud_${dateStr}_${timeStr}.xlsx`;
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = filename;
+                            document.body.appendChild(link);
+                            link.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(link);
+                            toast.success('Reporte descargado correctamente.');
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : 'Error al generar el reporte.');
+                          } finally {
+                            setIsExportingVaccination(false);
+                          }
+                        }}
+                        className="w-full sm:w-auto"
+                      >
+                        {isExportingVaccination ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <span className="hidden sm:inline">Descargando...</span>
+                            <span className="sm:hidden">...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Exportar Excel Vacunación</span>
+                            <span className="sm:hidden">Excel Vacunación</span>
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>

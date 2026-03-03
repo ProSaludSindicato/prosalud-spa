@@ -25,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, X } from 'lucide-react';
-import { relacionesContactoEmergencia, tiposDocumentoCompletos, municipios, tallasUniforme, nivelesEducativos } from '@/components/actualizar-datos-personales/formOptions';
+import { relacionesContactoEmergencia, tiposDocumentoCompletos, tiposDocumentoEncuestas, municipios, tallasUniforme, nivelesEducativos } from '@/components/actualizar-datos-personales/formOptions';
 import { paises, getDefaultPais, normalizePais } from '@/components/actualizar-datos-personales/paises';
 import { obfuscateValue, isObfuscated as isObfuscatedValue } from '@/utils/obfuscate';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
@@ -1906,10 +1906,11 @@ const EncuestaBienestarPageContent: React.FC = () => {
                           <SelectValue placeholder="Seleccione" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="CC">Cédula de Ciudadanía (CC)</SelectItem>
-                          <SelectItem value="CE">Cédula de Extranjería (CE)</SelectItem>
-                          <SelectItem value="TI">Tarjeta de Identidad (TI)</SelectItem>
-                          <SelectItem value="PT">Permiso por Protección Temporal (PT)</SelectItem>
+                          {tiposDocumentoEncuestas.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
