@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, Calendar, Filter, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { requestsApiService } from '@/services/requestsApi';
+import { requestsService } from '@/services/requestsServiceApi';
 import { logger } from '@/utils/logger';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 
@@ -103,7 +104,8 @@ const BulkResponseTemplateDialog: React.FC<BulkResponseTemplateDialogProps> = ({
       } = {};
 
       if (requestType !== 'all') {
-        filters.request_type = requestType;
+        // Mapear el tipo de solicitud del frontend al formato esperado por el backend
+        filters.request_type = requestsService.mapRequestTypeToBackend(requestType);
       }
 
       if (status !== 'all') {
