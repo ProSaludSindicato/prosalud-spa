@@ -96,6 +96,15 @@ const handleUppercaseInput = (e: React.ChangeEvent<HTMLInputElement>, onChange: 
   onChange(value);
 };
 
+/** Sanitiza nombres y apellidos: sin tildes ni caracteres especiales, solo letras A-Z y espacios (cuando el usuario ingresa los datos). */
+const sanitizeNombreApellido = (value: string): string => {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^A-Za-z\s]/g, '')
+    .toUpperCase();
+};
+
 // Función helper para convertir a mayúsculas mientras se escribe (Textarea)
 const handleUppercaseTextarea = (e: React.ChangeEvent<HTMLTextAreaElement>, onChange: (value: string) => void) => {
   const value = e.target.value.toUpperCase();
@@ -2069,7 +2078,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="nombres"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">1. Nombres</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">1. Nombres completos</FormLabel>
                           <FormControl>
                             <Input 
                               {...field} 
@@ -2077,10 +2086,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               readOnly={!!afiliadoData} 
                               className={!!afiliadoData ? "bg-slate-100" : ""}
                               onChange={(e) => {
-                                handleUppercaseInput(e, (value) => {
-                                  field.onChange(value);
-                                  form.clearErrors('nombres');
-                                });
+                                const value = afiliadoData ? e.target.value : sanitizeNombreApellido(e.target.value);
+                                field.onChange(value);
+                                form.clearErrors('nombres');
                               }}
                             />
                           </FormControl>
@@ -2094,7 +2102,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="apellidos"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">2. Apellidos</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">2. Apellidos completos</FormLabel>
                           <FormControl>
                             <Input 
                               {...field} 
@@ -2102,10 +2110,9 @@ const EncuestaBienestarPageContent: React.FC = () => {
                               readOnly={!!afiliadoData} 
                               className={!!afiliadoData ? "bg-slate-100" : ""}
                               onChange={(e) => {
-                                handleUppercaseInput(e, (value) => {
-                                  field.onChange(value);
-                                  form.clearErrors('apellidos');
-                                });
+                                const value = afiliadoData ? e.target.value : sanitizeNombreApellido(e.target.value);
+                                field.onChange(value);
+                                form.clearErrors('apellidos');
                               }}
                             />
                           </FormControl>
