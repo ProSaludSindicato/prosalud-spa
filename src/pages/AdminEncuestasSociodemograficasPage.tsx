@@ -448,7 +448,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     setSearchParams({});
   };
 
-  // Formatear fecha
+  // Formatear fecha (lista: DD/MM/YYYY HH:mm)
   const formatDate = (dateString: string) => {
     try {
       // Manejar formato ISO: "2026-01-10T19:55:10.000000Z" o "2026-01-10T19:55:10Z"
@@ -483,7 +483,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
         throw new Error('Invalid date');
       }
       
-      return format(date, "dd 'de' MMMM, yyyy 'a las' HH:mm", { locale: es });
+      return format(date, "dd/MM/yyyy HH:mm");
     } catch {
       return dateString;
     }
@@ -851,7 +851,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-slate-600">{survey.formatted_created_at || formatDate(survey.created_at)}</span>
+                            <span className="text-sm text-slate-600">{formatDate(survey.created_at)}</span>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -948,7 +948,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                                 <div className="text-right">
                                   <p className="text-xs font-medium text-slate-500 mb-1">Fecha</p>
                                   <p className="text-xs text-slate-900">
-                                    {survey.formatted_created_at || formatDate(survey.created_at)}
+                                    {formatDate(survey.created_at)}
                                   </p>
                                 </div>
                               </div>
