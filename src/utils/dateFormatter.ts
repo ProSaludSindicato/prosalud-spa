@@ -34,6 +34,18 @@ export const formatTime12Hour = (timeString: string): string => {
  */
 
 /**
+ * Parsea una cadena YYYY-MM-DD (o ISO con parte de fecha) como fecha local.
+ * Evita el desfase de un día que produce new Date("YYYY-MM-DD") al interpretar medianoche UTC.
+ */
+export function parseLocalDate(dateString: string | null | undefined): Date {
+  if (dateString == null || dateString === '') return new Date(NaN);
+  const dateOnly = String(dateString).split('T')[0].trim();
+  const parts = dateOnly.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => isNaN(n))) return new Date(dateString);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+/**
  * Formatea una fecha en formato "dd MMM yyyy" (ej: "18 feb 2026")
  * Evita problemas de timezone parseando la fecha manualmente
  */

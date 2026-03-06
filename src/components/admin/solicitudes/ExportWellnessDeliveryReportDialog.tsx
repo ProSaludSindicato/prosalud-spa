@@ -10,27 +10,25 @@ import { toast } from 'sonner';
 import { wellnessDeliveryService, ExportDeliveryReportRequest } from '@/services/wellnessDeliveryService';
 import { logger } from '@/utils/logger';
 
+export interface FilterOption {
+  value: string;
+  label: string;
+}
+
 interface ExportWellnessDeliveryReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Estados que existen en los datos; si no se pasan, no se muestran opciones de estado */
+  availableEstados?: FilterOption[];
+  /** Tipos de entrega que existen en los datos; si no se pasan, no se muestran opciones de tipo */
+  availableTipos?: FilterOption[];
 }
 
-const TIPO_ENTREGA_OPTIONS = [
-  { value: 'kit_escolar', label: 'Kit Escolar' },
-  { value: 'desayuno', label: 'Desayuno' },
-  { value: 'lonchera', label: 'Lonchera' },
-] as const;
-
-const ESTADO_OPTIONS = [
-  { value: 'pendiente', label: 'Pendiente' },
-  { value: 'procesado', label: 'Procesado' },
-  { value: 'entregado', label: 'Entregado' },
-  { value: 'cancelado', label: 'Cancelado' },
-] as const;
-
-const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportDialogProps> = ({ 
-  open, 
+const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportDialogProps> = ({
+  open,
   onOpenChange,
+  availableEstados = [],
+  availableTipos = [],
 }) => {
   const [tipoEntrega, setTipoEntrega] = useState<string>('all');
   const [estado, setEstado] = useState<string>('all');
@@ -199,7 +197,7 @@ const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportD
       const filters: ExportDeliveryReportRequest = {};
 
       if (tipoEntrega !== 'all') {
-        filters.tipo_entrega = tipoEntrega as 'kit_escolar' | 'desayuno' | 'lonchera';
+        filters.tipo_entrega = /^\d+$/.test(tipoEntrega) ? Number(tipoEntrega) : tipoEntrega;
       }
 
       if (estado !== 'all') {
@@ -271,7 +269,7 @@ const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportD
             Exportar Reporte de Entregas de Bienestar
           </DialogTitle>
           <DialogDescription>
-            Genera un reporte en Excel de todas las entregas de bienestar (kits escolares, desayunos, loncheras, etc.)
+            Genera un reporte en Excel de las solicitudes de entregas de bienestar según los filtros seleccionados.
           </DialogDescription>
         </DialogHeader>
 
@@ -297,7 +295,7 @@ const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportD
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los tipos</SelectItem>
-                    {TIPO_ENTREGA_OPTIONS.map((option) => (
+                    {availableTipos.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -329,7 +327,7 @@ const ExportWellnessDeliveryReportDialog: React.FC<ExportWellnessDeliveryReportD
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los estados</SelectItem>
-                    {ESTADO_OPTIONS.map((option) => (
+                    {availableEstados.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

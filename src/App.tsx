@@ -28,6 +28,7 @@ import AdminRoleDetailPage from '@/pages/AdminRoleDetailPage';
 import AdminRoleEditPage from '@/pages/AdminRoleEditPage';
 import AdminSolicitudesPage from '@/pages/AdminSolicitudesPage';
 import AdminSolicitudBienestarPage from '@/pages/AdminSolicitudBienestarPage';
+import AdminRegistrarEntregaBienestarPage from '@/pages/AdminRegistrarEntregaBienestarPage';
 import AdminInventarioPage from '@/pages/AdminInventarioPage';
 import AdminBienestarPage from '@/pages/AdminBienestarPage';
 import AdminComfenalcoPage from '@/pages/AdminComfenalcoPage';
@@ -54,7 +55,7 @@ import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
 import EncuestaVacunacionPage from '@/pages/EncuestaVacunacionPage';
-import KitBienestarEscolarPage from '@/pages/KitBienestarEscolarPage';
+import EntregasBienestarPage from '@/pages/EntregasBienestarPage';
 
 // Legal Pages
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
@@ -122,7 +123,8 @@ const AppRoutes = () => {
             <Route path="/servicios/retiro-sindical" element={<SolicitudRetiroSindicalPage />} />
             <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
             <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
-            <Route path="/kit-bienestar-escolar" element={<KitBienestarEscolarPage />} />
+            <Route path="/entregas-bienestar" element={<EntregasBienestarPage />} />
+            <Route path="/kit-bienestar-escolar" element={<Navigate to="/entregas-bienestar" replace />} />
 
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
@@ -183,6 +185,14 @@ const AppRoutes = () => {
               element={
                 <ProtectedRoute requiredPermissions={['wellness_requests.view', 'wellness_delivery.view', 'wellness_delivery.manage']}>
                   <AdminSolicitudBienestarPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/entregas-bienestar/registrar" 
+              element={
+                <ProtectedRoute requiredPermissions={['wellness_delivery.manage']}>
+                  <AdminRegistrarEntregaBienestarPage />
                 </ProtectedRoute>
               } 
             />

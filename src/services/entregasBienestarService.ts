@@ -3,7 +3,27 @@ import { logger } from '@/utils/logger';
 import axios from 'axios';
 
 /**
- * Tipos para la autenticación del Kit de Bienestar Escolar
+ * Tipo de entrega activo (campaña vigente para la fecha actual)
+ */
+export type ModoAcceso = 'listado' | 'abierto';
+
+export interface WellnessDeliveryTypeActive {
+  id: number;
+  nombre: string;
+  /** listado = requiere autenticación contra Excel; abierto = puede buscar por documento sin validar listado */
+  modo_acceso?: ModoAcceso;
+  fecha_desde: string; // Y-m-d
+  fecha_hasta: string; // Y-m-d
+}
+
+export interface GetCurrentTypeResponse {
+  success: boolean;
+  message?: string;
+  data: WellnessDeliveryTypeActive | null;
+}
+
+/**
+ * Tipos para la autenticación en solicitudes de entregas de bienestar
  */
 
 export interface AuthenticateRequest {
@@ -43,10 +63,12 @@ export interface AuthenticateResponse {
   message: string;
   data: AuthenticateResponseData | null;
   errors?: Record<string, string[]>;
+  /** Código HTTP cuando success es false (para mostrar mensajes según 404/503) */
+  status?: number;
 }
 
 export interface SubmitInscriptionRequest {
-  tipo_entrega: string; // "kit_escolar"
+  /** No enviar: el backend asigna el tipo activo para la fecha actual */
   documento_afiliado: string;
   nombre_afiliado: string;
   hospital?: string;
@@ -60,23 +82,61 @@ export interface SubmitInscriptionRequest {
   tipo_firma?: string; // "digital" (default)
 }
 
+export interface SubmitInscriptionResponseData {
+  id: number;
+  wellness_delivery_type_id?: number;
+  tipo_entrega_text?: string;
+  documento_afiliado: string;
+  nombre_afiliado: string;
+  estado: string;
+  created_at: string;
+}
+
 export interface SubmitInscriptionResponse {
   success: boolean;
   message: string;
-  data: any;
+  data: SubmitInscriptionResponseData | null;
+  errors?: Record<string, string[]>;
 }
 
 /**
- * Servicio para el Kit de Bienestar Escolar
+ * Servicio para solicitudes de entregas de bienestar (tipos/campañas dinámicos)
  */
-class KitBienestarService {
+class EntregasBienestarService {
+  /**
+   * Obtener el tipo de entrega activo para la fecha actual
+   * GET /api/kit-bienestar/current-type
+   * Si no hay campaña activa, success es false y data es null.
+   */
+  async getCurrentType(): Promise<GetCurrentTypeResponse> {
+    try {
+      const response = await publicApi.get<GetCurrentTypeResponse>(
+        '/api/kit-bienestar/current-type',
+        { headers: { Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 200) {
+        return error.response.data as GetCurrentTypeResponse;
+      }
+      logger.error('Error al obtener tipo de entrega activo', {
+        error: axios.isAxiosError(error) ? error.message : error,
+      });
+      return {
+        success: false,
+        message: 'No se pudo verificar si hay una campaña activa.',
+        data: null,
+      };
+    }
+  }
+
   /**
    * Autenticar afiliado para verificar si cumple con los requisitos
    * POST /api/kit-bienestar/authenticate
    */
   async authenticate(data: AuthenticateRequest): Promise<AuthenticateResponse> {
     try {
-      logger.debug('Autenticando afiliado para Kit de Bienestar Escolar', {
+      logger.debug('Autenticando afiliado para entrega de bienestar', {
         documento: data.documento,
         tipo_documento: data.tipo_documento,
       });
@@ -100,31 +160,34 @@ class KitBienestarService {
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        // Manejar errores de validación (422)
+        // Manejar errores de validación (422) – puede ser "no hay campaña activa"
         if (error.response?.status === 422) {
           return {
             success: false,
             message: error.response.data?.message || 'Datos de entrada inválidos',
             data: null,
             errors: error.response.data?.errors,
+            status: 422,
           };
         }
 
-        // Manejar cuando no se encuentra (404)
+        // Manejar cuando no se encuentra (404) – no está en el listado (modo listado)
         if (error.response?.status === 404) {
           return {
             success: false,
-            message: error.response.data?.message || 'Lo sentimos, no cumples con los requisitos para reclamar el beneficio de los kits escolares en este momento.',
+            message: error.response.data?.message || 'No se encontró la información. La persona no está en el listado de afiliados permitidos para esta campaña.',
             data: null,
+            status: 404,
           };
         }
 
-        // Manejar servicio no disponible (503)
+        // Manejar servicio no disponible (503) – Excel no cargado (modo listado)
         if (error.response?.status === 503) {
           return {
             success: false,
-            message: error.response.data?.message || 'Servicio temporalmente no disponible',
+            message: error.response.data?.message || 'El listado de afiliados para esta campaña aún no está disponible. Debe cargarse desde el panel de administración.',
             data: null,
+            status: 503,
           };
         }
 
@@ -134,11 +197,12 @@ class KitBienestarService {
             success: false,
             message: error.response.data?.message || 'Error interno del servidor',
             data: null,
+            status: 500,
           };
         }
 
         // Otros errores
-        logger.error('Error al autenticar afiliado para Kit de Bienestar', {
+        logger.error('Error al autenticar afiliado para entrega de bienestar', {
           error: error.message,
           status: error.response?.status,
           data: error.response?.data,
@@ -148,6 +212,7 @@ class KitBienestarService {
           success: false,
           message: error.response?.data?.message || 'Error al procesar la solicitud',
           data: null,
+          status: error.response?.status,
         };
       }
 
@@ -157,18 +222,17 @@ class KitBienestarService {
   }
 
   /**
-   * Enviar inscripción con firma
+   * Enviar solicitud de entrega con firma
    * POST /api/kit-bienestar/request
+   * El tipo de entrega no se envía; el backend asigna el tipo activo para la fecha actual.
    */
   async submitInscription(data: SubmitInscriptionRequest): Promise<SubmitInscriptionResponse> {
     try {
-      logger.debug('Enviando inscripción de Kit de Bienestar Escolar', {
+      logger.debug('Enviando solicitud de entrega de bienestar', {
         documento: data.documento_afiliado,
       });
 
-      // Preparar el request según el nuevo formato del API
       const requestData = {
-        tipo_entrega: data.tipo_entrega || 'kit_escolar',
         documento_afiliado: data.documento_afiliado,
         nombre_afiliado: data.nombre_afiliado,
         hospital: data.hospital,
@@ -189,39 +253,50 @@ class KitBienestarService {
         }
       );
 
-      logger.debug('Inscripción enviada exitosamente', {
+      logger.debug('Solicitud enviada exitosamente', {
         success: response.data.success,
       });
 
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        logger.error('Error al enviar inscripción de Kit de Bienestar', {
-          error: error.message,
-          status: error.response?.status,
-          data: error.response?.data,
+        const status = error.response?.status;
+        const body = error.response?.data as { message?: string; errors?: Record<string, string[]> } | undefined;
+
+        logger.debug('Respuesta de error al enviar solicitud', {
+          status,
+          message: body?.message,
         });
 
-        if (error.response?.status === 422) {
+        if (status === 409) {
           return {
             success: false,
-            message: error.response.data?.message || 'Datos de entrada inválidos',
+            message: body?.message || 'Ya existe una solicitud (pendiente o entregada) para este documento en esta campaña.',
             data: null,
+          };
+        }
+
+        if (status === 422) {
+          return {
+            success: false,
+            message: body?.message || 'Datos de entrada inválidos',
+            data: null,
+            errors: body?.errors,
           };
         }
 
         return {
           success: false,
-          message: error.response?.data?.message || 'Error al procesar la inscripción',
+          message: body?.message || 'Error al procesar la solicitud',
           data: null,
+          errors: body?.errors,
         };
       }
 
-      logger.error('Error inesperado al enviar inscripción', { error });
+      logger.error('Error inesperado al enviar solicitud', { error });
       throw error;
     }
   }
 }
 
-export const kitBienestarService = new KitBienestarService();
-
+export const entregasBienestarService = new EntregasBienestarService();

@@ -15,24 +15,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertCircle, CheckCircle2, Calendar, Home, Loader2, FileCheck, XCircle } from 'lucide-react';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
-import { kitBienestarService, AuthenticateResponseData, SingleBeneficiaryResponse, MultipleBeneficiariesResponse } from '@/services/kitBienestarService';
+import { entregasBienestarService, AuthenticateResponseData, SingleBeneficiaryResponse, MultipleBeneficiariesResponse, WellnessDeliveryTypeActive, GetCurrentTypeResponse } from '@/services/entregasBienestarService';
+import { parseLocalDate } from '@/utils/dateFormatter';
 import { logger } from '@/utils/logger';
-
-// Validación de fechas: solo disponible 21, 22, 23 y 24 de Enero
-// Usar fechas en hora local (Colombia) para evitar problemas de zona horaria
-const isEnrollmentPeriodActive = (): boolean => {
-  const now = new Date();
-  const month = now.getMonth(); // 0-11 (enero = 0)
-  const day = now.getDate();
-  
-  // Verificar si estamos en enero
-  if (month !== 0) {
-    return false;
-  }
-  
-  // Verificar si el día está entre 21 y 24
-  return day >= 21 && day <= 24;
-};
 
 // Función para convertir fecha de YYYY-MM-DD (formato input date) a dd/mm/aa (formato API)
 // Parsear directamente desde el string para evitar problemas de zona horaria
@@ -125,8 +110,26 @@ const buildBeneficiariesList = (beneficiaries: Array<{ beneficiario: string }>):
   return `${formatted.join(', ')} y ${last}`;
 };
 
-const KitBienestarEscolarPage: React.FC = () => {
+/** Indica si la respuesta de authenticate viene con datos mínimos vacíos (modo abierto) */
+function isAuthDataEmpty(data: AuthenticateResponseData): boolean {
+  if ('beneficiario' in data) {
+    const s = data as SingleBeneficiaryResponse;
+    return !String(s.nombre ?? '').trim() || !String(s.beneficiario ?? '').trim();
+  }
+  const m = data as MultipleBeneficiariesResponse;
+  const hasNombre = !!String(m.afiliado?.nombre ?? '').trim();
+  const hasBeneficiarios = Array.isArray(m.beneficiarios) && m.beneficiarios.some((b) => !!String(b?.beneficiario ?? '').trim());
+  return !hasNombre || !hasBeneficiarios;
+}
+
+/** Tipo para campos manuales en modo abierto cuando la API devuelve datos vacíos */
+type ManualBeneficiary = { beneficiario: string; parentesco?: string; edad?: string };
+
+const EntregasBienestarPage: React.FC = () => {
   const navigate = useNavigate();
+  const [currentType, setCurrentType] = useState<WellnessDeliveryTypeActive | null>(null);
+  const [currentTypeLoading, setCurrentTypeLoading] = useState(true);
+  const [noCampaignMessage, setNoCampaignMessage] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authResult, setAuthResult] = useState<AuthenticateResponseData | null>(null);
@@ -135,10 +138,50 @@ const KitBienestarEscolarPage: React.FC = () => {
   const [showSignatureError, setShowSignatureError] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [successData, setSuccessData] = useState<any>(null);
+  const [successData, setSuccessData] = useState<{ tipo_entrega_text?: string; estado?: string; created_at?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [showVerifyButton, setShowVerifyButton] = useState(true);
   const signaturePadRef = useRef<SignaturePadRef>(null);
+  // Modo abierto: cuando la API devuelve datos vacíos, el usuario completa nombre, hospital y beneficiarios manualmente
+  const [needsManualEntry, setNeedsManualEntry] = useState(false);
+  const [manualNombre, setManualNombre] = useState('');
+  const [manualHospital, setManualHospital] = useState('');
+  const [manualBeneficiarios, setManualBeneficiarios] = useState<ManualBeneficiary[]>([{ beneficiario: '' }]);
+
+  // Al cargar, obtener el tipo de entrega activo para la fecha actual
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCurrentType = async () => {
+      setCurrentTypeLoading(true);
+      setNoCampaignMessage(null);
+      setCurrentType(null);
+      try {
+        const res: GetCurrentTypeResponse = await entregasBienestarService.getCurrentType();
+        if (cancelled) return;
+        if (res.success && res.data) {
+          // Solo mostrar el formulario público cuando el tipo es "listado" (afiliado se valida con listado).
+          // Si es "abierto", la campaña se gestiona en el panel admin y no se habilita esta vista.
+          if (res.data.modo_acceso === 'abierto') {
+            setNoCampaignMessage('Esta campaña se gestiona de forma interna. Para registrar tu entrega, acude al punto de entrega o contacta al personal autorizado.');
+            setCurrentType(null);
+          } else {
+            setCurrentType(res.data);
+          }
+        } else {
+          setNoCampaignMessage(res.message || 'No hay una campaña de entrega de bienestar activa en este momento.');
+        }
+      } catch (e) {
+        if (!cancelled) {
+          logger.error('Error al obtener tipo de entrega activo', { error: e });
+          setNoCampaignMessage('No se pudo verificar si hay una campaña activa. Intenta más tarde.');
+        }
+      } finally {
+        if (!cancelled) setCurrentTypeLoading(false);
+      }
+    };
+    fetchCurrentType();
+    return () => { cancelled = true; };
+  }, []);
 
   const form = useForm<AuthenticateFormValues>({
     resolver: zodResolver(authenticateSchema),
@@ -149,8 +192,26 @@ const KitBienestarEscolarPage: React.FC = () => {
     },
   });
 
-  // Verificar si el período de inscripción está activo
-  const isActive = isEnrollmentPeriodActive();
+  const hasActiveCampaign = currentType !== null;
+
+  const initManualFieldsFromAuth = (data: AuthenticateResponseData) => {
+    if ('beneficiario' in data) {
+      const s = data as SingleBeneficiaryResponse;
+      setManualNombre(s.nombre ?? '');
+      setManualHospital(s.hospital ?? '');
+      setManualBeneficiarios(
+        s.beneficiario ? [{ beneficiario: s.beneficiario, parentesco: s.parentesco, edad: s.edad }] : [{ beneficiario: '' }]
+      );
+    } else {
+      const m = data as MultipleBeneficiariesResponse;
+      setManualNombre(m.afiliado?.nombre ?? '');
+      setManualHospital(m.afiliado?.hospital ?? '');
+      const b = m.beneficiarios?.length
+        ? m.beneficiarios.map((x) => ({ beneficiario: x.beneficiario ?? '', parentesco: x.parentesco, edad: x.edad }))
+        : [{ beneficiario: '' }];
+      setManualBeneficiarios(b);
+    }
+  };
 
   // Observar cambios en el documento y fecha de expedición para mostrar el botón nuevamente
   const documento = form.watch('documento');
@@ -177,7 +238,7 @@ const KitBienestarEscolarPage: React.FC = () => {
       // Convertir la fecha de YYYY-MM-DD a dd/mm/aa
       const fechaExpedicionFormatted = formatDateForApi(data.fecha_expedicion);
       
-      const response = await kitBienestarService.authenticate({
+      const response = await entregasBienestarService.authenticate({
         tipo_documento: data.tipo_documento,
         documento: data.documento,
         fecha_expedicion: fechaExpedicionFormatted,
@@ -185,19 +246,36 @@ const KitBienestarEscolarPage: React.FC = () => {
 
       if (response.success && response.data) {
         setAuthResult(response.data);
-        setShowVerifyButton(true); // Asegurar que el botón esté visible en caso de éxito
+        setShowVerifyButton(true);
         toast.success('Autenticación exitosa');
+        // En modo abierto la API puede devolver datos mínimos vacíos; si es así, el usuario completará manualmente
+        const modoListado = currentType?.modo_acceso === 'listado';
+        if (!modoListado && response.data) {
+          const isEmpty = isAuthDataEmpty(response.data);
+          setNeedsManualEntry(isEmpty);
+          if (isEmpty) {
+            initManualFieldsFromAuth(response.data);
+          } else {
+            setNeedsManualEntry(false);
+          }
+        } else {
+          setNeedsManualEntry(false);
+        }
       } else {
-        // Usar mensaje amigable si es un error 404 (no encontrado)
-        const friendlyMessage = response.message?.includes('archivo') || response.message?.includes('No se encontró')
-          ? 'Lo sentimos, no cumples con los requisitos para reclamar el beneficio de los kits escolares en este momento.'
-          : response.message || 'Error al procesar la solicitud. Por favor, intenta nuevamente.';
-        
+        const modoListado = currentType?.modo_acceso === 'listado';
+        let friendlyMessage = response.message || 'Error al procesar la solicitud. Por favor, intenta nuevamente.';
+        if (response.status === 503 && modoListado) {
+          friendlyMessage = 'El listado de afiliados para esta campaña aún no está disponible. Debe cargarse desde el panel de administración.';
+        } else if (response.status === 404 && modoListado) {
+          friendlyMessage = 'No se encontró la información. La persona no está en el listado de afiliados permitidos para esta campaña.';
+        } else if (response.status === 422) {
+          friendlyMessage = response.message || 'No hay una campaña de entregas activa en este momento. Recarga la página o intenta más tarde.';
+        }
         setAuthError(friendlyMessage);
         toast.error(friendlyMessage);
-        
-        // Si es el mensaje de requisitos no cumplidos, ocultar el botón
-        if (friendlyMessage.includes('no cumples con los requisitos')) {
+        if (response.status === 422) {
+          setShowVerifyButton(false);
+        } else if (modoListado && (response.status === 404 || response.status === 503)) {
           setShowVerifyButton(false);
         }
       }
@@ -220,7 +298,7 @@ const KitBienestarEscolarPage: React.FC = () => {
   const handleSubmitInscription = async () => {
     if (!signature) {
       setShowSignatureError(true);
-      toast.error('Debes registrar tu firma para poder finalizar la inscripción');
+      toast.error('Debes registrar tu firma para poder finalizar la solicitud');
       return;
     }
     
@@ -234,26 +312,37 @@ const KitBienestarEscolarPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Preparar beneficiarios según el tipo de respuesta
       let beneficiarios: Array<{ beneficiario: string; parentesco?: string; edad?: string }> = [];
       let nombreAfiliado = '';
       let hospital = '';
 
-      if ('beneficiario' in authResult) {
-        // Un solo beneficiario
+      if (needsManualEntry) {
+        nombreAfiliado = manualNombre.trim();
+        hospital = manualHospital.trim();
+        beneficiarios = manualBeneficiarios
+          .filter((b) => String(b.beneficiario ?? '').trim())
+          .map((b) => ({ beneficiario: b.beneficiario.trim(), parentesco: b.parentesco, edad: b.edad }));
+        if (beneficiarios.length === 0) {
+          toast.error('Debes agregar al menos un beneficiario');
+          return;
+        }
+        if (!nombreAfiliado) {
+          toast.error('El nombre del afiliado es obligatorio');
+          return;
+        }
+      } else if ('beneficiario' in authResult) {
         const single = authResult as SingleBeneficiaryResponse;
         nombreAfiliado = single.nombre;
-        hospital = single.hospital;
+        hospital = single.hospital ?? '';
         beneficiarios = [{
           beneficiario: single.beneficiario,
           parentesco: single.parentesco,
           edad: single.edad,
         }];
       } else if ('beneficiarios' in authResult) {
-        // Múltiples beneficiarios
         const multiple = authResult as MultipleBeneficiariesResponse;
         nombreAfiliado = multiple.afiliado.nombre;
-        hospital = multiple.afiliado.hospital;
+        hospital = multiple.afiliado.hospital ?? '';
         beneficiarios = multiple.beneficiarios;
       }
 
@@ -261,8 +350,7 @@ const KitBienestarEscolarPage: React.FC = () => {
       // Convertir la fecha de YYYY-MM-DD a dd/mm/aa
       const fechaExpedicionFormatted = formatDateForApi(formData.fecha_expedicion);
       
-      const response = await kitBienestarService.submitInscription({
-        tipo_entrega: 'kit_escolar',
+      const response = await entregasBienestarService.submitInscription({
         documento_afiliado: formData.documento,
         nombre_afiliado: nombreAfiliado,
         hospital: hospital,
@@ -277,12 +365,12 @@ const KitBienestarEscolarPage: React.FC = () => {
         setShowSuccessModal(true);
         // Resetear formulario y estado después de cerrar el modal
       } else {
-        setErrorMessage(response.message || 'Error al procesar la inscripción');
+        setErrorMessage(response.message || 'Error al procesar la solicitud');
         setShowErrorModal(true);
       }
     } catch (error) {
-      logger.error('Error al enviar inscripción', { error });
-      setErrorMessage('Error al procesar la inscripción. Por favor, intenta nuevamente.');
+      logger.error('Error al enviar solicitud de entrega', { error });
+      setErrorMessage('Error al procesar la solicitud. Por favor, intenta nuevamente.');
       setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
@@ -291,15 +379,17 @@ const KitBienestarEscolarPage: React.FC = () => {
 
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
-    // Resetear formulario y estado
     form.reset();
     setAuthResult(null);
     setSignature(null);
     setAuthError(null);
+    setNeedsManualEntry(false);
+    setManualNombre('');
+    setManualHospital('');
+    setManualBeneficiarios([{ beneficiario: '' }]);
     if (signaturePadRef.current) {
       signaturePadRef.current.clear();
     }
-    // Redirigir a la página principal
     navigate('/');
   };
 
@@ -310,7 +400,8 @@ const KitBienestarEscolarPage: React.FC = () => {
 
   const formatDate = (dateString: string): string => {
     try {
-      const date = new Date(dateString);
+      const s = String(dateString);
+      const date = !s.includes('T') && !s.includes(' ') ? parseLocalDate(s) : new Date(dateString);
       return date.toLocaleDateString('es-CO', {
         year: 'numeric',
         month: 'long',
@@ -326,6 +417,7 @@ const KitBienestarEscolarPage: React.FC = () => {
   // Renderizar mensaje según el tipo de respuesta
   const renderSuccessMessage = () => {
     if (!authResult) return null;
+    const campaignName = currentType?.nombre ?? 'este beneficio';
 
     if ('beneficiario' in authResult) {
       // Un solo beneficiario
@@ -341,7 +433,7 @@ const KitBienestarEscolarPage: React.FC = () => {
               Hola <span className="font-semibold">{nombreAfiliado}</span>,
             </p>
             <p className="text-slate-700 leading-relaxed">
-              Hemos verificado que cumples con los requisitos para acceder al <span className="font-semibold">Kit de Bienestar Escolar</span> para {genero}:
+              Hemos verificado que cumples con los requisitos para acceder a <span className="font-semibold">{campaignName}</span> para {genero}:
             </p>
             <ul className="list-disc list-inside space-y-1 ml-4">
               <li className="text-slate-700">
@@ -351,7 +443,7 @@ const KitBienestarEscolarPage: React.FC = () => {
           </div>
           <div className="pt-2 border-t border-slate-200">
             <p className="text-slate-700 leading-relaxed">
-              Para finalizar la inscripción, por favor firma en el recuadro de abajo.
+              Para finalizar la solicitud, por favor firma en el recuadro de abajo.
             </p>
           </div>
           <div className="pt-2">
@@ -373,7 +465,7 @@ const KitBienestarEscolarPage: React.FC = () => {
               Hola <span className="font-semibold">{nombreAfiliado}</span>,
             </p>
             <p className="text-slate-700 leading-relaxed">
-              Hemos verificado que cumples con los requisitos para acceder al <span className="font-semibold">Kit de Bienestar Escolar</span> para los siguientes beneficiarios:
+              Hemos verificado que cumples con los requisitos para acceder a <span className="font-semibold">{campaignName}</span> para los siguientes beneficiarios:
             </p>
             <ul className="list-disc list-inside space-y-1 ml-4">
               {multiple.beneficiarios.map((beneficiario, index) => (
@@ -385,7 +477,7 @@ const KitBienestarEscolarPage: React.FC = () => {
           </div>
           <div className="pt-2 border-t border-slate-200">
             <p className="text-slate-700 leading-relaxed">
-              Para finalizar la inscripción, por favor firma en el recuadro de abajo.
+              Para finalizar la solicitud, por favor firma en el recuadro de abajo.
             </p>
           </div>
           <div className="pt-2">
@@ -413,31 +505,39 @@ const KitBienestarEscolarPage: React.FC = () => {
             Volver al inicio
           </Button>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Kit de Bienestar Escolar
+            {currentType ? currentType.nombre : 'Entrega de Bienestar'}
           </h1>
           {!authResult && (
             <p className="text-slate-600">
-              Verifica si cumples con los requisitos para acceder al beneficio de kits escolares
+              {currentType
+                ? `Verifica si cumples con los requisitos para acceder al beneficio: ${currentType.nombre}`
+                : 'Verifica si cumples con los requisitos para acceder al beneficio'}
             </p>
           )}
           {authResult && (
             <p className="text-slate-600">
-              Verifica tu información y firma para completar la inscripción al beneficio.
+              Verifica tu información y firma para completar la solicitud.
             </p>
           )}
         </div>
 
-        {!isActive && (
+        {currentTypeLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+          </div>
+        )}
+
+        {!currentTypeLoading && noCampaignMessage && (
           <Alert className="mb-6 border-amber-200 bg-amber-50">
             <Calendar className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-800">Período de inscripción no disponible</AlertTitle>
+            <AlertTitle className="text-amber-800">No hay campaña activa</AlertTitle>
             <AlertDescription className="text-amber-700">
-              El proceso de inscripción para el Kit de Bienestar Escolar está disponible únicamente los días 21, 22, 23 y 24 de Enero.
+              {noCampaignMessage}
             </AlertDescription>
           </Alert>
         )}
 
-        {isActive && (
+        {!currentTypeLoading && hasActiveCampaign && (
           <Card>
             {!authResult && (
               <CardHeader>
@@ -548,7 +648,90 @@ const KitBienestarEscolarPage: React.FC = () => {
 
               {authResult && (
                 <div className="space-y-6">
-                  {renderSuccessMessage()}
+                  {needsManualEntry ? (
+                    <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                      <p className="text-slate-700">
+                        Esta campaña permite registro abierto. Completa los datos a continuación y firma para finalizar la solicitud.
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="manual-nombre">Nombre del afiliado</Label>
+                          <Input
+                            id="manual-nombre"
+                            value={manualNombre}
+                            onChange={(e) => setManualNombre(e.target.value)}
+                            placeholder="Nombre completo"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="manual-hospital">Hospital (opcional)</Label>
+                          <Input
+                            id="manual-hospital"
+                            value={manualHospital}
+                            onChange={(e) => setManualHospital(e.target.value)}
+                            placeholder="Hospital"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Beneficiarios (al menos uno)</Label>
+                        {manualBeneficiarios.map((b, idx) => (
+                          <div key={idx} className="flex flex-wrap items-end gap-2">
+                            <Input
+                              value={b.beneficiario}
+                              onChange={(e) => {
+                                const next = [...manualBeneficiarios];
+                                next[idx] = { ...next[idx], beneficiario: e.target.value };
+                                setManualBeneficiarios(next);
+                              }}
+                              placeholder="Nombre del beneficiario"
+                              className="flex-1 min-w-[180px]"
+                            />
+                            <Input
+                              value={b.parentesco ?? ''}
+                              onChange={(e) => {
+                                const next = [...manualBeneficiarios];
+                                next[idx] = { ...next[idx], parentesco: e.target.value || undefined };
+                                setManualBeneficiarios(next);
+                              }}
+                              placeholder="Parentesco (opc.)"
+                              className="w-32"
+                            />
+                            <Input
+                              value={b.edad ?? ''}
+                              onChange={(e) => {
+                                const next = [...manualBeneficiarios];
+                                next[idx] = { ...next[idx], edad: e.target.value || undefined };
+                                setManualBeneficiarios(next);
+                              }}
+                              placeholder="Edad (opc.)"
+                              className="w-20"
+                            />
+                            {manualBeneficiarios.length > 1 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setManualBeneficiarios(manualBeneficiarios.filter((_, i) => i !== idx))}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setManualBeneficiarios([...manualBeneficiarios, { beneficiario: '' }])}
+                        >
+                          Agregar beneficiario
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    renderSuccessMessage()
+                  )}
 
                   <div className="space-y-3 pt-4 border-t border-slate-200">
                     <div>
@@ -556,7 +739,7 @@ const KitBienestarEscolarPage: React.FC = () => {
                         Firma digital
                       </Label>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Dibuja tu firma en el recuadro para autorizar la inscripción
+                        Dibuja tu firma en el recuadro para autorizar la solicitud
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -595,7 +778,7 @@ const KitBienestarEscolarPage: React.FC = () => {
                     {showSignatureError && (
                       <div className="flex items-center gap-2 text-sm text-red-600">
                         <AlertCircle className="h-4 w-4" />
-                        <span className="font-medium">Debes registrar tu firma para poder finalizar la inscripción.</span>
+                        <span className="font-medium">Debes registrar tu firma para poder finalizar la solicitud.</span>
                       </div>
                     )}
                   </div>
@@ -628,7 +811,7 @@ const KitBienestarEscolarPage: React.FC = () => {
                       ) : (
                         <>
                           <FileCheck className="mr-2 h-4 w-4" />
-                          Finalizar inscripción
+                          Finalizar solicitud
                         </>
                       )}
                     </Button>
@@ -669,7 +852,7 @@ const KitBienestarEscolarPage: React.FC = () => {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Tipo de entrega:</span>
-                    <span className="text-sm text-slate-900">Kit Escolar</span>
+                    <span className="text-sm text-slate-900">{successData.tipo_entrega_text ?? 'Campaña actual'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Estado:</span>
@@ -715,7 +898,7 @@ const KitBienestarEscolarPage: React.FC = () => {
                 Error al Procesar la Solicitud
               </DialogTitle>
               <DialogDescription className="text-center text-slate-600 mt-2">
-                No se pudo completar la inscripción
+                No se pudo completar la solicitud
               </DialogDescription>
             </DialogHeader>
             
@@ -739,5 +922,5 @@ const KitBienestarEscolarPage: React.FC = () => {
   );
 };
 
-export default KitBienestarEscolarPage;
+export default EntregasBienestarPage;
 

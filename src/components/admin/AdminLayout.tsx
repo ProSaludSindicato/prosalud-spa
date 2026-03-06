@@ -28,6 +28,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user } = useAuth();
 
   useEffect(() => {
+    if (location.pathname === '/admin/entregas-bienestar/registrar') {
+      setSidebarCollapsed(true);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     localStorage.setItem('adminSidebarCollapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
@@ -255,7 +261,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 w-full">
+        <main className="flex-1 w-full min-w-0 overflow-x-hidden">
           {children}
         </main>
         <Toaster />

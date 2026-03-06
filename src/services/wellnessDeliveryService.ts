@@ -1,6 +1,21 @@
 import { authenticatedApi } from './api';
 import { logger } from '@/utils/logger';
 import axios from 'axios';
+import type { SingleBeneficiaryResponse, MultipleBeneficiariesResponse } from './entregasBienestarService';
+
+/** Respuesta plana del endpoint affiliate-lookup (documento sin fecha expedición) */
+export interface AffiliateLookupFlatData {
+  documento_afiliado: string;
+  tipo_documento?: string;
+  nombre_afiliado: string;
+  /** Estado del afiliado en el sistema (ej. "Activo") para validación visual al entregar */
+  estado?: string;
+  hospital?: string | null;
+  beneficiarios: Array<{ beneficiario: string; parentesco?: string; edad?: string }>;
+}
+
+/** Estructura de búsqueda por documento; puede ser plana (affiliate-lookup) o igual a authenticate */
+export type AffiliateLookupData = AffiliateLookupFlatData | SingleBeneficiaryResponse | MultipleBeneficiariesResponse;
 
 /**
  * Tipos para las solicitudes de entrega de bienestar
@@ -20,8 +35,9 @@ export interface EntregadoPorUser {
 
 export interface WellnessDeliveryRequest {
   id: number;
-  tipo_entrega: string;
-  tipo_entrega_text?: string;
+  wellness_delivery_type_id?: number | null;
+  tipo_entrega?: string; // legacy
+  tipo_entrega_text?: string; // nombre del tipo para mostrar
   documento_afiliado: string;
   nombre_afiliado: string;
   hospital?: string;
@@ -65,7 +81,7 @@ export interface WellnessDeliveryRequestDetailResponse {
 }
 
 export interface WellnessDeliveryRequestFilters {
-  tipo_entrega?: string;
+  tipo_entrega?: string | number; // ID del tipo o valor legacy
   estado?: string;
   documento?: string;
   fecha_desde?: string; // YYYY-MM-DD - Fecha de inicio del rango (incluye todo el día desde 00:00:00)
@@ -79,6 +95,7 @@ export interface WellnessDeliveryRequestFilters {
 export interface UpdateDeliveryStatusRequest {
   estado: 'pendiente' | 'procesado' | 'entregado' | 'cancelado';
   firma_recibido?: string; // Base64 string, obligatorio cuando estado es "entregado"
+  cantidad_entregada?: number; // obligatorio cuando estado es "entregado", mínimo 1
   observaciones?: string;
 }
 
@@ -95,8 +112,37 @@ export interface UpdateDeliveryStatusResponse {
   };
 }
 
+/** Request para POST /api/wellness-delivery-requests/open (modo_acceso === 'abierto') */
+export interface SubmitOpenDeliveryRequest {
+  documento_afiliado: string;
+  nombre_afiliado: string;
+  firma: string;
+  hospital?: string;
+  fecha_expedicion?: string;
+  beneficiarios?: Array<{ beneficiario: string; parentesco?: string; edad?: string }>;
+}
+
+/** Respuesta de POST /api/wellness-delivery-requests/open */
+export interface SubmitOpenDeliveryResponseData {
+  id: number;
+  wellness_delivery_type_id?: number;
+  tipo_entrega_text?: string;
+  documento_afiliado: string;
+  nombre_afiliado: string;
+  estado: string;
+  entregado_por_user_id?: number;
+  created_at: string;
+}
+
+export interface SubmitOpenDeliveryResponse {
+  success: boolean;
+  message?: string;
+  data: SubmitOpenDeliveryResponseData | null;
+  errors?: Record<string, string[]>;
+}
+
 export interface ExportDeliveryReportRequest {
-  tipo_entrega?: 'kit_escolar' | 'desayuno' | 'lonchera';
+  tipo_entrega?: number | string; // ID del tipo o valor legacy
   estado?: 'pendiente' | 'procesado' | 'entregado' | 'cancelado';
   fecha_desde?: string; // YYYY-MM-DD
   fecha_hasta?: string; // YYYY-MM-DD
@@ -131,7 +177,7 @@ export interface UploadedByUser {
   email: string;
 }
 
-export interface KitBienestarFileVersion {
+export interface WellnessDeliveryFileVersion {
   id: number;
   file_name: string;
   s3_path: string;
@@ -144,12 +190,56 @@ export interface KitBienestarFileVersion {
 export interface UploadFileResponse {
   success: boolean;
   message: string;
-  data: KitBienestarFileVersion;
+  data: WellnessDeliveryFileVersion;
 }
 
 export interface FileVersionsResponse {
   success: boolean;
-  data: KitBienestarFileVersion[];
+  data: WellnessDeliveryFileVersion[];
+}
+
+/**
+ * Tipo de entrega (campaña) – administrable desde el panel
+ */
+export type ModoAccesoType = 'listado' | 'abierto';
+
+export interface WellnessDeliveryType {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  /** listado = requiere Excel de afiliados; abierto = cualquiera puede solicitar (opcional en respuestas legacy) */
+  modo_acceso?: ModoAccesoType;
+  fecha_desde: string; // Y-m-d
+  fecha_hasta: string; // Y-m-d
+  created_by?: { id: number; name: string } | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface WellnessDeliveryTypeListResponse {
+  success: boolean;
+  data: WellnessDeliveryType[];
+}
+
+export interface WellnessDeliveryTypeDetailResponse {
+  success: boolean;
+  data: WellnessDeliveryType;
+}
+
+export interface CreateWellnessDeliveryTypeRequest {
+  nombre: string;
+  modo_acceso: ModoAccesoType;
+  activo?: boolean;
+  fecha_desde: string; // Y-m-d
+  fecha_hasta: string; // Y-m-d
+}
+
+export interface UpdateWellnessDeliveryTypeRequest {
+  nombre?: string;
+  modo_acceso?: ModoAccesoType;
+  activo?: boolean;
+  fecha_desde?: string;
+  fecha_hasta?: string;
 }
 
 /**
@@ -166,8 +256,8 @@ class WellnessDeliveryService {
 
       const params = new URLSearchParams();
       
-      if (filters?.tipo_entrega) {
-        params.append('tipo_entrega', filters.tipo_entrega);
+      if (filters?.tipo_entrega !== undefined && filters?.tipo_entrega !== '') {
+        params.append('tipo_entrega', String(filters.tipo_entrega));
       }
       if (filters?.estado) {
         params.append('estado', filters.estado);
@@ -516,6 +606,157 @@ class WellnessDeliveryService {
         throw error;
       }
       logger.error('Error inesperado al obtener versiones', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Listar tipos de entrega (campañas)
+   * GET /api/wellness-delivery-types
+   */
+  async getDeliveryTypes(params?: { activo?: boolean; fecha?: string }): Promise<WellnessDeliveryTypeListResponse> {
+    try {
+      const search = new URLSearchParams();
+      if (params?.activo !== undefined) search.set('activo', String(params.activo));
+      if (params?.fecha) search.set('fecha', params.fecha);
+      const query = search.toString();
+      const url = `/api/wellness-delivery-types${query ? `?${query}` : ''}`;
+      const response = await authenticatedApi.get<WellnessDeliveryTypeListResponse>(url);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al listar tipos de entrega', { status: error.response?.status, data: error.response?.data });
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener un tipo de entrega por ID
+   * GET /api/wellness-delivery-types/{id}
+   */
+  async getDeliveryTypeById(id: number): Promise<WellnessDeliveryTypeDetailResponse> {
+    try {
+      const response = await authenticatedApi.get<WellnessDeliveryTypeDetailResponse>(`/api/wellness-delivery-types/${id}`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al obtener tipo de entrega', { id, status: error.response?.status });
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Crear tipo de entrega
+   * POST /api/wellness-delivery-types
+   */
+  async createDeliveryType(data: CreateWellnessDeliveryTypeRequest): Promise<WellnessDeliveryTypeDetailResponse & { message?: string }> {
+    try {
+      const response = await authenticatedApi.post<WellnessDeliveryTypeDetailResponse & { message?: string }>(
+        '/api/wellness-delivery-types',
+        data,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al crear tipo de entrega', { status: error.response?.status, data: error.response?.data });
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar tipo de entrega
+   * PUT/PATCH /api/wellness-delivery-types/{id}
+   */
+  async updateDeliveryType(id: number, data: UpdateWellnessDeliveryTypeRequest): Promise<WellnessDeliveryTypeDetailResponse & { message?: string }> {
+    try {
+      const response = await authenticatedApi.patch<WellnessDeliveryTypeDetailResponse & { message?: string }>(
+        `/api/wellness-delivery-types/${id}`,
+        data,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        logger.error('Error al actualizar tipo de entrega', { id, status: error.response?.status });
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Registrar entrega en modo abierto (solo cuando el tipo activo tiene modo_acceso === 'abierto').
+   * Requiere autenticación y permiso wellness_delivery.manage.
+   * La solicitud se crea con estado = 'entregado' y entregado_por = usuario autenticado.
+   * POST /api/wellness-delivery-requests/open
+   */
+  async submitOpenDelivery(data: SubmitOpenDeliveryRequest): Promise<SubmitOpenDeliveryResponse> {
+    try {
+      logger.debug('Enviando solicitud de entrega (modo abierto)', { documento: data.documento_afiliado });
+      const response = await authenticatedApi.post<SubmitOpenDeliveryResponse>(
+        '/api/wellness-delivery-requests/open',
+        data,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const body = error.response?.data as { success?: boolean; message?: string; data?: unknown; errors?: Record<string, string[]> };
+        if (status === 422) {
+          return {
+            success: false,
+            message: body?.message || 'No se pudo registrar la entrega.',
+            data: null,
+            errors: body?.errors,
+          };
+        }
+        if (status === 409) {
+          return {
+            success: false,
+            message: body?.message || 'Ya existe una solicitud para este documento y tipo de entrega.',
+            data: null,
+          };
+        }
+        logger.error('Error al registrar entrega (modo abierto)', { status, data: error.response?.data });
+        throw error;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Búsqueda de afiliado por documento (modo interno, sin validar fecha de expedición).
+   * Para que un usuario interno registre la entrega: buscar por documento, obtener datos y enviar solicitud con firma.
+   * GET /api/wellness-delivery-requests/affiliate-lookup?documento=XXX
+   */
+  async lookupAffiliateForDelivery(documento: string): Promise<{ success: boolean; data: AffiliateLookupData | null; message?: string }> {
+    try {
+      const doc = String(documento).trim();
+      if (!doc) {
+        return { success: false, data: null, message: 'El documento es requerido.' };
+      }
+      const response = await authenticatedApi.get<{ success: boolean; data: AffiliateLookupData | null; message?: string }>(
+        `/api/wellness-delivery-requests/affiliate-lookup?documento=${encodeURIComponent(doc)}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const body = error.response?.data as { message?: string } | undefined;
+        if (status === 404) {
+          return { success: false, data: null, message: body?.message || 'No se encontró un afiliado con ese documento.' };
+        }
+        logger.error('Error al buscar afiliado para entrega', { status, data: error.response?.data });
+        return { success: false, data: null, message: body?.message || 'Error al buscar el afiliado.' };
+      }
       throw error;
     }
   }

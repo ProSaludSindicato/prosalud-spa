@@ -4,6 +4,7 @@ import { Eraser } from 'lucide-react';
 
 interface SignaturePadProps {
   onChange?: (dataUrl: string | null) => void;
+  onClear?: () => void;
   height?: number;
   initialValue?: string;
 }
@@ -15,7 +16,7 @@ export interface SignaturePadRef {
 }
 
 export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
-  ({ onChange, height = 180, initialValue }, ref) => {
+  ({ onChange, onClear, height = 180, initialValue }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
     const savedDataRef = useRef<string | null>(null);
@@ -188,6 +189,7 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
     context.fillRect(0, 0, width, height);
     savedDataRef.current = null;
     onChange?.(null);
+    onClear?.();
   };
 
   return (

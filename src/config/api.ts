@@ -35,9 +35,10 @@ export const API_CONFIG = {
     AFILIADOS_AUTHENTICATE_FOR_DATA_UPDATE: '/api/afiliados/authenticate-for-data-update',
     // Socio Demographic Survey endpoint
     SOCIO_DEMOGRAPHIC_SURVEYS: '/api/socio-demographic-surveys',
-    // Kit Bienestar Escolar endpoints
+    // Kit Bienestar / Entregas de bienestar (públicos)
+    KIT_BIENESTAR_CURRENT_TYPE: '/api/kit-bienestar/current-type',
     KIT_BIENESTAR_AUTHENTICATE: '/api/kit-bienestar/authenticate',
-    KIT_BIENESTAR_SUBMIT: '/api/kit-bienestar/submit',
+    KIT_BIENESTAR_REQUEST: '/api/kit-bienestar/request',
     // Encuesta de vacunación (acceso solo por enlace)
     ENCUESTA_VACUNACION: '/api/encuesta-vacunacion',
     ENCUESTA_VACUNACION_EXPORT_EXCEL: '/api/encuesta-vacunacion/export/excel',

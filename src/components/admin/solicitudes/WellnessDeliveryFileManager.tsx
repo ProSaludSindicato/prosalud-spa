@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -21,13 +20,14 @@ import {
   FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { wellnessDeliveryService, KitBienestarFileVersion } from '@/services/wellnessDeliveryService';
+import { wellnessDeliveryService } from '@/services/wellnessDeliveryService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { parseLocalDate } from '@/utils/dateFormatter';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/context/AuthContext';
 
-const KitBienestarFileManager: React.FC = () => {
+const WellnessDeliveryFileManager: React.FC = () => {
   const { can } = usePermissions();
   const { hasRole } = useAuth();
   const queryClient = useQueryClient();
@@ -43,7 +43,7 @@ const KitBienestarFileManager: React.FC = () => {
     error: versionsError,
     refetch: refetchVersions,
   } = useQuery({
-    queryKey: ['kit-bienestar-file-versions'],
+    queryKey: ['wellness-delivery-file-versions'],
     queryFn: () => wellnessDeliveryService.getFileVersions(),
     enabled: can('wellness_delivery.view'),
   });
@@ -65,7 +65,7 @@ const KitBienestarFileManager: React.FC = () => {
         fileInputRef.current.value = '';
       }
       // Refrescar la lista de versiones
-      queryClient.invalidateQueries({ queryKey: ['kit-bienestar-file-versions'] });
+      queryClient.invalidateQueries({ queryKey: ['wellness-delivery-file-versions'] });
     },
     onError: (error: any) => {
       const errorMessage =
@@ -137,7 +137,9 @@ const KitBienestarFileManager: React.FC = () => {
 
   const formatDate = (dateString: string): string => {
     try {
-      return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es });
+      const s = String(dateString);
+      const date = !s.includes('T') && !s.includes(' ') ? parseLocalDate(s) : new Date(dateString);
+      return format(date, "dd 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es });
     } catch {
       return dateString;
     }
@@ -388,5 +390,5 @@ const KitBienestarFileManager: React.FC = () => {
   );
 };
 
-export default KitBienestarFileManager;
+export default WellnessDeliveryFileManager;
 

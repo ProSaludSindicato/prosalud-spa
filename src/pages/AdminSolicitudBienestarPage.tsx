@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
-import { formatDateReadable, formatTime12Hour } from '@/utils/dateFormatter';
+import { formatDateReadable, formatTime12Hour, parseLocalDate } from '@/utils/dateFormatter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,7 @@ import {
   Send,
   Heart,
   Calendar,
+  CalendarRange,
   Users,
   Building,
   MapPin,
@@ -51,13 +52,15 @@ import {
   Package,
   Signature,
   FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 import DataPagination from '@/components/ui/data-pagination';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
-import { wellnessDeliveryService, WellnessDeliveryRequest } from '@/services/wellnessDeliveryService';
+import { wellnessDeliveryService, WellnessDeliveryRequest, WellnessDeliveryType } from '@/services/wellnessDeliveryService';
 import { TableLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -71,7 +74,9 @@ import WellnessActivityRealizedForm from '@/components/admin/solicitudes/Wellnes
 import WellnessActivityReviewDialog from '@/components/admin/solicitudes/WellnessActivityReviewDialog';
 import ExportWellnessReportDialog from '@/components/admin/solicitudes/ExportWellnessReportDialog';
 import ExportWellnessDeliveryReportDialog from '@/components/admin/solicitudes/ExportWellnessDeliveryReportDialog';
-import KitBienestarFileManager from '@/components/admin/solicitudes/KitBienestarFileManager';
+import WellnessDeliveryFileManager from '@/components/admin/solicitudes/WellnessDeliveryFileManager';
+import WellnessDeliveryTypeFormDialog, { WellnessDeliveryTypeFormValues } from '@/components/admin/solicitudes/WellnessDeliveryTypeFormDialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -221,6 +226,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 
 const AdminSolicitudBienestarPage: React.FC = () => {
   const { can } = usePermissions();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSolicitud, setSelectedSolicitud] = useState<WellnessRequest | null>(null);
   const [responseDialogOpen, setResponseDialogOpen] = useState(false);
@@ -248,15 +254,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const canViewEntregas = can('wellness_delivery.view');
   
   // Persistir el tab activo en localStorage, pero ajustar según permisos disponibles
-  const [activeTab, setActiveTab] = useState<'solicitudes' | 'entregas'>(() => {
+  const [activeTab, setActiveTab] = useState<'solicitudes' | 'entregas' | 'campañas'>(() => {
     const savedTab = localStorage.getItem('adminSolicitudBienestarActiveTab');
-    // Si el tab guardado no está disponible, usar el primero disponible
     if (savedTab === 'solicitudes' && canViewSolicitudes) return 'solicitudes';
     if (savedTab === 'entregas' && canViewEntregas) return 'entregas';
-    // Por defecto, usar el primero disponible
+    if (savedTab === 'campañas' && canViewEntregas) return 'campañas';
     if (canViewSolicitudes) return 'solicitudes';
     if (canViewEntregas) return 'entregas';
-    return 'solicitudes'; // Fallback
+    return 'solicitudes';
   });
 
   // Guardar el tab cuando cambia
@@ -266,10 +271,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   
   // Ajustar el tab activo si el actual no está disponible
   useEffect(() => {
-    if (activeTab === 'solicitudes' && !canViewSolicitudes && canViewEntregas) {
-      setActiveTab('entregas');
-    } else if (activeTab === 'entregas' && !canViewEntregas && canViewSolicitudes) {
-      setActiveTab('solicitudes');
+    if (activeTab === 'solicitudes' && !canViewSolicitudes) {
+      setActiveTab(canViewEntregas ? 'entregas' : 'solicitudes');
+    } else if (activeTab === 'entregas' && !canViewEntregas) {
+      setActiveTab(canViewSolicitudes ? 'solicitudes' : 'entregas');
+    } else if (activeTab === 'campañas' && !canViewEntregas) {
+      setActiveTab(canViewSolicitudes ? 'solicitudes' : 'entregas');
     }
   }, [canViewSolicitudes, canViewEntregas, activeTab]);
   
@@ -282,6 +289,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [fechaHastaEntrega, setFechaHastaEntrega] = useState<string>('');
   const [currentPageEntregas, setCurrentPageEntregas] = useState<number>(1);
   const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(15);
+  const [showFiltrosEntregas, setShowFiltrosEntregas] = useState(false);
   
   // Debounce para el filtro de documento (esperar 500ms después de que el usuario deje de escribir)
   useEffect(() => {
@@ -305,6 +313,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [showDeliverySignatureError, setShowDeliverySignatureError] = useState(false);
   const [showSignatureDrawer, setShowSignatureDrawer] = useState(false);
   const deliverySignaturePadRef = React.useRef<SignaturePadRef>(null);
+  // Tipos de entrega (campañas): formulario crear/editar
+  const [showDeliveryTypeFormDialog, setShowDeliveryTypeFormDialog] = useState(false);
+  const [editingDeliveryType, setEditingDeliveryType] = useState<WellnessDeliveryType | null>(null);
   
   // Hooks para móvil y orientación
   const isMobile = useIsMobile();
@@ -475,6 +486,68 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
     enabled: canViewEntregas && activeTab === 'entregas',
   });
+
+  // Query para Tipos de entrega (campañas): usado en filtro de entregas y en tab Campañas
+  const {
+    data: deliveryTypesResponse,
+    isLoading: isLoadingDeliveryTypes,
+    refetch: refetchDeliveryTypes,
+  } = useQuery({
+    queryKey: ['wellness-delivery-types'],
+    queryFn: () => wellnessDeliveryService.getDeliveryTypes({}),
+    enabled: canViewEntregas,
+  });
+  const deliveryTypes = deliveryTypesResponse?.data ?? [];
+
+  // Query para opciones de filtro: estados y tipos que realmente existen en los datos (sin filtrar por tipo/estado)
+  const { data: filterOptionsResponse } = useQuery({
+    queryKey: ['wellness-delivery-requests', 'filter-options'],
+    queryFn: () => wellnessDeliveryService.getRequests({ per_page: 500 }),
+    enabled: canViewEntregas,
+  });
+  const filterOptionsData = filterOptionsResponse?.data ?? [];
+
+  // Estados únicos que existen en los datos (para filtro y export)
+  const uniqueEstadosOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    const labelMap: Record<string, string> = {
+      pendiente: 'Pendiente',
+      procesado: 'Procesado',
+      entregado: 'Entregado',
+      cancelado: 'Cancelado',
+    };
+    filterOptionsData.forEach((r) => {
+      const e = r.estado?.toLowerCase?.() || r.estado;
+      if (e && !seen.has(e)) {
+        seen.add(e);
+        out.push({
+          value: r.estado,
+          label: r.estado_text || labelMap[e] || r.estado,
+        });
+      }
+    });
+    return out.sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterOptionsData]);
+
+  // Tipos únicos que existen en los datos (para filtro y export): value puede ser id del tipo o "kit_escolar"
+  const uniqueTiposOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { value: string; label: string }[] = [];
+    filterOptionsData.forEach((r) => {
+      const id = r.wellness_delivery_type_id != null ? String(r.wellness_delivery_type_id) : (r.tipo_entrega || '');
+      const key = id || 'unknown';
+      if (key !== 'unknown' && !seen.has(key)) {
+        seen.add(key);
+        const label =
+          r.tipo_entrega === 'kit_escolar'
+            ? 'Kit escolar'
+            : (r.tipo_entrega_text || deliveryTypes.find((t) => String(t.id) === key)?.nombre || key);
+        out.push({ value: key, label });
+      }
+    });
+    return out.sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterOptionsData, deliveryTypes]);
 
   // Filtrar entregas por documento en el frontend
   const entregasFiltered = useMemo(() => {
@@ -658,9 +731,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     }
   };
 
-  // Formatear fecha para entregas
+  // Formatear fecha para entregas (evita desfase de un día en fechas YYYY-MM-DD por UTC)
   const formatDeliveryDate = (dateString: string): string => {
     try {
+      if (!dateString) return '';
+      const s = String(dateString);
+      if (!s.includes('T') && !s.includes(' ')) {
+        return format(parseLocalDate(s), "dd 'de' MMMM 'de' yyyy", { locale: es });
+      }
       return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
     } catch {
       return dateString;
@@ -757,6 +835,38 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       setIsSubmittingDeliveryStatus(false);
     },
   });
+
+  // Mutación para crear/actualizar tipo de entrega (campaña)
+  const saveDeliveryTypeMutation = useMutation({
+    mutationFn: async ({ data, id }: { data: WellnessDeliveryTypeFormValues; id?: number }) => {
+      if (id != null) {
+        return wellnessDeliveryService.updateDeliveryType(id, data);
+      }
+      return wellnessDeliveryService.createDeliveryType({
+        nombre: data.nombre,
+        modo_acceso: data.modo_acceso,
+        activo: data.activo,
+        fecha_desde: data.fecha_desde,
+        fecha_hasta: data.fecha_hasta,
+      });
+    },
+    onSuccess: (_, variables) => {
+      toast.success(variables.id != null ? 'Campaña actualizada' : 'Campaña creada', {
+        description: 'Los cambios se verán reflejados en la página de solicitud de entregas.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['wellness-delivery-types'] });
+      refetchDeliveryTypes();
+      setShowDeliveryTypeFormDialog(false);
+      setEditingDeliveryType(null);
+    },
+    onError: (error: any) => {
+      toast.error('Error al guardar la campaña', { description: getErrorMessage(error) });
+    },
+  });
+
+  const handleSaveDeliveryType = async (data: WellnessDeliveryTypeFormValues) => {
+    await saveDeliveryTypeMutation.mutateAsync({ data, id: editingDeliveryType?.id });
+  };
 
   // Función para enviar el cambio de estado
   const handleSubmitDeliveryStatusChange = async (data: DeliveryStatusChangeFormValues) => {
@@ -974,9 +1084,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         )}
                       </div>
                       <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
-                        {activeTab === 'solicitudes' 
+                        {activeTab === 'solicitudes'
                           ? 'Gestiona las solicitudes de actividades de bienestar'
-                          : 'Gestiona las solicitudes de entrega de kits escolares y otros beneficios'}
+                          : activeTab === 'campañas'
+                            ? 'Gestiona los tipos de entrega (campañas) para que los afiliados soliciten beneficios.'
+                            : 'Gestiona las solicitudes de entregas de bienestar y otros beneficios'}
                       </CardDescription>
                     </div>
                   </div>
@@ -992,15 +1104,43 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         <span className="sm:hidden">Exportar</span>
                       </Button>
                     )}
-                    {activeTab === 'entregas' && can('wellness_delivery.view') && (
+                    {activeTab === 'entregas' && (
+                      <>
+                        {can('wellness_delivery.view') && (
+                          <Button
+                            onClick={() => setShowExportDeliveryDialog(true)}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Exportar Reporte</span>
+                            <span className="sm:hidden">Exportar</span>
+                          </Button>
+                        )}
+                        {can('wellness_delivery.manage') && (
+                          <Button
+                            variant="default"
+                            onClick={() => navigate('/admin/entregas-bienestar/registrar')}
+                            className="w-full sm:w-auto bg-primary-prosalud hover:bg-primary-prosalud-dark text-white"
+                          >
+                            <Package className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Registrar entrega</span>
+                            <span className="sm:hidden">Registrar</span>
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {activeTab === 'campañas' && can('wellness_delivery.manage') && (
                       <Button
-                        onClick={() => setShowExportDeliveryDialog(true)}
-                        variant="outline"
-                        className="w-full sm:w-auto"
+                        onClick={() => {
+                          setEditingDeliveryType(null);
+                          setShowDeliveryTypeFormDialog(true);
+                        }}
+                        className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Exportar Reporte</span>
-                        <span className="sm:hidden">Exportar</span>
+                        <Plus className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Nueva campaña</span>
+                        <span className="sm:hidden">Nueva</span>
                       </Button>
                     )}
                     {activeTab === 'solicitudes' && can('wellness_requests.create') && (
@@ -1023,16 +1163,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm bg-white">
               <CardContent className="p-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'solicitudes' | 'entregas')} className="space-y-6">
-                  <div className="p-6 pb-0">
-                    <TabsList className={`grid w-full bg-gray-50 border p-1 ${canViewSolicitudes && canViewEntregas ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'solicitudes' | 'entregas' | 'campañas')} className="space-y-6">
+                  <div className="p-4 sm:p-6 pb-0">
+                    <TabsList className={`grid w-full bg-gray-50 border p-1 ${canViewEntregas ? (canViewSolicitudes ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-1'}`}>
                       {canViewSolicitudes && (
                         <TabsTrigger
                           value="solicitudes"
                           className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
                         >
                           <Heart className="h-4 w-4" />
-                          <span>Solicitudes de Bienestar</span>
+                          <span>Solicitudes</span>
                         </TabsTrigger>
                       )}
                       {canViewEntregas && (
@@ -1041,13 +1181,22 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
                         >
                           <Package className="h-4 w-4" />
-                          <span>Entregas de Bienestar</span>
+                          <span>Entregas</span>
+                        </TabsTrigger>
+                      )}
+                      {canViewEntregas && (
+                        <TabsTrigger
+                          value="campañas"
+                          className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
+                        >
+                          <CalendarRange className="h-4 w-4" />
+                          <span>Campañas</span>
                         </TabsTrigger>
                       )}
                     </TabsList>
                   </div>
 
-                  <div className="p-6 pt-0">
+                  <div className="p-4 sm:p-6 pt-0 min-w-0 overflow-x-hidden">
                     {/* Tab: Solicitudes de Bienestar */}
                     <TabsContent value="solicitudes" className="space-y-6 mt-0">
                       {!canViewSolicitudes ? (
@@ -1593,111 +1742,113 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         </Card>
                       ) : (
                         <>
-                          {/* Filtros para Entregas */}
-                          <Card className="border shadow-sm bg-white">
-                            <CardHeader>
-                              <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center space-x-2">
-                                  <Filter className="h-5 w-5" />
-                                  <span>Filtros</span>
-                                </CardTitle>
-                                {can('wellness_delivery.view') && (
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setShowFileManagerModal(true)}
-                                    className="flex items-center gap-2"
+                          {/* Filtros (colapsables) - arriba de la tabla */}
+                          <Collapsible open={showFiltrosEntregas} onOpenChange={setShowFiltrosEntregas}>
+                            <Card className="border shadow-sm bg-white">
+                              <CardHeader className="py-3">
+                                <CollapsibleTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center justify-between gap-2 p-0 h-auto rounded-md hover:bg-slate-100 text-left transition-colors"
                                   >
-                                    <FileSpreadsheet className="h-4 w-4" />
-                                    Gestión de Archivo Excel
-                                  </Button>
-                                )}
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="relative sm:col-span-2 lg:col-span-2">
-                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                  <Input
-                                    placeholder="Buscar por documento..."
-                                    value={documentoEntregaFilter}
-                                    onChange={(e) => {
-                                      setDocumentoEntregaFilter(e.target.value);
-                                      setCurrentPageEntregas(1);
-                                    }}
-                                    className="pl-10"
-                                  />
-                                </div>
-                                <Select
-                                  value={tipoEntregaFilter}
-                                  onValueChange={(value) => {
-                                    setTipoEntregaFilter(value);
-                                    setCurrentPageEntregas(1);
-                                  }}
-                                >
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Tipo de entrega" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="all">Todos los tipos</SelectItem>
-                                    <SelectItem value="kit_escolar">Kit Escolar</SelectItem>
-                                    <SelectItem value="desayuno">Desayuno</SelectItem>
-                                    <SelectItem value="lonchera">Lonchera</SelectItem>
-                                    <SelectItem value="otro">Otro</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Select
-                                  value={estadoEntregaFilter}
-                                  onValueChange={(value) => {
-                                    setEstadoEntregaFilter(value);
-                                    setCurrentPageEntregas(1);
-                                  }}
-                                >
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Estado" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="all">Todos los estados</SelectItem>
-                                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                                    <SelectItem value="procesado">Procesado</SelectItem>
-                                    <SelectItem value="entregado">Entregado</SelectItem>
-                                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                                    Fecha desde
-                                  </label>
-                                  <Input
-                                    type="date"
-                                    value={fechaDesdeEntrega}
-                                    onChange={(e) => {
-                                      setFechaDesdeEntrega(e.target.value);
-                                      setCurrentPageEntregas(1);
-                                    }}
-                                    max={fechaHastaEntrega || undefined}
-                                    className="w-full"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                                    Fecha hasta
-                                  </label>
-                                  <Input
-                                    type="date"
-                                    value={fechaHastaEntrega}
-                                    onChange={(e) => {
-                                      setFechaHastaEntrega(e.target.value);
-                                      setCurrentPageEntregas(1);
-                                    }}
-                                    min={fechaDesdeEntrega || undefined}
-                                    className="w-full"
-                                  />
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
+                                    <span className="flex items-center space-x-2 text-base font-medium text-gray-900">
+                                      <Filter className="h-4 w-4 text-gray-600" />
+                                      <span>Filtros</span>
+                                    </span>
+                                    {showFiltrosEntregas ? <ChevronUp className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+                                  </button>
+                                </CollapsibleTrigger>
+                              </CardHeader>
+                              <CollapsibleContent>
+                                <CardContent className="pt-0">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="relative sm:col-span-2 lg:col-span-2">
+                                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                      <Input
+                                        placeholder="Buscar por documento..."
+                                        value={documentoEntregaFilter}
+                                        onChange={(e) => {
+                                          setDocumentoEntregaFilter(e.target.value);
+                                          setCurrentPageEntregas(1);
+                                        }}
+                                        className="pl-10"
+                                      />
+                                    </div>
+                                    <Select
+                                      value={tipoEntregaFilter}
+                                      onValueChange={(value) => {
+                                        setTipoEntregaFilter(value);
+                                        setCurrentPageEntregas(1);
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Tipo de entrega" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="all">Todos los tipos</SelectItem>
+                                        {uniqueTiposOptions.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select
+                                      value={estadoEntregaFilter}
+                                      onValueChange={(value) => {
+                                        setEstadoEntregaFilter(value);
+                                        setCurrentPageEntregas(1);
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Estado" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="all">Todos los estados</SelectItem>
+                                        {uniqueEstadosOptions.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                      <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                        Fecha desde
+                                      </label>
+                                      <Input
+                                        type="date"
+                                        value={fechaDesdeEntrega}
+                                        onChange={(e) => {
+                                          setFechaDesdeEntrega(e.target.value);
+                                          setCurrentPageEntregas(1);
+                                        }}
+                                        max={fechaHastaEntrega || undefined}
+                                        className="w-full"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-medium text-gray-700 mb-1 block">
+                                        Fecha hasta
+                                      </label>
+                                      <Input
+                                        type="date"
+                                        value={fechaHastaEntrega}
+                                        onChange={(e) => {
+                                          setFechaHastaEntrega(e.target.value);
+                                          setCurrentPageEntregas(1);
+                                        }}
+                                        min={fechaDesdeEntrega || undefined}
+                                        className="w-full"
+                                      />
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </CollapsibleContent>
+                            </Card>
+                          </Collapsible>
 
                           {/* Tabla de Entregas */}
                           <Card className="border shadow-sm bg-white">
@@ -1751,10 +1902,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                             <TableCell className="font-medium">#{request.id}</TableCell>
                                             <TableCell>
                                               {request.tipo_entrega_text || 
-                                               (request.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
-                                                request.tipo_entrega === 'desayuno' ? 'Desayuno' :
-                                                request.tipo_entrega === 'lonchera' ? 'Lonchera' :
-                                                request.tipo_entrega === 'otro' ? 'Otro' : request.tipo_entrega)}
+                                               (request.tipo_entrega === 'kit_escolar' ? 'Kit escolar' : request.tipo_entrega)}
                                             </TableCell>
                                             <TableCell className="max-w-[200px] truncate">
                                               {request.nombre_afiliado}
@@ -1777,7 +1925,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               </Badge>
                                             </TableCell>
                                             <TableCell className="text-sm text-gray-600">
-                                              {format(new Date(request.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                                              {formatDeliveryDate(request.created_at)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                               <DropdownMenu>
@@ -1866,10 +2014,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                   <p className="text-xs font-medium text-gray-500 mb-1">Tipo</p>
                                                   <p className="text-sm text-gray-900">
                                                     {request.tipo_entrega_text || 
-                                                     (request.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
-                                                      request.tipo_entrega === 'desayuno' ? 'Desayuno' :
-                                                      request.tipo_entrega === 'lonchera' ? 'Lonchera' :
-                                                      request.tipo_entrega === 'otro' ? 'Otro' : request.tipo_entrega)}
+                                                     (request.tipo_entrega === 'kit_escolar' ? 'Kit escolar' : request.tipo_entrega)}
                                                   </p>
                                                 </div>
                                                 <div>
@@ -1900,7 +2045,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               <div className="flex items-center gap-2 text-sm">
                                                 <Calendar className="h-4 w-4 text-gray-400" />
                                                 <span className="text-gray-600">
-                                                  {format(new Date(request.created_at), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}
+                                                  {formatDeliveryDate(request.created_at)}
                                                 </span>
                                               </div>
                                             </div>
@@ -1924,6 +2069,179 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                       />
                                     </div>
                                   )}
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+                    </TabsContent>
+
+                    {/* Tab: Campañas (tipos de entrega) */}
+                    <TabsContent value="campañas" className="space-y-6 mt-0 overflow-hidden">
+                      {!canViewEntregas ? (
+                        <Card>
+                          <CardContent className="p-4 sm:p-6">
+                            <p className="text-red-600 text-sm sm:text-base">No tienes permisos para acceder a esta sección.</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <>
+                          <Card className="border shadow-sm bg-white overflow-hidden">
+                            <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+                              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                                <CalendarRange className="h-5 w-5 shrink-0" />
+                                <span className="break-words">Campañas (tipos de entrega)</span>
+                              </CardTitle>
+                              <CardDescription className="text-sm">
+                                Gestiona los tipos de entrega que aparecen en la página de solicitud. Solo una campaña activa aplica por fecha; el afiliado no elige el tipo, el sistema asigna el activo.
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+                              {isLoadingDeliveryTypes ? (
+                                <TableLoadingSkeleton columns={5} rows={4} />
+                              ) : deliveryTypes.length === 0 ? (
+                                <div className="text-center py-8 sm:py-12 border rounded-lg bg-gray-50 px-4">
+                                  <CalendarRange className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3" />
+                                  <p className="text-gray-600 mb-1 text-sm sm:text-base">No hay campañas configuradas</p>
+                                  <p className="text-xs sm:text-sm text-gray-500 mb-4">Crea una para que los afiliados puedan solicitar entregas en ese período.</p>
+                                  {can('wellness_delivery.manage') && (
+                                    <Button
+                                      onClick={() => {
+                                        setEditingDeliveryType(null);
+                                        setShowDeliveryTypeFormDialog(true);
+                                      }}
+                                      className="bg-primary-prosalud hover:bg-primary-prosalud-dark text-white w-full sm:w-auto"
+                                    >
+                                      <Plus className="h-4 w-4 mr-2 shrink-0" />
+                                      Nueva campaña
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Desktop: tabla */}
+                                  <div className="hidden lg:block overflow-x-auto min-w-0">
+                                    <Table className="min-w-[640px]">
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="text-xs sm:text-sm">Nombre</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Modo</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Activo</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Desde</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Hasta</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Creado</TableHead>
+                                          {can('wellness_delivery.manage') && <TableHead className="text-right text-xs sm:text-sm">Acciones</TableHead>}
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {deliveryTypes.map((t) => (
+                                          <TableRow key={t.id}>
+                                            <TableCell className="font-medium text-xs sm:text-sm min-w-[120px] max-w-[180px] sm:max-w-none truncate" title={t.nombre}>{t.nombre}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">
+                                              <Badge variant="outline" className="text-xs">
+                                                {t.modo_acceso === 'abierto' ? 'Abierto' : 'Con listado'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">
+                                              <Badge
+                                                variant="outline"
+                                                className={`text-xs ${t.activo ? 'border-green-600 bg-green-50 text-green-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
+                                              >
+                                                {t.activo ? 'Activo' : 'Inactivo'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm text-gray-600 min-w-[100px]">
+                                              {format(t.created_at && !String(t.created_at).includes('T') ? parseLocalDate(t.created_at) : new Date(t.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                                              {t.created_by?.name && (
+                                                <span className="block text-xs text-gray-500">por {t.created_by.name}</span>
+                                              )}
+                                            </TableCell>
+                                            {can('wellness_delivery.manage') && (
+                                              <TableCell className="text-right whitespace-nowrap">
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-8 px-2 sm:px-3"
+                                                  onClick={() => {
+                                                    setEditingDeliveryType(t);
+                                                    setShowDeliveryTypeFormDialog(true);
+                                                  }}
+                                                >
+                                                  <Pencil className="h-4 w-4 sm:mr-1" />
+                                                  <span className="hidden sm:inline">Editar</span>
+                                                </Button>
+                                              </TableCell>
+                                            )}
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+
+                                  {/* Móvil: cards */}
+                                  <div className="lg:hidden space-y-3">
+                                    {deliveryTypes.map((t) => (
+                                      <Card key={t.id} className="border shadow-sm">
+                                        <CardContent className="p-4">
+                                          <div className="flex flex-col gap-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <p className="font-medium text-gray-900 break-words flex-1 min-w-0">{t.nombre}</p>
+                                              <div className="flex items-center gap-2 flex-shrink-0">
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`text-xs ${t.activo ? 'border-green-600 bg-green-50 text-green-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
+                                                >
+                                                  {t.activo ? 'Activo' : 'Inactivo'}
+                                                </Badge>
+                                                {can('wellness_delivery.manage') && (
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    onClick={() => {
+                                                      setEditingDeliveryType(t);
+                                                      setShowDeliveryTypeFormDialog(true);
+                                                    }}
+                                                  >
+                                                    <Pencil className="h-4 w-4 mr-1" />
+                                                    Editar
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2 text-sm">
+                                              <div className="flex justify-between gap-2">
+                                                <span className="text-gray-500">Modo</span>
+                                                <Badge variant="outline" className="text-xs w-fit">
+                                                  {t.modo_acceso === 'abierto' ? 'Abierto' : 'Con listado'}
+                                                </Badge>
+                                              </div>
+                                              <div className="flex justify-between gap-2">
+                                                <span className="text-gray-500">Desde</span>
+                                                <span className="text-gray-900">{format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es })}</span>
+                                              </div>
+                                              <div className="flex justify-between gap-2">
+                                                <span className="text-gray-500">Hasta</span>
+                                                <span className="text-gray-900">{format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es })}</span>
+                                              </div>
+                                              <div className="flex justify-between gap-2">
+                                                <span className="text-gray-500">Creado</span>
+                                                <span className="text-gray-900 text-right">
+                                                  {format(t.created_at && !String(t.created_at).includes('T') ? parseLocalDate(t.created_at) : new Date(t.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                                                  {t.created_by?.name && (
+                                                    <span className="block text-xs text-gray-500">por {t.created_by.name}</span>
+                                                  )}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
                                 </>
                               )}
                             </CardContent>
@@ -2508,6 +2826,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
         <ExportWellnessDeliveryReportDialog
           open={showExportDeliveryDialog}
           onOpenChange={setShowExportDeliveryDialog}
+          availableEstados={uniqueEstadosOptions}
+          availableTipos={uniqueTiposOptions}
         />
 
         {/* Modal de Detalles de Entrega */}
@@ -2557,11 +2877,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         <div>
                           <label className="text-sm font-medium text-gray-700">Tipo de Entrega</label>
                           <p className="mt-1 text-sm text-gray-900">
-                            {selectedDeliveryRequest.tipo_entrega_text || 
-                             (selectedDeliveryRequest.tipo_entrega === 'kit_escolar' ? 'Kit Escolar' :
-                              selectedDeliveryRequest.tipo_entrega === 'desayuno' ? 'Desayuno' :
-                              selectedDeliveryRequest.tipo_entrega === 'lonchera' ? 'Lonchera' :
-                              selectedDeliveryRequest.tipo_entrega === 'otro' ? 'Otro' : selectedDeliveryRequest.tipo_entrega)}
+{selectedDeliveryRequest.tipo_entrega_text ||
+                             (selectedDeliveryRequest.tipo_entrega === 'kit_escolar' ? 'Kit escolar' : selectedDeliveryRequest.tipo_entrega)}
                           </p>
                         </div>
                         <div>
@@ -3148,14 +3465,23 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                 Gestión de Archivo Excel
               </DialogTitle>
               <DialogDescription>
-                Gestiona el archivo Excel utilizado para autenticar afiliados en el sistema de kits escolares
+                Gestiona el archivo Excel utilizado para autenticar afiliados en las solicitudes de entregas de bienestar
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <KitBienestarFileManager />
+              <WellnessDeliveryFileManager />
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog crear/editar tipo de entrega (campaña) */}
+        <WellnessDeliveryTypeFormDialog
+          open={showDeliveryTypeFormDialog}
+          onOpenChange={setShowDeliveryTypeFormDialog}
+          type={editingDeliveryType}
+          onSubmit={handleSaveDeliveryType}
+          isSubmitting={saveDeliveryTypeMutation.isPending}
+        />
       </div>
     </AdminLayout>
   );
