@@ -560,19 +560,24 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   }, [entregasFiltered, currentPageEntregas, itemsPerPageEntregas]);
 
   // Calcular paginación manual
+  // Usar total del API cuando no hay filtro por documento (el backend puede devolver menos registros por límite)
   const entregasPagination = useMemo(() => {
-    const total = entregasFiltered.length;
-    const totalPages = Math.ceil(total / itemsPerPageEntregas);
+    const dataCount = entregasFiltered.length;
+    const apiTotal = entregasResponse?.pagination?.total;
+    const total = documentoFilterNormalized
+      ? dataCount
+      : (apiTotal != null ? apiTotal : dataCount);
+    const totalPages = Math.ceil(dataCount / itemsPerPageEntregas);
     return {
       current_page: currentPageEntregas,
       per_page: itemsPerPageEntregas,
       total,
       total_pages: totalPages,
       last_page: totalPages,
-      from: total > 0 ? (currentPageEntregas - 1) * itemsPerPageEntregas + 1 : 0,
-      to: Math.min(currentPageEntregas * itemsPerPageEntregas, total),
+      from: dataCount > 0 ? (currentPageEntregas - 1) * itemsPerPageEntregas + 1 : 0,
+      to: Math.min(currentPageEntregas * itemsPerPageEntregas, dataCount),
     };
-  }, [entregasFiltered.length, currentPageEntregas, itemsPerPageEntregas]);
+  }, [entregasFiltered.length, entregasResponse?.pagination?.total, documentoFilterNormalized, currentPageEntregas, itemsPerPageEntregas]);
 
   // Open modal from URL parameter
   useEffect(() => {
