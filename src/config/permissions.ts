@@ -114,7 +114,7 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
     },
   },
   wellnessRequests: {
-    name: 'Solicitudes Bienestar',
+    name: 'Bienestar',
     href: '/admin/solicitudes-bienestar',
     icon: Heart,
     permissions: {

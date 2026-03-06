@@ -546,6 +546,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
         out.push({ value: key, label });
       }
     });
+    // Incluir siempre "Kit escolar" (legacy) por si hay registros que no estén en la muestra
+    if (!seen.has('kit_escolar')) {
+      out.push({ value: 'kit_escolar', label: 'Kit escolar' });
+    }
     return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [filterOptionsData, deliveryTypes]);
 
