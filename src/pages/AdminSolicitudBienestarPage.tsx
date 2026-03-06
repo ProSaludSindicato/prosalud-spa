@@ -225,7 +225,8 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 };
 
 const AdminSolicitudBienestarPage: React.FC = () => {
-  const { can } = usePermissions();
+  const { can, hasRole } = usePermissions();
+  const isAdminRole = hasRole('admin');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedSolicitud, setSelectedSolicitud] = useState<WellnessRequest | null>(null);
@@ -258,7 +259,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     const savedTab = localStorage.getItem('adminSolicitudBienestarActiveTab');
     if (savedTab === 'solicitudes' && canViewSolicitudes) return 'solicitudes';
     if (savedTab === 'entregas' && canViewEntregas) return 'entregas';
-    if (savedTab === 'campañas' && canViewEntregas) return 'campañas';
+    if (savedTab === 'campañas' && canViewEntregas && isAdminRole) return 'campañas';
     if (canViewSolicitudes) return 'solicitudes';
     if (canViewEntregas) return 'entregas';
     return 'solicitudes';
@@ -275,10 +276,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       setActiveTab(canViewEntregas ? 'entregas' : 'solicitudes');
     } else if (activeTab === 'entregas' && !canViewEntregas) {
       setActiveTab(canViewSolicitudes ? 'solicitudes' : 'entregas');
-    } else if (activeTab === 'campañas' && !canViewEntregas) {
-      setActiveTab(canViewSolicitudes ? 'solicitudes' : 'entregas');
+    } else if (activeTab === 'campañas' && (!canViewEntregas || !isAdminRole)) {
+      setActiveTab(canViewEntregas ? 'entregas' : canViewSolicitudes ? 'solicitudes' : 'entregas');
     }
-  }, [canViewSolicitudes, canViewEntregas, activeTab]);
+  }, [canViewSolicitudes, canViewEntregas, isAdminRole, activeTab]);
   
   // Estados para Entregas de Bienestar
   const [tipoEntregaFilter, setTipoEntregaFilter] = useState<string>('all');
@@ -1169,7 +1170,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
               <CardContent className="p-0">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'solicitudes' | 'entregas' | 'campañas')} className="space-y-6">
                   <div className="p-4 sm:p-6 pb-0">
-                    <TabsList className={`grid w-full bg-gray-50 border p-1 ${canViewEntregas ? (canViewSolicitudes ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-1'}`}>
+                    <TabsList className={`grid w-full bg-gray-50 border p-1 ${canViewEntregas ? (canViewSolicitudes && isAdminRole ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-1'}`}>
                       {canViewSolicitudes && (
                         <TabsTrigger
                           value="solicitudes"
@@ -1188,7 +1189,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           <span>Entregas</span>
                         </TabsTrigger>
                       )}
-                      {canViewEntregas && (
+                      {canViewEntregas && isAdminRole && (
                         <TabsTrigger
                           value="campañas"
                           className="flex items-center space-x-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200"
@@ -2083,7 +2084,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
                     {/* Tab: Campañas (tipos de entrega) */}
                     <TabsContent value="campañas" className="space-y-6 mt-0 overflow-hidden">
-                      {!canViewEntregas ? (
+                      {(!canViewEntregas || !isAdminRole) ? (
                         <Card>
                           <CardContent className="p-4 sm:p-6">
                             <p className="text-red-600 text-sm sm:text-base">No tienes permisos para acceder a esta sección.</p>
