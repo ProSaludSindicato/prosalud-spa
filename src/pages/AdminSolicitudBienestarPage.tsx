@@ -500,36 +500,20 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   });
   const deliveryTypes = deliveryTypesResponse?.data ?? [];
 
-  // Query para opciones de filtro: estados y tipos que realmente existen en los datos (sin filtrar por tipo/estado)
+  // Query para opciones de filtro: estados y tipos que existen en los datos (sin filtrar por tipo/estado)
+  // per_page alto para reducir el riesgo de que estados queden fuera por paginación
   const { data: filterOptionsResponse } = useQuery({
     queryKey: ['wellness-delivery-requests', 'filter-options'],
-    queryFn: () => wellnessDeliveryService.getRequests({ per_page: 500 }),
+    queryFn: () => wellnessDeliveryService.getRequests({ per_page: 2000 }),
     enabled: canViewEntregas,
   });
   const filterOptionsData = filterOptionsResponse?.data ?? [];
 
-  // Estados únicos que existen en los datos (para filtro y export)
-  const uniqueEstadosOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { value: string; label: string }[] = [];
-    const labelMap: Record<string, string> = {
-      pendiente: 'Pendiente',
-      procesado: 'Procesado',
-      entregado: 'Entregado',
-      cancelado: 'Cancelado',
-    };
-    filterOptionsData.forEach((r) => {
-      const e = r.estado?.toLowerCase?.() || r.estado;
-      if (e && !seen.has(e)) {
-        seen.add(e);
-        out.push({
-          value: r.estado,
-          label: r.estado_text || labelMap[e] || r.estado,
-        });
-      }
-    });
-    return out.sort((a, b) => a.label.localeCompare(b.label));
-  }, [filterOptionsData]);
+  // Opciones de estado para el filtro (solo Pendiente y Entregado por ahora)
+  const uniqueEstadosOptions: { value: string; label: string }[] = [
+    { value: 'pendiente', label: 'Pendiente' },
+    { value: 'entregado', label: 'Entregado' },
+  ];
 
   // Tipos únicos que existen en los datos (para filtro y export): value puede ser id del tipo o "kit_escolar"
   const uniqueTiposOptions = useMemo(() => {
