@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Search, FileCheck, Loader2, Calendar, CheckCircle2, XCircle, User, Building, Package, UserPlus } from 'lucide-react';
+import { ArrowLeft, Search, FileCheck, Loader2, Calendar, CheckCircle2, XCircle, User, Building, Package, UserPlus, AlertCircle } from 'lucide-react';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { entregasBienestarService } from '@/services/entregasBienestarService';
 import { wellnessDeliveryService, type AffiliateLookupData, type AffiliateLookupFlatData } from '@/services/wellnessDeliveryService';
@@ -95,6 +95,29 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
   const isFlatLookupData = (d: AffiliateLookupData): d is AffiliateLookupFlatData =>
     d != null && 'nombre_afiliado' in d && typeof (d as AffiliateLookupFlatData).nombre_afiliado === 'string';
 
+  /** Obtiene información sobre una solicitud existente para el tipo activo, si aplica */
+  const getExistingDeliveryInfo = (): { message: string } | null => {
+    if (!lookupData || !isFlatLookupData(lookupData)) return null;
+    const flat = lookupData as AffiliateLookupFlatData;
+    if (!flat.solicitud_existente) return null;
+
+    if (flat.solicitud_existente_mensaje) {
+      return { message: flat.solicitud_existente_mensaje };
+    }
+
+    const tipoNombre = flat.tipo_entrega_nombre || currentType?.nombre || 'este tipo de entrega';
+    let estadoLabel = 'registrada';
+    if (flat.solicitud_estado === 'entregado') {
+      estadoLabel = 'entregada';
+    } else if (flat.solicitud_estado === 'pendiente') {
+      estadoLabel = 'pendiente';
+    }
+
+    return {
+      message: `Ya existe una solicitud ${estadoLabel} para este documento y este tipo de entrega («${tipoNombre}»). No se pueden crear solicitudes duplicadas.`,
+    };
+  };
+
   const getPayloadFromLookup = (): { nombre_afiliado: string; hospital: string; fecha_expedicion: string; beneficiarios: Array<{ beneficiario: string; parentesco?: string; edad?: string }> } | null => {
     if (!lookupData) return null;
     if (isFlatLookupData(lookupData)) {
@@ -127,6 +150,12 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    const existingInfo = getExistingDeliveryInfo();
+    if (existingInfo) {
+      toast.error(existingInfo.message);
+      return;
+    }
+
     if (!signature) {
       setShowSignatureError(true);
       toast.error('Registra la firma del afiliado');
@@ -265,7 +294,6 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                       value={documento}
                       onChange={(e) => setDocumento(e.target.value.replace(/[^0-9]/g, ''))}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      disabled={!!lookupData}
                       className="w-full"
                     />
                   </div>
@@ -307,6 +335,8 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                 <CardContent className="space-y-4 sm:space-y-6">
                   {(() => {
                     const p = getPayloadFromLookup();
+                    const existingInfo = getExistingDeliveryInfo();
+                    const hasExistingDelivery = !!existingInfo;
                     return (
                       <>
                         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
@@ -344,28 +374,42 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="border-t pt-4 space-y-2 min-w-0">
-                          <h3 className="text-base font-semibold text-slate-900">Firma del afiliado</h3>
-                          <p className="text-sm text-slate-600">La firma del afiliado constata que la entrega ha sido realizada.</p>
-                          <div className="overflow-hidden rounded-lg">
-                            <SignaturePad
-                              ref={signaturePadRef}
-                              onChange={setSignature}
-                              onClear={() => setShowSignatureError(false)}
-                              height={180}
-                            />
-                          </div>
-                          {showSignatureError && (
-                            <p className="text-sm text-red-600">Debe registrar la firma para continuar.</p>
-                          )}
-                        </div>
+                        {existingInfo && (
+                          <Alert className="mt-4 border-red-200 bg-red-50">
+                            <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                            <AlertTitle className="text-red-800 text-sm font-semibold">Entrega ya registrada</AlertTitle>
+                            <AlertDescription className="text-red-700 text-sm">
+                              {existingInfo.message}
+                            </AlertDescription>
+                          </Alert>
+                        )}
 
-                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t">
-                          <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto">
-                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileCheck className="h-4 w-4 mr-2" />}
-                            Registrar solicitud
-                          </Button>
-                        </div>
+                        {!hasExistingDelivery && (
+                          <>
+                            <div className="border-t pt-4 space-y-2 min-w-0">
+                              <h3 className="text-base font-semibold text-slate-900">Firma del afiliado</h3>
+                              <p className="text-sm text-slate-600">La firma del afiliado constata que la entrega ha sido realizada.</p>
+                              <div className="overflow-hidden rounded-lg">
+                                <SignaturePad
+                                  ref={signaturePadRef}
+                                  onChange={setSignature}
+                                  onClear={() => setShowSignatureError(false)}
+                                  height={180}
+                                />
+                              </div>
+                              {showSignatureError && (
+                                <p className="text-sm text-red-600">Debe registrar la firma para continuar.</p>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t">
+                              <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto">
+                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileCheck className="h-4 w-4 mr-2" />}
+                                Registrar solicitud
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </>
                     );
                   })()}

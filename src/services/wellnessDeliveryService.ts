@@ -12,6 +12,16 @@ export interface AffiliateLookupFlatData {
   estado?: string;
   hospital?: string | null;
   beneficiarios: Array<{ beneficiario: string; parentesco?: string; edad?: string }>;
+  /** Indica si ya existe una solicitud para el tipo de entrega activo y este documento */
+  solicitud_existente?: boolean;
+  /** Estado de la solicitud existente (por ejemplo, "pendiente" o "entregado") */
+  solicitud_estado?: string;
+  /** ID de la solicitud existente */
+  solicitud_id?: number;
+  /** Nombre del tipo de entrega asociado a la solicitud existente */
+  tipo_entrega_nombre?: string;
+  /** Mensaje listo para mostrar al usuario sobre la solicitud existente */
+  solicitud_existente_mensaje?: string;
 }
 
 /** Estructura de búsqueda por documento; puede ser plana (affiliate-lookup) o igual a authenticate */
