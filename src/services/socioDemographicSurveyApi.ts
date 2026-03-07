@@ -37,11 +37,22 @@ export interface SurveyMetrics {
   };
 }
 
+export interface SurveyFilterOptions {
+  hospitals: string[];
+  years: number[];
+}
+
 export interface SocioDemographicSurveyListResponse {
   success: true;
   data: SocioDemographicSurveyListItem[];
   pagination: PaginationData;
   metrics: SurveyMetrics;
+  filter_options?: SurveyFilterOptions;
+}
+
+export interface SurveyFilterOptionsResponse {
+  success: true;
+  data: SurveyFilterOptions;
 }
 
 export interface HijoData {
@@ -188,11 +199,39 @@ export interface SocioDemographicSurveyDetailResponse {
 
 export interface GetSurveysParams {
   hospital?: string;
+  /** Filtro por año (created_at). Rango 2000-2100. Backend acepta year o ano */
+  year?: number;
+  /** Filtro por mes (1-12). Backend acepta month o mes */
+  month?: number;
+  /** Filtro por hospitales (selección múltiple). Backend acepta hospitals[] o hospital */
+  hospitals?: string[];
   survey_type?: string;
   numero_documento?: string;
   nombre?: string;
   per_page?: number;
   page?: number;
+}
+
+/** Filtros compartidos por export PDF y Excel (alineados con la API de consulta + profesion y date_range) */
+export interface ExportSurveysFilters {
+  year?: number;
+  month?: number;
+  hospitals?: string[];
+  numero_documento?: string;
+  tipo_documento?: string;
+  nombre?: string;
+  survey_type?: string;
+  profesion?: string;
+  date_range: {
+    include_all: boolean;
+    start_date?: string;
+    end_date?: string;
+  };
+}
+
+/** Solo Excel: incluir firmas digitales (proceso asíncrono) */
+export interface ExportToExcelFilters extends ExportSurveysFilters {
+  include_signatures?: boolean;
 }
 
 class SocioDemographicSurveyApi {
@@ -201,8 +240,17 @@ class SocioDemographicSurveyApi {
    */
   async getSurveys(params?: GetSurveysParams): Promise<SocioDemographicSurveyListResponse> {
     const queryParams = new URLSearchParams();
-    
-    if (params?.hospital) {
+
+    if (params?.year != null && params.year >= 2000 && params.year <= 2100) {
+      queryParams.append('year', params.year.toString());
+    }
+    if (params?.month != null && params.month >= 1 && params.month <= 12) {
+      queryParams.append('month', params.month.toString());
+    }
+    if (params?.hospitals?.length) {
+      params.hospitals.forEach((h) => queryParams.append('hospitals[]', h));
+    }
+    if (params?.hospital && !params?.hospitals?.length) {
       queryParams.append('hospital', params.hospital);
     }
     if (params?.survey_type) {
@@ -223,8 +271,18 @@ class SocioDemographicSurveyApi {
 
     const queryString = queryParams.toString();
     const url = `/api/socio-demographic-surveys${queryString ? `?${queryString}` : ''}`;
-    
+
     const response = await authenticatedApi.get<SocioDemographicSurveyListResponse>(url);
+    return response.data;
+  }
+
+  /**
+   * Obtener opciones de filtrado (hospitales y años con encuestas)
+   */
+  async getFilterOptions(): Promise<SurveyFilterOptionsResponse> {
+    const response = await authenticatedApi.get<SurveyFilterOptionsResponse>(
+      '/api/socio-demographic-surveys/filter-options'
+    );
     return response.data;
   }
 
@@ -267,18 +325,22 @@ class SocioDemographicSurveyApi {
   /**
    * Iniciar generación asíncrona del PDF masivo de encuestas sociodemográficas.
    * Respuesta 202 Accepted con job_id; usar checkPdfExportStatus y downloadPdfExport para estado y descarga.
+   * Filtros alineados con la API de consulta: year, month, hospitals, numero_documento, tipo_documento, nombre, survey_type; más profesion y date_range.
    */
-  async exportToPdf(filters: {
-    survey_type?: string;
-    date_range: {
-      include_all: boolean;
-      start_date?: string;
-      end_date?: string;
-    };
-    hospital?: string;
-    profesion?: string;
-  }): Promise<{ job_id: string; status: string; check_status_url: string }> {
+  async exportToPdf(filters: ExportSurveysFilters): Promise<{ job_id: string; status: string; check_status_url: string }> {
     const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/pdf');
+    const body: Record<string, unknown> = {
+      date_range: filters.date_range,
+      survey_type: filters.survey_type || 'all',
+    };
+    if (filters.year != null && filters.year >= 2000 && filters.year <= 2100) body.year = filters.year;
+    if (filters.month != null && filters.month >= 1 && filters.month <= 12) body.month = filters.month;
+    if (filters.hospitals?.length) body.hospitals = filters.hospitals;
+    if (filters.numero_documento?.trim()) body.numero_documento = filters.numero_documento.trim();
+    if (filters.tipo_documento?.trim()) body.tipo_documento = filters.tipo_documento.trim();
+    if (filters.nombre?.trim()) body.nombre = filters.nombre.trim();
+    if (filters.profesion?.trim()) body.profesion = filters.profesion.trim();
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -286,12 +348,7 @@ class SocioDemographicSurveyApi {
         'Accept': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({
-        survey_type: filters.survey_type || 'all',
-        date_range: filters.date_range,
-        hospital: filters.hospital ?? undefined,
-        profesion: filters.profesion ?? undefined,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (response.status === 202) {
@@ -410,23 +467,26 @@ class SocioDemographicSurveyApi {
 
   /**
    * Exportar encuestas sociodemográficas a Excel
-   * Si include_signatures es true, retorna job_id para proceso asíncrono
-   * Si include_signatures es false, retorna blob directamente (síncrono)
+   * Mismos filtros que PDF (year, month, hospitals, numero_documento, tipo_documento, nombre, survey_type, profesion, date_range) más include_signatures.
+   * Si include_signatures es true, retorna job_id para proceso asíncrono; si no, retorna blob directamente (síncrono).
    */
-  async exportToExcel(filters: {
-    survey_type?: string;
-    date_range: {
-      include_all: boolean;
-      start_date?: string;
-      end_date?: string;
-    };
-    hospital?: string;
-    include_signatures?: boolean;
-  }): Promise<{ blob: Blob; filename: string } | { job_id: string; status: string; check_status_url: string }> {
+  async exportToExcel(filters: ExportToExcelFilters): Promise<{ blob: Blob; filename: string } | { job_id: string; status: string; check_status_url: string }> {
     try {
       const includeSignatures = filters.include_signatures ?? false;
       const url = buildAdminApiUrl('/api/socio-demographic-surveys/export/excel');
-      
+      const body: Record<string, unknown> = {
+        date_range: filters.date_range,
+        survey_type: filters.survey_type || 'all',
+        include_signatures: includeSignatures,
+      };
+      if (filters.year != null && filters.year >= 2000 && filters.year <= 2100) body.year = filters.year;
+      if (filters.month != null && filters.month >= 1 && filters.month <= 12) body.month = filters.month;
+      if (filters.hospitals?.length) body.hospitals = filters.hospitals;
+      if (filters.numero_documento?.trim()) body.numero_documento = filters.numero_documento.trim();
+      if (filters.tipo_documento?.trim()) body.tipo_documento = filters.tipo_documento.trim();
+      if (filters.nombre?.trim()) body.nombre = filters.nombre.trim();
+      if (filters.profesion?.trim()) body.profesion = filters.profesion.trim();
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -436,12 +496,7 @@ class SocioDemographicSurveyApi {
             : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          survey_type: filters.survey_type || 'all',
-          date_range: filters.date_range,
-          hospital: filters.hospital,
-          include_signatures: includeSignatures,
-        }),
+        body: JSON.stringify(body),
       });
 
       // Si incluye firmas, es asíncrono (HTTP 202)

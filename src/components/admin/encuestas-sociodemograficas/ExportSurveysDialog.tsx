@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,14 +6,33 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Download, Calendar, Filter, Loader2, CheckCircle2, AlertCircle, FileSignature, FileText, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { socioDemographicSurveyApi } from '@/services/socioDemographicSurveyApi';
 import { logger } from '@/utils/logger';
+export interface ExportInitialFilters {
+  year?: number;
+  month?: number;
+  hospitals?: string[];
+  numero_documento?: string;
+  survey_type?: string;
+}
+
+export interface ExportFilterOptions {
+  hospitals: string[];
+  years: number[];
+}
 
 interface ExportSurveysDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Filtros actuales de la lista para prellenar el diálogo */
+  initialFilters?: ExportInitialFilters;
+  /** Opciones para año y hospitales (desde filter_options de la API) */
+  filterOptions?: ExportFilterOptions;
 }
 
 interface DateRangeFilter {
@@ -22,16 +41,23 @@ interface DateRangeFilter {
   end?: Date;
 }
 
+const currentCalendarYear = new Date().getFullYear();
+
 const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({ 
   open, 
   onOpenChange,
+  initialFilters,
+  filterOptions = { hospitals: [], years: [] },
 }) => {
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
   const [surveyType, setSurveyType] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<number>(currentCalendarYear);
+  const [monthFilter, setMonthFilter] = useState<string>('');
+  const [hospitalsFilter, setHospitalsFilter] = useState<string[]>([]);
+  const [numeroDocumento, setNumeroDocumento] = useState<string>('');
   const [dateRange, setDateRange] = useState<DateRangeFilter>({
     includeAll: true
   });
-  const [hospital, setHospital] = useState<string>('');
   const [profesion, setProfesion] = useState<string>('');
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -39,6 +65,18 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const availableYears = useMemo(() => {
+    const y = filterOptions.years?.length ? filterOptions.years.slice().sort((a, b) => b - a) : [currentCalendarYear, currentCalendarYear - 1, currentCalendarYear - 2];
+    if (!y.includes(yearFilter)) y.push(yearFilter);
+    return y.sort((a, b) => b - a);
+  }, [filterOptions.years, yearFilter]);
+
+  const availableMonths = useMemo(() => {
+    const now = new Date();
+    const maxMonth = yearFilter === now.getFullYear() ? now.getMonth() + 1 : 12;
+    return Array.from({ length: maxMonth }, (_, i) => i + 1);
+  }, [yearFilter]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -49,8 +87,15 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
     };
   }, []);
 
-  // Reset state when dialog closes
+  // Apply initial filters when dialog opens; reset when closes
   useEffect(() => {
+    if (open && initialFilters) {
+      if (initialFilters.year != null) setYearFilter(initialFilters.year);
+      if (initialFilters.month != null) setMonthFilter(String(initialFilters.month));
+      if (initialFilters.hospitals?.length) setHospitalsFilter(initialFilters.hospitals);
+      if (initialFilters.numero_documento != null) setNumeroDocumento(initialFilters.numero_documento);
+      if (initialFilters.survey_type != null) setSurveyType(initialFilters.survey_type);
+    }
     if (!open) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -62,10 +107,24 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
       setIsGenerating(false);
       setIncludeSignatures(false);
       setExportFormat('excel');
-      setHospital('');
+      setMonthFilter('');
+      setHospitalsFilter([]);
+      setNumeroDocumento('');
+      setYearFilter(currentCalendarYear);
+      setSurveyType('all');
       setProfesion('');
+      setDateRange({ includeAll: true });
     }
-  }, [open]);
+  }, [open, initialFilters]);
+
+  // Si el año es el actual y el mes seleccionado es futuro, limpiar mes
+  useEffect(() => {
+    const now = new Date();
+    if (yearFilter === now.getFullYear() && monthFilter) {
+      const m = parseInt(monthFilter, 10);
+      if (m > now.getMonth() + 1) setMonthFilter('');
+    }
+  }, [yearFilter, monthFilter]);
 
   const handleIncludeAllChange = (includeAll: boolean) => {
     setDateRange({
@@ -337,6 +396,23 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
     pollingIntervalRef.current = interval;
   };
 
+  const buildExportFilters = () => {
+    const base = {
+      year: yearFilter,
+      month: monthFilter ? parseInt(monthFilter, 10) : undefined,
+      hospitals: hospitalsFilter.length ? hospitalsFilter : undefined,
+      numero_documento: numeroDocumento.trim() || undefined,
+      survey_type: surveyType !== 'all' ? surveyType : undefined,
+      profesion: profesion.trim() || undefined,
+      date_range: {
+        include_all: dateRange.includeAll,
+        start_date: formatDateForApi(dateRange.start),
+        end_date: formatDateForApi(dateRange.end),
+      },
+    };
+    return base;
+  };
+
   const handleExport = async () => {
     // Validar fechas si no se incluyen todas
     if (!dateRange.includeAll) {
@@ -356,19 +432,10 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
     
     try {
       logger.debug('Iniciando exportación de encuestas sociodemográficas desde backend', { format: exportFormat });
-      
+      const filters = buildExportFilters();
+
       if (exportFormat === 'pdf') {
-        // Exportar a PDF (asíncrono: POST devuelve job_id, luego polling y descarga)
-        const result = await socioDemographicSurveyApi.exportToPdf({
-          survey_type: surveyType !== 'all' ? surveyType : undefined,
-          date_range: {
-            include_all: dateRange.includeAll,
-            start_date: formatDateForApi(dateRange.start),
-            end_date: formatDateForApi(dateRange.end),
-          },
-          hospital: hospital.trim() || undefined,
-          profesion: profesion.trim() || undefined,
-        });
+        const result = await socioDemographicSurveyApi.exportToPdf(filters);
 
         setExportJobId(result.job_id);
         setExportStatus('processing');
@@ -378,15 +445,8 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
         });
         return;
       } else {
-        // Exportar a Excel
         const result = await socioDemographicSurveyApi.exportToExcel({
-          survey_type: surveyType !== 'all' ? surveyType : undefined,
-          date_range: {
-            include_all: dateRange.includeAll,
-            start_date: formatDateForApi(dateRange.start),
-            end_date: formatDateForApi(dateRange.end),
-          },
-          hospital: hospital.trim() || undefined,
+          ...filters,
           include_signatures: includeSignatures,
         });
 
@@ -538,38 +598,101 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
             )}
           </div>
 
-          {/* Filters Grid - Two Columns on larger screens */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Survey Type Filter */}
-            <Card className="border border-gray-200">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Filter className="h-5 w-5 text-gray-600" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">Tipo de Encuesta</h4>
-                    <p className="text-sm text-gray-600">
-                      Filtra por tipo específico
-                    </p>
-                  </div>
+          {/* Filtros alineados con la API de consulta */}
+          <Card className="border border-gray-200">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center space-x-3">
+                <Filter className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Filtros de exportación</h4>
+                  <p className="text-sm text-gray-600">
+                    Año, mes, hospitales, documento, tipo de encuesta y proceso/profesión
+                  </p>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Seleccionar tipo</label>
-                  <Select value={surveyType} onValueChange={setSurveyType}>
+                  <label className="text-sm font-medium text-gray-700">Año</label>
+                  <Select value={String(yearFilter)} onValueChange={(v) => setYearFilter(parseInt(v, 10))}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Todos los tipos de encuestas" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos los tipos de encuestas</SelectItem>
+                      {availableYears.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Mes</label>
+                  <Select value={monthFilter || 'all'} onValueChange={(v) => setMonthFilter(v === 'all' ? '' : v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los meses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los meses</SelectItem>
+                      {availableMonths.map((m) => (
+                        <SelectItem key={m} value={String(m)}>
+                          {format(new Date(2000, m - 1, 1), 'MMMM', { locale: es })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                  <label className="text-sm font-medium text-gray-700">Hospitales</label>
+                  <MultiSelect
+                    options={filterOptions.hospitals.map((h) => ({ value: h, label: h }))}
+                    selected={hospitalsFilter}
+                    onSelectionChange={setHospitalsFilter}
+                    placeholder="Todos los hospitales"
+                    emptyText="No hay hospitales"
+                    maxDisplay={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Número de documento</label>
+                  <Input
+                    placeholder="Ej: 12345678"
+                    value={numeroDocumento}
+                    onChange={(e) => setNumeroDocumento(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Tipo de encuesta</label>
+                  <Select value={surveyType} onValueChange={setSurveyType}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
                       <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                  <label className="text-sm font-medium text-gray-700">Proceso / Profesión</label>
+                  <Input
+                    type="text"
+                    placeholder="Ej: Enfermería, Médico"
+                    value={profesion}
+                    onChange={(e) => setProfesion(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Escribe el proceso exactamente como aparece en los reportes.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Date Range Selector */}
+          {/* Rango de fechas e inclusión de firmas en una fila, dos columnas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border border-gray-200">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center space-x-3">
@@ -577,7 +700,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                   <div>
                     <h4 className="font-medium text-gray-900">Rango de Fechas</h4>
                     <p className="text-sm text-gray-600">
-                      Filtra por período específico
+                      Filtra por período específico (opcional)
                     </p>
                   </div>
                 </div>
@@ -619,80 +742,35 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                 )}
               </CardContent>
             </Card>
-          </div>
 
-          {/* Additional Filters (Hospital and Profesion) */}
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center space-x-3">
-                <Filter className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Filtros Adicionales</h4>
-                  <p className="text-sm text-gray-600">
-                    Filtra por hospital o proceso (opcional)
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Hospital</label>
-                  <Input
-                    type="text"
-                    placeholder="Ej: LA MARIA, VENANCIO"
-                    value={hospital}
-                    onChange={(e) => setHospital(e.target.value)}
-                    disabled={isGenerating}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Usa el nombre tal como está registrado (respetando mayúsculas, tildes y espacios).
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Proceso/Profesión</label>
-                  <Input
-                    type="text"
-                    placeholder="Ej: Enfermería, Médico"
-                    value={profesion}
-                    onChange={(e) => setProfesion(e.target.value)}
-                    disabled={isGenerating}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Escribe el proceso exactamente como aparece en los reportes (mayúsculas y tildes incluidas).
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Include Signatures Option (only for Excel) */}
-          {exportFormat === 'excel' && (
-            <Card className="border border-gray-200">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center space-x-3">
-                  <FileSignature className="h-5 w-5 text-gray-600" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">Incluir Firmas Digitales</h4>
-                    <p className="text-sm text-gray-600">
-                      Si está activado, el proceso tomará más tiempo (se ejecuta en segundo plano)
-                    </p>
+            {exportFormat === 'excel' && (
+              <Card className="border border-gray-200">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <FileSignature className="h-5 w-5 text-gray-600" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">Incluir Firmas Digitales</h4>
+                      <p className="text-sm text-gray-600">
+                        Si está activado, el proceso tomará más tiempo (se ejecuta en segundo plano)
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="include-signatures" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Incluir firmas digitales embebidas en el reporte
-                  </Label>
-                  <Switch
-                    id="include-signatures"
-                    checked={includeSignatures}
-                    onCheckedChange={(checked) => setIncludeSignatures(checked === true)}
-                    disabled={isGenerating}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="include-signatures" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Incluir firmas digitales embebidas en el reporte
+                    </Label>
+                    <Switch
+                      id="include-signatures"
+                      checked={includeSignatures}
+                      onCheckedChange={(checked) => setIncludeSignatures(checked === true)}
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           {/* Processing Status */}
           {exportStatus === 'processing' && (

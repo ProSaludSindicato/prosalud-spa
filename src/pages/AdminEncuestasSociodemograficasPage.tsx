@@ -13,6 +13,7 @@ import {
   User,
   Building2,
   Briefcase,
+  ChevronLeft,
   ChevronRight,
   CheckCircle2,
   XCircle,
@@ -59,6 +60,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import ExportSurveysDialog from '@/components/admin/encuestas-sociodemograficas/ExportSurveysDialog';
 import { exportVaccinationSurveyToExcel } from '@/services/vaccinationSurveyAdminApi';
+import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 
 // Función para obtener el nombre completo del tipo de documento
 const getTipoDocumentoDisplayName = (tipoDocumento: string | null | undefined): string => {
@@ -261,9 +263,32 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Estado para filtros
+  const currentYear = new Date().getFullYear();
+
+  // Estado para filtros (encuestas agrupadas por año por requisito SST)
+  const [yearFilter, setYearFilter] = useState<number>(() => {
+    const y = searchParams.get('year') || searchParams.get('ano');
+    if (y) {
+      const n = parseInt(y, 10);
+      if (n >= 2000 && n <= 2100) return n;
+    }
+    return currentYear;
+  });
+  const [monthFilter, setMonthFilter] = useState<string>(() => {
+    const m = searchParams.get('month') || searchParams.get('mes');
+    if (m) {
+      const n = parseInt(m, 10);
+      if (n >= 1 && n <= 12) return m;
+    }
+    return '';
+  });
+  const [hospitalsFilter, setHospitalsFilter] = useState<string[]>(() => {
+    const h = searchParams.get('hospitals') || searchParams.get('hospital');
+    if (h) return h.split(',').map((s) => s.trim()).filter(Boolean);
+    return [];
+  });
   const [hospitalFilter, setHospitalFilter] = useState<string>(
-    searchParams.get('hospital') || ''
+    searchParams.get('hospital') && !searchParams.get('hospitals') ? searchParams.get('hospital')! : ''
   );
   const [surveyTypeFilter, setSurveyTypeFilter] = useState<string>(
     searchParams.get('survey_type') || 'all'
@@ -315,14 +340,17 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   useEffect(() => {
     if (id) return;
     setCurrentPage(1);
-  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, id]);
+  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, id]);
 
   // Sincronizar filtros con searchParams automáticamente (reactivo)
   useEffect(() => {
     if (id) return; // No actualizar si estamos en vista de detalle
-    
+
     const newParams = new URLSearchParams();
-    if (hospitalFilter.trim()) newParams.set('hospital', hospitalFilter.trim());
+    newParams.set('year', yearFilter.toString());
+    if (monthFilter) newParams.set('month', monthFilter);
+    if (hospitalsFilter.length) newParams.set('hospitals', hospitalsFilter.join(','));
+    else if (hospitalFilter.trim()) newParams.set('hospital', hospitalFilter.trim());
     if (surveyTypeFilter && surveyTypeFilter !== 'all') {
       newParams.set('survey_type', surveyTypeFilter);
     }
@@ -334,41 +362,40 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     }
     newParams.set('per_page', perPage.toString());
     newParams.set('page', currentPage.toString());
-    
+
     // Solo actualizar si hay cambios para evitar loops infinitos
     const currentParams = searchParams.toString();
     const newParamsString = newParams.toString();
     if (currentParams !== newParamsString) {
       setSearchParams(newParams, { replace: true });
     }
-  }, [hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
+  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
+
+  // Opciones de filtrado (endpoint dedicado; la respuesta index puede incluir filter_options y se usará al cargar)
+  const { data: filterOptionsData } = useQuery({
+    queryKey: ['socio-demographic-surveys', 'filter-options'],
+    queryFn: () => socioDemographicSurveyApi.getFilterOptions(),
+    enabled: can('socio_demographic_surveys.view') && !id,
+  });
 
   // Construir parámetros de consulta (ejecutar siempre, incluso si hay id)
   const queryParams = useMemo(() => {
     if (id) return {}; // Retornar objeto vacío si hay id, no se usará
     const params: any = {
-      // Usar la paginación del backend
       per_page: perPage,
       page: currentPage,
+      year: yearFilter,
     };
-    const hospitalTrimmed = hospitalFilter.trim();
-    if (hospitalTrimmed) params.hospital = hospitalTrimmed;
-    
-    if (surveyTypeFilter && surveyTypeFilter !== 'all') {
-      params.survey_type = surveyTypeFilter;
-    }
-    
+    if (monthFilter) params.month = parseInt(monthFilter, 10);
+    if (hospitalsFilter.length) params.hospitals = hospitalsFilter;
+    else if (hospitalFilter.trim()) params.hospital = hospitalFilter.trim();
+    if (surveyTypeFilter && surveyTypeFilter !== 'all') params.survey_type = surveyTypeFilter;
     const nombreTrimmed = nombreFilterDebounced.trim();
-    if (nombreTrimmed) {
-      params.nombre = nombreTrimmed;
-    }
+    if (nombreTrimmed) params.nombre = nombreTrimmed;
     const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
-    if (documentoTrimmed) {
-      params.numero_documento = documentoTrimmed;
-    }
-    
+    if (documentoTrimmed) params.numero_documento = documentoTrimmed;
     return params;
-  }, [id, hospitalFilter, surveyTypeFilter, nombreFilterDebounced, numeroDocumentoFilterDebounced, perPage, currentPage]);
+  }, [id, yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, nombreFilterDebounced, numeroDocumentoFilterDebounced, perPage, currentPage]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -381,6 +408,39 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     queryFn: () => socioDemographicSurveyApi.getSurveys(queryParams),
     enabled: can('socio_demographic_surveys.view') && !id,
   });
+
+  // Opciones de filtrado: preferir filter_options de la respuesta index, si no del endpoint
+  const filterOptions = useMemo(() => {
+    const fromIndex = surveysResponse?.filter_options;
+    const fromEndpoint = filterOptionsData?.data;
+    return {
+      years: fromIndex?.years?.length ? fromIndex.years : fromEndpoint?.years ?? [],
+      hospitals: fromIndex?.hospitals?.length ? fromIndex.hospitals : fromEndpoint?.hospitals ?? [],
+    };
+  }, [surveysResponse?.filter_options, filterOptionsData?.data]);
+
+  const availableYears = useMemo(() => {
+    const y = filterOptions.years;
+    const base = y.length ? y.slice().sort((a, b) => b - a) : [currentYear, currentYear - 1, currentYear - 2];
+    if (!base.includes(yearFilter)) base.push(yearFilter);
+    return base.sort((a, b) => b - a);
+  }, [filterOptions.years, currentYear, yearFilter]);
+
+  // Meses disponibles para el filtro: si es el año actual, solo hasta el mes actual
+  const availableMonths = useMemo(() => {
+    const now = new Date();
+    const maxMonth = yearFilter === now.getFullYear() ? now.getMonth() + 1 : 12;
+    return Array.from({ length: maxMonth }, (_, i) => i + 1);
+  }, [yearFilter]);
+
+  // Si el año es el actual y el mes seleccionado es futuro, limpiar el filtro de mes
+  useEffect(() => {
+    const now = new Date();
+    if (yearFilter === now.getFullYear() && monthFilter) {
+      const m = parseInt(monthFilter, 10);
+      if (m > now.getMonth() + 1) setMonthFilter('');
+    }
+  }, [yearFilter, monthFilter]);
 
   // Filtrar por número de documento en el frontend (además de backend, por compatibilidad)
   const filteredSurveys = useMemo(() => {
@@ -440,6 +500,9 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
 
   // Función para limpiar filtros
   const handleClearFilters = () => {
+    setYearFilter(currentYear);
+    setMonthFilter('');
+    setHospitalsFilter([]);
     setHospitalFilter('');
     setSurveyTypeFilter('all');
     setNumeroDocumentoFilter('');
@@ -447,6 +510,16 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     setCurrentPage(1);
     setSearchParams({});
   };
+
+  const hasActiveFilters = Boolean(
+    yearFilter !== currentYear ||
+    monthFilter ||
+    hospitalsFilter.length ||
+    hospitalFilter.trim() ||
+    surveyTypeFilter !== 'all' ||
+    numeroDocumentoFilter.trim() ||
+    nombreFilter.trim()
+  );
 
   // Formatear fecha (lista: DD/MM/YYYY HH:mm)
   const formatDate = (dateString: string) => {
@@ -528,10 +601,56 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                       <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary-prosalud" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
                         <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">
                           Encuestas Sociodemográficas y Salud
                         </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-600 font-medium">Año:</span>
+                          <div className="flex items-center gap-1 rounded-lg border bg-white p-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                const idx = availableYears.indexOf(yearFilter);
+                                if (idx < availableYears.length - 1) setYearFilter(availableYears[idx + 1]);
+                              }}
+                              disabled={availableYears.indexOf(yearFilter) >= availableYears.length - 1}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Select
+                              value={yearFilter.toString()}
+                              onValueChange={(v) => setYearFilter(parseInt(v, 10))}
+                            >
+                              <SelectTrigger className="h-8 w-[4.5rem] border-0 shadow-none">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableYears.map((y) => (
+                                  <SelectItem key={y} value={y.toString()}>
+                                    {y}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                const idx = availableYears.indexOf(yearFilter);
+                                if (idx > 0) setYearFilter(availableYears[idx - 1]);
+                              }}
+                              disabled={availableYears.indexOf(yearFilter) <= 0}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
                         {pagination && (
                           <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
                             Total: {pagination.total}
@@ -539,7 +658,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                         )}
                       </div>
                       <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
-                        Visualiza y gestiona las encuestas sociodemográficas y de diagnóstico de condiciones de salud
+                        Visualiza y gestiona las encuestas sociodemográficas y de diagnóstico de condiciones de salud. Las encuestas se agrupan por año (requisito SST).
                       </CardDescription>
                     </div>
                   </div>
@@ -695,7 +814,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Número de Documento</label>
                 <Input
@@ -713,14 +832,6 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Hospital</label>
-                <Input
-                  placeholder="Buscar por hospital"
-                  value={hospitalFilter}
-                  onChange={(e) => setHospitalFilter(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
                 <label className="text-sm font-medium">Tipo de Encuesta</label>
                 <Select value={surveyTypeFilter} onValueChange={setSurveyTypeFilter}>
                   <SelectTrigger>
@@ -734,11 +845,37 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium invisible">Acciones</label>
-                {(hospitalFilter || surveyTypeFilter !== 'all' || numeroDocumentoFilter || nombreFilter) && (
+                <label className="text-sm font-medium">Mes</label>
+                <Select value={monthFilter || 'all'} onValueChange={(v) => setMonthFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los meses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los meses</SelectItem>
+                    {availableMonths.map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {format(new Date(2000, m - 1, 1), 'MMMM', { locale: es })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-sm font-medium">Hospitales</label>
+                <MultiSelect
+                  options={filterOptions.hospitals.map((h) => ({ value: h, label: h }))}
+                  selected={hospitalsFilter}
+                  onSelectionChange={setHospitalsFilter}
+                  placeholder="Todos los hospitales"
+                  emptyText="No hay hospitales"
+                  maxDisplay={2}
+                />
+              </div>
+              <div className="space-y-2 flex flex-col justify-end">
+                {hasActiveFilters && (
                   <Button variant="outline" onClick={handleClearFilters} className="w-full">
                     <Filter className="h-4 w-4 mr-2" />
-                    Limpiar
+                    Limpiar filtros
                   </Button>
                 )}
               </div>
@@ -752,7 +889,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
             <Card>
           <CardHeader>
             <CardTitle>
-              Lista de Encuestas
+              Lista de Encuestas {yearFilter}
               {pagination && (
                 <span className="ml-2 text-base font-normal text-slate-600">
                   ({pagination.total})
@@ -764,7 +901,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 ? `Mostrando ${(currentPage - 1) * perPage + 1} - ${Math.min(
                     currentPage * perPage,
                     pagination.total
-                  )} de ${pagination.total} encuestas`
+                  )} de ${pagination.total} encuestas del año ${yearFilter}`
                 : 'Cargando...'}
             </CardDescription>
           </CardHeader>
@@ -994,9 +1131,20 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
       </div>
       
       {/* Export Dialog */}
-      <ExportSurveysDialog 
-        open={exportDialogOpen} 
+      <ExportSurveysDialog
+        open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
+        initialFilters={{
+          year: yearFilter,
+          month: monthFilter ? parseInt(monthFilter, 10) : undefined,
+          hospitals: hospitalsFilter.length ? hospitalsFilter : undefined,
+          numero_documento: numeroDocumentoFilter.trim() || undefined,
+          survey_type: surveyTypeFilter && surveyTypeFilter !== 'all' ? surveyTypeFilter : undefined,
+        }}
+        filterOptions={{
+          hospitals: filterOptions.hospitals,
+          years: filterOptions.years?.length ? filterOptions.years : [currentYear, currentYear - 1, currentYear - 2],
+        }}
       />
     </AdminLayout>
   );
