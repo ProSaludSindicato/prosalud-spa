@@ -42,6 +42,8 @@ export const API_CONFIG = {
     // Encuesta de vacunación (acceso solo por enlace)
     ENCUESTA_VACUNACION: '/api/encuesta-vacunacion',
     ENCUESTA_VACUNACION_EXPORT_EXCEL: '/api/encuesta-vacunacion/export/excel',
+    ENCUESTA_VACUNACION_EXPORT_STATUS: '/api/encuesta-vacunacion/export/status',
+    ENCUESTA_VACUNACION_EXPORT_DOWNLOAD: '/api/encuesta-vacunacion/export/download',
     // Wellness Delivery Requests endpoints
     WELLNESS_DELIVERY_REQUESTS: '/api/wellness-delivery-requests',
   },

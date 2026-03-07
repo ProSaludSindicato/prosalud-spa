@@ -59,7 +59,11 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import ExportSurveysDialog from '@/components/admin/encuestas-sociodemograficas/ExportSurveysDialog';
-import { exportVaccinationSurveyToExcel } from '@/services/vaccinationSurveyAdminApi';
+import {
+  requestVaccinationSurveyExport,
+  getVaccinationExportStatus,
+  downloadVaccinationExport,
+} from '@/services/vaccinationSurveyAdminApi';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 
 // Función para obtener el nombre completo del tipo de documento
@@ -307,6 +311,16 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   );
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isExportingVaccination, setIsExportingVaccination] = useState(false);
+  const vaccinationExportPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Limpiar polling de export vacunación al desmontar
+  useEffect(() => {
+    return () => {
+      if (vaccinationExportPollingRef.current) {
+        clearInterval(vaccinationExportPollingRef.current);
+      }
+    };
+  }, []);
 
   // Debounce para el filtro de número de documento
   const [numeroDocumentoFilterDebounced, setNumeroDocumentoFilterDebounced] = useState<string>(
@@ -678,26 +692,108 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                         variant="outline"
                         disabled={isExportingVaccination}
                         onClick={async () => {
+                          const POLL_INTERVAL_MS = 3000;
+                          const MAX_POLL_ATTEMPTS = 100; // ~5 min
+
+                          const startPolling = (jobId: string) => {
+                            let attempts = 0;
+
+                            const poll = async () => {
+                              attempts++;
+                              try {
+                                const statusResult = await getVaccinationExportStatus(jobId);
+
+                                if (statusResult.status === 'completed') {
+                                  if (vaccinationExportPollingRef.current) {
+                                    clearInterval(vaccinationExportPollingRef.current);
+                                    vaccinationExportPollingRef.current = null;
+                                  }
+                                  const fileName = statusResult.file_name;
+                                  const { blob, filename } = await downloadVaccinationExport(
+                                    jobId,
+                                    fileName
+                                  );
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = filename;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  window.URL.revokeObjectURL(url);
+                                  document.body.removeChild(link);
+                                  setIsExportingVaccination(false);
+                                  toast.success('Reporte descargado correctamente.');
+                                  return;
+                                }
+
+                                if (statusResult.status === 'failed') {
+                                  if (vaccinationExportPollingRef.current) {
+                                    clearInterval(vaccinationExportPollingRef.current);
+                                    vaccinationExportPollingRef.current = null;
+                                  }
+                                  setIsExportingVaccination(false);
+                                  const errMsg =
+                                    statusResult.error ||
+                                    statusResult.message ||
+                                    'Error al generar el reporte.';
+                                  toast.error('Error al generar el reporte', {
+                                    description: errMsg,
+                                  });
+                                  return;
+                                }
+
+                                if (!statusResult.success && statusResult.message) {
+                                  if (vaccinationExportPollingRef.current) {
+                                    clearInterval(vaccinationExportPollingRef.current);
+                                    vaccinationExportPollingRef.current = null;
+                                  }
+                                  setIsExportingVaccination(false);
+                                  toast.error('Error', {
+                                    description: statusResult.message,
+                                  });
+                                  return;
+                                }
+
+                                if (attempts >= MAX_POLL_ATTEMPTS) {
+                                  if (vaccinationExportPollingRef.current) {
+                                    clearInterval(vaccinationExportPollingRef.current);
+                                    vaccinationExportPollingRef.current = null;
+                                  }
+                                  setIsExportingVaccination(false);
+                                  toast.error('El reporte está tardando más de lo habitual.', {
+                                    description: 'Puede intentar de nuevo más tarde.',
+                                  });
+                                }
+                              } catch (error) {
+                                if (attempts >= MAX_POLL_ATTEMPTS) {
+                                  if (vaccinationExportPollingRef.current) {
+                                    clearInterval(vaccinationExportPollingRef.current);
+                                    vaccinationExportPollingRef.current = null;
+                                  }
+                                  setIsExportingVaccination(false);
+                                  toast.error(
+                                    error instanceof Error ? error.message : 'Error al verificar el estado.'
+                                  );
+                                }
+                              }
+                            };
+
+                            poll();
+                            vaccinationExportPollingRef.current = setInterval(poll, POLL_INTERVAL_MS);
+                          };
+
                           setIsExportingVaccination(true);
                           try {
-                            const { blob } = await exportVaccinationSurveyToExcel({});
-                            const now = new Date();
-                            const dateStr = now.toISOString().slice(0, 10);
-                            const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-                            const filename = `Reporte_Encuesta_Vacunacion_ProSalud_${dateStr}_${timeStr}.xlsx`;
-                            const url = window.URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = filename;
-                            document.body.appendChild(link);
-                            link.click();
-                            window.URL.revokeObjectURL(url);
-                            document.body.removeChild(link);
-                            toast.success('Reporte descargado correctamente.');
+                            const result = await requestVaccinationSurveyExport({});
+                            toast.info('El reporte se está generando…', {
+                              description: 'Se descargará automáticamente cuando esté listo.',
+                            });
+                            startPolling(result.job_id);
                           } catch (error) {
-                            toast.error(error instanceof Error ? error.message : 'Error al generar el reporte.');
-                          } finally {
                             setIsExportingVaccination(false);
+                            toast.error(
+                              error instanceof Error ? error.message : 'Error al generar el reporte.'
+                            );
                           }
                         }}
                         className="w-full sm:w-auto"
@@ -705,7 +801,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                         {isExportingVaccination ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            <span className="hidden sm:inline">Descargando...</span>
+                            <span className="hidden sm:inline">Generando reporte…</span>
                             <span className="sm:hidden">...</span>
                           </>
                         ) : (
