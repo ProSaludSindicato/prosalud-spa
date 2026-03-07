@@ -609,61 +609,59 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
               <CardHeader className="pb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
                     <div className="bg-primary-prosalud/10 p-2 sm:p-3 rounded-lg flex-shrink-0">
                       <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-primary-prosalud" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
-                        <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud">
-                          Encuestas Sociodemográficas y Salud
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-600 font-medium">Año:</span>
-                          <div className="flex items-center gap-1 rounded-lg border bg-white p-0.5">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => {
-                                const idx = availableYears.indexOf(yearFilter);
-                                if (idx < availableYears.length - 1) setYearFilter(availableYears[idx + 1]);
-                              }}
-                              disabled={availableYears.indexOf(yearFilter) >= availableYears.length - 1}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <Select
-                              value={yearFilter.toString()}
-                              onValueChange={(v) => setYearFilter(parseInt(v, 10))}
-                            >
-                              <SelectTrigger className="h-8 w-[4.5rem] border-0 shadow-none">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableYears.map((y) => (
-                                  <SelectItem key={y} value={y.toString()}>
-                                    {y}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => {
-                                const idx = availableYears.indexOf(yearFilter);
-                                if (idx > 0) setYearFilter(availableYears[idx - 1]);
-                              }}
-                              disabled={availableYears.indexOf(yearFilter) <= 0}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
+                      <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold text-primary-prosalud block">
+                        Encuestas Sociodemográficas y Salud
+                      </CardTitle>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
+                        <span className="text-slate-600 font-medium">Año:</span>
+                        <div className="flex items-center gap-1 rounded-lg border bg-white p-0.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => {
+                              const idx = availableYears.indexOf(yearFilter);
+                              if (idx < availableYears.length - 1) setYearFilter(availableYears[idx + 1]);
+                            }}
+                            disabled={availableYears.indexOf(yearFilter) >= availableYears.length - 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Select
+                            value={yearFilter.toString()}
+                            onValueChange={(v) => setYearFilter(parseInt(v, 10))}
+                          >
+                            <SelectTrigger className="h-8 w-[4.5rem] border-0 shadow-none">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableYears.map((y) => (
+                                <SelectItem key={y} value={y.toString()}>
+                                  {y}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => {
+                              const idx = availableYears.indexOf(yearFilter);
+                              if (idx > 0) setYearFilter(availableYears[idx - 1]);
+                            }}
+                            disabled={availableYears.indexOf(yearFilter) <= 0}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
                         </div>
                         {pagination && (
                           <Badge variant="secondary" className="text-sm sm:text-base px-2 sm:px-3 py-1 w-fit">
