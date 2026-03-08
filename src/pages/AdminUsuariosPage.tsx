@@ -265,6 +265,9 @@ const AdminUsuariosPage: React.FC = () => {
                               </Badge>
                             )}
                           </div>
+                          <p className="text-text-gray text-sm">
+                            <span className="text-gray-500 font-medium">ID:</span> {user.id}
+                          </p>
                           <p className="text-text-gray text-sm">{user.email}</p>
                           <p className="text-xs text-gray-500">
                             Creado: {new Date(user.createdAt).toLocaleDateString()}

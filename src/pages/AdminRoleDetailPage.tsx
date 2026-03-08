@@ -666,6 +666,7 @@ const AdminRoleDetailPage: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>ID</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Correo Electrónico</TableHead>
                     <TableHead>Estado</TableHead>
@@ -674,6 +675,7 @@ const AdminRoleDetailPage: React.FC = () => {
                 <TableBody>
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
+                      <TableCell className="text-gray-500 font-mono text-sm">{user.id}</TableCell>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell className="text-gray-600">{user.email}</TableCell>
                       <TableCell>
