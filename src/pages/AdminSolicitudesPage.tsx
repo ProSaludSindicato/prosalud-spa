@@ -1711,7 +1711,8 @@ const AdminSolicitudesPage: React.FC = () => {
       }
     }
 
-    if (requiresFondoPensionesAnnex) {
+    // El adjunto (planillas fondo de pensiones) solo es requerido al aprobar (resolved); no al rechazar ni al pasar a en progreso
+    if (requiresFondoPensionesAnnex && data.newStatus === 'resolved') {
       const hasFiles = data.attachments && (data.attachments as FileList).length > 0;
       if (!hasFiles) {
         responseForm.setError('attachments', { type: 'custom', message: 'Debe adjuntar al menos un documento (planillas de pagos de seguridad social).' });
@@ -5769,7 +5770,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       />
                     )}
 
-                    {requiresFondoPensionesAnnex && responseForm.watch('newStatus') !== 'in_progress' && (
+                    {requiresFondoPensionesAnnex && responseForm.watch('newStatus') === 'resolved' && (
                       <Alert className="bg-amber-50 border-amber-200 text-amber-800">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle className="text-sm font-semibold">Anexo requerido</AlertTitle>
@@ -6273,7 +6274,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           <FormLabel>
                             <div className="flex items-center gap-2">
                               <Paperclip className="h-4 w-4" />
-                              {requiresFondoPensionesAnnex ? 'Adjuntar Archivos *' : 'Adjuntar Archivos (Opcional)'}
+                              {requiresFondoPensionesAnnex && responseForm.watch('newStatus') === 'resolved' ? 'Adjuntar Archivos *' : 'Adjuntar Archivos (Opcional)'}
                             </div>
                           </FormLabel>
                           <FormControl>
