@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FILE_PERMISSIONS } from '@/config/permissions';
 import { logger } from '@/utils/logger';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type DashboardUploadType = Extract<AdminExcelFileType, 'afiliados' | 'incapacidades' | 'liquidaciones' | 'compensaciones'>;
 
@@ -142,9 +143,17 @@ const AdminDashboard: React.FC = () => {
   const [isDownloadingFile, setIsDownloadingFile] = useState(false);
   const [downloadingFileType, setDownloadingFileType] = useState<AdminExcelFileType | null>(null);
   const [activeFileTab, setActiveFileTab] = useState<string>('afiliados');
+  const [lastUploadResult, setLastUploadResult] = useState<{
+    status: 'success' | 'error';
+    message: string;
+    type: DashboardUploadType;
+  } | null>(null);
 
   const handleUploadButtonClick = (type: DashboardUploadType) => {
     if (isUploading) return;
+
+    // Limpiar el resultado previo para evitar confusión al iniciar una nueva carga
+    setLastUploadResult(null);
 
     if (selectedFileUrl) {
       URL.revokeObjectURL(selectedFileUrl);
@@ -517,7 +526,15 @@ const AdminDashboard: React.FC = () => {
       const response = await adminExcelFilesService.uploadExcelFile(type, selectedFile);
 
       if (response.success) {
-        toast.success(response.message || config.successFallback);
+        const successMessage = response.message || config.successFallback;
+        toast.success(successMessage);
+
+        setLastUploadResult({
+          status: 'success',
+          message: successMessage,
+          type,
+        });
+
         // Refresh file info after upload
         if (type === 'compensaciones') {
           await fetchCompensacionesFileInfo();
@@ -529,15 +546,33 @@ const AdminDashboard: React.FC = () => {
           await fetchLiquidacionesFileInfo();
         }
       } else {
-        toast.error(response.message || config.errorFallback);
+        const fallbackMessage = response.message || config.errorFallback;
+        toast.error(fallbackMessage);
+
+        setLastUploadResult({
+          status: 'error',
+          message: fallbackMessage,
+          type,
+        });
       }
     } catch (error: any) {
-      const backendMessage: string | undefined = error?.response?.data?.message;
+      const backendData = error?.response?.data;
+      const backendMessage: string | undefined = backendData?.message;
+      const backendErrors: Record<string, string[] | string> | undefined = backendData?.errors;
       const statusCode: number | undefined = error?.response?.status;
 
       let errorMessage = backendMessage || config.errorFallback;
 
-      if (statusCode === 422) {
+      // Mostrar mensajes de validación detallados cuando el backend los envía
+      if (backendErrors && typeof backendErrors === 'object') {
+        const detailedMessages = Object.values(backendErrors)
+          .flatMap((messages) => (Array.isArray(messages) ? messages : [messages]))
+          .filter((msg): msg is string => typeof msg === 'string');
+
+        if (detailedMessages.length > 0) {
+          errorMessage = detailedMessages.join('\n');
+        }
+      } else if (statusCode === 422) {
         const lowerMessage = backendMessage?.toLowerCase() ?? '';
         if (lowerMessage.includes('formato')) {
           errorMessage = 'El archivo debe ser un Excel válido (.xlsx o .xls).';
@@ -555,6 +590,12 @@ const AdminDashboard: React.FC = () => {
       }
 
       toast.error(errorMessage);
+
+      setLastUploadResult({
+        status: 'error',
+        message: errorMessage,
+        type,
+      });
     } finally {
       setIsUploading(false);
       setUploadingType(null);
@@ -1166,6 +1207,41 @@ const AdminDashboard: React.FC = () => {
                     onChange={handleFileChange}
                   />
                 </div>
+                {lastUploadResult && (
+                  <div className="mt-4">
+                    <Alert
+                      className={
+                        lastUploadResult.status === 'error'
+                          ? 'border-red-200 bg-red-50'
+                          : 'border-emerald-200 bg-emerald-50'
+                      }
+                    >
+                      <AlertCircle
+                        className={
+                          lastUploadResult.status === 'error'
+                            ? 'h-5 w-5 text-red-600'
+                            : 'h-5 w-5 text-emerald-600'
+                        }
+                      />
+                      <AlertDescription className="text-sm">
+                        <span
+                          className={
+                            lastUploadResult.status === 'error'
+                              ? 'font-semibold text-red-800'
+                              : 'font-semibold text-emerald-800'
+                          }
+                        >
+                          {lastUploadResult.status === 'error'
+                            ? 'Error en el último intento de actualización de '
+                            : 'Último intento de actualización exitoso de '}
+                          {dashboardUploadConfigs[lastUploadResult.type].resourceLabel}
+                          {': '}
+                        </span>
+                        {lastUploadResult.message}
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

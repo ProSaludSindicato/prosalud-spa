@@ -1,2 +1,48 @@
-/* Remove all existing styles or keep only very specific global adjustments if necessary */
-/* For this redesign, we'll start fresh */
+/* Estilos globales para toasts (sonner) */
+
+.toast-attention-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.toast-attention-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid rgba(59, 130, 246, 0.5); /* azul por defecto */
+  pointer-events: none;
+  animation: toast-border-pulse 1.4s ease-in-out infinite;
+}
+
+/* Colores según tipo de toast (si la lib añade data-type) */
+.toast-attention-border[data-type="error"]::before {
+  border-color: rgba(248, 113, 113, 0.7); /* rojo */
+}
+
+.toast-attention-border[data-type="success"]::before {
+  border-color: rgba(52, 211, 153, 0.7); /* verde */
+}
+
+.toast-attention-border[data-type="warning"]::before {
+  border-color: rgba(251, 191, 36, 0.7); /* ámbar */
+}
+
+.toast-attention-border[data-type="info"]::before {
+  border-color: rgba(59, 130, 246, 0.7); /* azul */
+}
+
+@keyframes toast-border-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
