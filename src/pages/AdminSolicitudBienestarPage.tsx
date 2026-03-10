@@ -17,6 +17,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, Dr
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -235,6 +236,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingSolicitud, setEditingSolicitud] = useState<WellnessRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchTermDebounced, setSearchTermDebounced] = useState('');
+  const [solicitanteFilter, setSolicitanteFilter] = useState('');
+  const [solicitanteFilterDebounced, setSolicitanteFilterDebounced] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedCentroCostos, setSelectedCentroCostos] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -400,6 +404,25 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     },
   });
 
+  // Debounce para filtros de búsqueda en solicitudes (evitar llamadas por cada tecla)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTermDebounced(searchTerm);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSolicitanteFilterDebounced(solicitanteFilter);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [solicitanteFilter]);
+
   // Construir filtros para la API
   const apiFilters = useMemo(() => {
     const filters: any = {
@@ -417,12 +440,23 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       filters.centroCostos = selectedCentroCostos;
     }
 
-    if (searchTerm) {
-      filters.busqueda = searchTerm;
+    if (searchTermDebounced) {
+      filters.busqueda = searchTermDebounced;
+    }
+
+    if (solicitanteFilterDebounced) {
+      filters.solicitante = solicitanteFilterDebounced;
     }
 
     return filters;
-  }, [currentPage, itemsPerPage, selectedStatus, selectedCentroCostos, searchTerm]);
+  }, [
+    currentPage,
+    itemsPerPage,
+    selectedStatus,
+    selectedCentroCostos,
+    searchTermDebounced,
+    solicitanteFilterDebounced,
+  ]);
 
   const {
     data: wellnessRequestsData,
@@ -1287,40 +1321,63 @@ const AdminSolicitudBienestarPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col md:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Buscar por nombre, actividad, centro de costos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                  <div className="flex flex-col flex-[2] space-y-1">
+                    <Label htmlFor="filtro-busqueda-general">Búsqueda general</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="filtro-busqueda-general"
+                        placeholder="Buscar por nombre, actividad, centro de costos..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="w-full md:w-[200px]">
-                      <SelectValue placeholder="Todos los estados" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los estados</SelectItem>
-                      <SelectItem value="pending">Pendiente</SelectItem>
-                      <SelectItem value="in_progress">En Revisión</SelectItem>
-                      <SelectItem value="resolved">Aprobada</SelectItem>
-                      <SelectItem value="rejected">Rechazada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedCentroCostos} onValueChange={setSelectedCentroCostos}>
-                    <SelectTrigger className="w-full md:w-[200px]">
-                      <SelectValue placeholder="Todos los centros" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los centros de costos</SelectItem>
-                      {centrosCostosDisponibles.map((centro) => (
-                        <SelectItem key={centro} value={centro}>
-                          {centro}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col flex-1 space-y-1">
+                    <Label htmlFor="filtro-solicitante">Solicitante</Label>
+                    <div className="relative">
+                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="filtro-solicitante"
+                        placeholder="Filtrar por solicitante..."
+                        value={solicitanteFilter}
+                        onChange={(e) => setSolicitanteFilter(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col flex-1 space-y-1">
+                    <Label htmlFor="filtro-estado">Estado</Label>
+                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                      <SelectTrigger id="filtro-estado" className="w-full">
+                        <SelectValue placeholder="Todos los estados" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los estados</SelectItem>
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="in_progress">En Revisión</SelectItem>
+                        <SelectItem value="resolved">Aprobada</SelectItem>
+                        <SelectItem value="rejected">Rechazada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col flex-1 space-y-1">
+                    <Label htmlFor="filtro-centro-costos">Centro de costos</Label>
+                    <Select value={selectedCentroCostos} onValueChange={setSelectedCentroCostos}>
+                      <SelectTrigger id="filtro-centro-costos" className="w-full">
+                        <SelectValue placeholder="Todos los centros" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los centros de costos</SelectItem>
+                        {centrosCostosDisponibles.map((centro) => (
+                          <SelectItem key={centro} value={centro}>
+                            {centro}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1346,7 +1403,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                   <div className="text-center py-12">
                     <Heart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                     <p className="text-lg text-gray-600">
-                      {searchTerm || selectedStatus !== 'all'
+                      {searchTerm || solicitanteFilter || selectedStatus !== 'all'
                         ? 'No se encontraron solicitudes con los filtros aplicados'
                         : 'No hay solicitudes de bienestar registradas'}
                     </p>
