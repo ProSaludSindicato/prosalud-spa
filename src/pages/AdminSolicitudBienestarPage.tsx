@@ -239,6 +239,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [searchTermDebounced, setSearchTermDebounced] = useState('');
   const [solicitanteFilter, setSolicitanteFilter] = useState('');
   const [solicitanteFilterDebounced, setSolicitanteFilterDebounced] = useState('');
+  const [actividadesRealizadasFilter, setActividadesRealizadasFilter] = useState<'todas' | 'realizadas' | 'no_realizadas'>('todas');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedCentroCostos, setSelectedCentroCostos] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -440,6 +441,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       filters.centroCostos = selectedCentroCostos;
     }
 
+    if (actividadesRealizadasFilter && actividadesRealizadasFilter !== 'todas') {
+      filters.actividadesRealizadas = actividadesRealizadasFilter;
+    }
+
     if (searchTermDebounced) {
       filters.busqueda = searchTermDebounced;
     }
@@ -454,6 +459,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     itemsPerPage,
     selectedStatus,
     selectedCentroCostos,
+    actividadesRealizadasFilter,
     searchTermDebounced,
     solicitanteFilterDebounced,
   ]);
@@ -1378,6 +1384,24 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="flex flex-col flex-1 space-y-1">
+                    <Label htmlFor="filtro-actividades-realizadas">Evidencias cargadas</Label>
+                    <Select
+                      value={actividadesRealizadasFilter}
+                      onValueChange={(v) =>
+                        setActividadesRealizadasFilter(v as 'todas' | 'realizadas' | 'no_realizadas')
+                      }
+                    >
+                      <SelectTrigger id="filtro-actividades-realizadas" className="w-full">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas</SelectItem>
+                        <SelectItem value="realizadas">Ya cargó evidencias</SelectItem>
+                        <SelectItem value="no_realizadas">Aún no ha cargado evidencias</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1403,7 +1427,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                   <div className="text-center py-12">
                     <Heart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                     <p className="text-lg text-gray-600">
-                      {searchTerm || solicitanteFilter || selectedStatus !== 'all'
+                      {searchTerm ||
+                      solicitanteFilter ||
+                      selectedStatus !== 'all' ||
+                      selectedCentroCostos !== 'all' ||
+                      actividadesRealizadasFilter !== 'todas'
                         ? 'No se encontraron solicitudes con los filtros aplicados'
                         : 'No hay solicitudes de bienestar registradas'}
                     </p>
