@@ -367,7 +367,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-sm:inset-x-4 max-sm:max-w-[calc(100vw-2rem)] sm:w-full sm:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-gray-900">
             {isEditing ? 'Editar Información de Actividad Realizada' : 'Registrar Actividad Realizada'}
@@ -666,7 +666,11 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                 <Alert className="mb-4 bg-blue-50 border-blue-200">
                   <Info className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-sm text-blue-800">
-                    Suba el archivo con el listado de asistencia de la actividad (PDF o Excel).
+                    Suba el archivo con el listado de asistencia de la actividad en formato PDF y{' '}
+                    <span className="font-semibold text-primary-prosalud">
+                      utilizando exclusivamente la planilla oficial de ProSalud. Otros formatos no son válidos y no
+                      podrán ser utilizados por la organización.
+                    </span>
                   </AlertDescription>
                 </Alert>
                 {listadoAsistenciaError && (
@@ -705,7 +709,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
                     <input
                       type="file"
-                      accept=".pdf,.xls,.xlsx"
+                      accept="application/pdf,.pdf"
                       onChange={handleListadoAsistenciaUpload}
                       className="hidden"
                       id="listado-asistencia-upload"
@@ -713,7 +717,9 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
                     <label htmlFor="listado-asistencia-upload" className="cursor-pointer">
                       <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm font-medium text-gray-600 mb-1">Seleccionar listado de asistencia</p>
-                      <p className="text-xs text-gray-500">PDF o Excel (.pdf, .xls, .xlsx) - máx. 10MB</p>
+                      <p className="text-xs text-gray-500">
+                        Sólo se admite PDF en el formato de planilla oficial de ProSalud (.pdf) - máx. 10MB
+                      </p>
                     </label>
                   </div>
                 )}
