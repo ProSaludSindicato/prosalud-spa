@@ -1562,11 +1562,22 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Calendar className="h-4 w-4 text-gray-400" />
-                                  {solicitud.fechaPropuesta
-                                    ? formatDateReadable(solicitud.fechaPropuesta)
-                                    : 'N/A'}
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                    {solicitud.fechaPropuesta
+                                      ? formatDateReadable(solicitud.fechaPropuesta)
+                                      : 'N/A'}
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[11px] text-gray-400 italic">
+                                    <Clock className="h-3 w-3" />
+                                    <span>
+                                      creada:{' '}
+                                      {solicitud.created_at
+                                        ? formatDateReadable(solicitud.created_at)
+                                        : 'N/A'}
+                                    </span>
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1771,13 +1782,22 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                       {solicitud.solicitante?.email || 'N/A'}
                                     </p>
                                   </div>
-                                  <div className="text-right">
+                                  <div className="text-right space-y-1">
                                     <p className="text-xs font-medium text-gray-500 mb-1">Fecha Propuesta</p>
                                     <div className="flex items-center gap-2 text-sm">
                                       <Calendar className="h-4 w-4 text-gray-400" />
                                       <span className="text-gray-900">
                                         {solicitud.fechaPropuesta
                                           ? formatDateReadable(solicitud.fechaPropuesta)
+                                          : 'N/A'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 justify-end text-[11px] text-gray-400 italic">
+                                      <Clock className="h-3 w-3" />
+                                      <span>
+                                        creada:{' '}
+                                        {solicitud.created_at
+                                          ? formatDateReadable(solicitud.created_at)
                                           : 'N/A'}
                                       </span>
                                     </div>
