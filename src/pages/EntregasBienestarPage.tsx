@@ -125,14 +125,26 @@ function isAuthDataEmpty(data: AuthenticateResponseData): boolean {
 /** Tipo para campos manuales en modo abierto cuando la API devuelve datos vacíos */
 type ManualBeneficiary = { beneficiario: string; parentesco?: string; edad?: string };
 
+/** Tipos activos con modo "listado" (disponibles para el formulario público) */
+function getListadoTypes(data: WellnessDeliveryTypeActive[] | null): WellnessDeliveryTypeActive[] {
+  if (!Array.isArray(data)) return [];
+  return data.filter((t) => t.modo_acceso === 'listado');
+}
+
 const EntregasBienestarPage: React.FC = () => {
   const navigate = useNavigate();
-  const [currentType, setCurrentType] = useState<WellnessDeliveryTypeActive | null>(null);
+  /** Todos los tipos activos hoy (solo listado; los abiertos no se muestran aquí) */
+  const [activeTypesListado, setActiveTypesListado] = useState<WellnessDeliveryTypeActive[]>([]);
   const [currentTypeLoading, setCurrentTypeLoading] = useState(true);
   const [noCampaignMessage, setNoCampaignMessage] = useState<string | null>(null);
+  /** Tipo elegido por el usuario cuando hay varios; si solo hay uno, es ese. */
+  const [selectedType, setSelectedType] = useState<WellnessDeliveryTypeActive | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authResult, setAuthResult] = useState<AuthenticateResponseData | null>(null);
+  /** Tipo usado en la autenticación (viene en la respuesta o es el seleccionado) */
+  const [authTypeId, setAuthTypeId] = useState<number | null>(null);
+  const [authTypeNombre, setAuthTypeNombre] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignatureError, setShowSignatureError] = useState(false);
@@ -148,27 +160,30 @@ const EntregasBienestarPage: React.FC = () => {
   const [manualHospital, setManualHospital] = useState('');
   const [manualBeneficiarios, setManualBeneficiarios] = useState<ManualBeneficiary[]>([{ beneficiario: '' }]);
 
-  // Al cargar, obtener el tipo de entrega activo para la fecha actual
+  // Al cargar, obtener los tipos de entrega activos para la fecha actual (data es array)
   useEffect(() => {
     let cancelled = false;
     const fetchCurrentType = async () => {
       setCurrentTypeLoading(true);
       setNoCampaignMessage(null);
-      setCurrentType(null);
+      setActiveTypesListado([]);
+      setSelectedType(null);
       try {
         const res: GetCurrentTypeResponse = await entregasBienestarService.getCurrentType();
         if (cancelled) return;
-        if (res.success && res.data) {
-          // Solo mostrar el formulario público cuando el tipo es "listado" (afiliado se valida con listado).
-          // Si es "abierto", la campaña se gestiona en el panel admin y no se habilita esta vista.
-          if (res.data.modo_acceso === 'abierto') {
-            setNoCampaignMessage('Esta campaña se gestiona de forma interna. Para registrar tu entrega, acude al punto de entrega o contacta al personal autorizado.');
-            setCurrentType(null);
-          } else {
-            setCurrentType(res.data);
-          }
-        } else {
+        const data = res.success && Array.isArray(res.data) ? res.data : null;
+        if (!data || data.length === 0) {
           setNoCampaignMessage(res.message || 'No hay una campaña de entrega de bienestar activa en este momento.');
+          return;
+        }
+        const listado = getListadoTypes(data);
+        if (listado.length === 0) {
+          setNoCampaignMessage('Esta campaña se gestiona de forma interna. Para registrar tu entrega, acude al punto de entrega o contacta al personal autorizado.');
+          return;
+        }
+        setActiveTypesListado(listado);
+        if (listado.length === 1) {
+          setSelectedType(listado[0]);
         }
       } catch (e) {
         if (!cancelled) {
@@ -192,7 +207,9 @@ const EntregasBienestarPage: React.FC = () => {
     },
   });
 
-  const hasActiveCampaign = currentType !== null;
+  const hasActiveCampaign = activeTypesListado.length > 0;
+  /** Tipo efectivo: el único si hay uno, o el elegido por el usuario si hay varios */
+  const currentType = selectedType ?? (activeTypesListado.length === 1 ? activeTypesListado[0] : null);
 
   const initManualFieldsFromAuth = (data: AuthenticateResponseData) => {
     if ('beneficiario' in data) {
@@ -229,23 +246,35 @@ const EntregasBienestarPage: React.FC = () => {
   }, [documento, tipoDocumento, fechaExpedicion]);
 
   const handleAuthenticate = async (data: AuthenticateFormValues) => {
+    if (activeTypesListado.length > 1 && !selectedType) {
+      toast.error('Selecciona el tipo de entrega al que deseas aplicar');
+      return;
+    }
     setIsAuthenticating(true);
     setAuthError(null);
     setAuthResult(null);
     setSignature(null);
+    setAuthTypeId(null);
+    setAuthTypeNombre(null);
 
     try {
       // Convertir la fecha de YYYY-MM-DD a dd/mm/aa
       const fechaExpedicionFormatted = formatDateForApi(data.fecha_expedicion);
-      
-      const response = await entregasBienestarService.authenticate({
+      const payload: Parameters<typeof entregasBienestarService.authenticate>[0] = {
         tipo_documento: data.tipo_documento,
         documento: data.documento,
         fecha_expedicion: fechaExpedicionFormatted,
-      });
+      };
+      if (activeTypesListado.length > 1 && selectedType) {
+        payload.wellness_delivery_type_id = selectedType.id;
+      }
+      const response = await entregasBienestarService.authenticate(payload);
 
       if (response.success && response.data) {
+        const dataWithType = response.data as AuthenticateResponseData & { wellness_delivery_type_id?: number; tipo_entrega_nombre?: string };
         setAuthResult(response.data);
+        if (dataWithType.wellness_delivery_type_id != null) setAuthTypeId(dataWithType.wellness_delivery_type_id);
+        if (dataWithType.tipo_entrega_nombre) setAuthTypeNombre(dataWithType.tipo_entrega_nombre);
         setShowVerifyButton(true);
         toast.success('Autenticación exitosa');
         // En modo abierto la API puede devolver datos mínimos vacíos; si es así, el usuario completará manualmente
@@ -349,7 +378,7 @@ const EntregasBienestarPage: React.FC = () => {
       const formData = form.getValues();
       // Convertir la fecha de YYYY-MM-DD a dd/mm/aa
       const fechaExpedicionFormatted = formatDateForApi(formData.fecha_expedicion);
-      
+      const typeId = authTypeId ?? (currentType ? currentType.id : undefined);
       const response = await entregasBienestarService.submitInscription({
         documento_afiliado: formData.documento,
         nombre_afiliado: nombreAfiliado,
@@ -358,6 +387,7 @@ const EntregasBienestarPage: React.FC = () => {
         beneficiarios: beneficiarios,
         firma: signature,
         tipo_firma: 'digital',
+        ...(typeId != null && { wellness_delivery_type_id: typeId }),
       });
 
       if (response.success) {
@@ -381,6 +411,8 @@ const EntregasBienestarPage: React.FC = () => {
     setShowSuccessModal(false);
     form.reset();
     setAuthResult(null);
+    setAuthTypeId(null);
+    setAuthTypeNombre(null);
     setSignature(null);
     setAuthError(null);
     setNeedsManualEntry(false);
@@ -513,6 +545,35 @@ const EntregasBienestarPage: React.FC = () => {
                 ? `Verifica si cumples con los requisitos para acceder al beneficio: ${currentType.nombre}`
                 : 'Verifica si cumples con los requisitos para acceder al beneficio'}
             </p>
+          )}
+          {hasActiveCampaign && activeTypesListado.length > 1 && !authResult && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 mt-4">
+              <Label className="text-sm font-medium text-slate-700">Tipo de entrega</Label>
+              <p className="text-xs text-slate-500 mb-2">Selecciona la campaña a la que deseas aplicar</p>
+              <Select
+                value={selectedType ? String(selectedType.id) : ''}
+                onValueChange={(v) => {
+                  const t = activeTypesListado.find((x) => String(x.id) === v);
+                  setSelectedType(t ?? null);
+                }}
+              >
+                <SelectTrigger className="w-full max-w-md">
+                  <SelectValue placeholder="Elige un tipo de entrega" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeTypesListado.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      <span className="flex items-center gap-2">
+                        {t.nombre}
+                        {t.siempre_activo && (
+                          <span className="text-xs text-slate-500 font-normal">(siempre activo)</span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
           {authResult && (
             <p className="text-slate-600">
@@ -852,7 +913,7 @@ const EntregasBienestarPage: React.FC = () => {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Tipo de entrega:</span>
-                    <span className="text-sm text-slate-900">{successData.tipo_entrega_text ?? 'Campaña actual'}</span>
+                    <span className="text-sm text-slate-900">{successData.tipo_entrega_text ?? authTypeNombre ?? currentType?.nombre ?? 'Campaña actual'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-600">Estado:</span>

@@ -3,7 +3,8 @@ import { logger } from '@/utils/logger';
 import axios from 'axios';
 
 /**
- * Tipo de entrega activo (campaña vigente para la fecha actual)
+ * Tipo de entrega activo (campaña vigente para la fecha actual).
+ * Puede ser siempre activo (sin rango) o con rango de fechas.
  */
 export type ModoAcceso = 'listado' | 'abierto';
 
@@ -12,14 +13,19 @@ export interface WellnessDeliveryTypeActive {
   nombre: string;
   /** listado = requiere autenticación contra Excel; abierto = puede buscar por documento sin validar listado */
   modo_acceso?: ModoAcceso;
-  fecha_desde: string; // Y-m-d
-  fecha_hasta: string; // Y-m-d
+  /** Y-m-d o null si es siempre activo */
+  fecha_desde: string | null;
+  /** Y-m-d o null si es siempre activo */
+  fecha_hasta: string | null;
+  /** true cuando no tiene rango de fechas (activo todos los días) */
+  siempre_activo: boolean;
 }
 
 export interface GetCurrentTypeResponse {
   success: boolean;
   message?: string;
-  data: WellnessDeliveryTypeActive | null;
+  /** Array de tipos activos hoy (0, 1 o más). null cuando success === false. */
+  data: WellnessDeliveryTypeActive[] | null;
 }
 
 /**
@@ -30,6 +36,8 @@ export interface AuthenticateRequest {
   tipo_documento: string;
   documento: string;
   fecha_expedicion: string; // Formato: dd/mm/aa
+  /** ID del tipo de entrega activo; obligatorio cuando hay varios tipos activos */
+  wellness_delivery_type_id?: number;
 }
 
 export interface SingleBeneficiaryResponse {
@@ -61,14 +69,16 @@ export type AuthenticateResponseData = SingleBeneficiaryResponse | MultipleBenef
 export interface AuthenticateResponse {
   success: boolean;
   message: string;
-  data: AuthenticateResponseData | null;
+  data: (AuthenticateResponseData & {
+    wellness_delivery_type_id?: number;
+    tipo_entrega_nombre?: string;
+  }) | null;
   errors?: Record<string, string[]>;
   /** Código HTTP cuando success es false (para mostrar mensajes según 404/503) */
   status?: number;
 }
 
 export interface SubmitInscriptionRequest {
-  /** No enviar: el backend asigna el tipo activo para la fecha actual */
   documento_afiliado: string;
   nombre_afiliado: string;
   hospital?: string;
@@ -80,6 +90,8 @@ export interface SubmitInscriptionRequest {
   }>;
   firma: string; // Base64 data URL de la firma
   tipo_firma?: string; // "digital" (default)
+  /** ID del tipo de entrega; obligatorio cuando hay varios tipos activos (viene de authenticate) */
+  wellness_delivery_type_id?: number;
 }
 
 export interface SubmitInscriptionResponseData {
@@ -232,7 +244,7 @@ class EntregasBienestarService {
         documento: data.documento_afiliado,
       });
 
-      const requestData = {
+      const requestData: Record<string, unknown> = {
         documento_afiliado: data.documento_afiliado,
         nombre_afiliado: data.nombre_afiliado,
         hospital: data.hospital,
@@ -241,6 +253,9 @@ class EntregasBienestarService {
         firma: data.firma,
         tipo_firma: data.tipo_firma || 'digital',
       };
+      if (data.wellness_delivery_type_id != null) {
+        requestData.wellness_delivery_type_id = data.wellness_delivery_type_id;
+      }
 
       const response = await publicApi.post<SubmitInscriptionResponse>(
         '/api/kit-bienestar/request',

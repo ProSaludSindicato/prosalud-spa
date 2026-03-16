@@ -779,6 +779,15 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     }
   };
 
+  /** true si la campaña está activa hoy: siempre activo o fecha actual dentro del rango */
+  const isDeliveryTypeActiveToday = (t: WellnessDeliveryType): boolean => {
+    const siempreActivo = t.siempre_activo ?? (t.fecha_desde == null && t.fecha_hasta == null);
+    if (siempreActivo) return true;
+    if (!t.fecha_desde || !t.fecha_hasta) return false;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return today >= t.fecha_desde && today <= t.fecha_hasta;
+  };
+
   // Función para abrir el diálogo de cambio de estado de entrega
   const handleOpenDeliveryStatusDialog = React.useCallback((request: WellnessDeliveryRequest) => {
     setDeliveryRequestToUpdate(request);
@@ -873,16 +882,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   // Mutación para crear/actualizar tipo de entrega (campaña)
   const saveDeliveryTypeMutation = useMutation({
     mutationFn: async ({ data, id }: { data: WellnessDeliveryTypeFormValues; id?: number }) => {
-      if (id != null) {
-        return wellnessDeliveryService.updateDeliveryType(id, data);
-      }
-      return wellnessDeliveryService.createDeliveryType({
+      const payload = {
         nombre: data.nombre,
         modo_acceso: data.modo_acceso,
-        activo: data.activo,
-        fecha_desde: data.fecha_desde,
-        fecha_hasta: data.fecha_hasta,
-      });
+        fecha_desde: data.siempre_activo ? null : (data.fecha_desde || undefined),
+        fecha_hasta: data.siempre_activo ? null : (data.fecha_hasta || undefined),
+      };
+      if (id != null) {
+        return wellnessDeliveryService.updateDeliveryType(id, payload);
+      }
+      return wellnessDeliveryService.createDeliveryType(payload);
     },
     onSuccess: (_, variables) => {
       toast.success(variables.id != null ? 'Campaña actualizada' : 'Campaña creada', {
@@ -2193,7 +2202,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 <span className="break-words">Campañas (tipos de entrega)</span>
                               </CardTitle>
                               <CardDescription className="text-sm">
-                                Gestiona los tipos de entrega que aparecen en la página de solicitud. Solo una campaña activa aplica por fecha; el afiliado no elige el tipo, el sistema asigna el activo.
+                                Gestiona los tipos de entrega. Pueden ser siempre activos (sin fechas) o con rango de fechas. Varias campañas pueden estar activas a la vez; el usuario elige el tipo al registrar la entrega.
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
@@ -2226,7 +2235,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                         <TableRow>
                                           <TableHead className="text-xs sm:text-sm">Nombre</TableHead>
                                           <TableHead className="text-xs sm:text-sm">Modo</TableHead>
-                                          <TableHead className="text-xs sm:text-sm">Activo</TableHead>
+                                          <TableHead className="text-xs sm:text-sm">Vigencia</TableHead>
                                           <TableHead className="text-xs sm:text-sm">Desde</TableHead>
                                           <TableHead className="text-xs sm:text-sm">Hasta</TableHead>
                                           <TableHead className="text-xs sm:text-sm">Creado</TableHead>
@@ -2234,8 +2243,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                         </TableRow>
                                       </TableHeader>
                                       <TableBody>
-                                        {deliveryTypes.map((t) => (
-                                          <TableRow key={t.id}>
+                                        {deliveryTypes.map((t) => {
+                                          const activaHoy = isDeliveryTypeActiveToday(t);
+                                          return (
+                                          <TableRow key={t.id} className={activaHoy ? 'bg-green-50/50' : undefined}>
                                             <TableCell className="font-medium text-xs sm:text-sm min-w-[120px] max-w-[180px] sm:max-w-none truncate" title={t.nombre}>{t.nombre}</TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
                                               <Badge variant="outline" className="text-xs">
@@ -2243,15 +2254,25 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               </Badge>
                                             </TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                              <Badge
-                                                variant="outline"
-                                                className={`text-xs ${t.activo ? 'border-green-600 bg-green-50 text-green-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
-                                              >
-                                                {t.activo ? 'Activo' : 'Inactivo'}
-                                              </Badge>
+                                              <div className="flex flex-wrap items-center gap-1.5">
+                                                {(t.siempre_activo ?? (t.fecha_desde == null && t.fecha_hasta == null)) ? (
+                                                  <Badge variant="outline" className="text-xs border-blue-600 bg-blue-50 text-blue-800">
+                                                    Siempre activo
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="text-xs border-slate-300 bg-slate-100 text-slate-700">
+                                                    Por rango
+                                                  </Badge>
+                                                )}
+                                                {activaHoy && (
+                                                  <Badge variant="outline" className="text-xs border-green-600 bg-green-50 text-green-800 font-medium">
+                                                    Activa hoy
+                                                  </Badge>
+                                                )}
+                                              </div>
                                             </TableCell>
-                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es })}</TableCell>
-                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{t.fecha_desde ? format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es }) : '—'}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{t.fecha_hasta ? format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es }) : '—'}</TableCell>
                                             <TableCell className="text-xs sm:text-sm text-gray-600 min-w-[100px]">
                                               {format(t.created_at && !String(t.created_at).includes('T') ? parseLocalDate(t.created_at) : new Date(t.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
                                               {t.created_by?.name && (
@@ -2275,26 +2296,37 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               </TableCell>
                                             )}
                                           </TableRow>
-                                        ))}
+                                          );
+                                        })}
                                       </TableBody>
                                     </Table>
                                   </div>
 
                                   {/* Móvil: cards */}
                                   <div className="lg:hidden space-y-3">
-                                    {deliveryTypes.map((t) => (
-                                      <Card key={t.id} className="border shadow-sm">
+                                    {deliveryTypes.map((t) => {
+                                      const activaHoy = isDeliveryTypeActiveToday(t);
+                                      return (
+                                      <Card key={t.id} className={`border shadow-sm ${activaHoy ? 'border-green-300 bg-green-50/30' : ''}`}>
                                         <CardContent className="p-4">
                                           <div className="flex flex-col gap-3">
                                             <div className="flex items-start justify-between gap-2">
                                               <p className="font-medium text-gray-900 break-words flex-1 min-w-0">{t.nombre}</p>
-                                              <div className="flex items-center gap-2 flex-shrink-0">
-                                                <Badge
-                                                  variant="outline"
-                                                  className={`text-xs ${t.activo ? 'border-green-600 bg-green-50 text-green-800' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
-                                                >
-                                                  {t.activo ? 'Activo' : 'Inactivo'}
-                                                </Badge>
+                                              <div className="flex flex-wrap items-center gap-2 flex-shrink-0 justify-end">
+                                                {(t.siempre_activo ?? (t.fecha_desde == null && t.fecha_hasta == null)) ? (
+                                                  <Badge variant="outline" className="text-xs border-blue-600 bg-blue-50 text-blue-800">
+                                                    Siempre activo
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="text-xs border-slate-300 bg-slate-100 text-slate-700">
+                                                    Por rango
+                                                  </Badge>
+                                                )}
+                                                {activaHoy && (
+                                                  <Badge variant="outline" className="text-xs border-green-600 bg-green-50 text-green-800 font-medium">
+                                                    Activa hoy
+                                                  </Badge>
+                                                )}
                                                 {can('wellness_delivery.manage') && (
                                                   <Button
                                                     variant="outline"
@@ -2320,11 +2352,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               </div>
                                               <div className="flex justify-between gap-2">
                                                 <span className="text-gray-500">Desde</span>
-                                                <span className="text-gray-900">{format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es })}</span>
+                                                <span className="text-gray-900">{t.fecha_desde ? format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es }) : '—'}</span>
                                               </div>
                                               <div className="flex justify-between gap-2">
                                                 <span className="text-gray-500">Hasta</span>
-                                                <span className="text-gray-900">{format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es })}</span>
+                                                <span className="text-gray-900">{t.fecha_hasta ? format(parseLocalDate(t.fecha_hasta), 'dd/MM/yyyy', { locale: es }) : '—'}</span>
                                               </div>
                                               <div className="flex justify-between gap-2">
                                                 <span className="text-gray-500">Creado</span>
@@ -2339,7 +2371,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                           </div>
                                         </CardContent>
                                       </Card>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </>
                               )}
@@ -3580,6 +3613,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           type={editingDeliveryType}
           onSubmit={handleSaveDeliveryType}
           isSubmitting={saveDeliveryTypeMutation.isPending}
+          onOpenFileManager={() => setShowFileManagerModal(true)}
         />
       </div>
     </AdminLayout>

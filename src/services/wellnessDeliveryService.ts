@@ -3,6 +3,19 @@ import { logger } from '@/utils/logger';
 import axios from 'axios';
 import type { SingleBeneficiaryResponse, MultipleBeneficiariesResponse } from './entregasBienestarService';
 
+/** Un tipo activo en affiliate-lookup, con indicador de si este documento ya tiene solicitud */
+export interface AffiliateLookupTipoActivo {
+  id: number;
+  nombre: string;
+  modo_acceso: 'listado' | 'abierto';
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
+  siempre_activo: boolean;
+  tiene_solicitud: boolean;
+  solicitud_estado: 'pendiente' | 'entregado' | null;
+  solicitud_id: number | null;
+}
+
 /** Respuesta plana del endpoint affiliate-lookup (documento sin fecha expedición) */
 export interface AffiliateLookupFlatData {
   documento_afiliado: string;
@@ -12,15 +25,26 @@ export interface AffiliateLookupFlatData {
   estado?: string;
   hospital?: string | null;
   beneficiarios: Array<{ beneficiario: string; parentesco?: string; edad?: string }>;
-  /** Indica si ya existe una solicitud para el tipo de entrega activo y este documento */
+  /** Lista de tipos de entrega activos hoy; el usuario elige uno para registrar */
+  tipos_activos?: AffiliateLookupTipoActivo[];
+  /** true si para algún tipo activo este documento ya tiene solicitud */
   solicitud_existente?: boolean;
+  /**
+   * true: hay al menos un tipo activo para el que este documento no tiene solicitud → mostrar formulario y selector.
+   * false: para todos los tipos activos ya tiene solicitud → no permitir registrar, mostrar mensaje de bloqueo.
+   */
+  puede_registrar_otro_tipo?: boolean;
   /** Estado de la solicitud existente (por ejemplo, "pendiente" o "entregado") */
   solicitud_estado?: string;
   /** ID de la solicitud existente */
   solicitud_id?: number;
   /** Nombre del tipo de entrega asociado a la solicitud existente */
   tipo_entrega_nombre?: string;
-  /** Mensaje listo para mostrar al usuario sobre la solicitud existente */
+  /**
+   * Mensaje condicional: solo cuando solicitud_existente es true.
+   * Si puede_registrar_otro_tipo es true → mostrar como aviso informativo.
+   * Si puede_registrar_otro_tipo es false → mostrar como mensaje de bloqueo.
+   */
   solicitud_existente_mensaje?: string;
 }
 
@@ -130,6 +154,8 @@ export interface SubmitOpenDeliveryRequest {
   hospital?: string;
   fecha_expedicion?: string;
   beneficiarios?: Array<{ beneficiario: string; parentesco?: string; edad?: string }>;
+  /** ID del tipo de entrega; obligatorio cuando hay varios tipos activos */
+  wellness_delivery_type_id?: number;
 }
 
 /** Respuesta de POST /api/wellness-delivery-requests/open */
@@ -216,11 +242,15 @@ export type ModoAccesoType = 'listado' | 'abierto';
 export interface WellnessDeliveryType {
   id: number;
   nombre: string;
-  activo: boolean;
+  activo?: boolean; // legacy; la vigencia se define por rango o siempre_activo
   /** listado = requiere Excel de afiliados; abierto = cualquiera puede solicitar (opcional en respuestas legacy) */
   modo_acceso?: ModoAccesoType;
-  fecha_desde: string; // Y-m-d
-  fecha_hasta: string; // Y-m-d
+  /** Y-m-d o null si es siempre activo */
+  fecha_desde: string | null;
+  /** Y-m-d o null si es siempre activo */
+  fecha_hasta: string | null;
+  /** true cuando fecha_desde y fecha_hasta son null */
+  siempre_activo?: boolean;
   created_by?: { id: number; name: string } | null;
   created_at: string;
   updated_at?: string;
@@ -239,17 +269,16 @@ export interface WellnessDeliveryTypeDetailResponse {
 export interface CreateWellnessDeliveryTypeRequest {
   nombre: string;
   modo_acceso: ModoAccesoType;
-  activo?: boolean;
-  fecha_desde: string; // Y-m-d
-  fecha_hasta: string; // Y-m-d
+  /** Si true, no enviar fecha_desde ni fecha_hasta (tipo siempre activo). Si false, ambas fechas obligatorias. */
+  fecha_desde?: string | null; // Y-m-d o null para siempre activo
+  fecha_hasta?: string | null; // Y-m-d o null para siempre activo
 }
 
 export interface UpdateWellnessDeliveryTypeRequest {
   nombre?: string;
   modo_acceso?: ModoAccesoType;
-  activo?: boolean;
-  fecha_desde?: string;
-  fecha_hasta?: string;
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
 }
 
 /**
