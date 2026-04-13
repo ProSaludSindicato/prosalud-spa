@@ -426,16 +426,16 @@ const createFormSchema = (initialValues: {
   return z.object({
     // Datos personales
     // Estado Civil: requerido si está vacío en los datos iniciales
-    estadoCivil: estadoCivilVacio 
-      ? z.string().min(1, 'El estado civil es requerido')
-      : z.string().optional(),
-    direccion: z.string().optional(),
-    municipio: z.string().optional(),
-    telefonoFijo: z.string().optional(),
+    estadoCivil: estadoCivilVacio
+      ? z.string().min(1, 'El estado civil es requerido').max(50, 'El estado civil no puede exceder 50 caracteres')
+      : z.string().max(50, 'El estado civil no puede exceder 50 caracteres').optional(),
+    direccion: z.string().max(500, 'La direccion no puede exceder 500 caracteres').optional(),
+    municipio: z.string().max(255, 'El municipio no puede exceder 255 caracteres').optional(),
+    telefonoFijo: z.string().max(20, 'El telefono fijo no puede exceder 20 caracteres').optional(),
     // Celular: requerido si está vacío en los datos iniciales
     celular: celularVacio
-      ? z.string().min(1, 'El celular es requerido')
-      : z.string().optional(),
+      ? z.string().min(1, 'El celular es requerido').max(20, 'El celular no puede exceder 20 caracteres')
+      : z.string().max(20, 'El celular no puede exceder 20 caracteres').optional(),
     correo: z.string()
       .optional()
       .or(z.literal(''))
@@ -459,26 +459,26 @@ const createFormSchema = (initialValues: {
       ),
     // Talla de Uniforme: requerido si está vacío en los datos iniciales
     tallaUniforme: tallaUniformeVacio
-      ? z.string().min(1, 'La talla de uniforme es requerida')
-      : z.string().optional(),
+      ? z.string().min(1, 'La talla de uniforme es requerida').max(10, 'La talla de uniforme no puede exceder 10 caracteres')
+      : z.string().max(10, 'La talla de uniforme no puede exceder 10 caracteres').optional(),
     // Talla de Calzado: requerido si está vacío en los datos iniciales
     tallaCalzado: tallaCalzadoVacio
-      ? z.string().min(1, 'La talla de calzado es requerida')
-      : z.string().optional(),
+      ? z.string().min(1, 'La talla de calzado es requerida').max(10, 'La talla de calzado no puede exceder 10 caracteres')
+      : z.string().max(10, 'La talla de calzado no puede exceder 10 caracteres').optional(),
   
     // Contacto de emergencia: requerido si está vacío en los datos iniciales
     nombreContactoEmergencia: nombreContactoEmergenciaVacio
-      ? z.string().min(1, 'El nombre del contacto de emergencia es requerido')
-      : z.string().optional(),
+      ? z.string().min(1, 'El nombre del contacto de emergencia es requerido').max(255, 'El nombre del contacto de emergencia no puede exceder 255 caracteres')
+      : z.string().max(255, 'El nombre del contacto de emergencia no puede exceder 255 caracteres').optional(),
     relacionContactoEmergencia: relacionContactoEmergenciaVacio
-      ? z.string().min(1, 'La relación del contacto de emergencia es requerida')
-      : z.string().optional(),
+      ? z.string().min(1, 'La relación del contacto de emergencia es requerida').max(100, 'La relación del contacto de emergencia no puede exceder 100 caracteres')
+      : z.string().max(100, 'La relación del contacto de emergencia no puede exceder 100 caracteres').optional(),
     telefonoContactoEmergencia: telefonoContactoEmergenciaVacio
-      ? z.string().min(1, 'El teléfono del contacto de emergencia es requerido')
-      : z.string().optional(),
+      ? z.string().min(1, 'El teléfono del contacto de emergencia es requerido').max(20, 'El teléfono del contacto de emergencia no puede exceder 20 caracteres')
+      : z.string().max(20, 'El teléfono del contacto de emergencia no puede exceder 20 caracteres').optional(),
   
   // Nivel educativo (opcional - solo si se quiere actualizar)
-  nivelEducativo: z.string().optional(),
+  nivelEducativo: z.string().max(50, 'El nivel educativo no puede exceder 50 caracteres').optional(),
   diplomaEducativo: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
@@ -489,21 +489,21 @@ const createFormSchema = (initialValues: {
     .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   
   // Información bancaria (opcional - solo si se quiere actualizar)
-  numeroCuenta: z.string().optional(),
-  tipoCuenta: z.string().optional(),
-  banco: z.string().optional(),
+  numeroCuenta: z.string().max(255, 'El numero de cuenta no puede exceder 255 caracteres').optional(),
+  tipoCuenta: z.string().max(20, 'El tipo de cuenta no puede exceder 20 caracteres').optional(),
+  banco: z.string().max(50, 'El banco no puede exceder 50 caracteres').optional(),
   certificacionBancaria: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
     .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
   
   // EPS y AFP (opcionales - solo si se quiere actualizar)
-  eps: z.string().optional(),
+  eps: z.string().max(50, 'La EPS no puede exceder 50 caracteres').optional(),
   certificadoEps: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
     .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  afp: z.string().optional(),
+  afp: z.string().max(50, 'La AFP no puede exceder 50 caracteres').optional(),
   certificadoAfp: z.any()
     .optional()
     .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 // Feature flag to control modal visibility
-const SHOW_WELCOME_MODAL = true;
+const SHOW_WELCOME_MODAL = false;
 
 const WelcomeModal: React.FC = () => {
   // Check if modal was already shown immediately
