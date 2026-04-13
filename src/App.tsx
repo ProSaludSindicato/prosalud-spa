@@ -37,6 +37,9 @@ import AdminVotacionesPage from '@/pages/AdminVotacionesPage';
 import AdminSstPage from '@/pages/AdminSstPage';
 import AdminEncuestasSociodemograficasPage from '@/pages/AdminEncuestasSociodemograficasPage';
 import AdminDocumentSigningPage from '@/pages/AdminDocumentSigningPage';
+import AdminAsambleaLivePage from '@/pages/AdminAsambleaLivePage';
+import AssemblyDelegatePage from '@/pages/AssemblyDelegatePage';
+import AssemblyPublicResultsPage from '@/pages/AssemblyPublicResultsPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -65,6 +68,7 @@ import AccesoDirectoMovilPage from '@/pages/AccesoDirectoMovilPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
 import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
+import { VotingModeProvider } from '@/context/VotingModeContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +98,17 @@ const AppRoutes = () => {
             <Route path="/contacto" element={<ContactoPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/ayuda/acceso-directo-movil" element={<AccesoDirectoMovilPage />} />
+
+            <Route
+              path="/asamblea"
+              element={
+                <VotingModeProvider>
+                  <AssemblyDelegatePage />
+                </VotingModeProvider>
+              }
+            />
+            <Route path="/asamblea/resultados" element={<AssemblyPublicResultsPage />} />
+            <Route path="/assembly/results" element={<Navigate to="/asamblea/resultados" replace />} />
 
             {/* Auth Routes */}
             <Route path="/auth/login" element={<LoginPage />} />
@@ -240,6 +255,17 @@ const AppRoutes = () => {
                   <AdminVotacionesPage />
                 </ProtectedRoute>
               } 
+            />
+
+            <Route
+              path="/admin/asamblea-en-vivo"
+              element={
+                <ProtectedRoute requiredPermissions={['assembly.questions.manage', 'assembly.quorum.manage']}>
+                  <VotingModeProvider>
+                    <AdminAsambleaLivePage />
+                  </VotingModeProvider>
+                </ProtectedRoute>
+              }
             />
             
             <Route 

@@ -5,7 +5,7 @@
 
 import {
   Users, GraduationCap, BarChart3, Settings, Heart,
-  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText, FileSignature
+  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText, FileSignature, Megaphone,
 } from 'lucide-react';
 
 export interface ModulePermissions {
@@ -170,6 +170,14 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
         audit: ['votes.audit.view'],
         manage: ['votes.manage'],
       },
+    },
+  },
+  assemblyLive: {
+    name: 'Asamblea en vivo',
+    href: '/admin/asamblea-en-vivo',
+    icon: Megaphone,
+    permissions: {
+      view: ['assembly.questions.manage', 'assembly.quorum.manage'],
     },
   },
   documentSigning: {
