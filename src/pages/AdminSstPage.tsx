@@ -1820,10 +1820,16 @@ const AdminSstPage: React.FC = () => {
                                       const itemName = isCarnet 
                                         ? 'Carnet' 
                                         : (inventoryItem?.name ?? item.itemId);
-                                      const colorInfo = item.variant?.color 
-                                        ? resolveSstColorInfo(item.variant.color) 
-                                        : (inventoryItem?.defaultColor ? resolveSstColorInfo(inventoryItem.defaultColor) : null);
-                                      const colorLabel = colorInfo?.label ?? item.variant?.color ?? inventoryItem?.defaultColor;
+                                      const colorInfo = item.variant?.color
+                                        ? resolveSstColorInfo(item.variant.color)
+                                        : inventoryItem?.defaultColor
+                                          ? resolveSstColorInfo(inventoryItem.defaultColor)
+                                          : null;
+                                      const colorLabel =
+                                        item.variant?.colorLabel ??
+                                        colorInfo?.label ??
+                                        item.variant?.color ??
+                                        inventoryItem?.defaultColor;
                                       const sizeLabel = item.variant?.size;
                                       const genderLabel = inventoryItem?.gender;
 
@@ -1935,10 +1941,16 @@ const AdminSstPage: React.FC = () => {
                                       const itemName = isCarnet 
                                         ? 'Carnet' 
                                         : (inventoryItem?.name ?? item.itemId);
-                                      const colorInfo = item.variant?.color 
-                                        ? resolveSstColorInfo(item.variant.color) 
-                                        : (inventoryItem?.defaultColor ? resolveSstColorInfo(inventoryItem.defaultColor) : null);
-                                      const colorLabel = colorInfo?.label ?? item.variant?.color ?? inventoryItem?.defaultColor;
+                                      const colorInfo = item.variant?.color
+                                        ? resolveSstColorInfo(item.variant.color)
+                                        : inventoryItem?.defaultColor
+                                          ? resolveSstColorInfo(inventoryItem.defaultColor)
+                                          : null;
+                                      const colorLabel =
+                                        item.variant?.colorLabel ??
+                                        colorInfo?.label ??
+                                        item.variant?.color ??
+                                        inventoryItem?.defaultColor;
                                       const sizeLabel = item.variant?.size;
                                       const genderLabel = inventoryItem?.gender;
 

@@ -4,6 +4,8 @@ export type SstInventoryCategory = 'EPP' | 'Dotación' | 'Otro';
 
 export interface SstInventoryVariant {
   color?: string;
+  /** Etiqueta humana desde inventory_colors (API); preferir sobre el mapa estático del front */
+  colorLabel?: string;
   size?: string;
   stockAvailable?: number;
 }

@@ -9,7 +9,7 @@ const COLOR_REFERENCE = [
   { id: 'BEIGE', label: 'Beige', hex: '#D4C4A8' },
   { id: 'BLANCO', label: 'Blanco', hex: '#FFFFFF' },
   { id: 'CAFE', label: 'Café', hex: '#92400E' },
-  { id: 'GRIS', label: 'Gris', hex: '#6B7280' },
+  { id: 'GRIS', label: 'Gris Claro', hex: '#6B7280' },
   { id: 'GRIS_OSCURO', label: 'Gris Oscuro', hex: '#374151' },
   { id: 'GRIS_RATON', label: 'Gris Ratón', hex: '#4B5563' },
   { id: 'GRIS_REFLECTIVO', label: 'Gris Reflectivo', hex: '#9CA3AF' },

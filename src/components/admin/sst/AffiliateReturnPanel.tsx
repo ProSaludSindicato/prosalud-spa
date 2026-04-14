@@ -374,7 +374,7 @@ export function AffiliateReturnPanel({
           <div className="flex items-center gap-2">
             {renderColorSwatch(variant.color)}
             <span className="text-xs font-medium text-slate-600">
-              {resolveSstColorInfo(variant.color)?.label ?? variant.color}
+              {variant.colorLabel ?? resolveSstColorInfo(variant.color)?.label ?? variant.color}
             </span>
           </div>
         )}
@@ -1305,7 +1305,8 @@ export function AffiliateReturnPanel({
                                     inventory.find((inv) => inv.id === item.itemId);
                                   const rawColor = item.variant?.color ?? inventoryItem?.defaultColor ?? null;
                                   const colorInfo = resolveSstColorInfo(rawColor ?? undefined);
-                                  const colorLabel = colorInfo?.label ?? rawColor;
+                                  const colorLabel =
+                                    item.variant?.colorLabel ?? colorInfo?.label ?? rawColor;
                                   const sizeLabel = item.variant?.size ?? 'Única';
 
                                   return (
