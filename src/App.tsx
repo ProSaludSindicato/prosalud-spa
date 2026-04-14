@@ -38,6 +38,7 @@ import AdminSstPage from '@/pages/AdminSstPage';
 import AdminEncuestasSociodemograficasPage from '@/pages/AdminEncuestasSociodemograficasPage';
 import AdminDocumentSigningPage from '@/pages/AdminDocumentSigningPage';
 import AdminAsambleaLivePage from '@/pages/AdminAsambleaLivePage';
+import AdminAsambleaGeneralPage from '@/pages/AdminAsambleaGeneralPage';
 import AssemblyDelegatePage from '@/pages/AssemblyDelegatePage';
 import AssemblyPublicResultsPage from '@/pages/AssemblyPublicResultsPage';
 
@@ -248,6 +249,22 @@ const AppRoutes = () => {
               } 
             />
             
+            <Route
+              path="/admin/asamblea-general"
+              element={
+                <ProtectedRoute
+                  requiredPermissions={[
+                    'votes.statistics.view',
+                    'votes.audit.view',
+                    'assembly.questions.manage',
+                    'assembly.quorum.manage',
+                  ]}
+                >
+                  <AdminAsambleaGeneralPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route 
               path="/admin/votaciones" 
               element={

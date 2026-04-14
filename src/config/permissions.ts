@@ -5,7 +5,7 @@
 
 import {
   Users, GraduationCap, BarChart3, Settings, Heart,
-  ClipboardList, Package, MessageSquare, Vote, Images, ShieldCheck, FileText, FileSignature, Megaphone,
+  ClipboardList, Package, MessageSquare, Images, ShieldCheck, FileText, FileSignature, Landmark,
 } from 'lucide-react';
 
 export interface ModulePermissions {
@@ -26,6 +26,8 @@ export interface ModuleConfig {
   href: string;
   icon: any;
   permissions: ModulePermissions;
+  /** Rutas de submódulos que mantienen activo este ítem en el menú (p. ej. tras unificar módulos) */
+  relatedPaths?: string[];
 }
 
 /**
@@ -159,25 +161,25 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
       edit: ['chatbot.manage'],
     },
   },
-  votes: {
-    name: 'Votaciones Asamblea',
-    href: '/admin/votaciones',
-    icon: Vote,
+  assemblyGeneral: {
+    name: 'Asamblea General',
+    href: '/admin/asamblea-general',
+    icon: Landmark,
+    relatedPaths: ['/admin/votaciones', '/admin/asamblea-en-vivo'],
     permissions: {
-      view: ['votes.statistics.view', 'votes.audit.view'],
+      view: [
+        'votes.statistics.view',
+        'votes.audit.view',
+        'assembly.questions.manage',
+        'assembly.quorum.manage',
+      ],
       custom: {
         statistics: ['votes.statistics.view'],
         audit: ['votes.audit.view'],
         manage: ['votes.manage'],
+        assemblyQuestions: ['assembly.questions.manage'],
+        assemblyQuorum: ['assembly.quorum.manage'],
       },
-    },
-  },
-  assemblyLive: {
-    name: 'Asamblea en vivo',
-    href: '/admin/asamblea-en-vivo',
-    icon: Megaphone,
-    permissions: {
-      view: ['assembly.questions.manage', 'assembly.quorum.manage'],
     },
   },
   documentSigning: {

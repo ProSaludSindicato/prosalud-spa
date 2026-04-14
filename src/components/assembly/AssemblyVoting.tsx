@@ -1,18 +1,87 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UserSession } from "@/types/assemblyVoting";
 import { LIVE_VOTE_OPTIONS, type AssemblyQuestion, type AssemblyVote } from "@/types/assembly";
 import { assemblyApi } from "@/services/assemblyApi";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, Clock, CheckCircle, Info } from "lucide-react";
+import { Loader2, Clock, Info, Activity, SendHorizontal } from "lucide-react";
 import { getAssemblyEcho } from "@/lib/assemblyEcho";
+import { cn } from "@/lib/utils";
 
 interface Props {
   session: UserSession;
   onLogout: () => void;
+}
+
+function votesRecordEqual(a: Record<string, AssemblyVote>, b: Record<string, AssemblyVote>): boolean {
+  const keysA = Object.keys(a).sort();
+  const keysB = Object.keys(b).sort();
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (let i = 0; i < keysA.length; i++) {
+    if (keysA[i] !== keysB[i]) {
+      return false;
+    }
+  }
+  for (const id of keysA) {
+    const va = a[id];
+    const vb = b[id];
+    if (!va || !vb) {
+      return false;
+    }
+    const sa = [...(va.selectedOptions ?? [])].sort().join(",");
+    const sb = [...(vb.selectedOptions ?? [])].sort().join(",");
+    if (va.id !== vb.id || sa !== sb) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Título generado por API cuando el moderador no escribe enunciado (AssemblyQuestionController). */
+const PLACEHOLDER_TITLE_REGEX = /^Pregunta\s*#\s*\d+$/i;
+
+function isPlaceholderQuestionTitle(title: string): boolean {
+  return title.trim() === "" || PLACEHOLDER_TITLE_REGEX.test(title.trim());
+}
+
+const DELEGATE_LIVE_QUESTION_HEADLINE = "La pregunta se enuncia en vivo";
+
+function questionsDelegateViewEqual(a: AssemblyQuestion[], b: AssemblyQuestion[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  const byId = new Map(b.map((q) => [q.id, q]));
+  for (const q of a) {
+    const o = byId.get(q.id);
+    if (!o) {
+      return false;
+    }
+    if (
+      q.status !== o.status ||
+      q.order !== o.order ||
+      q.votesCount !== o.votesCount ||
+      (q.title ?? "") !== (o.title ?? "") ||
+      (q.openedAt ?? "") !== (o.openedAt ?? "") ||
+      (q.closedAt ?? "") !== (o.closedAt ?? "") ||
+      q.timeLimit !== o.timeLimit
+    ) {
+      return false;
+    }
+    if (q.options.length !== o.options.length) {
+      return false;
+    }
+    for (let i = 0; i < q.options.length; i++) {
+      if (q.options[i].id !== o.options[i].id || q.options[i].text !== o.options[i].text) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 export default function AssemblyVoting({ session, onLogout }: Props) {
@@ -27,15 +96,18 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
   const [echoClient, setEchoClient] = useState<ReturnType<typeof getAssemblyEcho>>(null);
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeChannelRef = useRef<{ stopListening: (e: string) => void; leave?: () => void } | null>(null);
+  const initialFetchDoneRef = useRef(false);
   const voterIdentifier = useMemo(
     () => `${session.documentType}-${session.documentNumber}`,
     [session.documentType, session.documentNumber],
   );
 
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (mode: "initial" | "refresh" = "refresh") => {
+    const isInitial = mode === "initial" || !initialFetchDoneRef.current;
     try {
       const currentAssembly = await assemblyApi.getCurrentAssembly();
       if (!currentAssembly) {
+        initialFetchDoneRef.current = true;
         setQuestions([]);
         setUserVotes({});
         setIsLoading(false);
@@ -49,9 +121,6 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
         options: q.options.map((opt) => ({ ...opt })),
       }));
 
-      setQuestions(() => questionsWithNewRefs);
-
-      setUserVotes({});
       const votes: Record<string, AssemblyVote> = {};
       for (const q of questionsData) {
         const vote = await assemblyApi.getUserVote(q.id, voterIdentifier);
@@ -59,11 +128,34 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
           votes[q.id] = vote;
         }
       }
-      setUserVotes(votes);
+
+      const applyUpdate = () => {
+        setQuestions((prev) => {
+          if (!isInitial && questionsDelegateViewEqual(prev, questionsWithNewRefs)) {
+            return prev;
+          }
+          return questionsWithNewRefs;
+        });
+        setUserVotes((prev) => {
+          if (!isInitial && votesRecordEqual(prev, votes)) {
+            return prev;
+          }
+          return votes;
+        });
+      };
+
+      if (isInitial) {
+        applyUpdate();
+        initialFetchDoneRef.current = true;
+      } else {
+        startTransition(applyUpdate);
+      }
     } catch (error) {
       console.error("Error loading questions:", error);
     } finally {
-      setIsLoading(false);
+      if (isInitial) {
+        setIsLoading(false);
+      }
     }
   }, [voterIdentifier]);
 
@@ -73,8 +165,8 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       if (fallbackIntervalRef.current) {
         clearInterval(fallbackIntervalRef.current);
       }
-      void loadQuestions();
-      fallbackIntervalRef.current = setInterval(() => void loadQuestions(), 5000);
+      void loadQuestions("initial");
+      fallbackIntervalRef.current = setInterval(() => void loadQuestions("refresh"), 5000);
     };
 
     if (!echo) {
@@ -205,7 +297,7 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
         description: "Su voto ha sido registrado exitosamente",
       });
 
-      await loadQuestions();
+      await loadQuestions("refresh");
       setSelectedAnswers({});
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo registrar el voto");
@@ -261,6 +353,46 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       ? Math.max(0, Math.min(100, (timeRemaining / currentQuestion.timeLimit) * 100))
       : 0;
   const currentQuestionTitle = currentQuestion?.title?.trim() ?? "";
+  const delegateQuestionHeadline =
+    currentQuestion && isPlaceholderQuestionTitle(currentQuestionTitle)
+      ? DELEGATE_LIVE_QUESTION_HEADLINE
+      : currentQuestionTitle;
+
+  const optionLabelClass = (optionId: string, isSelected: boolean): string => {
+    if (optionId === "agree") {
+      return isSelected
+        ? "border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-800/50"
+        : "border-emerald-200 bg-emerald-50/40 text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50/80";
+    }
+    if (optionId === "disagree") {
+      return isSelected
+        ? "border-red-700 bg-red-600 text-white shadow-md ring-2 ring-red-800/50"
+        : "border-red-200 bg-red-50/40 text-red-900 hover:border-red-400 hover:bg-red-50/80";
+    }
+    return isSelected
+      ? "border-primary bg-primary/10 text-foreground ring-2 ring-primary"
+      : "border-slate-200 bg-white text-foreground hover:border-primary/40";
+  };
+
+  const optionLabelTextClass = (optionId: string, isSelected: boolean): string => {
+    if (isSelected && (optionId === "agree" || optionId === "disagree")) {
+      return "text-base font-semibold text-white";
+    }
+    if (optionId === "agree") {
+      return "text-base font-medium text-emerald-900";
+    }
+    if (optionId === "disagree") {
+      return "text-base font-medium text-red-900";
+    }
+    return "text-base font-medium text-foreground";
+  };
+
+  const radioItemClass = (optionId: string, isSelected: boolean): string => {
+    if (isSelected && (optionId === "agree" || optionId === "disagree")) {
+      return "h-5 w-5 shrink-0 border-white text-white ring-offset-2 ring-offset-transparent data-[state=checked]:border-white";
+    }
+    return "h-5 w-5 shrink-0";
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f4f6fb] via-white to-[#eef2ff]">
@@ -280,9 +412,29 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-16 pt-8">
         <Card className="rounded-3xl border-none bg-white/90 shadow-sm">
           <CardContent className="space-y-3 p-6 text-center">
-            <p className="text-sm font-medium uppercase tracking-wide text-primary/70">Escucha al moderador</p>
-            <p className="text-2xl font-semibold text-foreground">La pregunta se enuncia en vivo</p>
-            <p className="text-sm text-muted-foreground">Selecciona tu respuesta cuando el moderador abra la votación.</p>
+            {currentQuestion ? (
+              <>
+                <p className="text-sm font-medium uppercase tracking-wide text-primary/70">
+                  Pregunta #{currentQuestion.order ?? 1}
+                </p>
+                <p className="text-balance text-2xl font-semibold text-foreground">
+                  {delegateQuestionHeadline}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {hasVoted
+                    ? `Voto registrado${votedOptionText ? ` — ${votedOptionText}` : ""}.`
+                    : "Elige una opción abajo para registrar tu voto - Pendiente por votar."}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium uppercase tracking-wide text-primary/70">Escucha al moderador</p>
+                <p className="text-2xl font-semibold text-foreground">La pregunta se enuncia en vivo</p>
+                <p className="text-sm text-muted-foreground">
+                  Selecciona tu respuesta cuando el moderador abra la votación.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -302,47 +454,35 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
 
         {currentQuestion && (
           <Card className="rounded-3xl border-none bg-white shadow-lg shadow-primary/5">
-            <CardHeader className="space-y-5">
-              <div className="text-center text-xs font-semibold uppercase tracking-wide text-primary/60">
-                Pregunta #{currentQuestion.order ?? 1}
-              </div>
-              <div className="rounded-2xl bg-slate-50/80 p-4 text-sm text-slate-600">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 font-medium text-slate-700">
-                    <Clock className="h-4 w-4" />
-                    {hasTimer
-                      ? timeRemaining > 0
-                        ? `Tiempo restante ${formatTime(timeRemaining)}`
-                        : "Cierre inminente"
-                      : "Votación abierta"}
-                  </span>
-                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                    {currentQuestion.votesCount} votos
-                  </div>
+            <CardHeader className="space-y-4 pb-2">
+              <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200/90 pb-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  {hasTimer ? (
+                    <>
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tiempo</p>
+                      <p className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                        <Clock className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                        {timeRemaining > 0
+                          ? `Restante ${formatTime(timeRemaining)}`
+                          : "Cierre inminente"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Estado</p>
+                      <p className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                        <Activity className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                        Votación abierta
+                      </p>
+                    </>
+                  )}
                 </div>
-                {hasTimer && <Progress value={progress} className="mt-3 h-2 rounded-full bg-slate-200" />}
+                <p className="shrink-0 text-right text-xs leading-tight text-slate-500">
+                  <span className="block font-semibold tabular-nums text-slate-700">{currentQuestion.votesCount}</span>
+                  votos en total
+                </p>
               </div>
-              {currentQuestionTitle && (
-                <CardTitle className="text-center text-xl font-semibold text-slate-900">{currentQuestionTitle}</CardTitle>
-              )}
-              <div
-                className={[
-                  "rounded-2xl border p-4 text-sm",
-                  hasVoted
-                    ? "border-emerald-100 bg-emerald-50/80 text-emerald-700"
-                    : "border-amber-100 bg-amber-50/80 text-amber-600",
-                ].join(" ")}
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  <CheckCircle className={hasVoted ? "h-4 w-4 text-emerald-600" : "h-4 w-4 text-amber-500"} />
-                  {hasVoted ? "Voto registrado" : "Pendiente por votar"}
-                </div>
-                {hasVoted && votedOptionText && (
-                  <p className="mt-1 text-emerald-600">
-                    Respuesta enviada: <span className="font-semibold">{votedOptionText}</span>
-                  </p>
-                )}
-              </div>
+              {hasTimer && <Progress value={progress} className="h-2 rounded-full bg-slate-200" />}
             </CardHeader>
             <CardContent className="space-y-6 pb-8">
               {!hasVoted && (
@@ -360,30 +500,40 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
                         <label
                           key={option.id}
                           htmlFor={`${currentQuestion.id}-${option.id}`}
-                          className={[
+                          className={cn(
                             "flex cursor-pointer items-center gap-3 rounded-2xl border p-4 shadow-sm transition-all",
-                            isSelected
-                              ? "border-primary bg-primary/10 ring-2 ring-primary"
-                              : "border-slate-200 bg-white hover:border-primary/40",
-                          ].join(" ")}
+                            optionLabelClass(option.id, isSelected),
+                          )}
                         >
                           <RadioGroupItem
                             id={`${currentQuestion.id}-${option.id}`}
                             value={option.id}
-                            className="h-5 w-5"
+                            className={radioItemClass(option.id, isSelected)}
                           />
-                          <div className="flex-1 text-base font-medium text-foreground">{option.text}</div>
+                          <div className={cn("flex-1", optionLabelTextClass(option.id, isSelected))}>
+                            {option.text}
+                          </div>
                         </label>
                       );
                     })}
                   </RadioGroup>
                   <Button
-                    className="w-full rounded-2xl py-6 text-base font-semibold shadow-sm"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl py-6 text-base font-semibold shadow-sm"
                     size="lg"
                     onClick={() => void handleVoteSubmit()}
                     disabled={!selectedOption || submittingQuestionId === currentQuestion.id}
                   >
-                    {submittingQuestionId === currentQuestion.id ? "Enviando voto..." : "Enviar respuesta"}
+                    {submittingQuestionId === currentQuestion.id ? (
+                      <>
+                        <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                        Enviando voto…
+                      </>
+                    ) : (
+                      <>
+                        <SendHorizontal className="h-5 w-5 shrink-0" aria-hidden />
+                        Enviar respuesta
+                      </>
+                    )}
                   </Button>
                 </>
               )}

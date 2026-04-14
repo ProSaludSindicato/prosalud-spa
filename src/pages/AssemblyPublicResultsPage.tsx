@@ -84,10 +84,10 @@ export default function AssemblyPublicResultsPage() {
 
   const visibleQuestions = questions.filter((q) => q.resultsVisible);
   const OPTION_COLORS: Record<string, { bar: string; progress: string }> = {
-    agree: { bar: "hsl(214 84% 56%)", progress: "bg-[hsl(214,84%,56%)]" },
-    disagree: { bar: "hsl(0 72% 60%)", progress: "bg-[hsl(0,72%,60%)]" },
+    agree: { bar: "hsl(160 84% 39%)", progress: "bg-emerald-600" },
+    disagree: { bar: "hsl(0 72% 51%)", progress: "bg-red-600" },
   };
-  const FALLBACK_COLORS = ["hsl(214 84% 56%)", "hsl(0 72% 60%)"];
+  const FALLBACK_COLORS = ["hsl(160 84% 39%)", "hsl(0 72% 51%)"];
 
   if (isLoading) {
     return (
@@ -289,12 +289,19 @@ export default function AssemblyPublicResultsPage() {
                                 <span className="text-xl font-bold" style={{ color: colors.bar }}>
                                   {result.votes}
                                 </span>
-                                <span className="text-sm font-semibold text-slate-600">
+                                <span
+                                  className="text-sm font-semibold tabular-nums"
+                                  style={{ color: colors.bar }}
+                                >
                                   {result.percentage.toFixed(1)}%
                                 </span>
                               </div>
                             </div>
-                            <Progress value={result.percentage} className="h-3 bg-slate-200" />
+                            <Progress
+                              value={result.percentage}
+                              className="h-3 bg-slate-200"
+                              indicatorClassName={colors.progress}
+                            />
                           </div>
                         );
                       })}

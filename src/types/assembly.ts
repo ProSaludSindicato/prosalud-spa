@@ -88,6 +88,28 @@ export type PaginatedResponse<T> = {
   total: number;
 };
 
+export interface AssemblyDelegatesFileSummary {
+  hasFile: boolean;
+  disk?: string | null;
+}
+
+export interface AssemblyDelegateFileVersion {
+  id: number;
+  storagePath: string;
+  disk: string;
+  originalFilename: string | null;
+  rowCount: number;
+  uploadedBy: { id: number; name: string; email: string } | null;
+  createdAt: string;
+}
+
+export interface AssemblyDelegatesFileInfo {
+  hasFile: boolean;
+  storagePath: string | null;
+  disk: string | null;
+  latestVersion: AssemblyDelegateFileVersion | null;
+}
+
 export interface Assembly {
   id: string;
   name: string;
@@ -95,9 +117,12 @@ export interface Assembly {
   startDate?: string | null;
   endDate?: string | null;
   isActive: boolean;
+  /** false después de desactivar: el API no permite volver a activar esa asamblea. */
+  allowsReactivation?: boolean;
   createdAt: string;
   updatedAt: string;
   questionsCount?: number;
   attendancesCount?: number;
   quorumConfigsCount?: number;
+  delegatesFile?: AssemblyDelegatesFileSummary;
 }

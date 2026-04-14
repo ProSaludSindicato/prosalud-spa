@@ -8,7 +8,20 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import UserProfileDropdown from './UserProfileDropdown';
 import { Toaster } from '@/components/ui/toaster';
-import { getVisibleModules } from '@/config/permissions';
+import { getVisibleModules, type ModuleConfig } from '@/config/permissions';
+
+function pathMatchesModule(pathname: string, item: ModuleConfig): boolean {
+  if (pathname === item.href) {
+    return true;
+  }
+  if (item.relatedPaths?.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return true;
+  }
+  if (pathname.startsWith(`${item.href}/`) && item.href !== '/admin') {
+    return true;
+  }
+  return false;
+}
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -100,11 +113,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className={`flex-1 space-y-1 ${sidebarCollapsed ? 'px-2 py-3' : 'p-4'}`}>
             {navigation.map((item) => {
-              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta,
-              // pero evitando que rutas como /admin/solicitudes-bienestar activen también /admin/solicitudes
-              const isActive =
-                location.pathname === item.href ||
-                (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
+              const isActive = pathMatchesModule(location.pathname, item);
               return (
                 <Link
                   key={item.name}
@@ -178,11 +187,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4">
             {navigation.map((item) => {
-              // Para rutas anidadas, usar startsWith en lugar de igualdad exacta,
-              // pero evitando que rutas como /admin/solicitudes-bienestar activen también /admin/solicitudes
-              const isActive =
-                location.pathname === item.href ||
-                (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
+              const isActive = pathMatchesModule(location.pathname, item);
               return (
                 <Link
                   key={item.name}
@@ -239,10 +244,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <Home className="h-4 w-4" />
               <ChevronRight className="h-4 w-4" />
               <span className="font-medium text-primary-prosalud">
-                {navigation.find(item =>
-                  location.pathname === item.href ||
-                  (location.pathname.startsWith(`${item.href}/`) && item.href !== '/admin')
-                )?.name || 'Dashboard'}
+                {navigation.find((item) => pathMatchesModule(location.pathname, item))?.name || 'Dashboard'}
               </span>
             </div>
 

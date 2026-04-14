@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { StatisticsCards } from "@/components/admin/votaciones/StatisticsCards";
@@ -13,7 +14,7 @@ import { generateVotacionesExcelReport } from "@/components/admin/votaciones/uti
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Vote, BarChart3, Upload, Download, CheckCircle2 } from "lucide-react";
+import { Vote, BarChart3, Upload, Download, CheckCircle2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import type { AuditFilters, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
@@ -66,6 +67,13 @@ const votacionesUploadConfigs: Record<VotacionesUploadType, VotacionesUploadConf
 
 export default function AdminVotacionesPage() {
   const { can } = usePermissions();
+
+  const showBackToAssemblyHub = useMemo(
+    () =>
+      (can("votes.statistics.view") || can("votes.audit.view")) &&
+      (can("assembly.questions.manage") || can("assembly.quorum.manage")),
+    [can]
+  );
   const [auditFilters, setAuditFilters] = useState<Omit<AuditFilters, 'page' | 'per_page'>>({});
   const [statisticsFilters, setStatisticsFilters] = useState<StatisticsFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
@@ -372,11 +380,21 @@ export default function AdminVotacionesPage() {
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
         <div className="space-y-6 p-4 sm:p-6 max-w-7xl mx-auto">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Votaciones Asamblea</h1>
-          <p className="text-muted-foreground">
-            Estadísticas y auditoría del proceso de votación a asamblea general
-          </p>
+        <div className="space-y-2">
+          {showBackToAssemblyHub && (
+            <Button variant="ghost" size="sm" className="-ml-2 h-auto gap-2 px-2 text-slate-600 hover:text-slate-900" asChild>
+              <Link to="/admin/asamblea-general">
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                Asamblea General
+              </Link>
+            </Button>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Votaciones Asamblea</h1>
+            <p className="text-muted-foreground">
+              Estadísticas y auditoría del proceso de votación a asamblea general
+            </p>
+          </div>
         </div>
 
         <Tabs defaultValue={can("votes.statistics.view") ? "statistics" : "audit"} className="space-y-6">

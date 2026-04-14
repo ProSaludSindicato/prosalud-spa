@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -22,12 +23,22 @@ import { useVotingMode } from "@/context/VotingModeContext";
 import { assemblyApi } from "@/services/assemblyApi";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { useAuth } from "@/context/AuthContext";
-import { AssemblyQuestion, QuorumConfig, AttendanceRecord, Assembly } from "@/types/assembly";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  AssemblyQuestion,
+  QuorumConfig,
+  AttendanceRecord,
+  Assembly,
+  type AssemblyDelegateFileVersion,
+  type AssemblyDelegatesFileInfo,
+} from "@/types/assembly";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertCircle,
+  ArrowLeft,
   Clock,
   Download,
+  FileUp,
   Eye,
   EyeOff,
   Loader2,
@@ -41,6 +52,10 @@ import {
   Plus,
   CheckCircle2,
   XCircle,
+  Radio,
+  ClipboardList,
+  Building2,
+  Monitor,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,6 +68,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const STATUS_STYLES: Record<AssemblyQuestion["status"], { label: string; className: string }> = {
   OPEN: { label: "Abierta", className: "bg-emerald-100 text-emerald-700" },
   CLOSED: { label: "Cerrada", className: "bg-slate-200 text-slate-800" },
@@ -67,7 +83,15 @@ const FIXED_OPTIONS = [
 export default function AdminAsambleaLivePage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { can } = usePermissions();
   const { mode, setMode } = useVotingMode();
+
+  const showBackToAssemblyHub = useMemo(
+    () =>
+      (can("votes.statistics.view") || can("votes.audit.view")) &&
+      (can("assembly.questions.manage") || can("assembly.quorum.manage")),
+    [can]
+  );
   const [questions, setQuestions] = useState<AssemblyQuestion[]>([]);
   const [quorum, setQuorum] = useState<QuorumConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,7 +119,8 @@ export default function AdminAsambleaLivePage() {
   });
   const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
   const [isDownloadingReport, setIsDownloadingReport] = useState(false);
-  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  // const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  const showDuplicatesOnly = false; // temporal: desactivado filtro "solo duplicados"
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
@@ -103,6 +128,11 @@ export default function AdminAsambleaLivePage() {
   const [selectedAssemblyForHistory, setSelectedAssemblyForHistory] = useState<Assembly | null>(null);
   const selectedAssemblyRef = useRef<Assembly | null>(null);
   const [isLoadingAssemblies, setIsLoadingAssemblies] = useState(false);
+  const [delegatesFileInfo, setDelegatesFileInfo] = useState<AssemblyDelegatesFileInfo | null>(null);
+  const [delegatesVersions, setDelegatesVersions] = useState<AssemblyDelegateFileVersion[]>([]);
+  const [loadingDelegatesFile, setLoadingDelegatesFile] = useState(false);
+  const [uploadingDelegatesFile, setUploadingDelegatesFile] = useState(false);
+  const delegatesFileInputRef = useRef<HTMLInputElement>(null);
   const [isCreatingAssembly, setIsCreatingAssembly] = useState(false);
   const [isActivatingAssembly, setIsActivatingAssembly] = useState<string | null>(null);
   const [showCreateAssemblyDialog, setShowCreateAssemblyDialog] = useState(false);
@@ -149,6 +179,40 @@ export default function AdminAsambleaLivePage() {
   useEffect(() => {
     selectedAssemblyRef.current = selectedAssemblyForHistory;
   }, [selectedAssemblyForHistory]);
+
+  useEffect(() => {
+    if (!viewingAssembly?.id) {
+      setDelegatesFileInfo(null);
+      setDelegatesVersions([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDelegatesFile(true);
+    void Promise.all([
+      assemblyApi.getDelegatesFileInfo(viewingAssembly.id),
+      assemblyApi.getDelegatesFileVersions(viewingAssembly.id),
+    ])
+      .then(([info, versions]) => {
+        if (!cancelled) {
+          setDelegatesFileInfo(info);
+          setDelegatesVersions(versions);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDelegatesFileInfo(null);
+          setDelegatesVersions([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDelegatesFile(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewingAssembly?.id]);
 
   useEffect(() => {
     void loadAssemblies();
@@ -236,11 +300,60 @@ export default function AdminAsambleaLivePage() {
     }
   };
 
+  const handleDelegatesFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !viewingAssembly) {
+      return;
+    }
+    setUploadingDelegatesFile(true);
+    try {
+      const result = await assemblyApi.uploadDelegatesFile(viewingAssembly.id, file);
+      toast({
+        title: "Lista de delegados actualizada",
+        description: `Se registraron ${result.rowCount} fila(s). Los nuevos delegados pueden autenticarse de inmediato.`,
+        variant: "success",
+      });
+      const [info, versions] = await Promise.all([
+        assemblyApi.getDelegatesFileInfo(viewingAssembly.id),
+        assemblyApi.getDelegatesFileVersions(viewingAssembly.id),
+      ]);
+      setDelegatesFileInfo(info);
+      setDelegatesVersions(versions);
+      void loadAssemblies();
+    } catch (err) {
+      toast({
+        title: "No se pudo subir el archivo",
+        description: err instanceof Error ? err.message : "Intente de nuevo o revise el formato Excel.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDelegatesFile(false);
+    }
+  };
+
+  const handleDownloadDelegatesFile = async (versionId?: number) => {
+    if (!viewingAssembly) {
+      return;
+    }
+    try {
+      await assemblyApi.downloadDelegatesFile(viewingAssembly.id, versionId);
+    } catch {
+      toast({
+        title: "Error al descargar",
+        description: "No se pudo descargar el archivo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleModeToggle = (checked: boolean) => {
     setMode({ type: checked ? "ASSEMBLY" : "CANDIDATE" });
     toast({
-      title: "Modo actualizado",
-      description: `Ahora en modo: ${checked ? "Votación de Asamblea" : "Votación a Candidatos"}`,
+      title: "Tipo de votación actualizado",
+      description: checked
+        ? "Asamblea activa: los votantes usan preguntas de acuerdo o en desacuerdo."
+        : "Modo candidatos: el flujo de votación es para elección de candidatos (no asamblea).",
       variant: "success",
     });
   };
@@ -650,9 +763,18 @@ export default function AdminAsambleaLivePage() {
       setAttendanceLastPage(1);
       setAttendanceTotal(0);
     } catch (error) {
+      const apiMessage =
+        isAxiosError(error) &&
+        error.response?.data &&
+        typeof error.response.data === "object" &&
+        "message" in error.response.data
+          ? String((error.response.data as { message?: string }).message ?? "")
+          : "";
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo desactivar la asamblea",
+        description:
+          apiMessage ||
+          (error instanceof Error ? error.message : "No se pudo desactivar la asamblea"),
         variant: "destructive",
       });
     } finally {
@@ -722,19 +844,65 @@ export default function AdminAsambleaLivePage() {
   return (
     <AdminLayout>
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/images/logo_prosalud.webp" alt="Prosalud" className="h-12" />
-              <div>
-              <p className="text-sm uppercase tracking-wide text-primary">Panel de control</p>
-              <h1 className="text-2xl font-bold text-slate-900">Votación en Asamblea</h1>
-              </div>
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            {showBackToAssemblyHub && (
+              <Button variant="ghost" size="sm" className="-ml-2 h-auto gap-2 px-2 text-slate-600 hover:text-slate-900" asChild>
+                <Link to="/admin/asamblea-general">
+                  <ArrowLeft className="h-4 w-4 shrink-0" />
+                  Asamblea General
+                </Link>
+              </Button>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Votación en Asamblea</h1>
+              <p className="text-muted-foreground">
+                Quórum, votaciones en vivo, asistencia y resultados proyectados
+              </p>
             </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2">
-              <span className="text-sm font-medium text-slate-600">Modo Asamblea</span>
-              <Switch checked={mode.type === "ASSEMBLY"} onCheckedChange={handleModeToggle} />
+          </div>
+          <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex max-w-md flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo de votación</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {mode.type === "ASSEMBLY" ? "Asamblea" : "Candidatos"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className={`hidden text-xs font-medium sm:inline ${mode.type === "ASSEMBLY" ? "text-primary" : "text-slate-400"}`}
+                  >
+                    Asamblea
+                  </span>
+                  <Switch
+                    checked={mode.type === "ASSEMBLY"}
+                    onCheckedChange={handleModeToggle}
+                    aria-label="Alternar entre votación de asamblea y votación de candidatos"
+                  />
+                  <span
+                    className={`hidden text-xs font-medium sm:inline ${mode.type === "CANDIDATE" ? "text-primary" : "text-slate-400"}`}
+                  >
+                    Candidatos
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                {mode.type === "ASSEMBLY" ? (
+                  <>
+                    <span className="font-medium text-slate-800">Encendido:</span> los votantes entran al flujo de
+                    asamblea (de acuerdo / en desacuerdo).{" "}
+                    <span className="font-medium text-slate-800">Apagado:</span> cambia a elección de candidatos.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium text-slate-800">Modo candidatos:</span> la pantalla de votación es para
+                    listas o candidatos, no para preguntas de asamblea. Activa el interruptor para volver a asamblea.
+                  </>
+                )}
+              </p>
             </div>
               <Button
               variant="ghost"
@@ -749,9 +917,7 @@ export default function AdminAsambleaLivePage() {
               </Button>
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">
         {/* Selector Global de Asamblea */}
         {assemblies.length > 0 && (
           <Card className="border-none shadow-lg">
@@ -811,8 +977,9 @@ export default function AdminAsambleaLivePage() {
                       size="sm"
                       onClick={() => setSelectedAssemblyForHistory(null)}
                       className="ml-2 text-amber-700 hover:text-amber-900 hover:bg-amber-100"
+                      aria-label="Dejar de ver el histórico y mostrar la asamblea que está activa ahora"
                     >
-                      Volver a activa
+                      Cambiar a la asamblea activa
                     </Button>
                   </div>
                 )}
@@ -821,186 +988,45 @@ export default function AdminAsambleaLivePage() {
           </Card>
         )}
 
-        {/* Sección de Gestión de Asambleas */}
-        <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-primary">Gestión de Asambleas</p>
-              <h2 className="text-2xl font-semibold text-slate-900">Asambleas</h2>
-              <p className="text-sm text-slate-500">
-                Gestiona las diferentes versiones de asambleas para mantener historial y auditoría
-              </p>
-            </div>
-            <Dialog open={showCreateAssemblyDialog} onOpenChange={setShowCreateAssemblyDialog}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nueva Asamblea
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-white">
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Asamblea</DialogTitle>
-                  <DialogDescription>
-                    Crea una nueva asamblea para separar los datos y mantener el historial.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div>
-                    <Label htmlFor="assemblyName">Nombre de la Asamblea *</Label>
-                    <Input
-                      id="assemblyName"
-                      value={newAssemblyForm.name}
-                      onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, name: e.target.value })}
-                      placeholder="Ej: Asamblea General 2025"
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="assemblyDescription">Descripción</Label>
-                    <Textarea
-                      id="assemblyDescription"
-                      value={newAssemblyForm.description}
-                      onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, description: e.target.value })}
-                      placeholder="Descripción opcional de la asamblea"
-                      className="mt-2"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+        <Tabs defaultValue="live" className="space-y-6">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 p-1 sm:grid-cols-4">
+            <TabsTrigger value="live" className="gap-2">
+              <Radio className="h-4 w-4 shrink-0" />
+              En vivo
+            </TabsTrigger>
+            <TabsTrigger value="questions" className="gap-2">
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              Preguntas
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="gap-2">
+              <Users className="h-4 w-4 shrink-0" />
+              Asistencia
+            </TabsTrigger>
+            <TabsTrigger value="assemblies" className="gap-2">
+              <Building2 className="h-4 w-4 shrink-0" />
+              Asambleas
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="live" className="space-y-6">
+            {isViewingHistory && (
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                     <div>
-                      <Label htmlFor="assemblyStartDate">Fecha de Inicio</Label>
-                      <Input
-                        id="assemblyStartDate"
-                        type="date"
-                        value={newAssemblyForm.startDate}
-                        onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, startDate: e.target.value })}
-                        className="mt-2"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="assemblyEndDate">Fecha de Fin</Label>
-                      <Input
-                        id="assemblyEndDate"
-                        type="date"
-                        value={newAssemblyForm.endDate}
-                        onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, endDate: e.target.value })}
-                        className="mt-2"
-                      />
+                      <p className="text-sm font-semibold text-amber-900">Modo histórico</p>
+                      <p className="text-xs text-amber-800">
+                        Los controles de voto y quórum solo aplican a la asamblea activa. Usa el selector superior para
+                        volver a la asamblea activa o revisa datos en las otras pestañas.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="activateAssembly"
-                      checked={newAssemblyForm.activate}
-                      onCheckedChange={(checked) =>
-                        setNewAssemblyForm({ ...newAssemblyForm, activate: checked === true })
-                      }
-                    />
-                    <Label htmlFor="activateAssembly" className="cursor-pointer">
-                      Activar esta asamblea automáticamente
-                    </Label>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowCreateAssemblyDialog(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleCreateAssembly} disabled={isCreatingAssembly}>
-                    {isCreatingAssembly ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creando...
-                      </>
-                    ) : (
-                      "Crear Asamblea"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <Card className="border-none shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg">Asamblea Activa Actual</CardTitle>
-              <CardDescription>
-                Esta es la asamblea que está recibiendo votos y datos en este momento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingAssemblies ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : currentAssembly ? (
-                <div className="space-y-4">
-                  <div className="rounded-2xl border-2 border-primary bg-primary/5 p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                          <h3 className="text-lg font-semibold text-slate-900">{currentAssembly.name}</h3>
-                          <Badge className="bg-primary text-white">Activa</Badge>
-                        </div>
-                        {currentAssembly.description && (
-                          <p className="text-sm text-slate-600 mb-2">{currentAssembly.description}</p>
-                        )}
-                        <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-                          {currentAssembly.startDate && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              Inicio: {new Date(currentAssembly.startDate).toLocaleDateString("es-CO")}
-                            </span>
-                          )}
-                          {currentAssembly.endDate && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              Fin: {new Date(currentAssembly.endDate).toLocaleDateString("es-CO")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
-                          {currentAssembly.questionsCount !== undefined && (
-                            <span>{currentAssembly.questionsCount} preguntas</span>
-                          )}
-                          {currentAssembly.attendancesCount !== undefined && (
-                            <span>{currentAssembly.attendancesCount} asistencias</span>
-                          )}
-                        </div>
-                      </div>
-                      {canManageAssembly && canManageAssembly.id === currentAssembly.id && (
-                        <div className="ml-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setAssemblyToDeactivate(currentAssembly)}
-                            disabled={isActivatingAssembly === currentAssembly.id}
-                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                          >
-                            Desactivar
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-center">
-                  <AlertCircle className="mx-auto h-8 w-8 text-amber-600 mb-2" />
-                  <p className="font-semibold text-amber-900 mb-1">No hay asamblea activa</p>
-                  <p className="text-sm text-amber-700">
-                    Crea una nueva asamblea para comenzar a recibir votos y datos
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-        </section>
-
-        {!isViewingHistory && (
-          <>
+                </CardContent>
+              </Card>
+            )}
+            {!isViewingHistory && (
+              <>
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="border-none shadow-lg">
                 <CardHeader>
@@ -1209,6 +1235,41 @@ export default function AdminAsambleaLivePage() {
                 <CardDescription>Los delegados están respondiendo “De acuerdo” o “En desacuerdo”.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div
+                  className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                    openQuestion.resultsVisible
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-amber-200 bg-amber-50/80"
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <Monitor
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${openQuestion.resultsVisible ? "text-emerald-700" : "text-amber-700"}`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Pantalla pública:{" "}
+                        {openQuestion.resultsVisible
+                          ? "mostrando resultados"
+                          : "no muestra el conteo aún"}
+                      </p>
+                      <p className="text-xs leading-relaxed text-slate-600">
+                        {openQuestion.resultsVisible
+                          ? "El conteo y las barras se ven en la pantalla proyectada y en /assembly/results."
+                          : "Los votos se registran, pero la audiencia no ve números hasta que publiques."}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    className={`shrink-0 self-start sm:self-center ${
+                      openQuestion.resultsVisible
+                        ? "border-emerald-600/30 bg-emerald-600 text-white hover:bg-emerald-600"
+                        : "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-100"
+                    }`}
+                  >
+                    {openQuestion.resultsVisible ? "Visible al público" : "Oculto al público"}
+                  </Badge>
+                </div>
                 {openQuestion.timeLimit > 0 ? (
                   <div className="space-y-2 rounded-2xl bg-slate-50/80 p-4">
                     <div className="flex items-center justify-between text-sm text-slate-600">
@@ -1252,34 +1313,39 @@ export default function AdminAsambleaLivePage() {
               </div>
                   ))}
               </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <p className="text-xs text-slate-500 sm:mr-auto">
+                    Controla si el conteo se proyecta en la pantalla grande y en la vista web pública.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                variant="outline"
-                    onClick={() => handleToggleResults(openQuestion.id, !openQuestion.resultsVisible)}
-                    disabled={isViewingHistory || !currentAssembly || isToggleResults === openQuestion.id}
-                    className="gap-2"
-                  >
-                    {openQuestion.resultsVisible ? (
-                      <>
-                        <EyeOff className="h-4 w-4" />
-                        Ocultar en pantalla pública
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="h-4 w-4" />
-                        Mostrar en pantalla pública
-                      </>
-                    )}
-              </Button>
-                    <Button
-                    variant="destructive"
-                    onClick={handleCloseQuestion}
-                    disabled={isViewingHistory || !currentAssembly || isClosingQuestion}
-                    className="gap-2"
-                  >
-                    <Square className="h-4 w-4" />
-                    Cerrar votación
+                      variant={openQuestion.resultsVisible ? "outline" : "default"}
+                      onClick={() => handleToggleResults(openQuestion.id, !openQuestion.resultsVisible)}
+                      disabled={isViewingHistory || !currentAssembly || isToggleResults === openQuestion.id}
+                      className="gap-2"
+                    >
+                      {openQuestion.resultsVisible ? (
+                        <>
+                          <EyeOff className="h-4 w-4" />
+                          Dejar de publicar en pantalla
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" />
+                          Publicar resultados en pantalla
+                        </>
+                      )}
                     </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleCloseQuestion}
+                      disabled={isViewingHistory || !currentAssembly || isClosingQuestion}
+                      className="gap-2"
+                    >
+                      <Square className="h-4 w-4" />
+                      Cerrar votación
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1295,8 +1361,10 @@ export default function AdminAsambleaLivePage() {
           )}
             </section>
           </>
-        )}
+            )}
+          </TabsContent>
 
+          <TabsContent value="questions" className="space-y-4">
         <section className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1315,13 +1383,24 @@ export default function AdminAsambleaLivePage() {
               {sortedQuestions.map((question) => (
                 <Card key={question.id} className="border-none bg-white shadow-sm">
                   <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold text-slate-900">Pregunta #{question.order ?? 1}</p>
                         <Badge className={STATUS_STYLES[question.status].className}>
                           {STATUS_STYLES[question.status].label}
                         </Badge>
-                </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            question.resultsVisible
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                              : "border-slate-200 bg-slate-100 text-slate-700"
+                          }
+                        >
+                          <Monitor className="mr-1 inline h-3.5 w-3.5" />
+                          {question.resultsVisible ? "Publicado en pantalla" : "No publicado en pantalla"}
+                        </Badge>
+                      </div>
                       {question.title?.trim() ? (
                         <p className="text-base font-medium text-slate-900">{question.title.trim()}</p>
                       ) : (
@@ -1330,38 +1409,39 @@ export default function AdminAsambleaLivePage() {
                         </p>
                       )}
                       <p className="text-sm text-slate-500">
-                        {question.timeLimit}s · {question.votesCount} votos · Resultados {" "}
-                        {question.resultsVisible ? "visibles" : "ocultos"}
+                        {question.timeLimit}s · {question.votesCount} votos
                       </p>
-              </div>
+                    </div>
                     {question.status === "CLOSED" && (
-              <Button
-                        variant="outline"
-                size="sm"
+                      <Button
+                        variant={question.resultsVisible ? "outline" : "default"}
+                        size="sm"
                         onClick={() => handleToggleResults(question.id, !question.resultsVisible)}
                         disabled={isViewingHistory || !currentAssembly || isToggleResults === question.id}
-                        className="gap-2"
-              >
-                {question.resultsVisible ? (
-                  <>
+                        className="shrink-0 gap-2"
+                      >
+                        {question.resultsVisible ? (
+                          <>
                             <EyeOff className="h-4 w-4" />
-                            Ocultar resultados
-                  </>
-                ) : (
-                  <>
+                            Quitar de pantalla pública
+                          </>
+                        ) : (
+                          <>
                             <Eye className="h-4 w-4" />
-                            Mostrar resultados
-                  </>
-                )}
-              </Button>
-            )}
-      </CardContent>
-    </Card>
+                            Publicar en pantalla pública
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
         </section>
+          </TabsContent>
 
+          <TabsContent value="attendance" className="space-y-4">
         <section className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1445,6 +1525,7 @@ export default function AdminAsambleaLivePage() {
                 </Button>
               </div>
             </CardContent>
+            {/* Temporal: desactivado — "Mostrar solo registros duplicados"; reactivar descomentando estado y bloque
             <CardContent className="border-t pt-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -1465,6 +1546,7 @@ export default function AdminAsambleaLivePage() {
                 </Label>
               </div>
             </CardContent>
+            */}
           </Card>
 
           <Card className="border-none shadow-lg">
@@ -1602,30 +1684,309 @@ export default function AdminAsambleaLivePage() {
             </CardContent>
           </Card>
         </section>
-      </main>
+          </TabsContent>
+
+          <TabsContent value="assemblies" className="space-y-4">
+            <section className="space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-wide text-primary">Gestión de Asambleas</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">Asambleas</h2>
+                  <p className="text-sm text-slate-500">
+                    Gestiona las diferentes versiones de asambleas para mantener historial y auditoría
+                  </p>
+                </div>
+                <Dialog open={showCreateAssemblyDialog} onOpenChange={setShowCreateAssemblyDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Nueva Asamblea
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white">
+                    <DialogHeader>
+                      <DialogTitle>Crear Nueva Asamblea</DialogTitle>
+                      <DialogDescription>
+                        Crea una nueva asamblea para separar los datos y mantener el historial.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <Label htmlFor="assemblyName">Nombre de la Asamblea *</Label>
+                        <Input
+                          id="assemblyName"
+                          value={newAssemblyForm.name}
+                          onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, name: e.target.value })}
+                          placeholder="Ej: Asamblea General 2025"
+                          className="mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="assemblyDescription">Descripción</Label>
+                        <Textarea
+                          id="assemblyDescription"
+                          value={newAssemblyForm.description}
+                          onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, description: e.target.value })}
+                          placeholder="Descripción opcional de la asamblea"
+                          className="mt-2"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="assemblyStartDate">Fecha de Inicio</Label>
+                          <Input
+                            id="assemblyStartDate"
+                            type="date"
+                            value={newAssemblyForm.startDate}
+                            onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, startDate: e.target.value })}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="assemblyEndDate">Fecha de Fin</Label>
+                          <Input
+                            id="assemblyEndDate"
+                            type="date"
+                            value={newAssemblyForm.endDate}
+                            onChange={(e) => setNewAssemblyForm({ ...newAssemblyForm, endDate: e.target.value })}
+                            className="mt-2"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="activateAssembly"
+                          checked={newAssemblyForm.activate}
+                          onCheckedChange={(checked) =>
+                            setNewAssemblyForm({ ...newAssemblyForm, activate: checked === true })
+                          }
+                        />
+                        <Label htmlFor="activateAssembly" className="cursor-pointer">
+                          Activar esta asamblea automáticamente
+                        </Label>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowCreateAssemblyDialog(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleCreateAssembly} disabled={isCreatingAssembly}>
+                        {isCreatingAssembly ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creando...
+                          </>
+                        ) : (
+                          "Crear Asamblea"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <Card className="border-none shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg">Asamblea Activa Actual</CardTitle>
+                  <CardDescription>
+                    Esta es la asamblea que está recibiendo votos y datos en este momento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAssemblies ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : currentAssembly ? (
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border-2 border-primary bg-primary/5 p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="mb-2 flex items-center gap-2">
+                              <CheckCircle2 className="h-5 w-5 text-primary" />
+                              <h3 className="text-lg font-semibold text-slate-900">{currentAssembly.name}</h3>
+                              <Badge className="bg-primary text-white">Activa</Badge>
+                            </div>
+                            {currentAssembly.description && (
+                              <p className="mb-2 text-sm text-slate-600">{currentAssembly.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+                              {currentAssembly.startDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  Inicio: {new Date(currentAssembly.startDate).toLocaleDateString("es-CO")}
+                                </span>
+                              )}
+                              {currentAssembly.endDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  Fin: {new Date(currentAssembly.endDate).toLocaleDateString("es-CO")}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                              {currentAssembly.questionsCount !== undefined && (
+                                <span>{currentAssembly.questionsCount} preguntas</span>
+                              )}
+                              {currentAssembly.attendancesCount !== undefined && (
+                                <span>{currentAssembly.attendancesCount} asistencias</span>
+                              )}
+                            </div>
+                          </div>
+                          {canManageAssembly && canManageAssembly.id === currentAssembly.id && (
+                            <div className="ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAssemblyToDeactivate(currentAssembly)}
+                                disabled={isActivatingAssembly === currentAssembly.id}
+                                className="text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                              >
+                                Desactivar
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-center">
+                      <AlertCircle className="mx-auto mb-2 h-8 w-8 text-amber-600" />
+                      <p className="mb-1 font-semibold text-amber-900">No hay asamblea activa</p>
+                      <p className="text-sm text-amber-700">
+                        Crea una nueva asamblea para comenzar a recibir votos y datos
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {viewingAssembly && (
+                <Card className="border-none shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Lista de delegados (autenticación)</CardTitle>
+                    <CardDescription>
+                      Archivo Excel usado para validar documentos al ingresar. Se aplica a la asamblea seleccionada en el
+                      selector superior ({viewingAssembly.name}).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <input
+                      ref={delegatesFileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                      className="hidden"
+                      onChange={handleDelegatesFileSelected}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => delegatesFileInputRef.current?.click()}
+                        disabled={uploadingDelegatesFile || loadingDelegatesFile || !viewingAssembly}
+                        className="gap-2"
+                      >
+                        {uploadingDelegatesFile ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Subiendo...
+                          </>
+                        ) : (
+                          <>
+                            <FileUp className="h-4 w-4" />
+                            Subir Excel
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void handleDownloadDelegatesFile()}
+                        disabled={!delegatesFileInfo?.hasFile || loadingDelegatesFile}
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Descargar actual
+                      </Button>
+                    </div>
+                    {loadingDelegatesFile ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando información del archivo...
+                      </div>
+                    ) : delegatesFileInfo?.hasFile && delegatesFileInfo.latestVersion ? (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+                        <p className="font-medium text-slate-900">Última versión cargada</p>
+                        <p className="text-slate-600">
+                          {delegatesFileInfo.latestVersion.originalFilename ?? "archivo.xlsx"} ·{" "}
+                          {delegatesFileInfo.latestVersion.rowCount} fila(s) ·{" "}
+                          {new Date(delegatesFileInfo.latestVersion.createdAt).toLocaleString("es-CO")}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">No hay archivo de delegados para esta asamblea.</p>
+                    )}
+                    {delegatesVersions.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Historial de versiones
+                        </p>
+                        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                          {delegatesVersions.map((v) => (
+                            <li
+                              key={v.id}
+                              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                            >
+                              <span className="text-slate-700">
+                                {v.originalFilename ?? "archivo"} · {v.rowCount} filas ·{" "}
+                                {new Date(v.createdAt).toLocaleString("es-CO")}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void handleDownloadDelegatesFile(v.id)}
+                                className="gap-1 shrink-0"
+                              >
+                                <Download className="h-3 w-3" />
+                                Descargar
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </section>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       <AlertDialog open={assemblyToDeactivate !== null} onOpenChange={(open) => !open && setAssemblyToDeactivate(null)}>
         <AlertDialogContent className="bg-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desactivar asamblea?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {assemblyToDeactivate && (
-                <>
-                  Esta acción desactivará la asamblea <strong>{assemblyToDeactivate.name}</strong>.
-                  <br />
-                  <br />
-                  <strong>Esta acción es irreversible.</strong> Una vez desactivada:
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>La asamblea dejará de recibir votos y datos nuevos</li>
-                    <li>No se activará automáticamente otra asamblea</li>
-                    <li>Todos los datos históricos se conservarán para consulta</li>
+            <AlertDialogTitle>Confirmar desactivación de asamblea</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              {assemblyToDeactivate ? (
+                <div className="space-y-3 text-left text-sm text-muted-foreground">
+                  <p>
+                    Vas a desactivar la asamblea <strong className="text-foreground">{assemblyToDeactivate.name}</strong>.
+                  </p>
+                  <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                    <strong className="block text-amber-900">No podrás volver a activar esta asamblea.</strong>
+                    El sistema no permite reactivar una asamblea ya cerrada. Para un nuevo proceso de votación tendrás que
+                    crear una asamblea nueva.
+                  </p>
+                  <p className="font-medium text-foreground">Efectos de la desactivación:</p>
+                  <ul className="list-inside list-disc space-y-1 pl-0.5">
+                    <li>Dejará de recibir votos y datos nuevos de inmediato</li>
+                    <li>No se activará sola otra asamblea</li>
+                    <li>El historial (preguntas, asistencias, etc.) queda guardado solo para consulta</li>
                   </ul>
-                  <br />
-                  Para continuar recibiendo votos, deberás crear y activar una nueva asamblea.
-                  <br />
-                  <br />
-                  ¿Estás seguro de que deseas desactivar esta asamblea?
-                </>
+                  <p>¿Confirmas que deseas desactivar esta asamblea?</p>
+                </div>
+              ) : (
+                <span />
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1635,9 +1996,13 @@ export default function AdminAsambleaLivePage() {
             </AlertDialogCancel>
             {assemblyToDeactivate && (
               <AlertDialogAction
-                onClick={handleDeactivateAssembly}
+                type="button"
                 disabled={isActivatingAssembly === assemblyToDeactivate.id}
                 className="bg-amber-600 hover:bg-amber-700"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleDeactivateAssembly();
+                }}
               >
                 {isActivatingAssembly === assemblyToDeactivate.id ? (
                   <>
@@ -1645,7 +2010,7 @@ export default function AdminAsambleaLivePage() {
                     Desactivando...
                   </>
                 ) : (
-                  "Desactivar"
+                  "Sí, desactivar"
                 )}
               </AlertDialogAction>
             )}

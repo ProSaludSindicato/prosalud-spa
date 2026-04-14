@@ -2,6 +2,8 @@ import type { AxiosRequestConfig } from "axios";
 import api, { authenticatedApi } from "@/services/api";
 import type {
   Assembly,
+  AssemblyDelegateFileVersion,
+  AssemblyDelegatesFileInfo,
   AssemblyQuestion,
   AssemblyStats,
   AssemblyVote,
@@ -90,6 +92,8 @@ type RemoteAssembly = {
   end_date?: string | null;
   isActive?: boolean;
   is_active?: boolean;
+  allowsReactivation?: boolean;
+  allows_reactivation?: boolean;
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
@@ -201,19 +205,54 @@ const normalizeStats = (payload: RemoteStats): AssemblyStats => {
   };
 };
 
-const normalizeAssembly = (payload: RemoteAssembly): Assembly => ({
-  id: payload.id,
-  name: payload.name ?? "",
-  description: payload.description ?? null,
-  startDate: payload.startDate ?? payload.start_date ?? null,
-  endDate: payload.endDate ?? payload.end_date ?? null,
-  isActive: payload.isActive ?? payload.is_active ?? false,
-  createdAt: payload.createdAt ?? payload.created_at ?? new Date().toISOString(),
-  updatedAt: payload.updatedAt ?? payload.updated_at ?? new Date().toISOString(),
-  questionsCount: payload.questionsCount ?? payload.questions_count,
-  attendancesCount: payload.attendancesCount ?? payload.attendances_count,
-  quorumConfigsCount: payload.quorumConfigsCount ?? payload.quorum_configs_count,
-});
+const normalizeAssembly = (payload: RemoteAssembly): Assembly => {
+  const df = payload.delegatesFile ?? payload.delegates_file;
+  const delegatesFile =
+    df && typeof df === "object"
+      ? {
+          hasFile: Boolean((df as { hasFile?: boolean }).hasFile ?? (df as { has_file?: boolean }).has_file),
+          disk: (df as { disk?: string | null }).disk ?? null,
+        }
+      : undefined;
+
+  return {
+    id: payload.id,
+    name: payload.name ?? "",
+    description: payload.description ?? null,
+    startDate: payload.startDate ?? payload.start_date ?? null,
+    endDate: payload.endDate ?? payload.end_date ?? null,
+    isActive: payload.isActive ?? payload.is_active ?? false,
+    allowsReactivation: payload.allowsReactivation ?? payload.allows_reactivation,
+    createdAt: payload.createdAt ?? payload.created_at ?? new Date().toISOString(),
+    updatedAt: payload.updatedAt ?? payload.updated_at ?? new Date().toISOString(),
+    questionsCount: payload.questionsCount ?? payload.questions_count,
+    attendancesCount: payload.attendancesCount ?? payload.attendances_count,
+    quorumConfigsCount: payload.quorumConfigsCount ?? payload.quorum_configs_count,
+    delegatesFile,
+  };
+};
+
+const normalizeDelegateFileVersion = (raw: Record<string, unknown>): AssemblyDelegateFileVersion => {
+  const uploaded = raw.uploadedBy ?? raw.uploaded_by;
+  const uploader =
+    uploaded && typeof uploaded === "object"
+      ? {
+          id: Number((uploaded as { id?: number }).id),
+          name: String((uploaded as { name?: string }).name ?? ""),
+          email: String((uploaded as { email?: string }).email ?? ""),
+        }
+      : null;
+
+  return {
+    id: Number(raw.id),
+    storagePath: String(raw.storagePath ?? raw.storage_path ?? ""),
+    disk: String(raw.disk ?? ""),
+    originalFilename: (raw.originalFilename ?? raw.original_filename) as string | null,
+    rowCount: Number(raw.rowCount ?? raw.row_count ?? 0),
+    uploadedBy: uploader,
+    createdAt: String(raw.createdAt ?? raw.created_at ?? ""),
+  };
+};
 
 const serializeQuestionPayload = (payload: Partial<AssemblyQuestion>) =>
   removeUndefined({
@@ -331,14 +370,6 @@ export const assemblyApi = {
   deactivateAssembly: async (id: string): Promise<Assembly> => {
     const { data } = await authenticatedApi.post<{ success?: boolean; data?: RemoteAssembly; message?: string }>(
       `${PREFIX}/assemblies/${id}/deactivate`,
-    );
-    const assembly = (data as { data?: RemoteAssembly }).data ?? (data as unknown as RemoteAssembly);
-    return normalizeAssembly(assembly as RemoteAssembly);
-  },
-
-  activateAssembly: async (id: string): Promise<Assembly> => {
-    const { data } = await authenticatedApi.post<{ success?: boolean; data?: RemoteAssembly; message?: string }>(
-      `${PREFIX}/assemblies/${id}/activate`,
     );
     const assembly = (data as { data?: RemoteAssembly }).data ?? (data as unknown as RemoteAssembly);
     return normalizeAssembly(assembly as RemoteAssembly);
@@ -533,5 +564,87 @@ export const assemblyApi = {
 
   deleteAttendance: async (id: number): Promise<void> => {
     await authenticatedApi.delete(`${PREFIX}/attendance/${id}`);
+  },
+
+  getDelegatesFileInfo: async (assemblyId: string): Promise<AssemblyDelegatesFileInfo> => {
+    const { data } = await authenticatedApi.get<{
+      success?: boolean;
+      data?: Record<string, unknown>;
+    }>(`${PREFIX}/assemblies/${assemblyId}/delegates-file`);
+    const d = (data as { data?: Record<string, unknown> }).data ?? {};
+    const latestRaw = d.latestVersion ?? d.latest_version;
+    const latest =
+      latestRaw && typeof latestRaw === "object"
+        ? normalizeDelegateFileVersion(latestRaw as Record<string, unknown>)
+        : null;
+
+    return {
+      hasFile: Boolean(d.hasFile ?? d.has_file),
+      storagePath: (d.storagePath ?? d.storage_path) as string | null,
+      disk: (d.disk as string | null) ?? null,
+      latestVersion: latest,
+    };
+  },
+
+  getDelegatesFileVersions: async (assemblyId: string): Promise<AssemblyDelegateFileVersion[]> => {
+    const { data } = await authenticatedApi.get<{
+      success?: boolean;
+      data?: Record<string, unknown>[];
+    }>(`${PREFIX}/assemblies/${assemblyId}/delegates-file/versions`);
+    const rows = (data as { data?: Record<string, unknown>[] }).data ?? [];
+    return rows.map((row) => normalizeDelegateFileVersion(row));
+  },
+
+  uploadDelegatesFile: async (
+    assemblyId: string,
+    file: File,
+  ): Promise<{ rowCount: number; version: AssemblyDelegateFileVersion }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await authenticatedApi.post<{
+      success?: boolean;
+      data?: { rowCount?: number; row_count?: number; version?: Record<string, unknown> };
+    }>(`${PREFIX}/assemblies/${assemblyId}/delegates-file`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const payload = (data as { data?: { rowCount?: number; row_count?: number; version?: Record<string, unknown> } })
+      .data;
+    const versionRaw = payload?.version;
+    if (!versionRaw || typeof versionRaw !== "object") {
+      throw new Error("Respuesta inválida al subir archivo de delegados.");
+    }
+    return {
+      rowCount: Number(payload?.rowCount ?? payload?.row_count ?? 0),
+      version: normalizeDelegateFileVersion(versionRaw as Record<string, unknown>),
+    };
+  },
+
+  downloadDelegatesFile: async (assemblyId: string, versionId?: number): Promise<void> => {
+    const response = await authenticatedApi.get(`${PREFIX}/assemblies/${assemblyId}/delegates-file/download`, {
+      params: versionId !== undefined ? { version: versionId } : {},
+      responseType: "blob",
+      headers: { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    });
+
+    const contentDisposition = response.headers["content-disposition"] as string | undefined;
+    let filename = `delegados-asamblea-${assemblyId}.xlsx`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch?.[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, "");
+      }
+    }
+
+    const blob = new Blob([response.data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 };
