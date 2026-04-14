@@ -27,6 +27,7 @@ import {
   INVENTORY_MEN_PANTS_SIZES,
   INVENTORY_WOMEN_PANTS_SIZES,
 } from '@/types/inventory';
+import { isAxiosError } from 'axios';
 
 type NumericVariantField = 'stock' | 'minStock' | 'maxStock';
 
@@ -455,10 +456,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
       });
 
       if (product) {
-        const variants: ProductVariant[] = data.variants.map((variant, index) => {
-          const existingId = product.variants[index]?.id;
+        const persistedIdByCombo = new Map(
+          (product.variants ?? []).map((v) => [variantKey(v.size, v.colorId), v.id]),
+        );
+
+        const variants: ProductVariant[] = data.variants.map((variant) => {
+          const comboKey = variantKey(variant.size, variant.colorId);
+          const serverVariantId = persistedIdByCombo.get(comboKey);
           return ensureSku({
-            id: variant.id ?? existingId,
+            id: serverVariantId ?? variant.id,
             size: variant.size || undefined,
             colorId: variant.colorId || undefined,
             stock: variant.stock,
@@ -468,7 +474,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
           });
         });
 
-        updateProduct(product.id, {
+        await updateProduct(product.id, {
           name: data.name,
           categoryId: data.categoryId,
           subcategoryId: data.subcategoryId || undefined,
@@ -478,7 +484,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
           variants,
         });
       } else {
-        addProduct({
+        await addProduct({
           name: data.name,
           categoryId: data.categoryId,
           subcategoryId: data.subcategoryId || undefined,
@@ -506,9 +512,21 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onClose }) => {
       
       onClose();
     } catch (error) {
+      let description = 'Hubo un problema al guardar el producto';
+      if (isAxiosError(error) && error.response?.data) {
+        const data = error.response.data as { message?: string; errors?: Record<string, string[]> };
+        if (typeof data.message === 'string' && data.message.trim() !== '') {
+          description = data.message;
+        } else if (data.errors) {
+          const first = Object.values(data.errors).flat()[0];
+          if (typeof first === 'string' && first.trim() !== '') {
+            description = first;
+          }
+        }
+      }
       toast({
         title: 'Error',
-        description: 'Hubo un problema al guardar el producto',
+        description,
         variant: 'destructive',
       });
     } finally {

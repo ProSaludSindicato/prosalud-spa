@@ -18,6 +18,7 @@ import {
   INVENTORY_WOMEN_PANTS_SIZES,
 } from '@/types/inventory';
 import { inventoryApiService } from '@/services/inventoryApiService';
+import { isPersistedInventoryVariantId } from '@/utils/inventoryVariantId';
 import { logger } from '@/utils/logger';
 import { useAuth } from '@/context/AuthContext';
 
@@ -545,7 +546,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           description: payload.description,
           variant_mode: payload.variantMode,
           variants: payload.variants?.map((v) => ({
-            id: v.id,
+            ...(isPersistedInventoryVariantId(v.id) ? { id: v.id } : {}),
             size: v.size,
             color_id: v.colorId,
             stock: v.stock,
