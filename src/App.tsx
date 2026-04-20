@@ -41,6 +41,7 @@ import AdminAsambleaLivePage from '@/pages/AdminAsambleaLivePage';
 import AdminAsambleaGeneralPage from '@/pages/AdminAsambleaGeneralPage';
 import AssemblyDelegatePage from '@/pages/AssemblyDelegatePage';
 import AssemblyPublicResultsPage from '@/pages/AssemblyPublicResultsPage';
+import CandidateVotingPage from '@/pages/CandidateVotingPage';
 
 // Service Pages
 import SolicitudCertificadoConvenioPage from '@/pages/SolicitudCertificadoConvenioPage';
@@ -69,7 +70,6 @@ import AccesoDirectoMovilPage from '@/pages/AccesoDirectoMovilPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
 import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
-import { VotingModeProvider } from '@/context/VotingModeContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,14 +100,8 @@ const AppRoutes = () => {
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/ayuda/acceso-directo-movil" element={<AccesoDirectoMovilPage />} />
 
-            <Route
-              path="/asamblea"
-              element={
-                <VotingModeProvider>
-                  <AssemblyDelegatePage />
-                </VotingModeProvider>
-              }
-            />
+            <Route path="/asamblea" element={<AssemblyDelegatePage />} />
+            <Route path="/votacion-delegados" element={<CandidateVotingPage />} />
             <Route path="/asamblea/resultados" element={<AssemblyPublicResultsPage />} />
             <Route path="/assembly/results" element={<Navigate to="/asamblea/resultados" replace />} />
 
@@ -278,9 +272,7 @@ const AppRoutes = () => {
               path="/admin/asamblea-en-vivo"
               element={
                 <ProtectedRoute requiredPermissions={['assembly.questions.manage', 'assembly.quorum.manage']}>
-                  <VotingModeProvider>
-                    <AdminAsambleaLivePage />
-                  </VotingModeProvider>
+                  <AdminAsambleaLivePage />
                 </ProtectedRoute>
               }
             />

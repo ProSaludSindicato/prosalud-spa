@@ -4,15 +4,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter, X } from "lucide-react";
-import type { StatisticsFilters } from "@/types/votaciones";
+import type { CandidateVotingPeriod, StatisticsFilters } from "@/types/votaciones";
 
 interface StatisticsFiltersProps {
   onFilterChange: (filters: StatisticsFilters) => void;
   currentFilters?: StatisticsFilters;
   isLoading?: boolean;
+  periods?: CandidateVotingPeriod[];
 }
 
-export function StatisticsFiltersComponent({ onFilterChange, currentFilters, isLoading }: StatisticsFiltersProps) {
+export function StatisticsFiltersComponent({ onFilterChange, currentFilters, isLoading, periods = [] }: StatisticsFiltersProps) {
   const [filters, setFilters] = useState<StatisticsFilters>(currentFilters || {});
 
   // Sincronizar filtros locales con los filtros actuales desde el padre
@@ -49,6 +50,28 @@ export function StatisticsFiltersComponent({ onFilterChange, currentFilters, isL
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="statistics_candidate_election_key">Periodo</Label>
+            <Select
+              value={filters.candidate_election_key ? filters.candidate_election_key : 'active'}
+              onValueChange={(value) =>
+                handleFilterChange('candidate_election_key', value === 'active' ? '' : value)
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger id="statistics_candidate_election_key">
+                <SelectValue placeholder="Periodo activo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Periodo activo</SelectItem>
+                {periods.map((period) => (
+                  <SelectItem key={period.id} value={period.election_key}>
+                    {period.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="statistics_hospital">Hospital</Label>
             <Select

@@ -1,21 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter, X } from "lucide-react";
-import type { AuditFilters } from "@/types/votaciones";
+import type { AuditFilters, CandidateVotingPeriod } from "@/types/votaciones";
 
 type FiltersWithoutPagination = Omit<AuditFilters, 'page' | 'per_page'>;
 
 interface AuditFiltersProps {
   onFilterChange: (filters: FiltersWithoutPagination) => void;
+  currentFilters?: FiltersWithoutPagination;
   isLoading?: boolean;
+  periods?: CandidateVotingPeriod[];
 }
 
-export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFiltersProps) {
-  const [filters, setFilters] = useState<FiltersWithoutPagination>({});
+export function AuditFiltersComponent({ onFilterChange, currentFilters, isLoading, periods = [] }: AuditFiltersProps) {
+  const [filters, setFilters] = useState<FiltersWithoutPagination>(currentFilters ?? {});
+
+  useEffect(() => {
+    if (currentFilters) {
+      setFilters(currentFilters);
+    }
+  }, [currentFilters]);
 
   const handleFilterChange = (key: keyof FiltersWithoutPagination, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value || undefined }));
@@ -42,6 +50,26 @@ export function AuditFiltersComponent({ onFilterChange, isLoading }: AuditFilter
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="candidate_election_key">Periodo</Label>
+            <Select
+              value={filters.candidate_election_key || 'active'}
+              onValueChange={(value) => handleFilterChange('candidate_election_key', value === 'active' ? '' : value)}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="candidate_election_key">
+                <SelectValue placeholder="Periodo activo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Periodo activo</SelectItem>
+                {periods.map((period) => (
+                  <SelectItem key={period.id} value={period.election_key}>
+                    {period.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="start_date">Fecha Inicio</Label>
             <Input

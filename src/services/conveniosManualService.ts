@@ -30,6 +30,14 @@ export interface SendBulkEmailsResponse {
 /**
  * Tracking de correo manual
  */
+export type ConvenioSigningEstado =
+  | 'pendiente_firma'
+  | 'firmado_afiliado'
+  | 'firmando_presidente'
+  | 'error_firma_presidente'
+  | 'completado'
+  | 'rechazado';
+
 export interface ConvenioEmailTracking {
   id: number;
   documento: string;
@@ -44,6 +52,23 @@ export interface ConvenioEmailTracking {
   intentos: number;
   created_at: string;
   updated_at: string;
+  parent_tracking_id?: number | null;
+  signing_token_hash?: string | null;
+  token_expires_at?: string | null;
+  signing_estado?: ConvenioSigningEstado | null;
+  pdf_original_path?: string | null;
+  pdf_firmado_afiliado_path?: string | null;
+  pdf_final_path?: string | null;
+  firmado_afiliado_at?: string | null;
+  firmado_presidente_at?: string | null;
+  rechazado_at?: string | null;
+  motivo_rechazo?: string | null;
+  sede?: string | null;
+  president_sign_attempts?: number;
+  president_sign_last_error?: string | null;
+  president_sign_detection_method?: string | null;
+  president_sign_queued_at?: string | null;
+  president_sign_duration_ms?: number | null;
 }
 
 /**
@@ -51,6 +76,8 @@ export interface ConvenioEmailTracking {
  */
 export interface EmailHistoryResponse {
   success: true;
+  digital_signing_enabled: boolean;
+  auto_sign_enabled: boolean;
   data: {
     current_page: number;
     data: ConvenioEmailTracking[];
@@ -72,13 +99,26 @@ export interface EmailHistoryResponse {
   };
 }
 
+/** Filtro unificado: correo (pendiente/enviado/fallido) o etapa de firma digital. */
+export type EmailHistoryEstadoFiltro =
+  | 'todos'
+  | 'pendiente'
+  | 'enviado'
+  | 'fallido'
+  | 'firma_pendiente_firma'
+  | 'firma_firmado_afiliado'
+  | 'firma_completado'
+  | 'firma_error_presidente';
+
 /**
  * Parámetros para filtrar el historial
  */
 export interface EmailHistoryParams {
-  documento?: string;
-  estado?: 'pendiente' | 'enviado' | 'fallido';
-  nombre_convenio?: string;
+  /** Búsqueda en documento o nombre de convenio (coincidencia parcial). */
+  q?: string;
+  estado_filtro?: EmailHistoryEstadoFiltro;
+  /** Coincidencia parcial en sede o nombre de convenio. */
+  sede?: string;
   fecha_desde?: string; // YYYY-MM-DD
   fecha_hasta?: string; // YYYY-MM-DD
   per_page?: number;
@@ -130,6 +170,8 @@ export interface StatisticsParams {
 export interface StatisticsResponse {
   success: true;
   data: {
+    digital_signing_enabled: boolean;
+    auto_sign_enabled: boolean;
     total: number;
     by_status: {
       pendiente: number;
@@ -140,6 +182,29 @@ export interface StatisticsResponse {
     pending: number;
     sent: number;
     failed: number;
+    signing?: {
+      pendiente_firma: number;
+      firmado_afiliado: number;
+      firmando_presidente: number;
+      error_firma_presidente: number;
+      completado: number;
+      rechazado: number;
+    } | null;
+    signing_derived?: {
+      pendientes_firma: number;
+      firmados_afiliado_o_finalizados: number;
+      por_firmar_presidente: number;
+      firmando_presidente: number;
+      error_firma_presidente: number;
+    } | null;
+    by_sede?: Array<{
+      sede: string;
+      total: number;
+      pendiente_firma?: number;
+      firmado_afiliado?: number;
+      completado?: number;
+      rechazado?: number;
+    }>;
   };
 }
 
@@ -205,14 +270,14 @@ export const getEmailHistory = async (
   try {
     const queryParams = new URLSearchParams();
     
-    if (params?.documento) {
-      queryParams.append('documento', params.documento);
+    if (params?.q?.trim()) {
+      queryParams.append('q', params.q.trim());
     }
-    if (params?.estado) {
-      queryParams.append('estado', params.estado);
+    if (params?.estado_filtro && params.estado_filtro !== 'todos') {
+      queryParams.append('estado_filtro', params.estado_filtro);
     }
-    if (params?.nombre_convenio) {
-      queryParams.append('nombre_convenio', params.nombre_convenio);
+    if (params?.sede) {
+      queryParams.append('sede', params.sede);
     }
     if (params?.fecha_desde) {
       queryParams.append('fecha_desde', params.fecha_desde);
@@ -671,6 +736,151 @@ export const importBulkConvenios = async (
       success: false,
       message: 'Error desconocido al importar convenios',
       errors: {},
+    };
+  }
+};
+
+/** Descarga el PDF original generado o copiado para el envío (antes de firma del afiliado). */
+export const downloadConvenioOriginalPdf = async (
+  trackingId: number,
+  documento: string,
+): Promise<void> => {
+  try {
+    const response = await authenticatedApi.get<Blob>(
+      `/api/convenios-manual/tracking/${trackingId}/download-original`,
+      { responseType: 'blob' },
+    );
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Convenio_${documento}_original.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      let message = 'No se pudo descargar el PDF original';
+      if (axiosError.response?.data) {
+        const data = axiosError.response.data;
+        if (typeof data === 'string') {
+          try {
+            const parsed = JSON.parse(data) as { message?: string };
+            message = parsed.message ?? message;
+          } catch {
+            message = data;
+          }
+        } else if (typeof data === 'object' && data !== null && 'message' in data) {
+          message = (data as { message: string }).message;
+        }
+      }
+      throw {
+        success: false,
+        message,
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al descargar el PDF original',
+    };
+  }
+};
+
+/** Encola la firma presidencial de un convenio individual. */
+export const signAsPresident = async (trackingId: number): Promise<void> => {
+  try {
+    await authenticatedApi.post(
+      `/api/convenios-manual/tracking/${trackingId}/president-sign`,
+    );
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string; success?: boolean }>;
+      throw {
+        success: false,
+        message:
+          axiosError.response?.data?.message ||
+          'No se pudo enviar el convenio a firma presidencial',
+      };
+    }
+    throw {
+      success: false,
+      message: 'Error desconocido al enviar a firma presidencial',
+    };
+  }
+};
+
+/** Encola la firma presidencial de varios convenios (bulk). */
+export interface BulkPresidentSignResponse {
+  success: boolean;
+  accepted: number;
+  rejected: Array<{ tracking_id: number; reason: string }>;
+}
+
+export const signAsPresidentBulk = async (
+  trackingIds: number[],
+): Promise<BulkPresidentSignResponse> => {
+  try {
+    const response = await authenticatedApi.post<BulkPresidentSignResponse>(
+      '/api/convenios-manual/tracking/president-sign-bulk',
+      { tracking_ids: trackingIds },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw {
+        success: false,
+        message:
+          axiosError.response?.data?.message ||
+          'No se pudo enviar los convenios a firma presidencial',
+      };
+    }
+    throw {
+      success: false,
+      message: 'Error desconocido al enviar a firma presidencial masiva',
+    };
+  }
+};
+
+/** Descarga el PDF firmado por el afiliado (o PDF final histórico si el estado es completado). */
+export const downloadConvenioFinalPdf = async (
+  trackingId: number,
+  documento: string,
+  signingEstado: ConvenioSigningEstado | null | undefined,
+): Promise<void> => {
+  try {
+    const response = await authenticatedApi.get<Blob>(
+      `/api/convenios-manual/tracking/${trackingId}/download-final`,
+      { responseType: 'blob' },
+    );
+
+    const suffix =
+      signingEstado === 'completado' ? 'final' : 'firmado_afiliado';
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Convenio_${documento}_${suffix}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'No se pudo descargar el convenio firmado',
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al descargar el convenio firmado',
     };
   }
 };

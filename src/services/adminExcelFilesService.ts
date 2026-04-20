@@ -17,6 +17,7 @@ export interface AdminExcelUploadResponse {
   error_code?: string;
   backup_path?: string;
   rows_count?: number;
+  stored_photos_count?: number;
 }
 
 export interface AdminExcelFileInfo {
@@ -99,6 +100,27 @@ export const adminExcelFilesService = {
     // The interceptor will remove Content-Type for FormData, allowing axios to set it automatically with boundary
     const response = await authenticatedApi.post<AdminExcelUploadResponse>(
       buildAdminApiUrl(config.endpoint),
+      formData
+    );
+
+    return response.data;
+  },
+
+  async uploadDelegadosPhotosZip(file: File): Promise<AdminExcelUploadResponse> {
+    if (!file || !(file instanceof File)) {
+      throw new Error('El archivo proporcionado no es válido');
+    }
+
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.zip')) {
+      throw new Error('El archivo debe ser un ZIP (.zip)');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+
+    const response = await authenticatedApi.post<AdminExcelUploadResponse>(
+      buildAdminApiUrl('/api/delegados-file/photos/upload'),
       formData
     );
 

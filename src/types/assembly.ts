@@ -56,10 +56,6 @@ export interface AssemblyStats {
   majorityType: MajorityType;
 }
 
-export interface VotingMode {
-  type: "CANDIDATE" | "ASSEMBLY";
-}
-
 export const LIVE_VOTE_OPTIONS = [
   { id: "agree", text: "De acuerdo" },
   { id: "disagree", text: "En desacuerdo" },

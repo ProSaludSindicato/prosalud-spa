@@ -3,7 +3,6 @@ import { isAxiosError } from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +18,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useVotingMode } from "@/context/VotingModeContext";
 import { assemblyApi } from "@/services/assemblyApi";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { useAuth } from "@/context/AuthContext";
@@ -84,8 +82,6 @@ export default function AdminAsambleaLivePage() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { can } = usePermissions();
-  const { mode, setMode } = useVotingMode();
-
   const showBackToAssemblyHub = useMemo(
     () =>
       (can("votes.statistics.view") || can("votes.audit.view")) &&
@@ -345,17 +341,6 @@ export default function AdminAsambleaLivePage() {
         variant: "destructive",
       });
     }
-  };
-
-  const handleModeToggle = (checked: boolean) => {
-    setMode({ type: checked ? "ASSEMBLY" : "CANDIDATE" });
-    toast({
-      title: "Tipo de votación actualizado",
-      description: checked
-        ? "Asamblea activa: los votantes usan preguntas de acuerdo o en desacuerdo."
-        : "Modo candidatos: el flujo de votación es para elección de candidatos (no asamblea).",
-      variant: "success",
-    });
   };
 
   const parseNumericInput = (value: string, fallback = 0) => {
@@ -863,47 +848,6 @@ export default function AdminAsambleaLivePage() {
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex max-w-md flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo de votación</p>
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {mode.type === "ASSEMBLY" ? "Asamblea" : "Candidatos"}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span
-                    className={`hidden text-xs font-medium sm:inline ${mode.type === "ASSEMBLY" ? "text-primary" : "text-slate-400"}`}
-                  >
-                    Asamblea
-                  </span>
-                  <Switch
-                    checked={mode.type === "ASSEMBLY"}
-                    onCheckedChange={handleModeToggle}
-                    aria-label="Alternar entre votación de asamblea y votación de candidatos"
-                  />
-                  <span
-                    className={`hidden text-xs font-medium sm:inline ${mode.type === "CANDIDATE" ? "text-primary" : "text-slate-400"}`}
-                  >
-                    Candidatos
-                  </span>
-                </div>
-              </div>
-              <p className="text-xs leading-relaxed text-slate-600">
-                {mode.type === "ASSEMBLY" ? (
-                  <>
-                    <span className="font-medium text-slate-800">Encendido:</span> los votantes entran al flujo de
-                    asamblea (de acuerdo / en desacuerdo).{" "}
-                    <span className="font-medium text-slate-800">Apagado:</span> cambia a elección de candidatos.
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium text-slate-800">Modo candidatos:</span> la pantalla de votación es para
-                    listas o candidatos, no para preguntas de asamblea. Activa el interruptor para volver a asamblea.
-                  </>
-                )}
-              </p>
-            </div>
               <Button
               variant="ghost"
               onClick={() => {

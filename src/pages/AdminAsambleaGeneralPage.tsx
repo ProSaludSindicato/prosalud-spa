@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ArrowRight, BarChart3, Radio } from "lucide-react";
+import { VotingModeToggle } from "@/components/admin/voting/VotingModeToggle";
 
 export default function AdminAsambleaGeneralPage() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function AdminAsambleaGeneralPage() {
     () => can("assembly.questions.manage") || can("assembly.quorum.manage"),
     [can]
   );
+  const canManageVotingMode = useMemo(() => can("voting.mode.manage"), [can]);
 
   useEffect(() => {
     if (canDelegatesVoting && !canLiveAssembly) {
@@ -60,6 +62,23 @@ export default function AdminAsambleaGeneralPage() {
             Herramientas administrativas para la asamblea general: elige el área según lo que necesites gestionar.
           </p>
         </div>
+
+        {canManageVotingMode && (
+          <Card className="border-none shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-xl">Habilitar votaciones públicas</CardTitle>
+              <CardDescription>
+                Controla desde aquí qué flujo público está habilitado. Solo un modo puede estar activo al mismo tiempo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <VotingModeToggle mode="candidate" />
+                <VotingModeToggle mode="assembly" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-none shadow-lg transition-shadow hover:shadow-xl">

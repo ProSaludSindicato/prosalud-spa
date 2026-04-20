@@ -13,7 +13,8 @@ export interface Candidate {
   name: string;
   photo: string;
   position: string;
-  hospital: Hospital;
+  /** Sede / hospital from backend (delegados file). */
+  hospital: string;
   description?: string;
 }
 

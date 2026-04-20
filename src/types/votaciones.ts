@@ -26,6 +26,8 @@ export interface VotesByDate {
 export interface StatisticsResponse {
   success: boolean;
   statistics: VoteStatistics;
+  selected_candidate_election_key?: string | null;
+  active_candidate_election_key?: string | null;
 }
 
 export interface Voter {
@@ -39,6 +41,13 @@ export interface Voter {
 export interface Vote {
   vote_id: number;
   voter: Voter;
+  candidate?: {
+    id: string;
+    name: string;
+    position: string;
+    hospital: string;
+  };
+  candidate_election_key?: string | null;
   vote_timestamp: string;
   ip_address: string;
   user_agent: string;
@@ -66,10 +75,13 @@ export interface AuditTrailResponse {
   pagination: AuditPagination;
   summary_statistics: SummaryStatistics;
   votes: Vote[];
+  selected_candidate_election_key?: string | null;
+  active_candidate_election_key?: string | null;
 }
 
 export interface StatisticsFilters {
   candidate_id?: string;
+  candidate_election_key?: string;
   hospital?: string;
   start_date?: string;
   end_date?: string;
@@ -80,4 +92,16 @@ export interface AuditFilters extends StatisticsFilters {
   voter_document_number?: string;
   page?: number;
   per_page?: number;
+}
+
+export interface CandidateVotingPeriod {
+  id: number;
+  election_key: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface CandidateVotingPeriodsResponse {
+  success: boolean;
+  data: CandidateVotingPeriod[];
 }
