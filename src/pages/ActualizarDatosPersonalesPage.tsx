@@ -423,7 +423,7 @@ const createFormSchema = (initialValues: {
   const relacionContactoEmergenciaVacio = !initialValues.relacionContactoEmergencia || initialValues.relacionContactoEmergencia.trim() === '';
   const telefonoContactoEmergenciaVacio = !initialValues.telefonoContactoEmergencia || initialValues.telefonoContactoEmergencia.trim() === '';
 
-  return z.object({
+  const baseSchema = z.object({
     // Datos personales
     // Estado Civil: requerido si está vacío en los datos iniciales
     estadoCivil: estadoCivilVacio
@@ -465,7 +465,7 @@ const createFormSchema = (initialValues: {
     tallaCalzado: tallaCalzadoVacio
       ? z.string().min(1, 'La talla de calzado es requerida').max(10, 'La talla de calzado no puede exceder 10 caracteres')
       : z.string().max(10, 'La talla de calzado no puede exceder 10 caracteres').optional(),
-  
+
     // Contacto de emergencia: requerido si está vacío en los datos iniciales
     nombreContactoEmergencia: nombreContactoEmergenciaVacio
       ? z.string().min(1, 'El nombre del contacto de emergencia es requerido').max(255, 'El nombre del contacto de emergencia no puede exceder 255 caracteres')
@@ -476,44 +476,69 @@ const createFormSchema = (initialValues: {
     telefonoContactoEmergencia: telefonoContactoEmergenciaVacio
       ? z.string().min(1, 'El teléfono del contacto de emergencia es requerido').max(20, 'El teléfono del contacto de emergencia no puede exceder 20 caracteres')
       : z.string().max(20, 'El teléfono del contacto de emergencia no puede exceder 20 caracteres').optional(),
-  
-  // Nivel educativo (opcional - solo si se quiere actualizar)
-  nivelEducativo: z.string().max(50, 'El nivel educativo no puede exceder 50 caracteres').optional(),
-  diplomaEducativo: z.any()
-    .optional()
-    .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  actaGrado: z.any()
-    .optional()
-    .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  
-  // Información bancaria (opcional - solo si se quiere actualizar)
-  numeroCuenta: z.string().max(255, 'El numero de cuenta no puede exceder 255 caracteres').optional(),
-  tipoCuenta: z.string().max(20, 'El tipo de cuenta no puede exceder 20 caracteres').optional(),
-  banco: z.string().max(50, 'El banco no puede exceder 50 caracteres').optional(),
-  certificacionBancaria: z.any()
-    .optional()
-    .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  
-  // EPS y AFP (opcionales - solo si se quiere actualizar)
-  eps: z.string().max(50, 'La EPS no puede exceder 50 caracteres').optional(),
-  certificadoEps: z.any()
-    .optional()
-    .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  afp: z.string().max(50, 'La AFP no puede exceder 50 caracteres').optional(),
-  certificadoAfp: z.any()
-    .optional()
-    .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
-    .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
-  
-    // Beneficiarios nuevos (opcionales)
-    beneficiariosNuevos: z.array(beneficiarioSchema).optional().default([]),
-    // Beneficiarios actuales editables (opcionales)
-    beneficiariosActuales: z.array(beneficiarioSchema).optional().default([]),
-  });
+
+    // Nivel educativo (opcional - solo si se quiere actualizar)
+    nivelEducativo: z.string().max(50, 'El nivel educativo no puede exceder 50 caracteres').optional(),
+    diplomaEducativo: z.any()
+      .optional()
+      .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
+      .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
+    actaGrado: z.any()
+      .optional()
+      .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
+      .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
+
+    // Información bancaria (opcional - solo si se quiere actualizar)
+    numeroCuenta: z.string().max(255, 'El numero de cuenta no puede exceder 255 caracteres').optional(),
+    tipoCuenta: z.string().max(20, 'El tipo de cuenta no puede exceder 20 caracteres').optional(),
+    banco: z.string().max(50, 'El banco no puede exceder 50 caracteres').optional(),
+    certificacionBancaria: z.any()
+      .optional()
+      .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
+      .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
+
+    // EPS y AFP (opcionales - solo si se quiere actualizar)
+    eps: z.string().max(50, 'La EPS no puede exceder 50 caracteres').optional(),
+    certificadoEps: z.any()
+      .optional()
+      .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
+      .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
+    afp: z.string().max(50, 'La AFP no puede exceder 50 caracteres').optional(),
+    certificadoAfp: z.any()
+      .optional()
+      .refine(files => !files || files.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `El archivo no debe exceder los ${MAX_FILE_SIZE / (1024*1024)}MB.`)
+      .refine(files => !files || files.length === 0 || ALLOWED_FILE_TYPES_CERTIFICADO.includes(files?.[0]?.type), 'Se permiten archivos PDF, Word o imágenes (JPG, PNG).'),
+
+      // Beneficiarios nuevos (opcionales)
+      beneficiariosNuevos: z.array(beneficiarioSchema).optional().default([]),
+      // Beneficiarios actuales editables (opcionales)
+      beneficiariosActuales: z.array(beneficiarioSchema).optional().default([]),
+    });
+
+  // Aplicar validación interdependiente para los campos de contacto de emergencia
+  // Los tres campos deben completarse todos o ninguno
+  return baseSchema.refine(
+    (data) => {
+      const nombre = (data.nombreContactoEmergencia || '').trim();
+      const relacion = (data.relacionContactoEmergencia || '').trim();
+      const telefono = (data.telefonoContactoEmergencia || '').trim();
+
+      // Contar cuántos campos tienen valor
+      const fieldsWithValue = [nombre, relacion, telefono].filter(f => f !== '').length;
+
+      // Validación: o los tres tienen valor, o ninguno
+      if (fieldsWithValue === 0 || fieldsWithValue === 3) {
+        return true;
+      }
+
+      // Si algunos pero no todos tienen valor, es inválido
+      return false;
+    },
+    {
+      message: 'Debe completar todos los datos del contacto de emergencia (nombre, parentesco y celular) o dejar todos en blanco.',
+      path: ['nombreContactoEmergencia'], // Mostrar el error en el primer campo
+    }
+  );
 };
 
 // Schema por defecto (se actualizará dinámicamente)

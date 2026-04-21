@@ -224,6 +224,8 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
 const MAX_COMPRESSED_FILE_SIZE = 20 * 1024 * 1024; // 20MB en bytes para archivos comprimidos
 const MAX_FILES = 4;
+/** Debe coincidir con validación Zod / API (RespondToRequestRequest actividades.* max:1200) */
+const MAX_ACTIVIDAD_CERTIFICADO_CHARS = 1200;
 
 // Tipos MIME de archivos comprimidos
 const COMPRESSED_FILE_TYPES = [
@@ -277,7 +279,7 @@ const responseFormSchema = z.object({
   emailBody: z.string().max(5000, "El cuerpo no puede exceder 5000 caracteres").optional(),
   rejection_reason: z.enum(['anexos_no_validos', 'compensacion_pignorada_libranza', 'formato_archivos', 'no_aplica_otros_certificado', 'no_cumple_causales_retiro', 'no_vb_coordinadora', 'retiro_sindical', 'sin_capacidad_endeudamiento', 'sin_evidencias', 'sin_tiempo_provisionado', 'solicitud_repetida', 'otros']).optional(),
   rejection_reason_otros: z.string().max(200, "La razón personalizada no puede exceder 200 caracteres").optional(),
-  actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(500, "La actividad no puede exceder 500 caracteres")).optional(),
+  actividades: z.array(z.string().trim().min(1, "La actividad no puede estar vacía").max(MAX_ACTIVIDAD_CERTIFICADO_CHARS, `La actividad no puede exceder ${MAX_ACTIVIDAD_CERTIFICADO_CHARS} caracteres`)).optional(),
   attachments: z.any().optional().refine((files) => {
     if (!files || files.length === 0) return true;
     
@@ -1896,27 +1898,35 @@ const AdminSolicitudesPage: React.FC = () => {
         const originalData = (error as any).originalData;
         if (originalData?.errors) {
           const fieldErrors = originalData.errors;
-          
+          const actividadesServerMessages: string[] = [];
+
           // Establecer errores en los campos del formulario
           Object.entries(fieldErrors).forEach(([field, messages]) => {
             const messageArray = Array.isArray(messages) ? messages : [messages];
-            const firstMessage = messageArray[0] || '';
-            
+            const normalized = messageArray.filter(
+              (m): m is string => typeof m === "string" && m.trim() !== ""
+            );
+            const firstMessage = normalized[0] ?? "";
+
             // Mapear campos del backend a campos del formulario
-            if (field === 'attachments' || field === 'files') {
-              responseForm.setError('attachments', { 
-                type: 'server', 
-                message: firstMessage 
+            if (field === "attachments" || field === "files") {
+              responseForm.setError("attachments", {
+                type: "server",
+                message: firstMessage || "Error en los archivos adjuntos.",
               });
               hasFieldErrors = true;
-            } else if (field === 'actividades') {
-              responseForm.setError('actividades', { 
-                type: 'server', 
-                message: firstMessage 
-              });
-              hasFieldErrors = true;
+            } else if (field === "actividades" || /^actividades\.\d+$/.test(field)) {
+              normalized.forEach((m) => actividadesServerMessages.push(m));
             }
           });
+
+          if (actividadesServerMessages.length > 0) {
+            responseForm.setError("actividades", {
+              type: "server",
+              message: actividadesServerMessages.join(" "),
+            });
+            hasFieldErrors = true;
+          }
           
           // Construir mensaje de error más detallado
           const errorMessages = Object.entries(fieldErrors)
@@ -5954,13 +5964,29 @@ const AdminSolicitudesPage: React.FC = () => {
                               });
                               return;
                             }
+
+                            let truncadas = 0;
+                            const actividadesRecortadas = actividadesParseadas.map((texto) => {
+                              if (texto.length > MAX_ACTIVIDAD_CERTIFICADO_CHARS) {
+                                truncadas += 1;
+                                return texto.slice(0, MAX_ACTIVIDAD_CERTIFICADO_CHARS);
+                              }
+                              return texto;
+                            });
                             
                             // Agregar las actividades parseadas a las existentes
-                            const nuevasActividades = [...actividades, ...actividadesParseadas];
+                            const nuevasActividades = [...actividades, ...actividadesRecortadas];
                             field.onChange(nuevasActividades);
+
+                            if (truncadas > 0) {
+                              toast.warning("Texto recortado", {
+                                description: `${truncadas} actividad(es) superaban ${MAX_ACTIVIDAD_CERTIFICADO_CHARS} caracteres y se ajustaron al límite del certificado.`,
+                                duration: 6000,
+                              });
+                            }
                             
                             toast.success("Actividades agregadas", {
-                              description: `Se agregaron ${actividadesParseadas.length} actividad(es) exitosamente.`,
+                              description: `Se agregaron ${actividadesRecortadas.length} actividad(es) exitosamente.`,
                               duration: 3000,
                             });
                             
@@ -6007,7 +6033,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                           value={actividad}
                                           onChange={(e) => actualizarActividad(index, e.target.value)}
                                           placeholder={`Actividad ${index + 1}`}
-                                          maxLength={500}
+                                          maxLength={MAX_ACTIVIDAD_CERTIFICADO_CHARS}
                                           className="w-full min-h-[90px] resize-y"
                                           rows={3}
                                         />
