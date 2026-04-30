@@ -46,6 +46,9 @@ export const API_CONFIG = {
     ENCUESTA_VACUNACION_EXPORT_DOWNLOAD: '/api/encuesta-vacunacion/export/download',
     // Wellness Delivery Requests endpoints
     WELLNESS_DELIVERY_REQUESTS: '/api/wellness-delivery-requests',
+    // Dynamic Surveys (Módulo de Encuestas Dinámicas)
+    SURVEYS: '/api/surveys',
+    SURVEYS_FILTER_OPTIONS: '/api/surveys/filter-options',
   },
 } as const;
 

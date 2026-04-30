@@ -203,6 +203,21 @@ export const MODULES_CONFIG: Record<string, ModuleConfig> = {
       },
     },
   },
+  dynamicSurveys: {
+    name: 'Encuestas Dinámicas',
+    href: '/admin/encuestas',
+    icon: ClipboardList,
+    permissions: {
+      view: ['surveys.view'],
+      create: ['surveys.manage'],
+      edit: ['surveys.manage'],
+      delete: ['surveys.manage'],
+      custom: {
+        export: ['surveys.export'],
+      },
+    },
+    relatedPaths: ['/admin/encuestas/crear', '/admin/encuestas/:id'],
+  },
 };
 
 /**

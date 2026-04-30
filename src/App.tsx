@@ -60,7 +60,12 @@ import EventoDetallePage from '@/pages/EventoDetallePage';
 import AfiliacionComfenalcoPage from '@/pages/AfiliacionComfenalcoPage';
 import EncuestaBienestarPage from '@/pages/EncuestaBienestarPage';
 import EncuestaVacunacionPage from '@/pages/EncuestaVacunacionPage';
+import EncuestaDinamicaPage from '@/pages/EncuestaDinamicaPage';
 import EntregasBienestarPage from '@/pages/EntregasBienestarPage';
+import AdminEncuestasPage from '@/pages/AdminEncuestasPage';
+import AdminEncuestaCrearPage from '@/pages/AdminEncuestaCrearPage';
+import AdminEncuestaDetallePage from '@/pages/AdminEncuestaDetallePage';
+import AdminEncuestaEditarPage from '@/pages/AdminEncuestaEditarPage';
 
 // Legal Pages
 import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
@@ -126,6 +131,7 @@ const AppRoutes = () => {
             <Route path="/servicios/encuesta-sociodemografica" element={<EncuestaBienestarPage />} />
             <Route path="/servicios/encuesta-bienestar" element={<EncuestaBienestarPage />} /> {/* Ruta legacy, misma página */}
             <Route path="/encuesta-vacunacion" element={<EncuestaVacunacionPage />} />
+            <Route path="/encuestas/:id" element={<EncuestaDinamicaPage />} />
             <Route path="/servicios/galeria-bienestar" element={<GaleriaBienestarPage />} />
             <Route path="/servicios/galeria-bienestar/:eventId" element={<EventoDetallePage />} />
             <Route path="/servicios/permisos-turnos" element={<SolicitudPermisosCambioTurnosPage />} />
@@ -286,8 +292,41 @@ const AppRoutes = () => {
               } 
             />
             
-            <Route 
-              path="/admin/encuestas-sociodemograficas" 
+            <Route
+              path="/admin/encuestas"
+              element={
+                <ProtectedRoute requiredPermissions={['surveys.view']}>
+                  <AdminEncuestasPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/encuestas/crear"
+              element={
+                <ProtectedRoute requiredPermissions={['surveys.manage']}>
+                  <AdminEncuestaCrearPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/encuestas/:id/editar"
+              element={
+                <ProtectedRoute requiredPermissions={['surveys.manage']}>
+                  <AdminEncuestaEditarPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/encuestas/:id"
+              element={
+                <ProtectedRoute requiredPermissions={['surveys.view']}>
+                  <AdminEncuestaDetallePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/encuestas-sociodemograficas"
               element={
                 <ProtectedRoute requiredPermissions={['socio_demographic_surveys.view']}>
                   <AdminEncuestasSociodemograficasPage />
