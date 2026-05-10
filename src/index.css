@@ -250,6 +250,13 @@ input:disabled {
   cursor: not-allowed !important;
 }
 
+/* Prevenir desbordamiento de inputs de fecha en móviles */
+input[type="date"] {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 /* Elementos con pointer-events-none no deben bloquear el cursor del padre */
 [style*="pointer-events: none"],
 .pointer-events-none {
