@@ -126,7 +126,7 @@ export function IdentityFieldset({
           >
             <SignatureCanvas
               ref={signatureRef}
-              penColor="#003A70"
+              penColor="#000000"
               minWidth={0.8}
               maxWidth={2.4}
               canvasProps={{
