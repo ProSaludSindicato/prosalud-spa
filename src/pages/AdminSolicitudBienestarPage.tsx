@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/context/AuthContext';
 import { formatDateReadable, formatTime12Hour, parseLocalDate } from '@/utils/dateFormatter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   ChevronUp,
+  Star,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -67,7 +69,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, RotateCw, Eraser } from 'lucide-react';
+import { AlertCircle, RotateCw, Eraser, Info } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useScreenOrientation } from '@/hooks/useScreenOrientation';
 import WellnessRequestForm from '@/components/admin/solicitudes/WellnessRequestForm';
@@ -78,6 +80,57 @@ import ExportWellnessDeliveryReportDialog from '@/components/admin/solicitudes/E
 import WellnessDeliveryFileManager from '@/components/admin/solicitudes/WellnessDeliveryFileManager';
 import WellnessDeliveryTypeFormDialog, { WellnessDeliveryTypeFormValues } from '@/components/admin/solicitudes/WellnessDeliveryTypeFormDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+const isSolicitudPropia = (
+  solicitud: WellnessRequest,
+  currentUserId?: number | string | null,
+): boolean => {
+  if (typeof solicitud.esPropia === 'boolean') {
+    return solicitud.esPropia;
+  }
+
+  if (currentUserId == null) {
+    return false;
+  }
+
+  return String(solicitud.solicitanteId) === String(currentUserId);
+};
+
+const solicitudRowClassName = (esPropia: boolean): string =>
+  esPropia
+    ? ''
+    : 'bg-neutral-100/55 text-gray-500 [&_td]:text-gray-500 [&_.font-medium]:text-gray-600';
+
+const solicitudCardClassName = (esPropia: boolean): string =>
+  esPropia
+    ? 'border shadow-sm hover:shadow-md transition-shadow'
+    : 'border shadow-sm hover:shadow-md transition-shadow bg-neutral-100/55 text-gray-500';
+
+const SolicitudOwnStarIndicator: React.FC = () => (
+  <TooltipProvider delayDuration={200}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex shrink-0 cursor-help rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          tabIndex={0}
+          role="img"
+          aria-label="Mi solicitud"
+        >
+          <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-left">
+        <p className="font-medium">Tu solicitud</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          La estrella indica que tú creaste esta solicitud. Las filas sin estrella fueron registradas por otro
+          usuario de tu hospital.
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
 
 // Schema para cambiar el estado (simplificado, sin envío de correos)
 // No incluye 'pending' porque una solicitud no puede volver a ese estado
@@ -226,6 +279,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
 };
 
 const AdminSolicitudBienestarPage: React.FC = () => {
+  const { user } = useAuth();
   const { can, hasRole } = usePermissions();
   const isAdminRole = hasRole('admin');
   const navigate = useNavigate();
@@ -239,6 +293,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [searchTermDebounced, setSearchTermDebounced] = useState('');
   const [solicitanteFilter, setSolicitanteFilter] = useState('');
   const [solicitanteFilterDebounced, setSolicitanteFilterDebounced] = useState('');
+  const [modoYo, setModoYo] = useState(false);
   const [actividadesRealizadasFilter, setActividadesRealizadasFilter] = useState<'todas' | 'realizadas' | 'no_realizadas'>('todas');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedCentroCostos, setSelectedCentroCostos] = useState<string>('all');
@@ -424,6 +479,10 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [solicitanteFilter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [modoYo]);
+
   // Construir filtros para la API
   const apiFilters = useMemo(() => {
     const filters: any = {
@@ -449,7 +508,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       filters.busqueda = searchTermDebounced;
     }
 
-    if (solicitanteFilterDebounced) {
+    if (modoYo && user?.id) {
+      filters.solicitanteId = Number(user.id);
+    } else if (solicitanteFilterDebounced) {
       filters.solicitante = solicitanteFilterDebounced;
     }
 
@@ -462,6 +523,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     actividadesRealizadasFilter,
     searchTermDebounced,
     solicitanteFilterDebounced,
+    modoYo,
+    user?.id,
   ]);
 
   const {
@@ -1359,6 +1422,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                         value={solicitanteFilter}
                         onChange={(e) => setSolicitanteFilter(e.target.value)}
                         className="pl-10"
+                        disabled={modoYo}
                       />
                     </div>
                   </div>
@@ -1420,10 +1484,46 @@ const AdminSolicitudBienestarPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm bg-white">
               <CardHeader>
-                <CardTitle className="text-2xl font-bold text-gray-900">Solicitudes de Bienestar ({totalItems})</CardTitle>
-                <CardDescription className="text-gray-600 mt-1">
-                  Lista completa de solicitudes de actividades de bienestar
-                </CardDescription>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-gray-900">
+                      Solicitudes de Bienestar ({totalItems})
+                    </CardTitle>
+                    <CardDescription className="text-gray-600 mt-1">
+                      Lista completa de solicitudes de actividades de bienestar
+                    </CardDescription>
+                  </div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-2 shrink-0">
+                          <Switch
+                            id="modo-yo"
+                            checked={modoYo}
+                            onCheckedChange={setModoYo}
+                            disabled={!user?.id}
+                          />
+                          <Label
+                            htmlFor="modo-yo"
+                            className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-gray-700"
+                          >
+                            <Star
+                              className={`h-3.5 w-3.5 ${modoYo ? 'fill-amber-500 text-amber-500' : 'text-gray-400'}`}
+                            />
+                            Modo yo
+                            <Info className="h-3.5 w-3.5 text-gray-400" aria-hidden />
+                          </Label>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-left">
+                        <p>
+                          Muestra solo las solicitudes que tú creaste. Incluye las de tu hospital y las de otros
+                          usuarios; al activarlo verás únicamente las tuyas.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -1438,6 +1538,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                     <p className="text-lg text-gray-600">
                       {searchTerm ||
                       solicitanteFilter ||
+                      modoYo ||
                       selectedStatus !== 'all' ||
                       selectedCentroCostos !== 'all' ||
                       actividadesRealizadasFilter !== 'todas'
@@ -1497,12 +1598,23 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedSolicitudes.map((solicitud) => (
-                            <TableRow key={solicitud.id}>
-                              <TableCell className="font-medium">#{solicitud.id}</TableCell>
+                          {sortedSolicitudes.map((solicitud) => {
+                            const esPropia = isSolicitudPropia(solicitud, user?.id);
+
+                            return (
+                            <TableRow
+                              key={solicitud.id}
+                              className={solicitudRowClassName(esPropia)}
+                            >
+                              <TableCell className="font-medium">
+                                <span className="inline-flex items-center gap-1.5">
+                                  {esPropia && <SolicitudOwnStarIndicator />}
+                                  #{solicitud.id}
+                                </span>
+                              </TableCell>
                               <TableCell>
                                 <div className="max-w-xs">
-                                  <div className="font-medium text-gray-900 mb-1">
+                                  <div className="font-medium mb-1">
                                     {solicitud.nombreActividad || 'N/A'}
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1606,22 +1718,27 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                 />
                               </TableCell>
                             </TableRow>
-                          ))}
+                          );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
 
                     {/* Mobile Card View - Visible on mobile and tablet */}
                     <div className="lg:hidden space-y-3">
-                      {sortedSolicitudes.map((solicitud) => (
-                        <Card key={solicitud.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                      {sortedSolicitudes.map((solicitud) => {
+                        const esPropia = isSolicitudPropia(solicitud, user?.id);
+
+                        return (
+                        <Card key={solicitud.id} className={solicitudCardClassName(esPropia)}>
                           <CardContent className="p-4">
                             <div className="space-y-3">
                               {/* Header with ID and actions */}
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-medium text-gray-900 text-sm">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <p className="font-medium text-sm text-gray-900 inline-flex items-center gap-1.5">
+                                      {esPropia && <SolicitudOwnStarIndicator />}
                                       #{solicitud.id}
                                     </p>
                                     <Badge className={getStatusColor(solicitud.estado)}>
@@ -1816,7 +1933,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                             </div>
                           </CardContent>
                         </Card>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}

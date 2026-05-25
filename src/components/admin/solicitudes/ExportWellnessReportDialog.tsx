@@ -32,6 +32,7 @@ const COST_CENTERS = [
   { value: 'La Maria VIH', label: 'La María VIH' },
   { value: 'La Maria Cosalud', label: 'La María Cosalud' },
   { value: 'La Maria Enterritorio', label: 'La María Enterritorio' },
+  { value: 'Carisma', label: 'Carisma' },
   { value: 'Admon', label: 'Administración' },
 ] as const;
 

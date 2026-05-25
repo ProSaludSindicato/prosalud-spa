@@ -69,7 +69,7 @@ interface WellnessRequestFormProps {
 }
 
 // Centros de costos disponibles
-const CENTROS_COSTOS = ['Bello', 'Rionegro', 'La Maria asistencial', 'La Maria VIH', 'La Maria Cosalud', 'La Maria Enterritorio', 'Admon'];
+const CENTROS_COSTOS = ['Bello', 'Rionegro', 'La Maria asistencial', 'La Maria VIH', 'La Maria Cosalud', 'La Maria Enterritorio', 'Carisma', 'Admon'];
 
 // Mapeo de sedes por centro de costos
 const SEDES_POR_CENTRO_COSTOS: Record<string, string[]> = {
@@ -79,6 +79,7 @@ const SEDES_POR_CENTRO_COSTOS: Record<string, string[]> = {
   'La Maria VIH': ['Castilla', 'La 33'],
   'La Maria Cosalud': ['Castilla', 'La 33'],
   'La Maria Enterritorio': ['Castilla', 'La 33'],
+  'Carisma': ['Principal'],
   'Admon': ['Principal'],
 };
 

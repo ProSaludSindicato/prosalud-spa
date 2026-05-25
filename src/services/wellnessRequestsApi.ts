@@ -64,6 +64,8 @@ export interface WellnessActivityRealized {
 
 export interface WellnessRequest {
   id: number;
+  /** true si la solicitud fue creada por el usuario autenticado */
+  esPropia?: boolean;
   nombreActividad: string;
   descripcionActividad?: string;
   centroCostos: string;
