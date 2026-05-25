@@ -40,6 +40,7 @@ import AdminDocumentSigningPage from '@/pages/AdminDocumentSigningPage';
 import AdminAsambleaLivePage from '@/pages/AdminAsambleaLivePage';
 import AdminAsambleaGeneralPage from '@/pages/AdminAsambleaGeneralPage';
 import AssemblyDelegatePage from '@/pages/AssemblyDelegatePage';
+import AssemblyDelegateAccessKioskPage from '@/pages/AssemblyDelegateAccessKioskPage';
 import AssemblyPublicResultsPage from '@/pages/AssemblyPublicResultsPage';
 import CandidateVotingPage from '@/pages/CandidateVotingPage';
 
@@ -101,6 +102,7 @@ const AppRoutes = () => {
             <Route path="/ayuda/acceso-directo-movil" element={<AccesoDirectoMovilPage />} />
 
             <Route path="/asamblea" element={<AssemblyDelegatePage />} />
+            <Route path="/asamblea/acceso" element={<AssemblyDelegateAccessKioskPage />} />
             <Route path="/votacion-delegados" element={<CandidateVotingPage />} />
             <Route path="/asamblea/resultados" element={<AssemblyPublicResultsPage />} />
             <Route path="/assembly/results" element={<Navigate to="/asamblea/resultados" replace />} />
@@ -198,13 +200,13 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/admin/entregas-bienestar/registrar" 
+            <Route
+              path="/admin/entregas-bienestar/registrar"
               element={
                 <ProtectedRoute requiredPermissions={['wellness_delivery.manage']}>
                   <AdminRegistrarEntregaBienestarPage />
                 </ProtectedRoute>
-              } 
+              }
             />
             
             <Route 

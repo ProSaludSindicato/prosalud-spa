@@ -54,6 +54,9 @@ import {
   ClipboardList,
   Building2,
   Monitor,
+  Copy,
+  ExternalLink,
+  QrCode,
 } from "lucide-react";
 import {
   Dialog,
@@ -67,6 +70,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { buildPortalUrl } from "@/config/site";
+import { ASSEMBLY_DELEGATE_KIOSK_PATH, ASSEMBLY_DELEGATE_VOTE_PATH } from "@/constants/assemblyDelegateAccess";
 const STATUS_STYLES: Record<AssemblyQuestion["status"], { label: string; className: string }> = {
   OPEN: { label: "Abierta", className: "bg-emerald-100 text-emerald-700" },
   CLOSED: { label: "Cerrada", className: "bg-slate-200 text-slate-800" },
@@ -144,6 +149,22 @@ export default function AdminAsambleaLivePage() {
     attendanceTotal === 0 ? 0 : (attendancePage - 1) * attendancePerPage + 1;
   const attendanceRangeEnd =
     attendanceTotal === 0 ? 0 : Math.min(attendancePage * attendancePerPage, attendanceTotal);
+
+  const assemblyDelegateVoteUrl = useMemo(() => buildPortalUrl(ASSEMBLY_DELEGATE_VOTE_PATH), []);
+  const assemblyDelegateKioskUrl = useMemo(() => buildPortalUrl(ASSEMBLY_DELEGATE_KIOSK_PATH), []);
+
+  const copyToClipboard = useCallback(async (label: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copiado", description: `${label} en el portapapeles.` });
+    } catch {
+      toast({
+        title: "No se pudo copiar",
+        description: "Copie el enlace manualmente o use el botón abrir en nueva pestaña.",
+        variant: "destructive",
+      });
+    }
+  }, []);
 
   const openQuestion = useMemo(() => questions.find((q) => q.status === "OPEN") ?? null, [questions]);
   const sortedQuestions = useMemo(
@@ -1803,6 +1824,89 @@ export default function AdminAsambleaLivePage() {
                       </p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              <Card className="border border-slate-200 shadow-lg border-l-4 border-l-primary dark:border-slate-700">
+                <CardHeader>
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <QrCode className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Enlace para delegados</CardTitle>
+                      <CardDescription>
+                        Comparta esta URL por chat o correo. Para recepción o monitor, use la pantalla de acceso (sólo
+                        logo, QR e instrucciones; sin panel administrativo).
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Autenticación y votación
+                    </p>
+                    <p className="break-all font-mono text-sm text-slate-800 dark:text-slate-200">
+                      {assemblyDelegateVoteUrl}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => void copyToClipboard("Enlace de votación", assemblyDelegateVoteUrl)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copiar enlace
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                        <a href={assemblyDelegateVoteUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4" />
+                          Abrir
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Pantalla para mostrar a delegados (QR)
+                    </p>
+                    <p className="break-all font-mono text-sm text-slate-800 dark:text-slate-200">
+                      {assemblyDelegateKioskUrl}
+                    </p>
+                    {/*<p className="text-xs text-slate-600 dark:text-slate-400">
+                      Ábrala en pantalla completa en un segundo monitor o tableta. El archivo del QR debe estar en{" "}
+                      <code className="rounded bg-slate-200 px-1 text-[11px] dark:bg-slate-800">
+                        public/images/asamblea-delegados-acceso-qr.svg
+                      </code>
+                      .
+                    </p> */}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => void copyToClipboard("Pantalla de acceso", assemblyDelegateKioskUrl)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copiar
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                        <a href={assemblyDelegateKioskUrl} target="_blank" rel="noopener noreferrer">
+                          <Monitor className="h-4 w-4" />
+                          Abrir pantalla pública
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-500">
+                    Si el enlace no coincide con su dominio público, defina{" "}
+                    <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">VITE_PUBLIC_SITE_URL</code> en el
+                    entorno del front.
+                  </p>
                 </CardContent>
               </Card>
 
