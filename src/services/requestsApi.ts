@@ -86,6 +86,47 @@ export interface ApiResponse<T> {
   errors?: Record<string, string[]>;
 }
 
+export interface ApiPagination {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+export interface ApiRequestsListResponse extends ApiResponse<ApiRequest[]> {
+  pagination?: ApiPagination;
+}
+
+export interface GetRequestsParams {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: string;
+  request_type?: string;
+  request_subtype?: string;
+  sort_by?: 'created_at' | 'name';
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface ApiRequestStats {
+  total: number;
+  pending: number;
+  in_progress: number;
+  resolved: number;
+  rejected: number;
+  this_month: number;
+  unvalidated: number;
+  avg_resolution_time: number;
+  monthly_counts: Array<{ year: number; month: number; count: number }>;
+}
+
+export interface ApiRequestFilterOptions {
+  request_types: string[];
+  subtypes: Array<{ label: string; value: string }>;
+}
+
 // Add request/response interceptors for debugging (dev-only)
 requestsApi.interceptors.request.use((config) => {
   logger.debug("Requests API request", {
@@ -200,13 +241,58 @@ function buildCompensacionesPayload(data: {
 }
 
 export const requestsApiService = {
-  // Get all requests
-  async getAllRequests(): Promise<ApiRequest[]> {
+  async getRequests(params: GetRequestsParams = {}): Promise<ApiRequestsListResponse> {
     try {
-      const response = await requestsApi.get<ApiResponse<ApiRequest[]>>("/api/requests");
+      const response = await requestsApi.get<ApiRequestsListResponse>('/api/requests', {
+        params: {
+          page: params.page,
+          per_page: params.per_page,
+          search: params.search,
+          status: params.status,
+          request_type: params.request_type,
+          request_subtype: params.request_subtype,
+          sort_by: params.sort_by,
+          sort_order: params.sort_order,
+        },
+      });
 
       if (!response.data.success) {
-        throw new Error(response.data.message || "Error al obtener solicitudes");
+        throw new Error(response.data.message || 'Error al obtener solicitudes');
+      }
+
+      return response.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  async getAllRequests(): Promise<ApiRequest[]> {
+    const response = await this.getRequests();
+    return response.data;
+  },
+
+  async getRequestStats(): Promise<ApiRequestStats> {
+    try {
+      const response = await requestsApi.get<ApiResponse<ApiRequestStats>>('/api/requests/stats');
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener estadísticas');
+      }
+
+      return response.data.data;
+    } catch (error) {
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  async getFilterOptions(): Promise<ApiRequestFilterOptions> {
+    try {
+      const response = await requestsApi.get<ApiResponse<ApiRequestFilterOptions>>('/api/requests/filter-options');
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al obtener opciones de filtro');
       }
 
       return response.data.data;

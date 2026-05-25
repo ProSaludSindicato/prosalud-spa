@@ -47,7 +47,6 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/utils/errorSanitizer";
 import DataPagination from "@/components/ui/data-pagination";
-import { usePagination } from "@/hooks/usePagination";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -758,6 +757,10 @@ const AdminSolicitudesPage: React.FC = () => {
   
   // Estados para controlar los menús desplegables en las tablas
   const [openRequestMenuId, setOpenRequestMenuId] = useState<number | string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => searchParams.get('search') || "");
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Hook para gestionar actualizaciones pendientes de datos personales
   const {
@@ -908,16 +911,59 @@ const AdminSolicitudesPage: React.FC = () => {
     );
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder, itemsPerPage]);
+
+  const listQueryParams = useMemo(() => ({
+    page: currentPage,
+    perPage: itemsPerPage,
+    search: debouncedSearchTerm || undefined,
+    status: selectedStatus !== "all" ? selectedStatus : undefined,
+    requestType: selectedType !== "all" ? selectedType : undefined,
+    requestSubtype: selectedSubtypeFilter !== "all" ? selectedSubtypeFilter : undefined,
+    sortBy: (sortBy === "name" ? "name" : "created_at") as "name" | "created_at",
+    sortOrder,
+  }), [currentPage, itemsPerPage, debouncedSearchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
+
   const {
-    data: allSolicitudes = [],
+    data: solicitudesListResult,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ["admin-solicitudes"],
-    queryFn: requestsService.getRequests,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ["admin-solicitudes", listQueryParams],
+    queryFn: () => requestsService.getRequests(listQueryParams),
+    staleTime: 5 * 60 * 1000,
   });
+
+  const { data: stats, refetch: refetchStats } = useQuery({
+    queryKey: ["admin-solicitudes-stats"],
+    queryFn: () => requestsService.getRequestStats(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: filterOptionsData } = useQuery({
+    queryKey: ["admin-solicitudes-filter-options"],
+    queryFn: () => requestsService.getFilterOptions(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const solicitudes = solicitudesListResult?.data ?? [];
+  const totalItems = solicitudesListResult?.pagination?.total ?? solicitudes.length;
+  const totalPages = solicitudesListResult?.pagination?.last_page ?? 1;
+
+  const refetchAll = async () => {
+    await Promise.all([refetch(), refetchStats()]);
+  };
 
   // Sincronizar filtros con search params (solo cuando cambian los filtros, no cuando cambian los search params)
   useEffect(() => {
@@ -963,22 +1009,40 @@ const AdminSolicitudesPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder]);
 
-  // Open modal from URL parameter
   useEffect(() => {
     const viewId = searchParams.get('view');
-    if (viewId && allSolicitudes.length > 0) {
-      const solicitud = allSolicitudes.find(s => s.id === viewId);
-      if (solicitud) {
-        setSelectedSolicitud(solicitud);
-        // Scroll al inicio para asegurar que el modal sea visible
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        // Remove the view parameter from URL
-        const newSearchParams = new URLSearchParams(searchParams);
-        newSearchParams.delete('view');
-        setSearchParams(newSearchParams, { replace: true });
-      }
+    if (!viewId) {
+      return;
     }
-  }, [searchParams, allSolicitudes, setSearchParams]);
+
+    let cancelled = false;
+
+    const openFromUrl = async () => {
+      setIsLoadingDetail(true);
+      try {
+        const solicitud = await requestsService.getRequestById(viewId);
+        if (!cancelled && solicitud) {
+          setSelectedSolicitud(solicitud);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.delete('view');
+          setSearchParams(newSearchParams, { replace: true });
+        }
+      } catch (loadError) {
+        logger.error('Error al cargar solicitud desde URL', loadError instanceof Error ? loadError.message : loadError);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDetail(false);
+        }
+      }
+    };
+
+    openFromUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, setSearchParams]);
 
   // Efecto para asegurar que el modal esté visible cuando se selecciona una solicitud
   useEffect(() => {
@@ -1193,170 +1257,32 @@ const AdminSolicitudesPage: React.FC = () => {
     return labels[type] || type;
   };
 
-  // Obtener tipos únicos que existen en los registros (para el filtro)
-  // El backend ya filtra las solicitudes según las asignaciones, así que usamos todas las que vienen
   const existingRequestTypes = useMemo(() => {
-    const types = new Set<string>();
-    allSolicitudes.forEach((request) => {
-      types.add(request.request_type);
-    });
-    return Array.from(types).sort(); // Convertir a array ordenado para el select
-  }, [allSolicitudes]);
+    return (filterOptionsData?.request_types ?? []).slice().sort();
+  }, [filterOptionsData]);
 
-  // Obtener subtipos únicos de verificacion-pagos (para el filtro)
-  // Agrupa por label normalizado para evitar duplicados visuales
   const existingSubtypes = useMemo(() => {
-    // Mapa: label normalizado -> array de valores del backend que se mapean a ese label
     const labelToBackendValues = new Map<string, string[]>();
-    
-    allSolicitudes
-      .filter((request) => request.request_type === 'verificacion-pagos' && request.request_subtype)
-      .forEach((request) => {
-        if (request.request_subtype) {
-          const normalizedLabel = getVerificacionPagosSubtypeLabel(request.request_subtype);
-          if (!labelToBackendValues.has(normalizedLabel)) {
-            labelToBackendValues.set(normalizedLabel, []);
-          }
-          const backendValues = labelToBackendValues.get(normalizedLabel)!;
-          // Agregar el valor del backend solo si no está ya en el array
-          if (!backendValues.includes(request.request_subtype)) {
-            backendValues.push(request.request_subtype);
-          }
-        }
-      });
-    
-    // Convertir a array de objetos con label y el primer valor del backend
-    // Ordenar por label normalizado
-    return Array.from(labelToBackendValues.entries())
-      .map(([label, backendValues]) => ({
-        label,
-        backendValue: backendValues[0], // Usar el primer valor del backend como representante
-        allBackendValues: backendValues, // Guardar todos los valores para el filtrado
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [allSolicitudes]);
 
-  // Mapa auxiliar para buscar todos los valores del backend que corresponden a un label
-  const subtypeLabelToBackendValues = useMemo(() => {
-    const map = new Map<string, string[]>();
-    existingSubtypes.forEach(({ label, allBackendValues }) => {
-      map.set(label, allBackendValues);
-    });
-    return map;
-  }, [existingSubtypes]);
-
-  const filteredSolicitudes = useMemo(() => {
-    // El backend ya filtra las solicitudes según las asignaciones del usuario
-    // Solo aplicamos filtros de búsqueda, estado y tipo
-    let filtered = [...allSolicitudes];
-
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (request) =>
-          request.id.toString().includes(searchTerm) ||
-          request.name.toLowerCase().includes(searchLower) ||
-          request.last_name.toLowerCase().includes(searchLower) ||
-          request.email.toLowerCase().includes(searchLower) ||
-          request.id_number.toLowerCase().includes(searchLower) ||
-          getRequestTypeLabel(request.request_type).toLowerCase().includes(searchLower),
-      );
-    }
-
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter((request) => request.status === selectedStatus);
-    }
-
-    if (selectedType !== "all") {
-      filtered = filtered.filter((request) => request.request_type === selectedType as Request['request_type']);
-    }
-
-    // Filtrar por subtipo si el tipo es verificacion-pagos y hay un subtipo seleccionado
-    if (selectedType === 'verificacion-pagos' && selectedSubtypeFilter !== "all") {
-      filtered = filtered.filter((request) => {
-        if (!request.request_subtype) return false;
-        
-        // Buscar el label normalizado del valor seleccionado
-        const selectedLabel = getVerificacionPagosSubtypeLabel(selectedSubtypeFilter);
-        // Obtener todos los valores del backend que corresponden a ese label
-        const backendValuesForLabel = subtypeLabelToBackendValues.get(selectedLabel) || [selectedSubtypeFilter];
-        
-        // Comparar con cualquiera de los valores del backend que corresponden a ese label
-        return backendValuesForLabel.includes(request.request_subtype);
-      });
-    }
-
-    filtered.sort((a, b) => {
-      if (sortBy === "name") {
-        const nameA = `${a.name} ${a.last_name}`.toLowerCase();
-        const nameB = `${b.name} ${b.last_name}`.toLowerCase();
-        return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-      } else {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    (filterOptionsData?.subtypes ?? []).forEach(({ value }) => {
+      const normalizedLabel = getVerificacionPagosSubtypeLabel(value);
+      if (!labelToBackendValues.has(normalizedLabel)) {
+        labelToBackendValues.set(normalizedLabel, []);
+      }
+      const backendValues = labelToBackendValues.get(normalizedLabel)!;
+      if (!backendValues.includes(value)) {
+        backendValues.push(value);
       }
     });
 
-    return filtered;
-  }, [allSolicitudes, searchTerm, selectedStatus, selectedType, selectedSubtypeFilter, sortBy, sortOrder, subtypeLabelToBackendValues]);
-
-  const stats = useMemo(() => {
-    if (!allSolicitudes || allSolicitudes.length === 0) {
-      return {
-        total: 0,
-        pending: 0,
-        in_progress: 0,
-        resolved: 0,
-        rejected: 0,
-        this_month: 0,
-        avg_resolution_time: 0,
-        unvalidated: 0
-      };
-    }
-
-    const total = allSolicitudes.length;
-    const pending = allSolicitudes.filter(r => r.status === 'pending').length;
-    const in_progress = allSolicitudes.filter(r => r.status === 'in_progress').length;
-    const resolved = allSolicitudes.filter(r => r.status === 'resolved').length;
-    const rejected = allSolicitudes.filter(r => r.status === 'rejected').length;
-    
-    // Calculate unvalidated requests (require validation but haven't been validated yet)
-    const unvalidated = allSolicitudes.filter(r => 
-      requiresManualValidation(r) && !isRequestValidated(r)
-    ).length;
-    
-    const currentMonth = new Date().getMonth();
-    const this_month = allSolicitudes.filter(r => 
-      new Date(r.created_at).getMonth() === currentMonth
-    ).length;
-    
-    // Calculate average resolution time
-    const resolvedRequests = allSolicitudes.filter(r => r.status === 'resolved' && r.resolved_at);
-    let avg_resolution_time = 0;
-    
-    if (resolvedRequests.length > 0) {
-      const totalTime = resolvedRequests.reduce((acc, request) => {
-        const created = new Date(request.created_at).getTime();
-        const resolved = new Date(request.resolved_at!).getTime();
-        return acc + (resolved - created);
-      }, 0);
-      
-      // Convert to hours
-      avg_resolution_time = Math.round(totalTime / (resolvedRequests.length * 1000 * 60 * 60));
-    }
-    
-    return {
-      total,
-      pending,
-      in_progress,
-      resolved,
-      rejected,
-      this_month,
-      avg_resolution_time,
-      unvalidated
-    };
-  }, [allSolicitudes]);
+    return Array.from(labelToBackendValues.entries())
+      .map(([label, backendValues]) => ({
+        label,
+        backendValue: backendValues[0],
+        allBackendValues: backendValues,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterOptionsData]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -1378,32 +1304,42 @@ const AdminSolicitudesPage: React.FC = () => {
     },
   };
 
+  const loadRequestDetail = async (solicitud: Request) => {
+    setSelectedSolicitud(solicitud);
+    setIsLoadingDetail(true);
+
+    try {
+      const fullRequest = await requestsService.getRequestById(solicitud.id);
+      if (fullRequest) {
+        setSelectedSolicitud(fullRequest);
+      }
+    } catch (loadError) {
+      logger.error('Error al cargar detalle de solicitud', loadError instanceof Error ? loadError.message : loadError);
+      toast.error('No se pudo cargar el detalle completo de la solicitud');
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
   const handleViewDetails = (solicitud: Request) => {
     logger.debug("Visualizando detalles de solicitud", {
       id: solicitud.id,
       estado: solicitud.status,
     });
     
-    // Resetear subtipo seleccionado y colapsar sección al cambiar de solicitud
     setSelectedSubtype("");
     setIsSubtypeRedirectOpen(false);
     
-    // Si ya hay una solicitud seleccionada y es diferente, mostrar transición
     if (selectedSolicitud && selectedSolicitud.id !== solicitud.id) {
       setIsTransitioningRequest(true);
-      // Cerrar el diálogo actual primero
       setSelectedSolicitud(null);
       setExpandedFields({});
       
-      // Después de un breve delay, abrir la nueva solicitud con animación
       setTimeout(() => {
-        setSelectedSolicitud(solicitud);
-        // Scroll de la página al inicio para asegurar que el modal sea visible
+        void loadRequestDetail(solicitud);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        // Resetear transición después de que el modal se haya renderizado
         setTimeout(() => {
           setIsTransitioningRequest(false);
-          // Scroll suave al inicio del contenido del diálogo
           setTimeout(() => {
             const dialogContent = document.querySelector('[role="dialog"] [class*="overflow-y-auto"]');
             if (dialogContent) {
@@ -1413,18 +1349,37 @@ const AdminSolicitudesPage: React.FC = () => {
         }, 200);
       }, 300);
     } else {
-      // Si no hay solicitud seleccionada o es la misma, abrir directamente
-      setSelectedSolicitud(solicitud);
+      void loadRequestDetail(solicitud);
       setExpandedFields({});
-      // Scroll de la página al inicio para asegurar que el modal sea visible
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      // Scroll al inicio del contenido del diálogo después de que se renderice
       setTimeout(() => {
         const dialogContent = document.querySelector('[role="dialog"] [class*="overflow-y-auto"]');
         if (dialogContent) {
           dialogContent.scrollTo({ top: 0, behavior: 'smooth' });
         }
       }, 100);
+    }
+  };
+
+  const refreshSelectedRequest = async (solicitudId: string, fallback?: Request | null) => {
+    if (selectedSolicitud?.id !== solicitudId) {
+      return;
+    }
+
+    try {
+      const refreshedRequest = await requestsService.getRequestById(String(solicitudId).padStart(10, '0'));
+      if (refreshedRequest) {
+        setSelectedSolicitud(refreshedRequest);
+        setExpandedFields({});
+        return;
+      }
+    } catch (refreshError) {
+      logger.error('Error al actualizar la solicitud seleccionada', refreshError instanceof Error ? refreshError.message : refreshError);
+    }
+
+    if (fallback) {
+      setSelectedSolicitud(fallback);
+      setExpandedFields({});
     }
   };
 
@@ -1659,7 +1614,7 @@ const AdminSolicitudesPage: React.FC = () => {
       }
 
       // Refetch para actualizar la lista
-      await refetch();
+      await refetchAll();
 
       toast.success("Solicitud validada exitosamente", {
         description: `La solicitud #${solicitud.id} ha sido validada y está lista para ser gestionada.`,
@@ -1777,20 +1732,10 @@ const AdminSolicitudesPage: React.FC = () => {
         }, 500);
         
         // Refetch para actualizar la lista
-        await refetch();
+        await refetchAll();
         
-        // Actualizar la solicitud seleccionada si es la misma
         if (selectedSolicitud?.id === solicitudId) {
-          const refetchedData = (await refetch()).data || [];
-          const updatedFromList = refetchedData.find(req => req.id === solicitudId);
-          
-          if (updatedFromList) {
-            setSelectedSolicitud(updatedFromList);
-            setExpandedFields({});
-          } else {
-            setSelectedSolicitud(updatedRequest);
-            setExpandedFields({});
-          }
+          await refreshSelectedRequest(String(solicitudId), updatedRequest);
         }
         
         return; // Salir temprano, no enviar email
@@ -1836,8 +1781,7 @@ const AdminSolicitudesPage: React.FC = () => {
         handleCloseResponseDialog();
       }, 500);
       
-      // Refetch para actualizar la lista primero
-      const refetchResult = await refetch();
+      await refetchAll();
       
       // Refrescar actualizaciones pendientes si se procesó una actualización de datos
       if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
@@ -1852,36 +1796,8 @@ const AdminSolicitudesPage: React.FC = () => {
         }, 1000);
       }
       
-      // Actualizar la solicitud seleccionada con los datos más recientes del servidor
-      // Esto asegura que tenemos la información completa incluyendo archivos y respuestas actualizadas
       if (selectedSolicitud?.id === solicitudId) {
-        // Usar los datos del refetch primero (más rápido)
-        const refetchedData = refetchResult.data || [];
-        const updatedFromList = refetchedData.find(req => req.id === solicitudId);
-        
-        if (updatedFromList) {
-          // Si encontramos en la lista refetch, usar esos datos
-          setSelectedSolicitud(updatedFromList);
-          setExpandedFields({});
-        } else {
-          // Si no está en la lista, obtener directamente del servidor
-          try {
-            const refreshedRequest = await requestsService.getRequestById(solicitudId);
-            if (refreshedRequest) {
-              setSelectedSolicitud(refreshedRequest);
-              setExpandedFields({});
-            } else {
-              // Fallback final: usar updatedRequest
-              setSelectedSolicitud(updatedRequest);
-              setExpandedFields({});
-            }
-          } catch (error) {
-            logger.error("Error al actualizar la solicitud seleccionada", error instanceof Error ? error.message : error);
-            // Fallback: usar updatedRequest
-            setSelectedSolicitud(updatedRequest);
-            setExpandedFields({});
-          }
-        }
+        await refreshSelectedRequest(solicitudIdString, updatedRequest);
       }
     } catch (error) {
       logger.error("Error al enviar respuesta de solicitud", error instanceof Error ? error.message : error);
@@ -2056,20 +1972,10 @@ const AdminSolicitudesPage: React.FC = () => {
         }, 500);
         
         // Refetch para actualizar la lista
-        await refetch();
+        await refetchAll();
         
-        // Actualizar la solicitud seleccionada si es la misma
         if (selectedSolicitud?.id === solicitudId) {
-          const refetchedData = (await refetch()).data || [];
-          const updatedFromList = refetchedData.find(req => req.id === solicitudId);
-          
-          if (updatedFromList) {
-            setSelectedSolicitud(updatedFromList);
-            setExpandedFields({});
-          } else {
-            setSelectedSolicitud(updatedRequest);
-            setExpandedFields({});
-          }
+          await refreshSelectedRequest(String(solicitudId), updatedRequest);
         }
         
         return; // Salir temprano, no enviar email
@@ -2155,46 +2061,20 @@ const AdminSolicitudesPage: React.FC = () => {
         handleCloseResponseDialog();
       }, 500);
       
-      // Refetch para actualizar la lista primero
-      const refetchResult = await refetch();
+      await refetchAll();
       
-      // Refrescar actualizaciones pendientes si se procesó una actualización de datos
       if (solicitudToRespond?.request_type === 'actualizar-datos-personales') {
         refetchPendingUpdates();
       }
 
-      // Mostrar recordatorio para actualizar afiliados si se completó una actualización de datos
       if (isActualizacionCompletada) {
-        // Mostrar el diálogo de recordatorio después de un pequeño delay
         setTimeout(() => {
           setShowUpdateAfiliadosReminder(true);
         }, 1000);
       }
       
-      // Actualizar la solicitud seleccionada con los datos más recientes del servidor
       if (selectedSolicitud?.id === solicitudId) {
-        const refetchedData = refetchResult.data || [];
-        const updatedFromList = refetchedData.find(req => req.id === solicitudId);
-        
-        if (updatedFromList) {
-          setSelectedSolicitud(updatedFromList);
-          setExpandedFields({});
-        } else {
-          try {
-            const refreshedRequest = await requestsService.getRequestById(solicitudId);
-            if (refreshedRequest) {
-              setSelectedSolicitud(refreshedRequest);
-              setExpandedFields({});
-            } else {
-              setSelectedSolicitud(updatedRequest);
-              setExpandedFields({});
-            }
-          } catch (error) {
-            logger.error("Error al actualizar la solicitud seleccionada", error instanceof Error ? error.message : error);
-            setSelectedSolicitud(updatedRequest);
-            setExpandedFields({});
-          }
-        }
+        await refreshSelectedRequest(String(solicitudId).padStart(10, '0'), updatedRequest);
       }
     } catch (error) {
       logger.error("Error al enviar respuesta con compensaciones", error instanceof Error ? error.message : error);
@@ -2292,7 +2172,7 @@ const AdminSolicitudesPage: React.FC = () => {
         );
       }
 
-      refetch();
+      refetchAll();
     } catch (error) {
       logger.error("Error al actualizar estado de solicitud", error instanceof Error ? error.message : error);
       const errorMessage = getErrorMessage(error);
@@ -2302,12 +2182,14 @@ const AdminSolicitudesPage: React.FC = () => {
     }
   };
 
-  const { currentPage, itemsPerPage, totalPages, totalItems, paginatedData, goToPage, setItemsPerPage } = usePagination(
-    {
-      data: filteredSolicitudes,
-      initialItemsPerPage: 10,
-    },
-  );
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages || 1)));
+  };
+
+  const handleItemsPerPageChange = (items: number) => {
+    setItemsPerPage(items);
+    setCurrentPage(1);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -2786,7 +2668,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {paginatedData.map((solicitud) => (
+                          {solicitudes.map((solicitud) => (
                             <TableRow key={solicitud.id} className="hover:bg-gray-50 transition-colors">
                               <TableCell>
                                 <div className="flex items-center space-x-3">
@@ -2837,7 +2719,6 @@ const AdminSolicitudesPage: React.FC = () => {
                                   </p>
                                   <p className="text-sm text-gray-500">ID: {solicitud.id}</p>
                                   <div className="mt-1">
-                                    {console.log('Debug - has_bank_info_update:', solicitud.id, solicitud.has_bank_info_update)}
                                     <BankInfoUpdateBadge 
                                       hasBankInfoUpdate={
                                         solicitud.has_bank_info_update || 
@@ -2986,7 +2867,7 @@ const AdminSolicitudesPage: React.FC = () => {
 
                     {/* Mobile Card View - Visible on mobile and tablet */}
                     <div className="lg:hidden space-y-3">
-                      {paginatedData.map((solicitud) => (
+                      {solicitudes.map((solicitud) => (
                         <Card key={solicitud.id} className="border shadow-sm hover:shadow-md transition-shadow">
                           <CardContent className="p-4">
                             <div className="space-y-3">
@@ -3208,7 +3089,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       totalItems={totalItems}
                       itemsPerPage={itemsPerPage}
                       onPageChange={goToPage}
-                      onItemsPerPageChange={setItemsPerPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
                       className="mt-4"
                     />
                   </>
@@ -3242,7 +3123,7 @@ const AdminSolicitudesPage: React.FC = () => {
               onOpenChange={setBulkProcessDialogOpen}
               onSuccess={() => {
                 // Refrescar los datos después de procesar respuestas masivas
-                refetch();
+                refetchAll();
                 refetchPendingUpdates();
               }}
             />
@@ -3262,12 +3143,12 @@ const AdminSolicitudesPage: React.FC = () => {
               }
             }}>
               <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6">
-                {isTransitioningRequest && (
+                {(isTransitioningRequest || isLoadingDetail) && (
                   <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-8 w-8 text-primary-prosalud animate-spin" />
                       <p className="text-sm text-gray-700 font-medium">
-                        Cargando solicitud de actualización...
+                        {isTransitioningRequest ? 'Cargando solicitud de actualización...' : 'Cargando detalle de la solicitud...'}
                       </p>
                     </div>
                   </div>

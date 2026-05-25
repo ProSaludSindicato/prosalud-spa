@@ -85,4 +85,6 @@ export interface RequestStats {
   rejected: number;
   this_month: number;
   avg_resolution_time: number;
+  unvalidated?: number;
+  monthly_counts?: Array<{ year: number; month: number; count: number }>;
 }

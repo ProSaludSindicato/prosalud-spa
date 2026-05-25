@@ -222,13 +222,15 @@ const AdminDashboard: React.FC = () => {
     retryOnMount: false,
   });
 
-  const { data: allRequests, isLoading: loadingAllRequests } = useQuery({
-    queryKey: ['dashboard-all-requests'],
-    queryFn: () => requestsService.getRequests(),
+  const { data: recentRequestsResult, isLoading: loadingRecentRequests } = useQuery({
+    queryKey: ['dashboard-recent-requests'],
+    queryFn: () => requestsService.getRequests({ page: 1, perPage: 5, sortBy: 'created_at', sortOrder: 'desc' }),
     enabled: can('requests.view'),
     retry: false,
     retryOnMount: false,
   });
+
+  const recentRequests = recentRequestsResult?.data ?? [];
 
   const { data: wellnessRequestsData, isLoading: loadingWellnessRequests } = useQuery({
     queryKey: ['dashboard-wellness-requests'],
@@ -397,11 +399,11 @@ const AdminDashboard: React.FC = () => {
       let bienestarCount = 0;
 
       // Count requests by month from actual data
-      if (allRequests && can('requests.view')) {
-        solicitudesCount = allRequests.filter((req) => {
-          const reqDate = new Date(req.created_at);
-          return reqDate.getFullYear() === m.year && reqDate.getMonth() === m.monthIndex;
-        }).length;
+      if (requestsStats?.monthly_counts && can('requests.view')) {
+        const match = requestsStats.monthly_counts.find(
+          (entry) => entry.year === m.year && entry.month === m.monthIndex + 1,
+        );
+        solicitudesCount = match?.count ?? 0;
       }
 
       // Count wellness requests by month from actual data
@@ -425,7 +427,7 @@ const AdminDashboard: React.FC = () => {
       inventoryStatus: inventoryStatusData,
       monthlyTrends: monthlyRequestsData,
     };
-  }, [metrics, can, allRequests, wellnessRequestsData]);
+  }, [metrics, can, requestsStats, wellnessRequestsData]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -1268,16 +1270,13 @@ const AdminDashboard: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {loadingAllRequests ? (
+                      {loadingRecentRequests ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin text-primary-prosalud" />
                         </div>
-                      ) : allRequests && allRequests.length > 0 ? (
+                      ) : recentRequests.length > 0 ? (
                         <div className="space-y-3">
-                          {allRequests
-                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            .slice(0, 5)
-                            .map((request) => {
+                          {recentRequests.map((request) => {
                               const statusColors = {
                                 pending: 'bg-amber-100 text-amber-800',
                                 in_progress: 'bg-blue-100 text-blue-800',

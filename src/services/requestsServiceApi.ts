@@ -1,4 +1,4 @@
-import { requestsApiService, ApiRequest, ApiRequestResponse, ApiRequestFile, ApiResponseAttachment, ApiResponseResponder } from './requestsApi';
+import { requestsApiService, ApiRequest, ApiRequestResponse, ApiRequestFile, ApiResponseAttachment, ApiResponseResponder, GetRequestsParams, ApiPagination } from './requestsApi';
 import { Request, RequestResponse, RequestStats, RequestFile, ResponseAttachment, ResponseResponder } from '@/types/requests';
 import { logger } from '@/utils/logger';
 
@@ -87,6 +87,33 @@ const mapBackendRequestTypeToFrontend = (backendType: string): Request['request_
   return typeMap[backendType] || (backendType as Request['request_type']);
 };
 
+const mapFrontendRequestTypeToBackend = (frontendType: string): string => {
+  const typeMap: Record<string, string> = {
+    'retiro-sindical': 'solicitud-retiro-sindical',
+    'microcredito': 'solicitud-microcredito',
+    'incapacidad-licencia': 'incapacidades-licencias',
+    'descanso-laboral': 'compensacion-descanso',
+  };
+
+  return typeMap[frontendType] || frontendType;
+};
+
+const parseApiPayload = (payload: unknown): Record<string, unknown> => {
+  if (!payload) {
+    return {};
+  }
+
+  if (typeof payload === 'string') {
+    try {
+      return JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  return payload as Record<string, unknown>;
+};
+
 // Map API file to frontend file
 const mapApiFileToFrontendFile = (apiFile: ApiRequestFile): RequestFile => {
   return {
@@ -119,7 +146,7 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
     last_name: apiRequest.last_name || '',
     email: apiRequest.email || '',
     phone_number: apiRequest.phone_number || '',
-    payload: apiRequest.payload || {},
+    payload: parseApiPayload(apiRequest.payload),
     status: mapApiStatusToFrontendStatus(apiRequest.status),
     rejection_reason: apiRequest.rejection_reason || undefined,
     status_reason: apiRequest.status_reason || undefined,
@@ -138,13 +165,48 @@ const mapApiRequestToFrontendRequest = (apiRequest: ApiRequest): Request => {
   };
 };
 
+export interface RequestsListResult {
+  data: Request[];
+  pagination?: ApiPagination;
+}
+
+export interface GetRequestsServiceParams {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  status?: string;
+  requestType?: string;
+  requestSubtype?: string;
+  sortBy?: 'created_at' | 'name';
+  sortOrder?: 'asc' | 'desc';
+}
+
 // Service that connects to real API only - no mock fallbacks
 export const requestsService = {
-  async getRequests(): Promise<Request[]> {
-    logger.debug('Fetching requests from API');
-    const apiRequests = await requestsApiService.getAllRequests();
-    logger.debug('Requests fetched', { total: apiRequests.length });
-    return apiRequests.map(mapApiRequestToFrontendRequest);
+  async getRequests(params: GetRequestsServiceParams = {}): Promise<RequestsListResult> {
+    logger.debug('Fetching requests from API', params);
+
+    const apiParams: GetRequestsParams = {
+      page: params.page,
+      per_page: params.perPage,
+      search: params.search,
+      status: params.status && params.status !== 'all' ? params.status : undefined,
+      request_type: params.requestType && params.requestType !== 'all'
+        ? mapFrontendRequestTypeToBackend(params.requestType)
+        : undefined,
+      request_subtype: params.requestSubtype && params.requestSubtype !== 'all'
+        ? params.requestSubtype
+        : undefined,
+      sort_by: params.sortBy,
+      sort_order: params.sortOrder,
+    };
+
+    const response = await requestsApiService.getRequests(apiParams);
+
+    return {
+      data: response.data.map(mapApiRequestToFrontendRequest),
+      pagination: response.pagination,
+    };
   },
 
   async getRequestById(id: string): Promise<Request | null> {
@@ -277,42 +339,27 @@ export const requestsService = {
   },
 
   async getRequestStats(): Promise<RequestStats> {
-    const requests = await this.getRequests();
-    
-    const total = requests.length;
-    const pending = requests.filter(r => r.status === 'pending').length;
-    const in_progress = requests.filter(r => r.status === 'in_progress').length;
-    const resolved = requests.filter(r => r.status === 'resolved').length;
-    const rejected = requests.filter(r => r.status === 'rejected').length;
-    
-    const currentMonth = new Date().getMonth();
-    const this_month = requests.filter(r => 
-      new Date(r.created_at).getMonth() === currentMonth
-    ).length;
-    
-    // Calculate average resolution time
-    const resolvedRequests = requests.filter(r => r.status === 'resolved' && r.resolved_at);
-    let avg_resolution_time = 0;
-    
-    if (resolvedRequests.length > 0) {
-      const totalTime = resolvedRequests.reduce((acc, request) => {
-        const created = new Date(request.created_at).getTime();
-        const resolved = new Date(request.resolved_at!).getTime();
-        return acc + (resolved - created);
-      }, 0);
-      
-      // Convert to hours
-      avg_resolution_time = Math.round(totalTime / (resolvedRequests.length * 1000 * 60 * 60));
-    }
-    
+    const stats = await requestsApiService.getRequestStats();
+
     return {
-      total,
-      pending,
-      in_progress,
-      resolved,
-      rejected,
-      this_month,
-      avg_resolution_time
+      total: stats.total,
+      pending: stats.pending,
+      in_progress: stats.in_progress,
+      resolved: stats.resolved,
+      rejected: stats.rejected,
+      this_month: stats.this_month,
+      avg_resolution_time: stats.avg_resolution_time,
+      unvalidated: stats.unvalidated,
+      monthly_counts: stats.monthly_counts,
+    };
+  },
+
+  async getFilterOptions(): Promise<{ request_types: Request['request_type'][]; subtypes: Array<{ label: string; value: string }> }> {
+    const options = await requestsApiService.getFilterOptions();
+
+    return {
+      request_types: options.request_types.map(mapBackendRequestTypeToFrontend),
+      subtypes: options.subtypes,
     };
   },
 
