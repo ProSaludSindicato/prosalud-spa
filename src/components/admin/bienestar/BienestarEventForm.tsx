@@ -64,15 +64,22 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface EventImageEntry {
+  key: string;
+  preview: string;
+  existingId?: number;
+  file?: File;
+}
+
 interface BienestarEventFormProps {
   event?: BienestarEvent | null;
   onClose: () => void;
 }
 
 const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose }) => {
-  const [images, setImages] = useState<File[]>([]);
+  const [eventImages, setEventImages] = useState<EventImageEntry[]>([]);
+  const [initialImageIds, setInitialImageIds] = useState<number[]>([]);
   const [mainImageIndex, setMainImageIndex] = useState(0);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [listadoAsistencia, setListadoAsistencia] = useState<File | null>(null);
   const [listadoAsistenciaError, setListadoAsistenciaError] = useState<string>('');
@@ -141,10 +148,22 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
       // Cargar las imágenes existentes
       if (event.images && event.images.length > 0) {
-        const previews = event.images.map((img) => img.url);
-        setImagePreviews(previews);
+        setEventImages(
+          event.images.map((img, index) => ({
+            key: img.id ? `existing-${img.id}` : `existing-${index}`,
+            preview: img.url,
+            existingId: img.id,
+          }))
+        );
+        setInitialImageIds(
+          event.images.filter((img) => img.id !== undefined).map((img) => img.id!)
+        );
         const mainIndex = event.images.findIndex((img) => img.isMain);
         setMainImageIndex(mainIndex >= 0 ? mainIndex : 0);
+      } else {
+        setEventImages([]);
+        setInitialImageIds([]);
+        setMainImageIndex(0);
       }
       
       // Resetear el listado de asistencia al editar
@@ -155,6 +174,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       setSelectedWellnessRequestId(null);
     } else {
       // Resetear al crear nuevo evento
+      setEventImages([]);
+      setInitialImageIds([]);
+      setMainImageIndex(0);
       setListadoAsistencia(null);
       setListadoAsistenciaError('');
       setEliminarListadoAsistencia(false);
@@ -362,7 +384,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    if (images.length + files.length > 20) {
+    if (eventImages.length + files.length > 20) {
       toast.error("Límite excedido", {
         description: "Máximo 20 imágenes permitidas.",
       });
@@ -401,23 +423,29 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       }
     }
 
+    const addOptimizedImages = (optimizedFiles: File[]) => {
+      optimizedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          setEventImages((prev) => [
+            ...prev,
+            {
+              key: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              preview: loadEvent.target?.result as string,
+              file,
+            },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
     // Optimizar imágenes antes de agregarlas
     setIsOptimizing(true);
     try {
       const optimizedFiles = await optimizeImages(files);
+      addOptimizedImages(optimizedFiles);
 
-      setImages((prev) => [...prev, ...optimizedFiles]);
-
-      // Crear previews de las imágenes optimizadas
-      optimizedFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setImagePreviews((prev) => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // Notificar optimización
       const imageCount = files.filter(f => isImageFile(f)).length;
       if (imageCount > 0) {
         toast.success("Imágenes optimizadas", {
@@ -431,23 +459,16 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         description: "Se usarán las imágenes sin optimizar.",
         duration: 3000,
       });
-      // Si falla la optimización, usar las imágenes originales
-      setImages((prev) => [...prev, ...files]);
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setImagePreviews((prev) => [...prev, e.target?.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
+      addOptimizedImages(files);
     } finally {
       setIsOptimizing(false);
     }
+
+    e.target.value = "";
   };
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setEventImages((prev) => prev.filter((_, i) => i !== index));
     if (mainImageIndex === index) {
       setMainImageIndex(0);
     } else if (mainImageIndex > index) {
@@ -472,7 +493,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
   };
 
   const handleNextImage = () => {
-    if (selectedImageIndex !== null && selectedImageIndex < imagePreviews.length - 1) {
+    if (selectedImageIndex !== null && selectedImageIndex < eventImages.length - 1) {
       setSelectedImageIndex(selectedImageIndex + 1);
     }
   };
@@ -520,12 +541,27 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     }
   };
 
+  const getDeletedImageIds = (): number[] => {
+    const currentExistingIds = eventImages
+      .filter((img) => img.existingId !== undefined)
+      .map((img) => img.existingId!);
+    return initialImageIds.filter((id) => !currentExistingIds.includes(id));
+  };
+
+  const getNewImages = (): File[] => {
+    return eventImages.filter((img) => img.file).map((img) => img.file!);
+  };
+
+  const hasImageChanges = (): boolean => {
+    return getDeletedImageIds().length > 0 || getNewImages().length > 0;
+  };
+
   // Función auxiliar para verificar si hay cambios pendientes
   const hasPendingChanges = (data: FormData): boolean => {
     if (!event) return false;
     
     return (
-      images.length > 0 ||
+      hasImageChanges() ||
       listadoAsistencia !== null ||
       eliminarListadoAsistencia ||
       form.formState.isDirty ||
@@ -542,11 +578,13 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
 
   // Función para preparar datos de actualización
   const prepareUpdateData = (data: FormData): UpdateWellnessEventData => {
-    // Convertir strings vacíos a null para campos opcionales que fueron eliminados
     const normalizeOptionalString = (value: string | undefined): string | null | undefined => {
       if (value === undefined) return undefined;
       return value.trim() === '' ? null : value;
     };
+
+    const deletedImageIds = getDeletedImageIds();
+    const newImages = getNewImages();
 
     return {
       title: data.title,
@@ -558,14 +596,22 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
       gift: data.gift !== undefined ? normalizeOptionalString(data.gift) : (event!.gift !== undefined ? event!.gift : undefined),
       provider: data.provider || event!.provider || "ProSalud",
       is_visible: event!.isVisible !== undefined ? event!.isVisible : true,
-      images: images.length > 0 ? images : undefined,
+      images: newImages.length > 0 ? newImages : undefined,
+      deleted_image_ids: deletedImageIds.length > 0 ? deletedImageIds : undefined,
       attendance_list: listadoAsistencia || undefined,
       eliminar_attendance_list: eliminarListadoAsistencia && !listadoAsistencia ? true : undefined,
     };
   };
 
   const onSubmit = (data: FormData) => {
-    if (!event && images.length === 0) {
+    if (eventImages.length === 0) {
+      toast.error("Imágenes requeridas", {
+        description: "Debes tener al menos una imagen en el evento.",
+      });
+      return;
+    }
+
+    if (!event && getNewImages().length === 0) {
       toast.error("Imágenes requeridas", {
         description: "Debes subir al menos una imagen.",
       });
@@ -588,8 +634,9 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
           gift: updateData.gift,
           provider: updateData.provider,
           is_visible: updateData.is_visible,
-          tieneNuevasImagenes: images.length > 0,
-          cantidadImagenes: images.length,
+          tieneNuevasImagenes: getNewImages().length > 0,
+          cantidadImagenesNuevas: getNewImages().length,
+          imagenesEliminadas: updateData.deleted_image_ids?.length ?? 0,
           imagenesEnUpdateData: updateData.images ? updateData.images.length : 0,
           tieneListadoAsistencia: !!listadoAsistencia,
           eliminarListadoAsistencia: updateData.eliminar_attendance_list,
@@ -609,7 +656,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
         attendees: data.attendees,
         gift: data.gift,
         is_visible: false, // Por defecto false hasta aprobación
-        images,
+        images: getNewImages(),
         attendance_list: listadoAsistencia || undefined,
         wellness_request_id: relateToRequest && selectedWellnessRequestId ? selectedWellnessRequestId : undefined,
       };
@@ -1099,7 +1146,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {!imagePreviews.length ? (
+                    {!eventImages.length ? (
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors relative">
                         {isOptimizing && (
                           <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg z-10">
@@ -1127,10 +1174,10 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     ) : (
                       <>
                         <div className="grid grid-cols-2 gap-3">
-                          {imagePreviews.map((preview, index) => (
-                            <div key={index} className="relative group">
+                          {eventImages.map((imageEntry, index) => (
+                            <div key={imageEntry.key} className="relative group">
                               <img
-                                src={preview}
+                                src={imageEntry.preview}
                                 alt={`Preview ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg"
                               />
@@ -1262,10 +1309,10 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
               <DialogTitle className="sr-only">
                 Visualización de imagen {selectedImageIndex !== null ? selectedImageIndex + 1 : ''}
               </DialogTitle>
-              {selectedImageIndex !== null && imagePreviews[selectedImageIndex] && (
+              {selectedImageIndex !== null && eventImages[selectedImageIndex] && (
                 <div className="relative w-full h-[95vh] flex items-center justify-center">
                   <img
-                    src={imagePreviews[selectedImageIndex]}
+                    src={eventImages[selectedImageIndex].preview}
                     alt={`Imagen ${selectedImageIndex + 1}`}
                     className="max-w-full max-h-[90vh] object-contain"
                   />
@@ -1290,7 +1337,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                       <ChevronLeft className="h-6 w-6" />
                     </Button>
                   )}
-                  {selectedImageIndex < imagePreviews.length - 1 && (
+                  {selectedImageIndex < eventImages.length - 1 && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1303,7 +1350,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                     </Button>
                   )}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
-                    Imagen {selectedImageIndex + 1} de {imagePreviews.length}
+                    Imagen {selectedImageIndex + 1} de {eventImages.length}
                   </div>
                 </div>
               )}

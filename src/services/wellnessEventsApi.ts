@@ -106,6 +106,7 @@ export interface UpdateWellnessEventData {
   provider?: string;
   is_visible?: boolean;
   images?: File[];
+  deleted_image_ids?: number[];
   attendance_list?: File;
   eliminar_attendance_list?: boolean;
 }
@@ -152,6 +153,7 @@ function mapToBienestarEvent(apiEvent: WellnessEventResponse): BienestarEvent {
       }
       
       return {
+        id: img.id,
         url: imageUrl,
         alt: apiEvent.title,
         isMain: Boolean(img.is_main)
@@ -300,119 +302,101 @@ export async function updateWellnessEvent(
   data: UpdateWellnessEventData
 ): Promise<BienestarEvent> {
   try {
+    const { images, deleted_image_ids, ...fieldsData } = data;
+
     logger.debug('Actualizando evento de bienestar', {
       id,
-      hasImages: Boolean(data.images && data.images.length > 0),
-      dataKeys: Object.keys(data),
-      dataValues: {
-        title: data.title,
-        date: data.date,
-        category: data.category,
-        location: data.location,
-        description: data.description,
-        attendees: data.attendees,
-        gift: data.gift,
-        provider: data.provider,
-        is_visible: data.is_visible,
-      },
+      hasNewImages: Boolean(images && images.length > 0),
+      deletedImageIds: deleted_image_ids,
+      dataKeys: Object.keys(fieldsData),
     });
-    
+
+    if (deleted_image_ids && deleted_image_ids.length > 0) {
+      for (const imageId of deleted_image_ids) {
+        await deleteWellnessEventImage(id, imageId);
+      }
+      logger.debug('Imágenes eliminadas del evento', { total: deleted_image_ids.length });
+    }
+
+    if (images && images.length > 0) {
+      await addImagesToWellnessEvent(id, images);
+      logger.debug('Nuevas imágenes agregadas al evento', { total: images.length });
+    }
+
     const formData = new FormData();
     
     // Agregar campos principales - SIEMPRE enviar si están definidos en el objeto data
     // IMPORTANTE: Todos los campos deben enviarse como strings en FormData según la documentación
-    if (data.title !== undefined) {
-      formData.append('title', String(data.title));
+    if (fieldsData.title !== undefined) {
+      formData.append('title', String(fieldsData.title));
     }
-    if (data.date !== undefined) {
-      formData.append('date', String(data.date));
+    if (fieldsData.date !== undefined) {
+      formData.append('date', String(fieldsData.date));
     }
-    if (data.category !== undefined) {
-      formData.append('category', String(data.category));
+    if (fieldsData.category !== undefined) {
+      formData.append('category', String(fieldsData.category));
     }
-    if (data.location !== undefined) {
-      formData.append('location', String(data.location));
+    if (fieldsData.location !== undefined) {
+      formData.append('location', String(fieldsData.location));
     }
-    if (data.description !== undefined) {
-      // Si es null, no enviar el campo (el backend lo interpretará como eliminación)
-      // Si es string vacío, también tratarlo como null
-      if (data.description !== null && data.description.trim() !== '') {
-        formData.append('description', String(data.description));
+    if (fieldsData.description !== undefined) {
+      if (fieldsData.description !== null && fieldsData.description.trim() !== '') {
+        formData.append('description', String(fieldsData.description));
       } else {
-        // Enviar como string 'null' para que el backend lo interprete como null
         formData.append('description', 'null');
       }
     }
-    if (data.attendees !== undefined && data.attendees !== null) {
-      formData.append('attendees', String(data.attendees));
+    if (fieldsData.attendees !== undefined && fieldsData.attendees !== null) {
+      formData.append('attendees', String(fieldsData.attendees));
     }
-    if (data.gift !== undefined) {
-      // Si es null o string vacío, enviar como 'null' para indicar que se debe eliminar el valor
-      if (data.gift === null || (typeof data.gift === 'string' && data.gift.trim() === '')) {
+    if (fieldsData.gift !== undefined) {
+      if (fieldsData.gift === null || (typeof fieldsData.gift === 'string' && fieldsData.gift.trim() === '')) {
         formData.append('gift', 'null');
       } else {
-        formData.append('gift', String(data.gift));
+        formData.append('gift', String(fieldsData.gift));
       }
     }
-    if (data.provider !== undefined) {
-      formData.append('provider', String(data.provider || ''));
+    if (fieldsData.provider !== undefined) {
+      formData.append('provider', String(fieldsData.provider || ''));
     }
-    if (data.is_visible !== undefined) {
-      // Enviar como string 'true' o 'false' según la documentación
-      formData.append('is_visible', data.is_visible ? 'true' : 'false');
-    }
-    
-    // Agregar nuevas imágenes si existen (reemplazarán las anteriores)
-    // IMPORTANTE: Usar 'images[]' (sin índice) según la documentación del backend
-    if (data.images && data.images.length > 0) {
-      data.images.forEach((file) => {
-        formData.append('images[]', file);
-      });
-      logger.debug('Actualizando imágenes de evento', { total: data.images.length });
+    if (fieldsData.is_visible !== undefined) {
+      formData.append('is_visible', fieldsData.is_visible ? 'true' : 'false');
     }
     
-    // Agregar listado de asistencia si existe (reemplaza el existente)
-    if (data.attendance_list) {
-      formData.append('attendance_list', data.attendance_list);
+    if (fieldsData.attendance_list) {
+      formData.append('attendance_list', fieldsData.attendance_list);
       logger.debug('Listado de asistencia adjuntado al actualizar evento');
     }
     
-    // Eliminar listado de asistencia si se solicita
-    if (data.eliminar_attendance_list === true) {
+    if (fieldsData.eliminar_attendance_list === true) {
       formData.append('eliminar_attendance_list', 'true');
       logger.debug('Solicitando eliminación de listado de asistencia');
     }
     
-    // Logging detallado del FormData
     const formDataEntries = Array.from(formData.entries());
-    const formDataValues = formDataEntries.map(([key, value]) => {
-      // Para archivos, mostrar solo el nombre y tipo
-      if (value instanceof File) {
-        return [key, { type: 'File', name: value.name, size: value.size }];
-      }
-      return [key, value];
-    });
-    
-    logger.debug('Campos preparados para actualización de evento', {
-      totalEntries: formDataEntries.length,
-      entries: formDataValues,
-    });
     
     if (formDataEntries.length === 0) {
-      logger.error('Intento de actualizar evento sin cambios - FormData vacío', {
-        receivedData: data,
-        dataKeys: Object.keys(data),
-      });
+      if ((deleted_image_ids && deleted_image_ids.length > 0) || (images && images.length > 0)) {
+        return getWellnessEvent(id);
+      }
+      logger.error('Intento de actualizar evento sin cambios', { receivedData: data });
       throw new Error('No hay datos para actualizar');
     }
-    
-    // Usar PUT directamente según la documentación de la API
-    // NO incluir Content-Type: el navegador lo agrega automáticamente con el boundary correcto
-    // El interceptor de axios ya elimina Content-Type cuando detecta FormData
-    const response = await api.put<WellnessEventResponse>(
-      `/api/wellness-events/${id}`,
-      formData
-    );
+
+    const hasFileUpload = !!fieldsData.attendance_list;
+
+    const response = hasFileUpload
+      ? await api.post<WellnessEventResponse>(
+          `/api/wellness-events/${id}`,
+          (() => {
+            formData.append('_method', 'PUT');
+            return formData;
+          })()
+        )
+      : await api.put<WellnessEventResponse>(
+          `/api/wellness-events/${id}`,
+          formData
+        );
     
     logger.debug('Evento de bienestar actualizado correctamente', { status: response.status });
     
@@ -464,21 +448,17 @@ export async function addImagesToWellnessEvent(
   try {
     const formData = new FormData();
     
-    images.forEach((file, index) => {
-      formData.append(`images[${index}]`, file);
+    images.forEach((file) => {
+      formData.append('images[]', file);
     });
     
-    const response = await api.post<WellnessEventResponse>(
+    const response = await api.post<{ event?: WellnessEventResponse } & WellnessEventResponse>(
       `/api/wellness-events/${eventId}/images`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     
-    return mapToBienestarEvent(response.data);
+    const eventData = response.data.event ?? response.data;
+    return mapToBienestarEvent(eventData);
   } catch (error) {
     logger.error('Error al agregar imágenes al evento de bienestar', error instanceof Error ? error.message : error);
     throw error;

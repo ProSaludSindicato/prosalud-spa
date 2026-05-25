@@ -28,7 +28,7 @@ export interface BienestarEvent {
   attendees?: number;
   gift?: string;
   provider: string;
-  images: { url: string; alt?: string; isMain: boolean }[];
+  images: { id?: number; url: string; alt?: string; isMain: boolean }[];
   isVisible: boolean;
   createdAt: string;
   attendanceListPath?: string;
