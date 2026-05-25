@@ -349,7 +349,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const [fechaDesdeEntrega, setFechaDesdeEntrega] = useState<string>('');
   const [fechaHastaEntrega, setFechaHastaEntrega] = useState<string>('');
   const [currentPageEntregas, setCurrentPageEntregas] = useState<number>(1);
-  const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(15);
+  const [itemsPerPageEntregas, setItemsPerPageEntregas] = useState<number>(20);
   const [showFiltrosEntregas, setShowFiltrosEntregas] = useState(false);
   
   // Debounce para el filtro de documento (esperar 500ms después de que el usuario deje de escribir)
@@ -542,16 +542,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   const bienestarSolicitudes = wellnessRequestsData?.data || [];
   const pagination = wellnessRequestsData?.pagination;
 
-  // Normalizar el filtro de documento (trim y convertir a string) - usar el valor con debounce
-  const documentoFilterNormalized = useMemo(() => {
-    return documentoEntregaFilterDebounced ? documentoEntregaFilterDebounced.trim().toLowerCase() : '';
-  }, [documentoEntregaFilterDebounced]);
-
-  // Filtros para Entregas de Bienestar (sin documento, se filtra en frontend)
+  // Filtros para Entregas de Bienestar (paginación y filtros en servidor)
   const entregasFilters = useMemo(() => {
     const filters: any = {
-      page: 1, // Siempre obtener la primera página completa para filtrar en frontend
-      per_page: 1000, // Obtener muchos registros para poder filtrar en frontend
+      page: currentPageEntregas,
+      per_page: itemsPerPageEntregas,
       sort_by: 'created_at',
       sort_order: 'desc',
     };
@@ -568,25 +563,29 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     if (fechaHastaEntrega) {
       filters.fecha_hasta = fechaHastaEntrega;
     }
-    // No incluimos documento aquí, se filtra en frontend
+    if (documentoEntregaFilterDebounced.trim()) {
+      filters.documento = documentoEntregaFilterDebounced.trim();
+    }
 
     return filters;
-  }, [tipoEntregaFilter, estadoEntregaFilter, fechaDesdeEntrega, fechaHastaEntrega]);
+  }, [
+    currentPageEntregas,
+    itemsPerPageEntregas,
+    tipoEntregaFilter,
+    estadoEntregaFilter,
+    fechaDesdeEntrega,
+    fechaHastaEntrega,
+    documentoEntregaFilterDebounced,
+  ]);
 
-  // Query para Entregas de Bienestar (obtiene todos los datos para filtrar en frontend)
+  // Query para Entregas de Bienestar (paginación del servidor)
   const {
     data: entregasResponse,
     isLoading: isLoadingEntregas,
     error: errorEntregas,
     refetch: refetchEntregas,
   } = useQuery({
-    queryKey: [
-      'wellness-delivery-requests',
-      tipoEntregaFilter,
-      estadoEntregaFilter,
-      fechaDesdeEntrega,
-      fechaHastaEntrega,
-    ],
+    queryKey: ['wellness-delivery-requests', entregasFilters],
     queryFn: () => wellnessDeliveryService.getRequests(entregasFilters),
     enabled: canViewEntregas && activeTab === 'entregas',
   });
@@ -603,84 +602,24 @@ const AdminSolicitudBienestarPage: React.FC = () => {
   });
   const deliveryTypes = deliveryTypesResponse?.data ?? [];
 
-  // Query para opciones de filtro: estados y tipos que existen en los datos (sin filtrar por tipo/estado)
-  // per_page alto para reducir el riesgo de que estados queden fuera por paginación
-  const { data: filterOptionsResponse } = useQuery({
-    queryKey: ['wellness-delivery-requests', 'filter-options'],
-    queryFn: () => wellnessDeliveryService.getRequests({ per_page: 2000 }),
-    enabled: canViewEntregas,
-  });
-  const filterOptionsData = filterOptionsResponse?.data ?? [];
-
   // Opciones de estado para el filtro (solo Pendiente y Entregado por ahora)
   const uniqueEstadosOptions: { value: string; label: string }[] = [
     { value: 'pendiente', label: 'Pendiente' },
     { value: 'entregado', label: 'Entregado' },
   ];
 
-  // Tipos únicos que existen en los datos (para filtro y export): value puede ser id del tipo o "kit_escolar"
+  // Tipos de entrega administrables + legacy kit escolar (para filtro y export)
   const uniqueTiposOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { value: string; label: string }[] = [];
-    filterOptionsData.forEach((r) => {
-      const id = r.wellness_delivery_type_id != null ? String(r.wellness_delivery_type_id) : (r.tipo_entrega || '');
-      const key = id || 'unknown';
-      if (key !== 'unknown' && !seen.has(key)) {
-        seen.add(key);
-        const label =
-          r.tipo_entrega === 'kit_escolar'
-            ? 'Kit escolar'
-            : (r.tipo_entrega_text || deliveryTypes.find((t) => String(t.id) === key)?.nombre || key);
-        out.push({ value: key, label });
-      }
-    });
-    // Incluir siempre "Kit escolar" (legacy) por si hay registros que no estén en la muestra
-    if (!seen.has('kit_escolar')) {
-      out.push({ value: 'kit_escolar', label: 'Kit escolar' });
-    }
+    const out = deliveryTypes.map((t) => ({
+      value: String(t.id),
+      label: t.nombre,
+    }));
+    out.push({ value: 'kit_escolar', label: 'Kit escolar' });
     return out.sort((a, b) => a.label.localeCompare(b.label));
-  }, [filterOptionsData, deliveryTypes]);
+  }, [deliveryTypes]);
 
-  // Filtrar entregas por documento en el frontend
-  const entregasFiltered = useMemo(() => {
-    let filtered = entregasResponse?.data || [];
-    
-    // Filtrar por documento si hay un valor
-    if (documentoFilterNormalized) {
-      filtered = filtered.filter((entrega) =>
-        entrega.documento_afiliado?.toLowerCase().includes(documentoFilterNormalized)
-      );
-    }
-    
-    return filtered;
-  }, [entregasResponse?.data, documentoFilterNormalized]);
-
-  // Aplicar paginación en el frontend
-  const entregas = useMemo(() => {
-    const startIndex = (currentPageEntregas - 1) * itemsPerPageEntregas;
-    const endIndex = startIndex + itemsPerPageEntregas;
-    return entregasFiltered.slice(startIndex, endIndex);
-  }, [entregasFiltered, currentPageEntregas, itemsPerPageEntregas]);
-
-  // Calcular paginación manual
-  // Usar total del API cuando no hay filtro por documento (el backend puede devolver menos registros por límite)
-  const entregasPagination = useMemo(() => {
-    const dataCount = entregasFiltered.length;
-    const apiTotal = entregasResponse?.pagination?.total;
-    const total = documentoFilterNormalized
-      ? dataCount
-      : (apiTotal != null ? apiTotal : dataCount);
-    const totalPages = Math.ceil(dataCount / itemsPerPageEntregas);
-    return {
-      current_page: currentPageEntregas,
-      per_page: itemsPerPageEntregas,
-      total,
-      total_pages: totalPages,
-      last_page: totalPages,
-      from: dataCount > 0 ? (currentPageEntregas - 1) * itemsPerPageEntregas + 1 : 0,
-      to: Math.min(currentPageEntregas * itemsPerPageEntregas, dataCount),
-    };
-  }, [entregasFiltered.length, entregasResponse?.pagination?.total, documentoFilterNormalized, currentPageEntregas, itemsPerPageEntregas]);
+  const entregas = entregasResponse?.data ?? [];
+  const entregasPagination = entregasResponse?.pagination;
 
   // Open modal from URL parameter
   useEffect(() => {
