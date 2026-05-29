@@ -130,10 +130,7 @@ export const authenticateForDataUpdate = async (
         throw new Error(message);
       } else if (status === 401) {
         const reason = errorData.auth_failure_reason;
-        const message =
-          reason === 'affiliate_data_mismatch'
-            ? errorData.message || 'El número de documento existe pero el tipo de documento o la fecha de expedición no coinciden. Verifica los datos.'
-            : errorData.message || 'No existe un afiliado con ese número de documento.';
+        const message = "No pudimos verificar tu identidad con los datos proporcionados. Confirma que tu número de documento, tipo de documento y fecha de expedición sean correctos. Si la información es correcta, por favor contacta al equipo de ProSalud para obtener ayuda.";
         throw new AfiliadoAuthFailureError(message, reason);
       } else if (status === 422) {
         const message = errorData.message || 'Datos de entrada inválidos';

@@ -1,16 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ShieldCheck,
   Search,
   Loader2,
   RefreshCw,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
-  Users,
   Download,
   FileText,
   Info,
@@ -27,14 +23,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -180,10 +168,7 @@ const isRecentReturn = (dateString: string): boolean => {
 
 const AdminSstPage: React.FC = () => {
   const { toast } = useToast();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [affiliates, setAffiliates] = useState<SstAffiliate[]>([]);
-  const [totalAffiliates, setTotalAffiliates] = useState(0);
   const [hospitalOptions, setHospitalOptions] = useState<string[]>([]);
   const [inventory, setInventory] = useState<SstInventoryItem[]>([]);
   const [deliveryHistory, setDeliveryHistory] = useState<SstDeliveryRecord[]>([]);
@@ -193,10 +178,6 @@ const AdminSstPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'delivery' | 'return'>('delivery');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [hospitalFilter, setHospitalFilter] = useState<string>('all');
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [listFilterTerm, setListFilterTerm] = useState('');
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportHospital, setExportHospital] = useState<string>('all');
   const [exportStartDate, setExportStartDate] = useState('');
@@ -212,12 +193,10 @@ const AdminSstPage: React.FC = () => {
   const [deliveredByUsers, setDeliveredByUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoadingDeliveredByUsers, setIsLoadingDeliveredByUsers] = useState(false);
 
-  const [isLoadingAffiliates, setIsLoadingAffiliates] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingReturnHistory, setIsLoadingReturnHistory] = useState(false);
   const [isSearchingAffiliate, setIsSearchingAffiliate] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [returnConfirmationModalOpen, setReturnConfirmationModalOpen] = useState(false);
@@ -233,7 +212,6 @@ const AdminSstPage: React.FC = () => {
       }
     | null
   >(null);
-  const [showAffiliateList, setShowAffiliateList] = useState(true);
   const [highlightedRecordId, setHighlightedRecordId] = useState<string | null>(null);
   const [showLastDeliveryItems, setShowLastDeliveryItems] = useState(false);
   const [showLastReturnItems, setShowLastReturnItems] = useState(false);
@@ -253,60 +231,6 @@ const AdminSstPage: React.FC = () => {
     },
     [],
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let isMounted = true;
-
-    const fetchAffiliates = async () => {
-      try {
-        setIsLoadingAffiliates(true);
-        const response = await sstAdminService.getAffiliates({
-          page: currentPage,
-          pageSize: itemsPerPage,
-          hospital: hospitalFilter !== 'all' ? hospitalFilter : undefined,
-          status: 'all',
-          searchTerm: listFilterTerm || undefined,
-          signal: controller.signal,
-        });
-
-        if (!isMounted) return;
-
-        setAffiliates(response.items);
-        setTotalAffiliates(response.total ?? 0);
-        setErrorMessage(null);
-
-        setHospitalOptions((prev) => {
-          const next = new Set(prev);
-          response.items.forEach((item) => {
-            if (item.hospital) {
-              next.add(item.hospital);
-            }
-          });
-          return Array.from(next).sort((a, b) => a.localeCompare(b));
-        });
-      } catch (error) {
-        if (!isMounted) return;
-        logger.error('Error al cargar afiliados SST', error instanceof Error ? error.message : error);
-        const message = error instanceof Error ? error.message : 'No fue posible cargar la lista de afiliados.';
-        setAffiliates([]);
-        setTotalAffiliates(0);
-        setErrorMessage(message);
-        showFeedbackBanner('error', 'Error al cargar afiliados', message);
-      } finally {
-        if (isMounted) {
-          setIsLoadingAffiliates(false);
-        }
-      }
-    };
-
-    fetchAffiliates();
-
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [currentPage, itemsPerPage, hospitalFilter, listFilterTerm, showFeedbackBanner]);
 
   // Helper function to search affiliate by document number trying all document types
   const searchAffiliateByDocumentNumber = async (
@@ -394,7 +318,6 @@ const AdminSstPage: React.FC = () => {
                 duration: 5000,
               });
               setSelectedAffiliate(null);
-              setShowAffiliateList(true);
             }
             setIsSearchingAffiliate(false);
           })
@@ -431,7 +354,7 @@ const AdminSstPage: React.FC = () => {
         }
         logger.error('Error al cargar inventario SST', error instanceof Error ? error.message : error);
         if (isMounted) {
-          setErrorMessage('No fue posible cargar la información de inventario.');
+          showFeedbackBanner('error', 'Error al cargar inventario', 'No fue posible cargar la información de inventario.');
         }
       } finally {
         if (isMounted) {
@@ -545,37 +468,14 @@ const AdminSstPage: React.FC = () => {
     };
   }, [selectedAffiliate, fetchDeliveryHistory, fetchReturnHistory]);
 
-  const totalItems = totalAffiliates;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-
   const exportHospitalOptions = useMemo(() => {
     const options = new Set(hospitalOptions.filter((option) => option && option.trim().length > 0));
     return ['all', ...Array.from(options).sort((a, b) => a.localeCompare(b))];
   }, [hospitalOptions]);
 
-  const sortedAffiliates = useMemo(() => {
-    if (affiliates.length === 0) return [];
- 
-     const copy = [...affiliates];
-     copy.sort((a, b) => {
-       const nameA = `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim().toLowerCase();
-       const nameB = `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim().toLowerCase();
-       return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-     });
-     return copy;
-  }, [affiliates]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-
   const handleSelectAffiliate = (affiliate: SstAffiliate) => {
     setSelectedAffiliate(affiliate);
     setSearchTerm(affiliate.documentNumber);
-    setShowAffiliateList(false);
 
     // Si el afiliado está retirado, cambiar automáticamente a modo devolución
     const isRetired = affiliate.status?.toUpperCase() === 'RETIRADO';
@@ -634,12 +534,10 @@ const AdminSstPage: React.FC = () => {
           duration: 5000,
         });
         setSelectedAffiliate(null);
-        setShowAffiliateList(true);
         return;
       }
 
       handleSelectAffiliate(affiliate);
-      setListFilterTerm('');
       showFeedbackBanner(
         'success',
         'Afiliado encontrado',
@@ -660,7 +558,6 @@ const AdminSstPage: React.FC = () => {
         variant: 'destructive',
         duration: 5000,
       });
-      setShowAffiliateList(true);
     } finally {
       setIsSearchingAffiliate(false);
       controller.abort();
@@ -670,12 +567,10 @@ const AdminSstPage: React.FC = () => {
   const handleResetSelection = () => {
     setSelectedAffiliate(null);
     setSearchTerm('');
-    setListFilterTerm('');
-    setShowAffiliateList(true);
   };
 
   const handleOpenExportDialog = () => {
-    setExportHospital(hospitalFilter);
+    setExportHospital('all');
     setExportStartDate('');
     setExportEndDate('');
     setExportDocumentNumber('');
@@ -704,6 +599,7 @@ const AdminSstPage: React.FC = () => {
 
         // Extraer usuarios únicos de las entregas
         const usersMap = new Map<string, string>();
+        const hospitalsSet = new Set<string>();
         
         response.items.forEach((delivery) => {
           const deliveredBy = delivery.deliveredBy;
@@ -713,7 +609,13 @@ const AdminSstPage: React.FC = () => {
           if (deliveredBy && !usersMap.has(deliveredBy)) {
             usersMap.set(deliveredBy, deliveredByName);
           }
+
+          if (delivery.affiliateHospital) {
+            hospitalsSet.add(delivery.affiliateHospital);
+          }
         });
+
+        setHospitalOptions(Array.from(hospitalsSet).sort((a, b) => a.localeCompare(b)));
 
         // Convertir el Map a un array de objetos y ordenar alfabéticamente
         const usersList = Array.from(usersMap.entries())
@@ -784,17 +686,6 @@ const AdminSstPage: React.FC = () => {
       });
 
       await fetchDeliveryHistory(record.affiliateId, { showLoading: false });
-
-      setAffiliates((prev) =>
-        prev.map((affiliate) =>
-          affiliate.id === record.affiliateId
-            ? {
-                ...affiliate,
-                lastDeliveryAt: record.deliveredAt,
-              }
-            : affiliate,
-        ),
-      );
 
       setSelectedAffiliate((prev) =>
         prev && prev.id === record.affiliateId
@@ -1224,7 +1115,7 @@ const AdminSstPage: React.FC = () => {
                         Gestión Dotación y EPP
                       </CardTitle>
                       <CardDescription className="text-sm sm:text-base mt-1 sm:mt-2">
-                        Consulta afiliados activos, registra entregas de dotación y elementos de protección personal,
+                        Busca afiliados por número de documento, registra entregas de dotación y elementos de protección personal,
                         y guarda la firma de recibido como constancia.
                       </CardDescription>
                     </div>
@@ -1300,42 +1191,14 @@ const AdminSstPage: React.FC = () => {
           <motion.div variants={itemVariants}>
             <Card className="border shadow-sm">
               <CardHeader className="pb-2">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <Search className="h-5 w-5 text-primary-prosalud" />
-                      Buscar afiliado
-                    </CardTitle>
-                    <CardDescription>
-                      Ingresa el número de documento del afiliado para registrar la entrega.
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start gap-2 text-sm text-primary-prosalud hover:text-white w-full sm:w-auto"
-                      onClick={() =>
-                        setShowAffiliateList((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setSelectedAffiliate(null);
-                          }
-                          return next;
-                        })
-                      }
-                      disabled={isSearchingAffiliate}
-                    >
-                      <Users className="h-4 w-4" />
-                      <span className="hidden sm:inline">
-                        {showAffiliateList ? 'Ocultar listado de afiliados' : 'Mostrar listado de afiliados'}
-                      </span>
-                      <span className="sm:hidden">
-                        {showAffiliateList ? 'Ocultar listado' : 'Mostrar listado'}
-                      </span>
-                    </Button>
-                  </div>
+                <div>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Search className="h-5 w-5 text-primary-prosalud" />
+                    Buscar afiliado
+                  </CardTitle>
+                  <CardDescription>
+                    Ingresa el número de documento del afiliado para registrar la entrega o devolución.
+                  </CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1406,253 +1269,8 @@ const AdminSstPage: React.FC = () => {
               </CardContent>
             </Card>
           </motion.div>
-          
-          {showAffiliateList && (
-          <motion.div variants={itemVariants}>
-            <Card className="border shadow-sm">
-              <CardHeader className="pb-3 p-4 sm:p-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-lg sm:text-xl">Afiliados activos en Dotación y EPP</CardTitle>
-                    <CardDescription className="text-sm">
-                      Lista general de afiliados activos.
-                    </CardDescription>
-                  </div>
-                  <div className="w-full sm:w-48 flex-shrink-0">
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Filtrar por hospital
-                    </label>
-                    <Select
-                      value={hospitalFilter}
-                      onValueChange={(value) => {
-                        setHospitalFilter(value);
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos los hospitales" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los hospitales</SelectItem>
-                        {hospitalOptions.map((hospital) => (
-                          <SelectItem key={hospital} value={hospital}>
-                            {hospital}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {errorMessage && (
-                  <>
-                    <Alert variant="destructive" className="mx-4 mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>No se pudo cargar la información</AlertTitle>
-                      <AlertDescription>{errorMessage}</AlertDescription>
-                    </Alert>
-                    <Separator />
-                  </>
-                )}
-                {/* Desktop Table View - Hidden on mobile */}
-                <div className="hidden lg:block">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-slate-50 shadow-sm">
-                      <TableRow>
-                        <TableHead className="w-[28%]">
-                          Afiliado
-                        </TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Hospital</TableHead>
-                        <TableHead>Rol</TableHead>
-                        <TableHead>Última entrega</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoadingAffiliates ? (
-                        <TableRow>
-                          <TableCell colSpan={5}>
-                            <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Cargando afiliados activos...
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : totalItems === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5}>
-                            <div className="py-6 text-center text-sm text-slate-500">
-                              No se encontraron afiliados que coincidan con la búsqueda.
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        sortedAffiliates.map((affiliate) => {
-                          const isSelected = selectedAffiliate?.id === affiliate.id;
-                          return (
-                            <TableRow
-                              key={affiliate.id}
-                              onClick={() => handleSelectAffiliate(affiliate)}
-                              className={`cursor-pointer transition-colors ${
-                                isSelected
-                                  ? 'bg-primary-prosalud/10 hover:bg-primary-prosalud/20'
-                                  : 'hover:bg-primary-prosalud/10'
-                              }`}
-                            >
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-slate-800">
-                                    {affiliate.firstName} {affiliate.lastName}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-slate-700">{affiliate.documentNumber}</span>
-                                  <span className="text-xs uppercase text-slate-400">{affiliate.documentType}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm text-slate-600">{affiliate.hospital}</TableCell>
-                              <TableCell className="text-sm text-slate-600">{affiliate.role}</TableCell>
-                              <TableCell className="text-sm text-slate-600">
-                                {affiliate.lastDeliveryAt
-                                  ? new Date(affiliate.lastDeliveryAt).toLocaleDateString()
-                                  : 'Sin registro'}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
 
-                {/* Mobile Card View - Visible on mobile and tablet */}
-                <div className="lg:hidden space-y-3 p-4">
-                  {isLoadingAffiliates ? (
-                    <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando afiliados activos...
-                    </div>
-                  ) : totalItems === 0 ? (
-                    <div className="py-6 text-center text-sm text-slate-500">
-                      No se encontraron afiliados que coincidan con la búsqueda.
-                    </div>
-                  ) : (
-                    sortedAffiliates.map((affiliate) => {
-                      const isSelected = selectedAffiliate?.id === affiliate.id;
-                      return (
-                        <Card
-                          key={affiliate.id}
-                          onClick={() => handleSelectAffiliate(affiliate)}
-                          className={`cursor-pointer transition-all border-2 ${
-                            isSelected
-                              ? 'border-primary-prosalud bg-primary-prosalud/10 shadow-md'
-                              : 'border-slate-200 hover:border-primary-prosalud/50 hover:shadow-sm'
-                          }`}
-                        >
-                          <CardContent className="p-4">
-                            <div className="space-y-3">
-                              {/* Header with name */}
-                              <div>
-                                <h3 className="font-semibold text-slate-800 text-base mb-1">
-                                  {affiliate.firstName} {affiliate.lastName}
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-slate-700 text-sm">{affiliate.documentNumber}</span>
-                                  <span className="text-xs uppercase text-slate-400">{affiliate.documentType}</span>
-                                </div>
-                              </div>
-
-                              {/* Details */}
-                              <div className="grid grid-cols-1 gap-2 border-t pt-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium text-slate-500">Hospital</span>
-                                  <span className="text-sm text-slate-700">{affiliate.hospital}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium text-slate-500">Rol</span>
-                                  <span className="text-sm text-slate-700">{affiliate.role}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-medium text-slate-500">Última entrega</span>
-                                  <span className="text-sm text-slate-600">
-                                    {affiliate.lastDeliveryAt
-                                      ? new Date(affiliate.lastDeliveryAt).toLocaleDateString()
-                                      : 'Sin registro'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
-                  )}
-                </div>
-                <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Filter className="h-4 w-4" />
-                    <span>
-                      Mostrando {sortedAffiliates.length} de {totalItems} afiliados
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                     <div className="flex items-center gap-2 text-sm text-slate-600">
-                       <span>Filas por página</span>
-                       <Select
-                         value={String(itemsPerPage)}
-                         onValueChange={(value) => {
-                           setItemsPerPage(Number(value));
-                           setCurrentPage(1);
-                         }}
-                       >
-                         <SelectTrigger className="h-8 w-20">
-                           <SelectValue placeholder={itemsPerPage} />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {[10, 25, 50].map((size) => (
-                             <SelectItem key={size} value={String(size)}>
-                               {size}
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Button
-                         type="button"
-                         variant="outline"
-                         size="sm"
-                         onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                         disabled={currentPage === 1}
-                         className="h-8 w-8 p-0"
-                       >
-                         <ChevronLeft className="h-4 w-4" />
-                       </Button>
-                       <span className="text-sm text-slate-600">
-                         Página {currentPage} de {totalPages}
-                       </span>
-                       <Button
-                         type="button"
-                         variant="outline"
-                         size="sm"
-                         onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                         disabled={currentPage === totalPages}
-                         className="h-8 w-8 p-0"
-                       >
-                         <ChevronRight className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   </div>
-                 </div>
-               </CardContent>
-             </Card>
-           </motion.div>
-          )}
-
-          {selectedAffiliate && !showAffiliateList && (
+          {selectedAffiliate && (
             <motion.div variants={itemVariants} ref={deliveryPanelRef}>
               <Card className={`border-2 shadow-sm ${
                 viewMode === 'delivery' 

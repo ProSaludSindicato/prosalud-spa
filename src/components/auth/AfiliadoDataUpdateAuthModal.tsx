@@ -200,7 +200,7 @@ const AfiliadoDataUpdateAuthModal: React.FC<AfiliadoDataUpdateAuthModalProps> = 
               </AlertTitle>
               <AlertDescription className="mt-1">
                 {authError.reason === 'affiliate_data_mismatch'
-                  ? 'El número de documento existe en nuestro archivo, pero el tipo de documento o la fecha de expedición no coinciden. Verifica la información e intenta nuevamente. Si el problema persiste o consideras que tus datos son correctos, comunícate con ProSalud para revisar tu caso.'
+                  ? 'No pudimos verificar tu identidad con los datos proporcionados. Confirma que tu número de documento, tipo de documento y fecha de expedición sean correctos. Si la información es correcta, por favor contacta al equipo de ProSalud para obtener ayuda.'
                   : authError.message}
               </AlertDescription>
             </Alert>
