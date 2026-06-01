@@ -392,6 +392,8 @@ class SocioDemographicSurveyApi {
     error?: string;
     message?: string;
     count?: number;
+    completed_parts?: number;
+    total_parts?: number;
   }> {
     const url = buildAdminApiUrl(`/api/socio-demographic-surveys/export/pdf/status/${jobId}`);
     const response = await fetch(url, {

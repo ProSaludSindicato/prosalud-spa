@@ -64,6 +64,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
   const [exportStatus, setExportStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState<{ completedParts: number; totalParts: number; count?: number } | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const availableYears = useMemo(() => {
@@ -104,6 +105,7 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
       setExportStatus('idle');
       setExportError(null);
       setExportJobId(null);
+      setExportProgress(null);
       setIsGenerating(false);
       setIncludeSignatures(false);
       setExportFormat('excel');
@@ -228,11 +230,12 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
             document.body.removeChild(link);
             window.URL.revokeObjectURL(downloadUrl);
             setExportStatus('completed');
+            setExportProgress(null);
             setIsGenerating(false);
             toast.success('Reporte PDF generado', {
               description: statusResult.count != null
                 ? `Se descargaron ${statusResult.count} encuestas.`
-                : 'El PDF se ha descargado correctamente.',
+                : 'El ZIP con los PDFs se ha descargado correctamente.',
             });
             onOpenChange(false);
           } catch (error) {
@@ -256,6 +259,18 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
           setExportError(errMsg);
           toast.error('Error al generar PDF', { description: errMsg });
           return;
+        }
+
+        if (
+          statusResult.status === 'processing' &&
+          statusResult.total_parts != null &&
+          statusResult.total_parts > 0
+        ) {
+          setExportProgress({
+            completedParts: statusResult.completed_parts ?? 0,
+            totalParts: statusResult.total_parts,
+            count: statusResult.count,
+          });
         }
 
         setExportStatus('processing');
@@ -784,9 +799,28 @@ const ExportSurveysDialog: React.FC<ExportSurveysDialogProps> = ({
                     </h4>
                     <p className="text-sm text-blue-800 mt-1">
                       {exportFormat === 'pdf'
-                        ? 'El PDF se está generando en segundo plano. Se descargará automáticamente cuando esté listo.'
+                        ? exportProgress && exportProgress.totalParts > 0
+                          ? exportProgress.completedParts >= exportProgress.totalParts
+                            ? 'Todas las partes están listas. Empaquetando el archivo ZIP...'
+                            : `Generando parte ${exportProgress.completedParts} de ${exportProgress.totalParts}${
+                                exportProgress.count != null ? ` (${exportProgress.count} encuestas)` : ''
+                              }. Se descargará automáticamente cuando esté listo.`
+                          : 'El ZIP con los PDFs se está generando en segundo plano. Se descargará automáticamente cuando esté listo.'
                         : 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo para descargar.'}
                     </p>
+                    {exportFormat === 'pdf' && exportProgress && exportProgress.totalParts > 0 && (
+                      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                          style={{
+                            width: `${Math.min(
+                              exportProgress.completedParts >= exportProgress.totalParts ? 95 : 90,
+                              Math.round((exportProgress.completedParts / exportProgress.totalParts) * 90)
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
