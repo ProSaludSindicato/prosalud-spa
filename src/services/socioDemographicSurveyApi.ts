@@ -13,6 +13,7 @@ export interface SocioDemographicSurveyListItem {
   formatted_created_at: string;
   nombres?: string | null;
   apellidos?: string | null;
+  tiene_restriccion_laboral?: boolean;
 }
 
 export interface PaginationData {
@@ -208,6 +209,7 @@ export interface GetSurveysParams {
   survey_type?: string;
   numero_documento?: string;
   nombre?: string;
+  recomendacion_restriccion_laboral?: 'si' | 'no';
   per_page?: number;
   page?: number;
 }
@@ -261,6 +263,9 @@ class SocioDemographicSurveyApi {
     }
     if (params?.nombre) {
       queryParams.append('nombre', params.nombre);
+    }
+    if (params?.recomendacion_restriccion_laboral) {
+      queryParams.append('recomendacion_restriccion_laboral', params.recomendacion_restriccion_laboral);
     }
     if (params?.per_page) {
       queryParams.append('per_page', params.per_page.toString());
