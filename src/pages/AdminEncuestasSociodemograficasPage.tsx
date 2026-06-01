@@ -31,8 +31,10 @@ import {
   UserCheck,
   ClipboardList,
   Settings,
+  ShieldAlert,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -260,6 +262,14 @@ const getSurveyTypeBadgeClasses = (surveyType: string | null | undefined): strin
   return 'text-xs bg-green-100 text-green-800 border-green-300 hover:bg-green-200 whitespace-nowrap';
 };
 
+const LaborRestrictionIndicator: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span
+    className={`inline-block h-2.5 w-2.5 rounded-full bg-purple-600 flex-shrink-0 ${className}`}
+    title="Tiene recomendación o restricción laboral"
+    aria-label="Tiene recomendación o restricción laboral"
+  />
+);
+
 const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -303,6 +313,10 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   const [nombreFilter, setNombreFilter] = useState<string>(
     searchParams.get('nombre') || ''
   );
+  const [laborRestrictionFilter, setLaborRestrictionFilter] = useState<string>(() => {
+    const value = searchParams.get('recomendacion_restriccion_laboral');
+    return value === 'si' || value === 'no' ? value : 'all';
+  });
   const [perPage, setPerPage] = useState<number>(
     parseInt(searchParams.get('per_page') || '15', 10)
   );
@@ -354,7 +368,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
   useEffect(() => {
     if (id) return;
     setCurrentPage(1);
-  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, id]);
+  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, laborRestrictionFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, id]);
 
   // Sincronizar filtros con searchParams automáticamente (reactivo)
   useEffect(() => {
@@ -374,6 +388,9 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (nombreFilterDebounced.trim()) {
       newParams.set('nombre', nombreFilterDebounced.trim());
     }
+    if (laborRestrictionFilter && laborRestrictionFilter !== 'all') {
+      newParams.set('recomendacion_restriccion_laboral', laborRestrictionFilter);
+    }
     newParams.set('per_page', perPage.toString());
     newParams.set('page', currentPage.toString());
 
@@ -383,7 +400,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (currentParams !== newParamsString) {
       setSearchParams(newParams, { replace: true });
     }
-  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
+  }, [yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, laborRestrictionFilter, numeroDocumentoFilterDebounced, nombreFilterDebounced, perPage, currentPage, id]);
 
   // Opciones de filtrado (endpoint dedicado; la respuesta index puede incluir filter_options y se usará al cargar)
   const { data: filterOptionsData } = useQuery({
@@ -408,8 +425,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     if (nombreTrimmed) params.nombre = nombreTrimmed;
     const documentoTrimmed = numeroDocumentoFilterDebounced.trim();
     if (documentoTrimmed) params.numero_documento = documentoTrimmed;
+    if (laborRestrictionFilter === 'si' || laborRestrictionFilter === 'no') {
+      params.recomendacion_restriccion_laboral = laborRestrictionFilter;
+    }
     return params;
-  }, [id, yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, nombreFilterDebounced, numeroDocumentoFilterDebounced, perPage, currentPage]);
+  }, [id, yearFilter, monthFilter, hospitalsFilter, hospitalFilter, surveyTypeFilter, laborRestrictionFilter, nombreFilterDebounced, numeroDocumentoFilterDebounced, perPage, currentPage]);
 
   // Obtener lista de encuestas (ejecutar siempre, pero solo habilitado si no hay id)
   const {
@@ -519,6 +539,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     setHospitalsFilter([]);
     setHospitalFilter('');
     setSurveyTypeFilter('all');
+    setLaborRestrictionFilter('all');
     setNumeroDocumentoFilter('');
     setNombreFilter('');
     setCurrentPage(1);
@@ -531,6 +552,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
     hospitalsFilter.length ||
     hospitalFilter.trim() ||
     surveyTypeFilter !== 'all' ||
+    laborRestrictionFilter !== 'all' ||
     numeroDocumentoFilter.trim() ||
     nombreFilter.trim()
   );
@@ -908,7 +930,7 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Número de Documento</label>
                 <Input
@@ -935,6 +957,19 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active_affiliate">Afiliados Activos</SelectItem>
                     <SelectItem value="new_entry">Nuevo Ingreso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Restricción laboral</label>
+                <Select value={laborRestrictionFilter} onValueChange={setLaborRestrictionFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="si">Con restricción</SelectItem>
+                    <SelectItem value="no">Sin restricción</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -997,6 +1032,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                     pagination.total
                   )} de ${pagination.total} encuestas del año ${yearFilter}`
                 : 'Cargando...'}
+              <span className="block sm:inline sm:ml-6 mt-1 sm:mt-0 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <LaborRestrictionIndicator className="h-2 w-2" />
+                  Indica afiliado con recomendación o restricción laboral
+                </span>
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1041,7 +1082,11 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                         >
                           <TableCell>
                             <div className="flex items-start gap-2">
-                              <ClipboardList className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                              {survey.tiene_restriccion_laboral ? (
+                                <LaborRestrictionIndicator className="mt-1.5" />
+                              ) : (
+                                <ClipboardList className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                              )}
                               <div className="min-w-0">
                                 {nombreCompleto ? (
                                   <p className="text-sm font-medium text-slate-900">{nombreCompleto}</p>
@@ -1113,8 +1158,12 @@ const AdminEncuestasSociodemograficasPage: React.FC = () => {
                             {/* Header with user info and actions */}
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3 flex-1 min-w-0">
-                                <div className="bg-slate-100 p-2 rounded-full flex-shrink-0">
-                                  <ClipboardList className="h-4 w-4 text-slate-600" />
+                                <div className={`p-2 rounded-full flex-shrink-0 ${survey.tiene_restriccion_laboral ? 'bg-purple-100' : 'bg-slate-100'}`}>
+                                  {survey.tiene_restriccion_laboral ? (
+                                    <LaborRestrictionIndicator className="h-3 w-3" />
+                                  ) : (
+                                    <ClipboardList className="h-4 w-4 text-slate-600" />
+                                  )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   {nombreCompleto && (
@@ -1539,8 +1588,14 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                       ← Volver
                     </Button>
                     <div className="flex-1">
-                      <CardTitle className="text-3xl font-bold text-primary-prosalud">
+                      <CardTitle className="text-3xl font-bold text-primary-prosalud flex flex-wrap items-center gap-3">
                         Encuesta Sociodemográfica
+                        {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' && (
+                          <Badge className="bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-100 gap-1.5">
+                            <LaborRestrictionIndicator className="h-2 w-2" />
+                            Restricción laboral
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription className="text-base mt-2 flex items-center gap-2">
                         <span>ID: <span className="font-mono">{survey.id}</span></span>
@@ -1584,6 +1639,24 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
               </CardHeader>
             </Card>
           </motion.div>
+
+          {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' && (
+            <motion.div variants={itemVariantsDetail}>
+              <Alert className="border-purple-300 bg-purple-50">
+                <ShieldAlert className="h-5 w-5 text-purple-700" />
+                <AlertTitle className="text-purple-900">Restricción laboral reportada</AlertTitle>
+                <AlertDescription className="text-purple-800">
+                  Este afiliado indicó que tiene una recomendación o restricción laboral emitida por un médico o especialista.
+                  Revise el detalle para evaluar la situación y definir las acciones que correspondan.
+                  {survey.detalle_recomendacion_laboral && (
+                    <span className="block mt-2 font-medium whitespace-pre-wrap">
+                      {survey.detalle_recomendacion_laboral}
+                    </span>
+                  )}
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
 
           {/* Información General */}
           <motion.div variants={itemVariantsDetail}>
@@ -2114,24 +2187,34 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
 
           {/* Recomendaciones Laborales */}
           <motion.div variants={itemVariantsDetail}>
-            <Card>
+            <Card className={survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' ? 'border-purple-300 bg-purple-50/40' : undefined}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ClipboardCheck className="h-5 w-5 text-primary-prosalud" />
+                  <ClipboardCheck className={`h-5 w-5 ${survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' ? 'text-purple-700' : 'text-primary-prosalud'}`} />
                   Recomendaciones Laborales
+                  {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' && (
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-100 ml-1">
+                      Pendiente de revisión
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-            {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' && survey.detalle_recomendacion_laboral ? (
+            {survey.recomendacion_restriccion_laboral?.toLowerCase() === 'si' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-slate-600">¿Tiene recomendación o restricción laboral?</label>
-                  <p className="text-base">{formatSiNo(survey.recomendacion_restriccion_laboral)}</p>
+                  <p className="text-base font-medium text-purple-800 flex items-center gap-2">
+                    <LaborRestrictionIndicator />
+                    Sí
+                  </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Detalle de la Recomendación</label>
-                  <p className="text-base whitespace-pre-wrap">{survey.detalle_recomendacion_laboral}</p>
-                </div>
+                {survey.detalle_recomendacion_laboral && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">Detalle de la Recomendación</label>
+                    <p className="text-base whitespace-pre-wrap text-purple-900">{survey.detalle_recomendacion_laboral}</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div>
