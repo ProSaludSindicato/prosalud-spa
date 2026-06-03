@@ -181,27 +181,9 @@ export const bancos = [
   { value: 'otros', label: 'Otros' },
 ];
 
-export const epsList = [
-  { value: 'sura', label: 'EPS Sura' },
-  { value: 'nueva_eps', label: 'Nueva EPS' },
-  { value: 'sanitas', label: 'Sanitas' },
-  { value: 'coomeva', label: 'Coomeva EPS' },
-  { value: 'compensar', label: 'Compensar EPS' },
-  { value: 'famisanar', label: 'Famisanar' },
-  { value: 'savia', label: 'Savia Salud EPS' },
-  { value: 'aliansalud', label: 'Aliansalud' },
-  { value: 'otros', label: 'Otros' },
-];
+export { epsList } from '@/utils/epsNormalization';
 
-export const afpList = [
-  { value: 'proteccion', label: 'Protección' },
-  { value: 'porvenir', label: 'Porvenir' },
-  { value: 'colfondos', label: 'Colfondos' },
-  { value: 'colpensiones', label: 'Colpensiones' },
-  { value: 'old_mutual', label: 'Old Mutual' },
-  { value: 'skandia', label: 'Skandia' },
-  { value: 'otros', label: 'Otros' },
-];
+export { afpList } from '@/utils/afpNormalization';
 
 export const parentescos = [
   { value: 'MADRE', label: 'Madre' },

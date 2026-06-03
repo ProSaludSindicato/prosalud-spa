@@ -66,7 +66,8 @@ import { ApiRequest, requestsApiService } from "@/services/requestsApi";
 import { TableLoadingSkeleton } from "@/components/ui/loading-skeleton";
 import RequestFilesSection from "@/components/admin/solicitudes/RequestFilesSection";
 import ResponseAttachmentsSection from "@/components/admin/solicitudes/ResponseAttachmentsSection";
-import { parentescos, estadosCiviles, relacionesContactoEmergencia } from '@/components/actualizar-datos-personales/formOptions';
+import { parentescos } from '@/components/actualizar-datos-personales/formOptions';
+import { formatActualizarDatosFieldValue } from '@/utils/actualizarDatosPayloadDisplay';
 import { optimizeFileList, isImageFile } from "@/utils/imageOptimizer";
 import { usePendingPersonalDataUpdates } from "@/hooks/usePendingPersonalDataUpdates";
 import { PendingDataUpdateAlert, PendingDataUpdateBadge } from "@/components/admin/solicitudes/PendingDataUpdateAlert";
@@ -3615,20 +3616,15 @@ const AdminSolicitudesPage: React.FC = () => {
                                   return tipoDocumentoLabels[val] || val;
                                 }
 
-                                // Transformar estadoCivil para solicitudes de actualizar-datos-personales
-                                if (selectedSolicitud.request_type === 'actualizar-datos-personales' && 
-                                    fieldKey === 'estadoCivil' && 
-                                    typeof val === 'string') {
-                                  const estadoCivilOption = estadosCiviles.find(ec => ec.value === val);
-                                  return estadoCivilOption ? estadoCivilOption.label : val;
-                                }
-
-                                // Transformar relacionContactoEmergencia para solicitudes de actualizar-datos-personales
-                                if (selectedSolicitud.request_type === 'actualizar-datos-personales' && 
-                                    fieldKey === 'relacionContactoEmergencia' && 
-                                    typeof val === 'string') {
-                                  const relacionOption = relacionesContactoEmergencia.find(rel => rel.value === val);
-                                  return relacionOption ? relacionOption.label : val;
+                                // Slugs → etiquetas legibles (EPS, AFP, banco, etc.)
+                                if (
+                                  selectedSolicitud.request_type === 'actualizar-datos-personales' &&
+                                  fieldKey
+                                ) {
+                                  const formattedField = formatActualizarDatosFieldValue(fieldKey, val);
+                                  if (formattedField !== null) {
+                                    return formattedField;
+                                  }
                                 }
 
                                 // Para solicitudes de incapacidades y licencias, el campo numeroDias siempre debe tratarse como número,

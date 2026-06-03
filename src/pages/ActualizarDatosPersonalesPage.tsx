@@ -17,7 +17,9 @@ import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import InvisibleRecaptcha, { InvisibleRecaptchaRef } from '@/components/shared/InvisibleRecaptcha';
 import { RECAPTCHA_CONFIG } from '@/config/api';
 import { logger } from '@/utils/logger';
-import { municipios, estadosCiviles, nivelesEducativos, tiposCuenta, bancos, epsList, afpList } from '@/components/actualizar-datos-personales/formOptions';
+import { municipios, estadosCiviles, nivelesEducativos, tiposCuenta, bancos } from '@/components/actualizar-datos-personales/formOptions';
+import { normalizeAfp } from '@/utils/afpNormalization';
+import { normalizeEps } from '@/utils/epsNormalization';
 import { isObfuscated } from '@/utils/obfuscate';
 
 import DatosPersonalesReadOnly from '@/components/shared/DatosPersonalesReadOnly';
@@ -116,46 +118,6 @@ const normalizeBanco = (value: string | null | undefined): string => {
     b.label.toLowerCase().includes(normalized)
   );
   return found?.value || normalized.replace(/\s+/g, '_');
-};
-
-const normalizeEps = (value: string | null | undefined): string => {
-  if (!value) return '';
-  const normalized = value.toLowerCase().trim();
-  // Buscar coincidencia parcial en la lista de EPS
-  const found = epsList.find(e => {
-    const epsLabel = e.label.toLowerCase();
-    const epsValue = e.value.toLowerCase();
-    return normalized.includes('sura') && epsValue === 'sura' ||
-           normalized.includes('nueva eps') && epsValue === 'nueva_eps' ||
-           normalized.includes('sanitas') && epsValue === 'sanitas' ||
-           normalized.includes('coomeva') && epsValue === 'coomeva' ||
-           normalized.includes('compensar') && epsValue === 'compensar' ||
-           normalized.includes('famisanar') && epsValue === 'famisanar' ||
-           normalized.includes('savia') && epsValue === 'savia' ||
-           normalized.includes('aliansalud') && epsValue === 'aliansalud' ||
-           epsValue === normalized ||
-           epsLabel === normalized;
-  });
-  return found?.value || 'otros';
-};
-
-const normalizeAfp = (value: string | null | undefined): string => {
-  if (!value) return '';
-  const normalized = value.toLowerCase().trim();
-  // Buscar coincidencia parcial en la lista de AFP
-  const found = afpList.find(a => {
-    const afpLabel = a.label.toLowerCase();
-    const afpValue = a.value.toLowerCase();
-    return normalized.includes('proteccion') && afpValue === 'proteccion' ||
-           normalized.includes('porvenir') && afpValue === 'porvenir' ||
-           normalized.includes('colfondos') && afpValue === 'colfondos' ||
-           normalized.includes('colpension') && afpValue === 'colpensiones' ||
-           normalized.includes('old mutual') && afpValue === 'old_mutual' ||
-           normalized.includes('skandia') && afpValue === 'skandia' ||
-           afpValue === normalized ||
-           afpLabel === normalized;
-  });
-  return found?.value || 'otros';
 };
 
 // Función para parsear el campo de contacto de emergencia
