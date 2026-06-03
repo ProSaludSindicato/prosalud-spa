@@ -358,7 +358,9 @@ export const requestsService = {
     const options = await requestsApiService.getFilterOptions();
 
     return {
-      request_types: options.request_types.map(mapBackendRequestTypeToFrontend),
+      request_types: [
+        ...new Set(options.request_types.map(mapBackendRequestTypeToFrontend)),
+      ],
       subtypes: options.subtypes,
     };
   },
