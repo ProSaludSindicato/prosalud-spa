@@ -586,49 +586,24 @@ const AdminSstPage: React.FC = () => {
     const controller = new AbortController();
     setIsLoadingDeliveredByUsers(true);
 
-    const fetchDeliveredByUsers = async () => {
+    const fetchExportFilterOptions = async () => {
       try {
-        // Obtener todas las entregas (con un pageSize grande para obtener la mayoría)
-        const response = await sstAdminService.getDeliveryHistory({
-          page: 1,
-          pageSize: 1000,
-          signal: controller.signal,
-        });
+        const options = await sstAdminService.getDeliveryReportFilterOptions(controller.signal);
 
         if (controller.signal.aborted) return;
 
-        // Extraer usuarios únicos de las entregas
-        const usersMap = new Map<string, string>();
-        const hospitalsSet = new Set<string>();
-        
-        response.items.forEach((delivery) => {
-          const deliveredBy = delivery.deliveredBy;
-          const deliveredByName = delivery.deliveredByName || deliveredBy;
-          
-          // Usar deliveredBy como ID único, y displayedName como nombre a mostrar
-          if (deliveredBy && !usersMap.has(deliveredBy)) {
-            usersMap.set(deliveredBy, deliveredByName);
-          }
-
-          if (delivery.affiliateHospital) {
-            hospitalsSet.add(delivery.affiliateHospital);
-          }
-        });
-
-        setHospitalOptions(Array.from(hospitalsSet).sort((a, b) => a.localeCompare(b)));
-
-        // Convertir el Map a un array de objetos y ordenar alfabéticamente
-        const usersList = Array.from(usersMap.entries())
-          .map(([id, name]) => ({ id, name }))
-          .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-
-        setDeliveredByUsers(usersList);
+        setHospitalOptions(options.hospitals);
+        setDeliveredByUsers(
+          [...options.deliveredBy].sort((a, b) =>
+            a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
+          ),
+        );
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           return;
         }
-        logger.error('Error al cargar usuarios que han entregado', error instanceof Error ? error.message : error);
-        // No mostrar error al usuario, simplemente dejar la lista vacía
+        logger.error('Error al cargar filtros del reporte de dotación', error instanceof Error ? error.message : error);
+        setHospitalOptions([]);
         setDeliveredByUsers([]);
       } finally {
         if (!controller.signal.aborted) {
@@ -637,7 +612,7 @@ const AdminSstPage: React.FC = () => {
       }
     };
 
-    fetchDeliveredByUsers();
+    fetchExportFilterOptions();
 
     return () => {
       controller.abort();
@@ -822,7 +797,7 @@ const AdminSstPage: React.FC = () => {
   };
 
   // Polling function for async report generation
-  const startPolling = (jobId: string, maxAttempts: number = 60): void => {
+  const startPolling = (jobId: string, maxAttempts: number = 120): void => {
     let attempts = 0;
     
     const poll = async () => {
@@ -982,85 +957,41 @@ const AdminSstPage: React.FC = () => {
       const endpoint = `/api/dotacion-epp/reports/deliveries/excel${params.toString() ? `?${params.toString()}` : ''}`;
       const url = buildAdminApiUrl(endpoint);
 
-      const headers: HeadersInit = {
-        'Accept': includeSignatures 
-          ? 'application/json' // Para respuestas asíncronas (202)
-          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // Para respuestas síncronas (200)
-      };
-
-      // Realizar petición al backend
       const response = await fetch(url, {
         method: 'GET',
-        headers,
+        headers: { Accept: 'application/json' },
         credentials: 'include',
       });
 
-      // Manejar respuesta asíncrona (202 Accepted)
-      if (response.status === 202) {
-        const data = await response.json();
-        if (data.success && data.job_id) {
-          setExportJobId(data.job_id);
-          setExportStatus('processing');
-          startPolling(data.job_id);
-          toast({
-            title: 'Generando reporte',
-            description: 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo.',
-          });
-          return; // Don't close dialog, keep it open to show progress
-        } else {
-          throw new Error(data.message || 'Error al iniciar la generación del reporte');
-        }
-      }
-
-      // Manejar errores (excepto 202 que ya se maneja arriba)
       if (!response.ok) {
         let errorMessage = 'Error al generar el reporte';
-        
-        // Intentar parsear el error como JSON
+
         const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
+        if (contentType?.includes('application/json')) {
           try {
             const errorData = await response.json();
             errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-            // Si no se puede parsear, usar el mensaje por defecto
+          } catch {
+            // usar mensaje por defecto
           }
         }
-        
+
         throw new Error(errorMessage);
       }
 
-      // Respuesta síncrona (200 OK) - descarga directa
-      const blob = await response.blob();
-
-      // Obtener nombre del archivo del header Content-Disposition si está disponible
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `reporte-dotacion-epp-${format(new Date(), 'yyyyMMdd-HHmmss')}.xlsx`;
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-        }
+      const data = await response.json();
+      if (data.success && data.job_id) {
+        setExportJobId(data.job_id);
+        setExportStatus('processing');
+        startPolling(data.job_id);
+        toast({
+          title: 'Generando reporte',
+          description: 'El reporte se está generando en segundo plano. Te notificaremos cuando esté listo.',
+        });
+        return;
       }
 
-      // Crear URL temporal y descargar
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      setExportStatus('completed');
-      setIsExporting(false);
-      toast({
-        title: 'Reporte exportado',
-        description: 'El reporte se ha descargado exitosamente.',
-      });
-      handleCloseExportDialog();
+      throw new Error(data.message || 'Error al iniciar la generación del reporte');
     } catch (error) {
       logger.error('Error al exportar entregas SST', error instanceof Error ? error.message : error);
       const message =
@@ -1795,8 +1726,7 @@ const AdminSstPage: React.FC = () => {
                   <div className="flex flex-col gap-1">
                     <span className="font-medium">Incluir firmas de los afiliados</span>
                     <span className="text-xs text-slate-500">
-                      El reporte se generará en segundo plano y puede tardar varios minutos. 
-                      Sin esta opción, el reporte se genera instantáneamente.
+                      Incluir las firmas aumenta el tiempo de generación del reporte.
                     </span>
                   </div>
                 </Label>

@@ -22,7 +22,13 @@ const endpoints = {
   inventory: `${BASE_PATH}/inventory`,
   deliveries: `${BASE_PATH}/deliveries`,
   returns: `${BASE_PATH}/returns`,
+  reportFilterOptions: `${BASE_PATH}/reports/deliveries/filter-options`,
 } as const;
+
+export interface SstDeliveryReportFilterOptions {
+  hospitals: string[];
+  deliveredBy: Array<{ id: string; name: string }>;
+}
 
 interface GetAffiliatesParams {
   page?: number;
@@ -422,6 +428,20 @@ export const sstAdminService = {
       total: data?.total ?? 0,
       page: data?.page ?? page,
       pageSize: data?.pageSize ?? pageSize,
+    };
+  },
+
+  async getDeliveryReportFilterOptions(
+    signal?: AbortSignal,
+  ): Promise<SstDeliveryReportFilterOptions> {
+    const data = await fetchJson<SstDeliveryReportFilterOptions>(
+      buildAdminApiUrl(endpoints.reportFilterOptions),
+      { method: 'GET', signal },
+    );
+
+    return {
+      hospitals: Array.isArray(data?.hospitals) ? data.hospitals : [],
+      deliveredBy: Array.isArray(data?.deliveredBy) ? data.deliveredBy : [],
     };
   },
 
