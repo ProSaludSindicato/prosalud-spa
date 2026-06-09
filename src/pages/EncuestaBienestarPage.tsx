@@ -482,6 +482,7 @@ const createEncuestaSchema = () => z.object({
       const phoneRegex = /^[3][0-9]{9}$/;
       return phoneRegex.test(val.replace(/\s/g, ''));
     }, { message: 'El teléfono debe tener 10 dígitos y comenzar con 3 (ej: 3001234567)' }),
+  barrio: z.string({ required_error: 'Barrio de residencia es requerido' }).min(1, 'Barrio de residencia es requerido'),
   direccion: z.string({ required_error: 'Dirección es requerida' }).min(1, 'Dirección es requerida'),
   municipio: z.string({ required_error: 'Municipio es requerido' }).min(1, 'Municipio es requerido'),
   tallaCalzado: z.string({ required_error: 'Talla de calzado es requerida' })
@@ -833,6 +834,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       lugarNacimiento: '',
       departamento: 'antioquia',
       celular: '',
+      barrio: '',
       direccion: '',
       municipio: '',
       tallaCalzado: '',
@@ -1347,6 +1349,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
       'lugarNacimiento',
       'departamento',
       'celular',
+      'barrio',
       'direccion',
       'municipio',
       'tallaCalzado',
@@ -2471,6 +2474,32 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
                     <FormField
                       control={form.control}
+                      name="barrio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-900">
+                            15. Barrio de residencia
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const upperValue = e.target.value.toUpperCase();
+                                const sanitized = sanitizeGeneral(upperValue, { maxLength: 100 });
+                                field.onChange(sanitized);
+                                form.clearErrors('barrio');
+                              }}
+                              placeholder="Ej: LAURELES, ENVIGADO CENTRO"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="direccion"
                       render={({ field }) => {
                         const currentValue = watchValues?.direccion || '';
@@ -2484,7 +2513,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         return (
                           <FormItem>
                             <FormLabel className="text-base font-semibold text-slate-900">
-                              {!isAfiliadoActivo ? '15. Dirección de residencia' : '15. Dirección de residencia'}
+                              {!isAfiliadoActivo ? '16. Dirección de residencia' : '16. Dirección de residencia'}
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -2529,7 +2558,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                         name="rh"
                         render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-base font-semibold text-slate-900">15. RH</FormLabel>
+                              <FormLabel className="text-base font-semibold text-slate-900">17. RH</FormLabel>
                               <FormControl>
                                 <Select onValueChange={field.onChange} value={field.value} disabled={!!(afiliadoData as any)?.rh}>
                                   <SelectTrigger className={(afiliadoData as any)?.rh ? 'bg-slate-100' : ''}>
@@ -2557,7 +2586,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="tallaVestimenta"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">16. Talla de vestimenta (Pijama)</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">18. Talla de vestimenta (Pijama)</FormLabel>
                           <Select onValueChange={(value) => {
                             field.onChange(value);
                             form.clearErrors('tallaVestimenta');
@@ -2585,7 +2614,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
                       name="tallaCalzado"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-900">17. Talla de calzado</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-900">19. Talla de calzado</FormLabel>
                           <FormControl>
                             <Input
                               {...field}

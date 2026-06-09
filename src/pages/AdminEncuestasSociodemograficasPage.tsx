@@ -224,6 +224,20 @@ const getPaisWithFlag = (value: string | null | undefined): string => {
   return value;
 };
 
+const formatDireccionConBarrio = (
+  direccion?: string | null,
+  barrio?: string | null,
+): string => {
+  const direccionTrimmed = (direccion ?? '').trim();
+  const barrioTrimmed = (barrio ?? '').trim();
+
+  if (direccionTrimmed && barrioTrimmed) {
+    return `${direccionTrimmed}, ${barrioTrimmed}`;
+  }
+
+  return direccionTrimmed || barrioTrimmed;
+};
+
 // Función para obtener el icono y color del género
 const getGeneroIcon = (genero: string | null | undefined) => {
   if (!genero) return null;
@@ -1311,6 +1325,9 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
   });
 
   const survey = surveyResponse?.data;
+  const direccionCompleta = survey
+    ? formatDireccionConBarrio(survey.direccion, survey.barrio)
+    : '';
 
   // Cargar imagen de la firma cuando el componente se monta
   useEffect(() => {
@@ -1705,7 +1722,7 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
 
           {/* Datos Básicos Adicionales */}
           {(survey.rh || survey.fecha_expedicion || survey.lugar_nacimiento || survey.departamento || 
-            survey.municipio || survey.celular || survey.direccion || survey.talla_calzado || 
+            survey.municipio || survey.barrio || survey.celular || survey.direccion || survey.talla_calzado || 
             survey.talla_vestimenta || survey.pais_nacimiento) && (
             <motion.div variants={itemVariantsDetail}>
               <Card>
@@ -1756,10 +1773,10 @@ const AdminEncuestaDetailView: React.FC<{ surveyId: string }> = ({ surveyId }) =
                   <p className="text-base">{survey.celular}</p>
                 </div>
               )}
-              {survey.direccion && (
+              {direccionCompleta && (
                 <div>
                   <label className="text-sm font-medium text-slate-600">Dirección</label>
-                  <p className="text-base">{survey.direccion}</p>
+                  <p className="text-base">{direccionCompleta}</p>
                 </div>
               )}
               {survey.talla_calzado && (

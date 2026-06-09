@@ -174,6 +174,7 @@ export interface SocioDemographicSurveyDetail {
   celular?: string;
   direccion?: string;
   municipio?: string;
+  barrio?: string;
   talla_calzado?: string;
   talla_vestimenta?: string;
   pais_nacimiento?: string;

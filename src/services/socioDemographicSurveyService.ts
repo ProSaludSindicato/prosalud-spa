@@ -20,6 +20,7 @@ export interface SocioDemographicSurveyData {
   celular?: string;
   direccion?: string;
   municipio?: string;
+  barrio: string;
   tallaCalzado?: string;
   tallaVestimenta?: string;
   paisNacimiento?: string;
