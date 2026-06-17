@@ -106,7 +106,7 @@ const RequireActiveAfiliadoAuth: React.FC<RequireActiveAfiliadoAuthProps> = ({ c
                 Lo sentimos, no puede realizar la solicitud de <strong>{procedureName}</strong> debido a que actualmente se encuentra retirado del sindicato.
               </p>
               <p className="text-sm text-gray-600">
-                Este trámite está disponible únicamente para afiliados activos. Si considera que hay un error en su estado, por favor comuníquese con ProSalud al correo electrónico <strong>talentohumano@sindicatoprosalud.com</strong>
+                Este trámite está disponible únicamente para afiliados activos. Si considera que hay un error en su estado, por favor comuníquese con ProSalud al correo electrónico <strong>talentohumanosindicatoprosalud@gmail.com</strong>
               </p>
             </DialogDescription>
             

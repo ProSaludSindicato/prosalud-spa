@@ -4,7 +4,7 @@ import CopyToClipboardButton from '@/components/ui/copyToClipboardButton'; // Co
 import { Mail, AlertTriangle } from 'lucide-react';
 
 const InstruccionesEnvioRetiroSection: React.FC = () => {
-  const email = "talentohumano@sindicatoprosalud.com";
+  const email = "talentohumanosindicatoprosalud@gmail.com";
 
   return (
     <div className="mb-6 p-6 border rounded-lg shadow-sm bg-white">

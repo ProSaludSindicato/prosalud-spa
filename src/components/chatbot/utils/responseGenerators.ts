@@ -737,7 +737,7 @@ Para entregar tu carta de retiro, debes:
 
 Para solicitar y enviar las actas pendientes (Acta de entendimiento o Acta de compromiso), contacta con:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 Ellos te indicarán cómo proceder y dónde enviar los documentos.
 
@@ -755,7 +755,7 @@ Ellos te indicarán cómo proceder y dónde enviar los documentos.
 
 Para solicitar y enviar los convenios pendientes, contacta por correo electrónico:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 `);
   }
@@ -776,7 +776,7 @@ Para solicitar y enviar los convenios pendientes, contacta por correo electróni
 
 Para solicitar y enviar los documentos pendientes (${otrosDocs}), contacta con:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 Ellos te indicarán cómo proceder y dónde enviar los documentos.
 
@@ -845,7 +845,7 @@ ${observacionesTraducidas}
 
 Si tienes dudas sobre cómo realizar la solicitud de retiro sindical o necesitas asistencia, contáctanos:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 `;
     } else if (instruccionesPendientes.length > 0) {
@@ -856,7 +856,7 @@ Si tienes dudas sobre cómo realizar la solicitud de retiro sindical o necesitas
 
 Si tienes más dudas o necesitas asistencia, contáctanos:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 `;
     } else {
@@ -867,7 +867,7 @@ Si tienes más dudas o necesitas asistencia, contáctanos:
 
 Contáctanos vía correo electrónico para solicitar y enviar los documentos pendientes:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 `;
     }
@@ -878,7 +878,7 @@ Contáctanos vía correo electrónico para solicitar y enviar los documentos pen
 
 Si tienes alguna pregunta sobre tu compensación final, contáctanos:
 
-📧 **talentohumano@sindicatoprosalud.com**
+📧 **talentohumanosindicatoprosalud@gmail.com**
 
 `;
   }
