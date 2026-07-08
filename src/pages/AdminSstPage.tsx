@@ -660,8 +660,6 @@ const AdminSstPage: React.FC = () => {
         duration: 5000,
       });
 
-      await fetchDeliveryHistory(record.affiliateId, { showLoading: false });
-
       setSelectedAffiliate((prev) =>
         prev && prev.id === record.affiliateId
           ? {
@@ -674,6 +672,8 @@ const AdminSstPage: React.FC = () => {
       setLastConfirmedRecordId(record.id);
       setPendingRecord(null);
       setConfirmationModalOpen(false);
+
+      void fetchDeliveryHistory(record.affiliateId, { showLoading: false });
     } catch (error) {
       logger.error('Error al registrar entrega SST', error instanceof Error ? error.message : error);
       const message = error instanceof Error ? error.message : 'No fue posible registrar la entrega. Intenta nuevamente.';
@@ -706,13 +706,12 @@ const AdminSstPage: React.FC = () => {
         duration: 5000,
       });
 
-      await fetchReturnHistory(record.affiliateId, { showLoading: false });
-      // Also refresh delivery history to update available quantities
-      await fetchDeliveryHistory(record.affiliateId, { showLoading: false });
-
       setLastConfirmedReturnId(record.id);
       setPendingReturnRecord(null);
       setReturnConfirmationModalOpen(false);
+
+      void fetchReturnHistory(record.affiliateId, { showLoading: false });
+      void fetchDeliveryHistory(record.affiliateId, { showLoading: false });
     } catch (error) {
       logger.error('Error al registrar devolución SST', error instanceof Error ? error.message : error);
       const message = error instanceof Error ? error.message : 'No fue posible registrar la devolución. Intenta nuevamente.';
