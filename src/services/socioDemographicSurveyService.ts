@@ -247,29 +247,32 @@ function convertToUppercase(data: any): any {
   return data;
 }
 
-function getMimeFromDataUri(dataURI: string): { mime: string; extension: string } {
-  const mimeString = dataURI.split(',')[0]?.split(':')[1]?.split(';')[0] ?? 'image/png';
-  const extension = mimeString === 'image/jpeg' ? 'jpg' : mimeString.split('/')[1] ?? 'png';
-
-  return { mime: mimeString, extension };
-}
-
-function dataURItoBlob(dataURI: string): Blob {
-  // Separar el data URI en sus partes
-  const splitDataURI = dataURI.split(',');
-  const byteString = splitDataURI[0].includes('base64')
-    ? atob(splitDataURI[1])
-    : decodeURIComponent(splitDataURI[1]);
-
-  const { mime } = getMimeFromDataUri(dataURI);
-
-  // Escribir los bytes
-  const ua = new Uint8Array(byteString.length);
-  for (let i = 0; i < byteString.length; i++) {
-    ua[i] = byteString.charCodeAt(i);
+function ensurePngDataUri(dataUri: string): Promise<string> {
+  if (dataUri.startsWith('data:image/png;base64,')) {
+    return Promise.resolve(dataUri);
   }
 
-  return new Blob([ua], { type: mime });
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('No se pudo preparar la firma para envío.'));
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('La firma digital no es válida.'));
+    img.src = dataUri;
+  });
 }
 
 /**
@@ -325,12 +328,10 @@ export const submitSurvey = async (
       }
     });
     
-    // Agregar firma como archivo (debe ser PNG real; el backend valida el contenido con mimes:png)
+    // Enviar firma como base64 PNG (evita validación mimes:png del archivo multipart)
     if (signatureBase64) {
-      const { mime, extension } = getMimeFromDataUri(signatureBase64);
-      const signatureBlob = dataURItoBlob(signatureBase64);
-      const signatureFile = new File([signatureBlob], `firma.${extension}`, { type: mime });
-      formData.append('files[firma]', signatureFile);
+      const pngSignature = await ensurePngDataUri(signatureBase64);
+      formData.append('firma', pngSignature);
     }
     
     // Agregar reCAPTCHA token si está presente

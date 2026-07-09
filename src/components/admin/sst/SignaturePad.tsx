@@ -155,7 +155,9 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
     blank.height = canvas.height;
 
     const isBlank = toSignatureDataUrl(canvas) === toSignatureDataUrl(blank);
-    onChange?.(isBlank ? null : toSignatureDataUrl(canvas));
+    const dataUrl = isBlank ? null : toSignatureDataUrl(canvas);
+    savedDataRef.current = dataUrl;
+    onChange?.(dataUrl);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
