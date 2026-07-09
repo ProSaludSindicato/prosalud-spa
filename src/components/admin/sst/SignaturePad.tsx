@@ -2,14 +2,16 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 're
 import { Button } from '@/components/ui/button';
 import { Eraser } from 'lucide-react';
 
-const SIGNATURE_IMAGE_TYPE = 'image/jpeg';
-const SIGNATURE_IMAGE_QUALITY = 0.85;
+const DEFAULT_SIGNATURE_IMAGE_TYPE = 'image/jpeg';
+const DEFAULT_SIGNATURE_IMAGE_QUALITY = 0.85;
 
 interface SignaturePadProps {
   onChange?: (dataUrl: string | null) => void;
   onClear?: () => void;
   height?: number;
   initialValue?: string;
+  imageType?: 'image/jpeg' | 'image/png';
+  imageQuality?: number;
 }
 
 export interface SignaturePadRef {
@@ -19,13 +21,22 @@ export interface SignaturePadRef {
 }
 
 export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
-  ({ onChange, onClear, height = 180, initialValue }, ref) => {
+  ({
+    onChange,
+    onClear,
+    height = 180,
+    initialValue,
+    imageType = DEFAULT_SIGNATURE_IMAGE_TYPE,
+    imageQuality = DEFAULT_SIGNATURE_IMAGE_QUALITY,
+  }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
     const savedDataRef = useRef<string | null>(null);
 
     const toSignatureDataUrl = (canvas: HTMLCanvasElement): string =>
-      canvas.toDataURL(SIGNATURE_IMAGE_TYPE, SIGNATURE_IMAGE_QUALITY);
+      imageType === 'image/png'
+        ? canvas.toDataURL('image/png')
+        : canvas.toDataURL('image/jpeg', imageQuality);
 
     useImperativeHandle(ref, () => ({
       toDataURL: () => {
@@ -97,7 +108,7 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
 
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, [height]);
+  }, [height, imageType, imageQuality]);
 
     useEffect(() => {
       if (initialValue && canvasRef.current) {

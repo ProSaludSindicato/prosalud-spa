@@ -247,23 +247,29 @@ function convertToUppercase(data: any): any {
   return data;
 }
 
+function getMimeFromDataUri(dataURI: string): { mime: string; extension: string } {
+  const mimeString = dataURI.split(',')[0]?.split(':')[1]?.split(';')[0] ?? 'image/png';
+  const extension = mimeString === 'image/jpeg' ? 'jpg' : mimeString.split('/')[1] ?? 'png';
+
+  return { mime: mimeString, extension };
+}
+
 function dataURItoBlob(dataURI: string): Blob {
   // Separar el data URI en sus partes
   const splitDataURI = dataURI.split(',');
   const byteString = splitDataURI[0].includes('base64')
     ? atob(splitDataURI[1])
     : decodeURIComponent(splitDataURI[1]);
-  
-  // Extraer el tipo MIME
-  const mimeString = splitDataURI[0].split(':')[1].split(';')[0];
-  
+
+  const { mime } = getMimeFromDataUri(dataURI);
+
   // Escribir los bytes
   const ua = new Uint8Array(byteString.length);
   for (let i = 0; i < byteString.length; i++) {
     ua[i] = byteString.charCodeAt(i);
   }
-  
-  return new Blob([ua], { type: mimeString });
+
+  return new Blob([ua], { type: mime });
 }
 
 /**
@@ -319,10 +325,11 @@ export const submitSurvey = async (
       }
     });
     
-    // Agregar firma como archivo
+    // Agregar firma como archivo (debe ser PNG real; el backend valida el contenido con mimes:png)
     if (signatureBase64) {
+      const { mime, extension } = getMimeFromDataUri(signatureBase64);
       const signatureBlob = dataURItoBlob(signatureBase64);
-      const signatureFile = new File([signatureBlob], 'firma.png', { type: 'image/png' });
+      const signatureFile = new File([signatureBlob], `firma.${extension}`, { type: mime });
       formData.append('files[firma]', signatureFile);
     }
     
