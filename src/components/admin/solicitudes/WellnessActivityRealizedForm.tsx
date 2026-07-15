@@ -193,7 +193,7 @@ const WellnessActivityRealizedForm: React.FC<WellnessActivityRealizedFormProps> 
     // Optimizar imágenes antes de agregarlas
     setIsOptimizing(true);
     try {
-      const optimizedFiles = await optimizeImages(files);
+      const optimizedFiles = await optimizeImages(files, { convertToWebP: false });
 
       setEvidencias(prev => [...prev, ...optimizedFiles]);
 

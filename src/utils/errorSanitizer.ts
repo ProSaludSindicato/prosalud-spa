@@ -8,6 +8,218 @@ interface SanitizedError {
   type: 'validation' | 'server' | 'network' | 'not_found' | 'unauthorized' | 'unknown';
 }
 
+export type PublicErrorType =
+  | 'validation'
+  | 'auth'
+  | 'timeout'
+  | 'server'
+  | 'connection'
+  | 'origin'
+  | 'not_found'
+  | 'unknown';
+
+export interface ClassifiedClientError {
+  type: PublicErrorType;
+  title: string;
+  description?: string;
+  isSuspectedCors?: boolean;
+}
+
+export interface ErrorToastContent {
+  title: string;
+  description?: string;
+}
+
+const CONNECTION_ERROR_TITLE = 'No pudimos conectar con el servicio';
+const CONNECTION_ERROR_DESCRIPTION =
+  'Verifique su conexión a internet. Si el problema continúa, pruebe en otro navegador, desactive extensiones (bloqueadores de anuncios) o intente desde otro dispositivo o red.';
+
+const ORIGIN_ERROR_TITLE = 'No fue posible completar la solicitud desde esta página';
+const ORIGIN_ERROR_DESCRIPTION =
+  'Acceda directamente desde el sitio oficial de ProSalud (prosalud.org.co) e intente de nuevo. Evite enlaces guardados o copiados de correos antiguos.';
+
+const TIMEOUT_ERROR_TITLE = 'La solicitud tardó demasiado';
+const TIMEOUT_ERROR_DESCRIPTION = 'Por favor, intente nuevamente.';
+
+const LEGACY_CORS_MESSAGE = 'Error de CORS:';
+
+/**
+ * Detecta si el navegador reportó explícitamente un bloqueo por CORS.
+ */
+export const isExplicitCorsError = (error: unknown): boolean => {
+  const err = error as { message?: string; isSuspectedCors?: boolean };
+  const message = String(err?.message ?? '');
+
+  return (
+    err?.isSuspectedCors === true ||
+    /cors/i.test(message) ||
+    /cross-origin/i.test(message) ||
+    /blocked by.*policy/i.test(message)
+  );
+};
+
+/**
+ * Detecta errores de red sin respuesta HTTP del servidor.
+ */
+export const isNetworkErrorWithoutResponse = (error: unknown): boolean => {
+  const err = error as { response?: unknown; code?: string; message?: string };
+
+  if (err?.response) {
+    return false;
+  }
+
+  const message = String(err?.message ?? '');
+
+  return (
+    err?.code === 'ERR_NETWORK' ||
+    /network error/i.test(message) ||
+    /failed to fetch/i.test(message)
+  );
+};
+
+/**
+ * Detecta errores por tiempo de espera agotado.
+ */
+export const isTimeoutError = (error: unknown): boolean => {
+  const err = error as { code?: string; message?: string };
+
+  return err?.code === 'ECONNABORTED' || /timeout/i.test(String(err?.message ?? ''));
+};
+
+const isLegacyCorsMessage = (error: unknown): boolean => {
+  const message = String((error as { message?: string })?.message ?? '');
+
+  return message.includes(LEGACY_CORS_MESSAGE);
+};
+
+/**
+ * Clasifica un error para mostrar mensajes seguros y accionables al usuario público.
+ */
+export const classifyClientError = (error: unknown): ClassifiedClientError => {
+  if (isTimeoutError(error)) {
+    return {
+      type: 'timeout',
+      title: TIMEOUT_ERROR_TITLE,
+      description: TIMEOUT_ERROR_DESCRIPTION,
+    };
+  }
+
+  if (isNetworkErrorWithoutResponse(error) || isLegacyCorsMessage(error)) {
+    if (isExplicitCorsError(error) || isLegacyCorsMessage(error)) {
+      return {
+        type: 'origin',
+        title: ORIGIN_ERROR_TITLE,
+        description: ORIGIN_ERROR_DESCRIPTION,
+        isSuspectedCors: true,
+      };
+    }
+
+    return {
+      type: 'connection',
+      title: CONNECTION_ERROR_TITLE,
+      description: CONNECTION_ERROR_DESCRIPTION,
+    };
+  }
+
+  if ((error as { response?: { status?: number } })?.response) {
+    const status = (error as { response: { status: number; data?: { message?: string } } }).response.status;
+    const data = (error as { response: { data?: { message?: string } } }).response.data ?? {};
+
+    if (status === 401 || status === 403) {
+      return {
+        type: 'auth',
+        title: 'No autorizado. Por favor, verifique sus credenciales.',
+      };
+    }
+
+    if (status === 404) {
+      return {
+        type: 'not_found',
+        title: 'El recurso solicitado no fue encontrado. Por favor, verifique la información e intente nuevamente.',
+      };
+    }
+
+    if (status === 422) {
+      const sanitized = sanitizeError(error);
+      return {
+        type: 'validation',
+        title: sanitized.message,
+      };
+    }
+
+    if (status === 502) {
+      return {
+        type: 'server',
+        title: 'El servicio no está disponible en este momento. Intente más tarde.',
+      };
+    }
+
+    if (status === 503) {
+      return {
+        type: 'server',
+        title: 'Servicio temporalmente no disponible. Intente más tarde.',
+      };
+    }
+
+    if (status >= 500) {
+      return {
+        type: 'server',
+        title: 'Error del servidor. Por favor, intente más tarde.',
+      };
+    }
+
+    if (typeof data.message === 'string' && data.message.trim() !== '') {
+      return {
+        type: 'unknown',
+        title: filterTechnicalDetails(data.message),
+      };
+    }
+  }
+
+  if (error instanceof Error && error.message.trim() !== '') {
+    return {
+      type: 'unknown',
+      title: filterTechnicalDetails(error.message),
+    };
+  }
+
+  return {
+    type: 'unknown',
+    title: 'Ocurrió un error inesperado. Por favor, intente nuevamente.',
+  };
+};
+
+/**
+ * Contenido listo para mostrar en toasts del usuario público.
+ */
+export const getErrorToastContent = (error: unknown): ErrorToastContent => {
+  const classified = classifyClientError(error);
+
+  return {
+    title: classified.title,
+    description: classified.description,
+  };
+};
+
+/**
+ * Crea un error con mensaje seguro para propagar en el flujo de la aplicación.
+ */
+export const createClientFacingError = (error: unknown): Error => {
+  const { title, description } = getErrorToastContent(error);
+  const clientError = new Error(title);
+
+  if (description) {
+    (clientError as Error & { description?: string }).description = description;
+  }
+
+  const classified = classifyClientError(error);
+  if (classified.isSuspectedCors) {
+    (clientError as Error & { isSuspectedCors?: boolean }).isSuspectedCors = true;
+  }
+
+  return clientError;
+};
+
 /**
  * Diccionario completo de traducciones inglés -> español para mensajes de error
  */
@@ -237,15 +449,18 @@ export const sanitizeError = (error: any): SanitizedError => {
 
   // Si es una instancia de Error
   if (error instanceof Error) {
-    // Para errores de red
-    if (
-      error.message.includes('Network Error') ||
-      error.message.includes('ERR_NETWORK') ||
-      error.message.includes('Failed to fetch') ||
-      error.message.includes('CORS')
-    ) {
+    if (isTimeoutError(error)) {
       return {
-        message: 'Error de conexión. Verifique su conexión a internet e intente nuevamente.',
+        message: TIMEOUT_ERROR_TITLE,
+        type: 'network',
+      };
+    }
+
+    if (isNetworkErrorWithoutResponse(error) || isLegacyCorsMessage(error) || isExplicitCorsError(error)) {
+      const classified = classifyClientError(error);
+
+      return {
+        message: classified.title,
         type: 'network',
       };
     }
@@ -378,8 +593,8 @@ export const sanitizeError = (error: any): SanitizedError => {
 /**
  * Helper para mostrar mensajes de error en toasts
  */
-export const getErrorMessage = (error: any): string => {
-  return sanitizeError(error).message;
+export const getErrorMessage = (error: unknown): string => {
+  return getErrorToastContent(error).title;
 };
 
 /**

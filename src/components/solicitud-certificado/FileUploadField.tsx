@@ -111,7 +111,7 @@ const FileUploadField = <TFieldValues extends FieldValues>({
                       setIsOptimizing(true);
                       try {
                         // Optimizar solo las imágenes
-                        const optimizedFiles = await optimizeFileList(e.target.files);
+                        const optimizedFiles = await optimizeFileList(e.target.files, { convertToWebP: false });
 
                         // Crear un nuevo FileList con los archivos optimizados
                         const dataTransfer = new DataTransfer();

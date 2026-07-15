@@ -365,12 +365,24 @@ export const requestsService = {
     };
   },
 
-  async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
-    return requestsApiService.downloadFile(requestId, fileKey);
+  async downloadFile(
+    requestId: string,
+    fileKey: string,
+    disposition: 'inline' | 'attachment' = 'attachment',
+    fallbackFilename?: string,
+    sourceMimeType?: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    return requestsApiService.downloadFile(requestId, fileKey, disposition, fallbackFilename, sourceMimeType);
   },
 
-  async downloadResponseAttachment(responseId: number, attachmentId: number): Promise<Blob> {
-    return requestsApiService.downloadResponseAttachment(responseId, attachmentId);
+  async downloadResponseAttachment(
+    responseId: number,
+    attachmentId: number,
+    disposition: 'inline' | 'attachment' = 'attachment',
+    fallbackFilename?: string,
+    sourceMimeType?: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    return requestsApiService.downloadResponseAttachment(responseId, attachmentId, disposition, fallbackFilename, sourceMimeType);
   },
 
   // Validate request (manual validation step)

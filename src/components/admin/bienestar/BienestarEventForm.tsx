@@ -443,7 +443,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
     // Optimizar imágenes antes de agregarlas
     setIsOptimizing(true);
     try {
-      const optimizedFiles = await optimizeImages(files);
+      const optimizedFiles = await optimizeImages(files, { convertToWebP: true });
       addOptimizedImages(optimizedFiles);
 
       const imageCount = files.filter(f => isImageFile(f)).length;

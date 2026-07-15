@@ -1,6 +1,10 @@
 import imageCompression, { type Options } from 'browser-image-compression';
 import { logger } from '@/utils/logger';
 
+export interface ImageOptimizerOptions extends Partial<Options> {
+  convertToWebP?: boolean;
+}
+
 /**
  * Tipos MIME de imágenes soportadas
  */
@@ -60,7 +64,7 @@ function supportsWebP(): boolean {
  * Optimiza una imagen:
  * - Reduce el peso del archivo de forma proporcional al tamaño original
  * - Elimina metadatos innecesarios
- * - Convierte a WebP siempre que sea posible (mejor compresión)
+ * - Convierte a WebP solo cuando convertToWebP es true (contenido público)
  * 
  * @param file Archivo de imagen a optimizar
  * @param options Opciones personalizadas de compresión (opcional)
@@ -68,7 +72,7 @@ function supportsWebP(): boolean {
  */
 export async function optimizeImage(
   file: File,
-  options?: Partial<Options>
+  options?: ImageOptimizerOptions
 ): Promise<File> {
   if (!isImageFile(file)) {
     throw new Error('El archivo no es una imagen válida');
@@ -78,28 +82,26 @@ export async function optimizeImage(
   const originalSizeMB = file.size / (1024 * 1024);
   const targetSizeMB = calculateTargetSizeMB(originalSizeMB);
 
-  // Determinar si debemos convertir a WebP
-  // WebP ofrece mejor compresión que JPG/PNG, así que siempre intentamos usarlo
-  const shouldConvertToWebP = supportsWebP() && 
-    (file.type.toLowerCase() === 'image/jpeg' || 
-     file.type.toLowerCase() === 'image/jpg' || 
+  const { convertToWebP = false, ...compressionOverrides } = options ?? {};
+
+  // WebP solo para contenido público (galería, Comfenalco) cuando se solicita explícitamente
+  const shouldConvertToWebP = convertToWebP && supportsWebP() &&
+    (file.type.toLowerCase() === 'image/jpeg' ||
+     file.type.toLowerCase() === 'image/jpg' ||
      file.type.toLowerCase() === 'image/png' ||
      file.type.toLowerCase() === 'image/gif');
 
-  // Configurar opciones de compresión
-  // Calidad más alta para WebP (0.85) ya que WebP comprime mejor
-  // Calidad media para otros formatos (0.75)
   const quality = shouldConvertToWebP ? 0.85 : 0.75;
 
   const compressionOptions: Options = {
     maxSizeMB: targetSizeMB,
-    maxWidthOrHeight: 1920, // Reducir resolución solo si es necesario (mantiene calidad)
+    maxWidthOrHeight: 1920,
     useWebWorker: true,
-    fileType: shouldConvertToWebP ? 'image/webp' : undefined, // Convertir a WebP si es posible
+    fileType: shouldConvertToWebP ? 'image/webp' : undefined,
     initialQuality: quality,
-    alwaysKeepResolution: false, // Permite reducir resolución para lograr el tamaño objetivo
-    exifOrientation: 1, // Elimina metadatos EXIF
-    ...options, // Permitir sobrescribir opciones
+    alwaysKeepResolution: false,
+    exifOrientation: 1,
+    ...compressionOverrides,
   };
 
   try {
@@ -159,7 +161,7 @@ export async function optimizeImage(
  */
 export async function optimizeImages(
   files: File[],
-  options?: Partial<Options>
+  options?: ImageOptimizerOptions
 ): Promise<File[]> {
   // Separar imágenes de otros archivos
   const imageFiles = files.filter(isImageFile);
@@ -183,7 +185,7 @@ export async function optimizeImages(
  */
 export async function optimizeFileList(
   fileList: FileList,
-  options?: Partial<Options>
+  options?: ImageOptimizerOptions
 ): Promise<File[]> {
   const files = Array.from(fileList);
   return optimizeImages(files, options);

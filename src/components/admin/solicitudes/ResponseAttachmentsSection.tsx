@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ResponseAttachment } from '@/types/requests';
-import { Download, FileText, Image, File, Loader2, ExternalLink, Paperclip } from 'lucide-react';
+import { Download, FileText, Image, File as FileIcon, Loader2, ExternalLink, Paperclip } from 'lucide-react';
 import { requestsService } from '@/services/requestsServiceApi';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
@@ -29,7 +29,7 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
     if (extension === 'pdf') {
       return FileText;
     }
-    return File;
+    return FileIcon;
   };
 
   const getFileTypeColor = (fileName: string) => {
@@ -72,25 +72,34 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
     return new Date(urlExpiresAt) < new Date();
   };
 
+  const isImageFileName = (fileName: string): boolean => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '');
+  };
+
   const handleDownload = async (attachment: ResponseAttachment) => {
     setDownloadingAttachments(prev => new Set(prev).add(attachment.id));
     
     try {
-      const blob = await requestsService.downloadResponseAttachment(responseId, attachment.id);
+      const { blob, filename } = await requestsService.downloadResponseAttachment(
+        responseId,
+        attachment.id,
+        'attachment',
+        attachment.original_name,
+      );
       
-      // Create a download link to force download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = attachment.original_name;
-      link.setAttribute('download', attachment.original_name);
+      link.download = filename;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
       toast.success('Anexo descargado', {
-        description: `El archivo "${attachment.original_name}" se ha descargado correctamente.`,
+        description: `El archivo "${filename}" se ha descargado correctamente.`,
       });
     } catch (error) {
       logger.error('Error al descargar anexo de respuesta', error instanceof Error ? error.message : error);
@@ -107,13 +116,33 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
     }
   };
 
-  const handleOpen = (attachment: ResponseAttachment) => {
-    // Open in new tab using the temporary URL if available and not expired
-    if (attachment.download_url && !isUrlExpired(attachment.url_expires_at)) {
-      window.open(attachment.download_url, '_blank');
-    } else {
-      // If URL expired, try to download instead
-      handleDownload(attachment);
+  const handleOpen = async (attachment: ResponseAttachment) => {
+    setDownloadingAttachments(prev => new Set(prev).add(attachment.id));
+
+    try {
+      const sourceMimeType = isImageFileName(attachment.original_name) ? 'image/jpeg' : undefined;
+      const { blob, filename } = await requestsService.downloadResponseAttachment(
+        responseId,
+        attachment.id,
+        'inline',
+        attachment.original_name,
+        sourceMimeType,
+      );
+      const namedFile = new File([blob], filename, { type: blob.type });
+      const url = window.URL.createObjectURL(namedFile);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      logger.error('Error al abrir anexo de respuesta', error instanceof Error ? error.message : error);
+      toast.error('Error al abrir anexo', {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setDownloadingAttachments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(attachment.id);
+        return newSet;
+      });
     }
   };
 
@@ -137,7 +166,7 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
           const FileIcon = getFileIcon(attachment.original_name);
           const isDownloading = downloadingAttachments.has(attachment.id);
           const urlExpired = isUrlExpired(attachment.url_expires_at);
-          const canUseUrl = attachment.download_url && !urlExpired;
+          const canOpen = true;
 
           return (
             <div
@@ -176,7 +205,7 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {canUseUrl && (
+                  {canOpen && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -192,7 +221,7 @@ const ResponseAttachmentsSection: React.FC<ResponseAttachmentsSectionProps> = ({
                     size="sm"
                     onClick={() => handleDownload(attachment)}
                     disabled={isDownloading}
-                    className="text-gray-500 bg-gray-100 hover:text-gray-700 hover:bg-gray-200"
+                    className="bg-gray-100 text-gray-700 border-gray-400 hover:bg-gray-200 hover:text-gray-900 hover:border-gray-500"
                   >
                     {isDownloading ? (
                       <>

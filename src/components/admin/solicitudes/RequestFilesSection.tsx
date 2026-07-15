@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RequestFile } from '@/types/requests';
-import { Download, FileText, Image, File, Loader2, ExternalLink } from 'lucide-react';
+import { Download, FileText, Image, File as FileIcon, Loader2, ExternalLink } from 'lucide-react';
 import { requestsService } from '@/services/requestsServiceApi';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
@@ -29,7 +29,7 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
     if (mimeType === 'application/pdf') {
       return FileText;
     }
-    return File;
+    return FileIcon;
   };
 
   const getFileTypeColor = (mimeType: string) => {
@@ -143,32 +143,30 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
     return mimeType.split('/')[1]?.split('.')[0]?.toUpperCase() || 'FILE';
   };
 
-  const isUrlExpired = (urlExpiresAt: string | null): boolean => {
-    if (!urlExpiresAt) return true;
-    return new Date(urlExpiresAt) < new Date();
-  };
-
   const handleDownload = async (fileKey: string, file: RequestFile) => {
-    // Always use the download endpoint to force download (not open in new tab)
     setDownloadingFiles(prev => new Set(prev).add(fileKey));
     
     try {
-      const blob = await requestsService.downloadFile(requestId, fileKey);
+      const { blob, filename } = await requestsService.downloadFile(
+        requestId,
+        fileKey,
+        'attachment',
+        file.original_name,
+        file.mime_type,
+      );
       
-      // Create a download link to force download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = file.original_name;
-      // Force download attribute
-      link.setAttribute('download', file.original_name);
+      link.download = filename;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
       toast.success('Archivo descargado', {
-        description: `El archivo "${file.original_name}" se ha descargado correctamente.`,
+        description: `El archivo "${filename}" se ha descargado correctamente.`,
       });
     } catch (error) {
       logger.error('Error al descargar archivo de solicitud', error instanceof Error ? error.message : error);
@@ -185,10 +183,32 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
     }
   };
 
-  const handleOpen = (file: RequestFile) => {
-    // Open in new tab using the temporary URL
-    if (file.download_url && !isUrlExpired(file.url_expires_at)) {
-      window.open(file.download_url, '_blank');
+  const handleOpen = async (fileKey: string, file: RequestFile) => {
+    setDownloadingFiles(prev => new Set(prev).add(fileKey));
+
+    try {
+      const { blob, filename } = await requestsService.downloadFile(
+        requestId,
+        fileKey,
+        'inline',
+        file.original_name,
+        file.mime_type,
+      );
+      const namedFile = new File([blob], filename, { type: blob.type });
+      const url = window.URL.createObjectURL(namedFile);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      logger.error('Error al abrir archivo de solicitud', error instanceof Error ? error.message : error);
+      toast.error('Error al abrir archivo', {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setDownloadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileKey);
+        return newSet;
+      });
     }
   };
 
@@ -215,8 +235,7 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
           {fileEntries.map(([fileKey, file]) => {
             const FileIcon = getFileIcon(file.mime_type);
             const isDownloading = downloadingFiles.has(fileKey);
-            const urlExpired = isUrlExpired(file.url_expires_at);
-            const canUseUrl = file.download_url && !urlExpired;
+            const canOpen = true;
 
             return (
               <div
@@ -248,11 +267,11 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {canUseUrl && (
+                    {canOpen && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpen(file)}
+                        onClick={() => handleOpen(fileKey, file)}
                         className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
@@ -264,7 +283,7 @@ const RequestFilesSection: React.FC<RequestFilesSectionProps> = ({
                       size="sm"
                       onClick={() => handleDownload(fileKey, file)}
                       disabled={isDownloading}
-                      className="text-gray-500 bg-gray-100 hover:text-gray-700 hover:bg-gray-200"
+                      className="bg-gray-100 text-gray-700 border-gray-400 hover:bg-gray-200 hover:text-gray-900 hover:border-gray-500"
                     >
                       {isDownloading ? (
                         <>

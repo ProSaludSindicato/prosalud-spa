@@ -131,7 +131,7 @@ const ComfenalcoEventForm: React.FC<ComfenalcoEventFormProps> = ({ event, onClos
       if (isImageFile(file)) {
         setIsOptimizing(true);
         try {
-          const optimizedFile = await optimizeImage(file);
+          const optimizedFile = await optimizeImage(file, { convertToWebP: true });
           setBannerImage(optimizedFile);
           
           // Crear preview local con la imagen optimizada

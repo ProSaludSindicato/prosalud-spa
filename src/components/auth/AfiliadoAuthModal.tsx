@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAfiliadoAuth } from '@/context/AfiliadoAuthContext';
 import { toast } from 'sonner';
+import { getErrorToastContent } from '@/utils/errorSanitizer';
 import { Loader2, X, IdCard, Hash, Calendar } from 'lucide-react';
 
 interface AfiliadoAuthModalProps {
@@ -64,8 +65,9 @@ const AfiliadoAuthModal: React.FC<AfiliadoAuthModalProps> = ({ open, onClose, on
       await authenticate(formData.tipoDocumento, formData.numeroDocumento, formData.fechaExpedicion);
       toast.success('Autenticación exitosa');
       onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al autenticar');
+    } catch (error: unknown) {
+      const { title, description } = getErrorToastContent(error);
+      toast.error(title, description ? { description } : undefined);
     } finally {
       setLoading(false);
     }

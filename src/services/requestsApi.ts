@@ -5,6 +5,66 @@ import { logger } from "@/utils/logger";
 // Use authenticated API client for requests endpoints
 const requestsApi = authenticatedApi;
 
+function parseFilenameFromDownloadResponse(
+  headers: Record<string, unknown>,
+  fallbackFilename: string,
+): string {
+  const normalizedHeaders = Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]),
+  ) as Record<string, string | string[] | undefined>;
+
+  const xFilename = normalizedHeaders['x-download-filename'];
+  if (typeof xFilename === 'string' && xFilename.length > 0) {
+    try {
+      return decodeURIComponent(xFilename);
+    } catch {
+      return xFilename;
+    }
+  }
+
+  const contentDisposition = normalizedHeaders['content-disposition'];
+  if (typeof contentDisposition === 'string' && contentDisposition.length > 0) {
+    const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (filenameStarMatch?.[1]) {
+      try {
+        return decodeURIComponent(filenameStarMatch[1]);
+      } catch {
+        return filenameStarMatch[1];
+      }
+    }
+
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i);
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1];
+    }
+
+    const unquotedMatch = contentDisposition.match(/filename=([^;]+)/i);
+    if (unquotedMatch?.[1]) {
+      return unquotedMatch[1].trim();
+    }
+  }
+
+  return fallbackFilename;
+}
+
+function resolveDeliveredFilename(
+  headers: Record<string, unknown>,
+  fallbackFilename: string,
+  sourceMimeType: string | undefined,
+  blobType: string,
+): string {
+  const parsed = parseFilenameFromDownloadResponse(headers, '');
+  if (parsed) {
+    return parsed;
+  }
+
+  if (blobType === 'application/pdf' && sourceMimeType?.startsWith('image/')) {
+    return fallbackFilename.replace(/\.[^/.]+$/, '.pdf');
+  }
+
+  return fallbackFilename;
+}
+
 // Request and response interfaces based on the API documentation
 export interface ApiResponseAttachment {
   id: number;
@@ -722,7 +782,13 @@ export const requestsApiService = {
   },
 
   // Download a specific file from a request
-  async downloadFile(requestId: string, fileKey: string): Promise<Blob> {
+  async downloadFile(
+    requestId: string,
+    fileKey: string,
+    disposition: 'inline' | 'attachment' = 'attachment',
+    fallbackFilename?: string,
+    sourceMimeType?: string,
+  ): Promise<{ blob: Blob; filename: string }> {
     try {
       // Validar que el ID es un string válido (10 dígitos)
       if (!requestId || typeof requestId !== 'string' || !/^\d{10}$/.test(requestId)) {
@@ -732,11 +798,22 @@ export const requestsApiService = {
       const response = await requestsApi.get(
         `/api/requests/${requestId}/files/${fileKey}`,
         {
-          responseType: 'blob', // Important: specify blob response type
+          responseType: 'blob',
+          params: { disposition },
         }
       );
 
-      return response.data;
+      const fallback = fallbackFilename ?? fileKey;
+
+      return {
+        blob: response.data,
+        filename: resolveDeliveredFilename(
+          response.headers,
+          fallback,
+          sourceMimeType,
+          response.data.type,
+        ),
+      };
     } catch (error) {
       handleApiError(error);
       throw error;
@@ -744,7 +821,13 @@ export const requestsApiService = {
   },
 
   // Download a response attachment
-  async downloadResponseAttachment(responseId: number, attachmentId: number): Promise<Blob> {
+  async downloadResponseAttachment(
+    responseId: number,
+    attachmentId: number,
+    disposition: 'inline' | 'attachment' = 'attachment',
+    fallbackFilename?: string,
+    sourceMimeType?: string,
+  ): Promise<{ blob: Blob; filename: string }> {
     try {
       if (!responseId || typeof responseId !== 'number' || responseId <= 0) {
         throw new Error('ID de respuesta inválido');
@@ -756,11 +839,22 @@ export const requestsApiService = {
       const response = await requestsApi.get(
         `/api/requests/responses/${responseId}/attachments/${attachmentId}`,
         {
-          responseType: 'blob', // Important: specify blob response type
+          responseType: 'blob',
+          params: { disposition },
         }
       );
 
-      return response.data;
+      const fallback = fallbackFilename ?? `attachment-${attachmentId}`;
+
+      return {
+        blob: response.data,
+        filename: resolveDeliveredFilename(
+          response.headers,
+          fallback,
+          sourceMimeType,
+          response.data.type,
+        ),
+      };
     } catch (error) {
       handleApiError(error);
       throw error;

@@ -4,6 +4,11 @@ import { API_CONFIG } from '@/config/api';
 import { toast } from 'sonner';
 import { verifyOtp, VerifyOtpResponse } from '@/services/afiliadosOtpService';
 import { authenticateForDataUpdate, AuthenticateForDataUpdateResponse } from '@/services/afiliadosDataUpdateService';
+import {
+  createClientFacingError,
+  isNetworkErrorWithoutResponse,
+  isTimeoutError,
+} from '@/utils/errorSanitizer';
 
 export interface Convenio {
   cliente: string | null;
@@ -432,16 +437,13 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           throw new Error('Error del servidor. Por favor, intenta más tarde.');
         }
         throw new Error(errorData.message || `Error al autenticar (${status})`);
-      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-        // Detectar errores de CORS específicamente
-        if (error.message.includes('CORS') || (error.code === 'ERR_NETWORK' && !error.response)) {
-          throw new Error('Error de CORS: El servidor no permite solicitudes desde este origen. Contacta al administrador del sistema.');
-        }
-        throw new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet e intenta nuevamente.');
-      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        throw new Error('La solicitud tardó demasiado. Por favor, intenta nuevamente.');
       }
-      throw new Error(error.message || 'Error desconocido al intentar autenticar');
+
+      if (isTimeoutError(error) || isNetworkErrorWithoutResponse(error)) {
+        throw createClientFacingError(error);
+      }
+
+      throw createClientFacingError(error);
     }
   }, []);
 

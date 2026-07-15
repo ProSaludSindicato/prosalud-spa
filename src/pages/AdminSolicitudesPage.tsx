@@ -546,7 +546,7 @@ const MICROCREDITO_EMAIL_BODY = "Hemos revisado su solicitud de libranza y esta 
 const MICROCREDITO_REJECTED_EMAIL_BODY = "NO TIENE CAPACIDAD DE ENDEUDAMIENTO";
 
 // Mensaje prediligenciado para solicitudes de retiro-sindical completadas
-const RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY = "Se recibe notificación de retiro libre y voluntario como afiliado(a) del sindicato PROSALUD, a continuación, compartimos información de su interés y solicitamos amablemente diligenciar la siguiente encuesta de retiro, con esto usted nos ayuda a identificar que procesos y factores influyen en la deserción de PROSALUD y los hospitales, y así podremos evaluar e implementar procesos de mejora.\n\nhttps://docs.google.com/forms/d/e/1FAIpQLScibi8bSKhMs1ByN9ySNgQUu9Wqqlbvg4yrIjAs6Je7o1XO_g/formResponse?pli=1";
+const RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY = "Se recibe notificación de retiro libre y voluntario como afiliado(a) del sindicato PROSALUD, a continuación, compartimos información de su interés y solicitamos amablemente diligenciar la siguiente encuesta de retiro, con esto usted nos ayuda a identificar que procesos y factores influyen en la deserción de PROSALUD y los hospitales, y así podremos evaluar e implementar procesos de mejora.\n\nhttps://forms.gle/i8CBCi4Jrc9sG23h8";
 
 // Función para convertir texto pegado de Excel a HTML de tabla
 const convertExcelPasteToHtmlTable = (text: string): string => {
@@ -4922,7 +4922,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           setIsOptimizing(true);
                           try {
                             // Optimizar solo las imágenes de los archivos seleccionados
-                            const optimizedFiles = await optimizeFileList(e.target.files);
+                            const optimizedFiles = await optimizeFileList(e.target.files, { convertToWebP: false });
 
                             // Combinar archivos existentes con los nuevos (optimizados)
                             const dataTransfer = new DataTransfer();
@@ -6137,7 +6137,7 @@ const AdminSolicitudesPage: React.FC = () => {
                         if (hasImages) {
                           setIsOptimizing(true);
                           try {
-                            const optimizedFiles = await optimizeFileList(e.target.files);
+                            const optimizedFiles = await optimizeFileList(e.target.files, { convertToWebP: false });
                             const dataTransfer = new DataTransfer();
                             currentFiles.forEach(file => dataTransfer.items.add(file));
                             optimizedFiles.forEach(file => dataTransfer.items.add(file));

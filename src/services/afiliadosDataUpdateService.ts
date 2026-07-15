@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_CONFIG } from '@/config/api';
+import { createClientFacingError, isNetworkErrorWithoutResponse, isTimeoutError } from '@/utils/errorSanitizer';
 
 // Create axios instance for data update authentication endpoints
 const dataUpdateApi = axios.create({
@@ -141,12 +142,13 @@ export const authenticateForDataUpdate = async (
         throw new Error('Servicio temporalmente no disponible');
       }
       throw new Error(errorData.message || `Error al autenticar (${status})`);
-    } else if (error.code === 'ERR_NETWORK' || error.message.includes('Failed to fetch')) {
-      throw new Error('No se pudo conectar con el servidor. Verifica tu conexión a internet e intenta nuevamente.');
-    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      throw new Error('La solicitud tardó demasiado. Por favor, intenta nuevamente.');
     }
-    throw new Error(error.message || 'Error desconocido al autenticar');
+
+    if (isTimeoutError(error) || isNetworkErrorWithoutResponse(error)) {
+      throw createClientFacingError(error);
+    }
+
+    throw createClientFacingError(error);
   }
 };
 
