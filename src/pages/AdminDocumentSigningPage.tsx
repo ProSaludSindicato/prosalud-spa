@@ -60,10 +60,10 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Checkbox } from '@/components/ui/checkbox';
 // Manual signing service (ACTIVE)
 import {
-  sendBulkEmails as sendBulkEmailsManual,
   getEmailHistory as getEmailHistoryManual,
   resendEmails as resendEmailsManual,
   getStatistics as getStatisticsManual,
+  getTrackingDetail,
   generateAndSendConvenio,
   downloadGeneratedConvenio,
   exportTemplate,
@@ -73,12 +73,14 @@ import {
   signAsPresident,
   signAsPresidentBulk,
   ConvenioEmailTracking,
+  ConvenioDeliveryMode,
   EmailHistoryParams as ManualEmailHistoryParams,
   EmailHistoryEstadoFiltro,
   GenerateAndSendConvenioRequest,
   GenerateAndSendConvenioResponse,
   DownloadGeneratedConvenioResult,
   ImportBulkConveniosResponse,
+  TrackingDetailResponse,
 } from '@/services/conveniosManualService';
 import {
   authenticateForDataUpdate,
@@ -227,10 +229,13 @@ const CONVENIO_TAB_TRIGGER_CLASS =
 const AdminDocumentSigningPage: React.FC = () => {
   const { can } = usePermissions();
   const [activeTab, setActiveTab] = useState('history');
-  const [documentNumbersList, setDocumentNumbersList] = useState<string[]>([]);
-  const [currentDocumentNumber, setCurrentDocumentNumber] = useState('');
-  const [emailsMap, setEmailsMap] = useState<Record<string, string>>({}); // Mapa de documento -> email
-  const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'send') {
+      setActiveTab('history');
+    }
+  }, [activeTab]);
+
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
   
   // Estados para importación masiva
@@ -243,6 +248,10 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [resendEmail, setResendEmail] = useState('');
   const [resendEmailSubject, setResendEmailSubject] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [isBulkResending, setIsBulkResending] = useState(false);
+  const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
+  const [trackingDetail, setTrackingDetail] = useState<TrackingDetailResponse['data'] | null>(null);
+  const [isLoadingTrackingDetail, setIsLoadingTrackingDetail] = useState(false);
   
   // Estado para consulta de afiliado
   const [consultTipoDocumento, setConsultTipoDocumento] = useState<string>('CC');
@@ -547,6 +556,13 @@ const AdminDocumentSigningPage: React.FC = () => {
     statsData?.data?.auto_sign_enabled ??
     false;
 
+  const deliveryMode: ConvenioDeliveryMode =
+    historyData?.delivery_mode ??
+    statsData?.delivery_mode ??
+    'production';
+
+  const isTestDeliveryMode = deliveryMode === 'test';
+
   const presidentSignButtonClassName =
     'bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 focus-visible:ring-accent';
 
@@ -572,13 +588,8 @@ const AdminDocumentSigningPage: React.FC = () => {
     return true;
   };
 
-  // Tracking IDs elegibles (estado permite firma presidencial)
-  const eligibleTrackingIds = useMemo(() => {
-    const items = historyData?.data.data ?? [];
-    return items
-      .filter((t) => t.signing_estado === 'firmado_afiliado' || t.signing_estado === 'error_firma_presidente')
-      .map((t) => t.id);
-  }, [historyData]);
+  const canResendTracking = (tracking: ConvenioEmailTracking): boolean =>
+    tracking.available_actions?.resend ?? shouldShowEmailResend(tracking);
 
   const queuePresidentProcessingFeedback = (trackingIds: number[], durationMs = 45000): void => {
     if (trackingIds.length === 0) {
@@ -619,12 +630,25 @@ const AdminDocumentSigningPage: React.FC = () => {
         });
       }
       
-      // Si se envió por correo, mostrar información
-      if (response.data?.email) {
-        toast.info('Correo encolado', {
-          description: `El correo se enviará a ${response.data.email.email}.`,
+      const responseTestMode = response.delivery_mode === 'test' || isTestDeliveryMode;
+
+      if (response.data?.email && responseTestMode) {
+        toast.info('Modo test', {
+          description: 'El convenio quedó en historial para verificación y el PDF se enviará a tu correo de usuario.',
           duration: 5000,
         });
+      } else if (response.data?.email) {
+        toast.info('Correo encolado', {
+          description: `El correo se enviará a ${(response.data.email as { email?: string }).email ?? 'el afiliado'}.`,
+          duration: 5000,
+        });
+      }
+
+      if (response.next_step === 'email-history' || responseTestMode) {
+        setTimeout(() => {
+          setActiveTab('history');
+          void refetchHistory();
+        }, 800);
       }
 
       // Si el usuario activó la descarga, iniciar polling para descargar el convenio generado
@@ -641,7 +665,7 @@ const AdminDocumentSigningPage: React.FC = () => {
               const blobUrl = window.URL.createObjectURL(result.blob);
               const link = document.createElement('a');
               link.href = blobUrl;
-              link.download = `Convenio_${numeroDocumento}.docx`;
+              link.download = `Convenio_${numeroDocumento}.pdf`;
               document.body.appendChild(link);
               link.click();
               link.remove();
@@ -916,16 +940,35 @@ const AdminDocumentSigningPage: React.FC = () => {
       importBulkConvenios(data.file, data.send_email),
     onSuccess: (response) => {
       setImportResult(response);
-      toast.success('Importación procesada', {
-        description: `Se procesaron ${response.data.procesados} filas. ${response.data.exitosos} convenios encolados exitosamente.`,
-        duration: 8000,
-      });
-      
-      if (response.data.errores > 0) {
-        toast.warning('Algunos convenios tuvieron errores', {
-          description: `${response.data.errores} fila(s) tuvieron errores. Revisa los detalles abajo.`,
+      const { procesados, exitosos, errores } = response.data;
+
+      if (exitosos === 0 && errores > 0) {
+        toast.error('Importación con errores', {
+          description: response.message || `${errores} fila(s) tuvieron errores. Revisa los detalles abajo.`,
           duration: 8000,
         });
+      } else if (exitosos > 0 && errores > 0) {
+        toast.warning('Importación parcial', {
+          description: response.message || `Se encolaron ${exitosos} de ${procesados} filas. ${errores} fila(s) tuvieron errores.`,
+          duration: 8000,
+        });
+      } else if (exitosos > 0) {
+        toast.success('Importación procesada', {
+          description: response.message || `Se procesaron ${procesados} filas. ${exitosos} convenios encolados exitosamente.`,
+          duration: 8000,
+        });
+      } else {
+        toast.info('Importación completada', {
+          description: response.message || 'No se encontraron filas con datos para procesar.',
+          duration: 8000,
+        });
+      }
+
+      if (exitosos > 0) {
+        setTimeout(() => {
+          setActiveTab('history');
+          void refetchHistory();
+        }, 1000);
       }
       
       // Limpiar archivo seleccionado
@@ -979,127 +1022,66 @@ const AdminDocumentSigningPage: React.FC = () => {
     });
   };
 
-  const handleAddDocumentNumber = () => {
-    const trimmed = currentDocumentNumber.trim();
-    if (!trimmed) return;
-    
-    if (documentNumbersList.includes(trimmed)) {
-      toast.warning('Número duplicado', {
-        description: 'Este número de documento ya está en la lista.',
-      });
+  const handleBulkResend = async () => {
+    if (resendEligibleSelectedIds.length === 0) {
       return;
     }
 
-    setDocumentNumbersList([...documentNumbersList, trimmed]);
-    setCurrentDocumentNumber('');
-  };
-
-  const handleRemoveDocumentNumber = (number: string) => {
-    setDocumentNumbersList(documentNumbersList.filter(n => n !== number));
-    // Remover email asociado si existe
-    const newEmailsMap = { ...emailsMap };
-    delete newEmailsMap[number];
-    setEmailsMap(newEmailsMap);
-  };
-
-  const handleEmailChange = (documentNumber: string, email: string) => {
-    setEmailsMap(prev => {
-      const newMap = { ...prev };
-      if (email.trim()) {
-        newMap[documentNumber] = email.trim();
-      } else {
-        delete newMap[documentNumber];
-      }
-      return newMap;
-    });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddDocumentNumber();
-    }
-  };
-
-  // Handler para envío masivo (Manual)
-  const handleSendBulkEmailsManual = async () => {
-    if (documentNumbersList.length === 0) {
-      toast.error('Error', {
-        description: 'Por favor, agrega al menos un número de documento.',
-      });
-      return;
-    }
-
-    // Validar emails si se proporcionaron
-    const invalidEmails: string[] = [];
-    Object.entries(emailsMap).forEach(([doc, email]) => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (email && !emailRegex.test(email)) {
-        invalidEmails.push(doc);
-      }
-    });
-
-    if (invalidEmails.length > 0) {
-      toast.error('Emails inválidos', {
-        description: `Los siguientes documentos tienen emails inválidos: ${invalidEmails.join(', ')}`,
-      });
-      return;
-    }
-
-    setIsSending(true);
+    setIsBulkResending(true);
     try {
-      const requestData: any = {
-        document_numbers: documentNumbersList,
-      };
-
-      // Agregar emails solo si hay al menos uno
-      // Formato requerido: emails debe ser un objeto asociativo donde las claves
-      // son los números de documento (strings) y los valores son los correos electrónicos
-      // Ejemplo: { "1234567890": "email@example.com", "9876543210": "otro@example.com" }
-      if (Object.keys(emailsMap).length > 0) {
-        requestData.emails = emailsMap;
-      }
-
-      const response = await sendBulkEmailsManual(requestData);
-
-      const { total_requested, files_found, enqueued, errors } = response.data;
-
-      // Mostrar confirmación inmediata
-      toast.success('Proceso iniciado', {
-        description: response.message || 'El proceso de envío masivo ha sido iniciado. Los correos se enviarán de forma asíncrona.',
-        duration: 5000,
+      const response = await resendEmailsManual({
+        tracking_ids: resendEligibleSelectedIds,
       });
 
-      // Mostrar resumen
-      if (errors > 0) {
-        toast.warning('Algunos archivos no se encontraron', {
-          description: `${errors} archivo(s) no se encontraron. Revisa el historial para más detalles.`,
-          duration: 8000,
+      if (response.data.success_count > 0) {
+        toast.success(
+          resendEligibleSelectedIds.length > 1 ? 'Reenvíos encolados' : 'Reenvío encolado',
+          {
+            description:
+              response.message ??
+              (isTestDeliveryMode
+                ? 'En modo test los correos llegarán al usuario que realiza la solicitud.'
+                : 'Consulte el historial para ver el estado.'),
+          },
+        );
+        setSelectedTrackingIds(new Set());
+        void refetchHistory();
+      } else if (response.data.failed_count > 0) {
+        toast.error('No se pudieron reenviar algunos registros', {
+          description: response.data.results.failed[0]?.error ?? 'Revise el historial.',
         });
       }
-
-      // Limpiar formulario
-      setDocumentNumbersList([]);
-      setCurrentDocumentNumber('');
-      setEmailsMap({});
-      
-      // Cambiar a historial para ver los nuevos envíos
-      if (enqueued > 0) {
-        setTimeout(() => {
-          setActiveTab('history');
-          refetchHistory();
-        }, 1000);
-      }
-    } catch (error: any) {
-      toast.error('Error al enviar correos', {
-        description: error.message || 'Ocurrió un error al enviar los correos.',
-      });
+    } catch (error: unknown) {
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
+          ? (error as { message: string }).message
+          : 'Ocurrió un error al reenviar los convenios seleccionados.';
+      toast.error('Error al reenviar', { description: message });
     } finally {
-      setIsSending(false);
+      setIsBulkResending(false);
     }
   };
 
-  // Abrir modal de confirmación para reenvío
+  const handleOpenTrackingDetail = async (tracking: ConvenioEmailTracking): Promise<void> => {
+    setTrackingDetailOpen(true);
+    setTrackingDetail(null);
+    setIsLoadingTrackingDetail(true);
+
+    try {
+      const response = await getTrackingDetail(tracking.id);
+      setTrackingDetail(response.data);
+    } catch (error: unknown) {
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
+          ? (error as { message: string }).message
+          : 'No se pudo cargar el detalle del convenio.';
+      toast.error('Error al cargar detalle', { description: message });
+      setTrackingDetailOpen(false);
+    } finally {
+      setIsLoadingTrackingDetail(false);
+    }
+  };
+
   const handleOpenResendDialog = (tracking: ConvenioEmailTracking) => {
     setSelectedTrackingId(tracking.id);
     setSelectedTrackingInfo(tracking);
@@ -1148,7 +1130,14 @@ const AdminDocumentSigningPage: React.FC = () => {
       const response = await resendEmailsManual(requestData);
 
       if (response.data.success_count > 0) {
-        toast.success('Correo reenviado exitosamente');
+        const responseTestMode = response.delivery_mode === 'test' || isTestDeliveryMode;
+        toast.success('Correo reenviado exitosamente', {
+          description:
+            response.message ??
+            (responseTestMode
+              ? 'En modo test el correo llegará al usuario que realiza la solicitud.'
+              : 'Consulte el historial para ver el estado.'),
+        });
         refetchHistory();
         setResendDialogOpen(false);
         setSelectedTrackingId(null);
@@ -1185,13 +1174,14 @@ const AdminDocumentSigningPage: React.FC = () => {
       pendiente: { label: 'Pendiente', variant: 'secondary' as const, icon: Clock, color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
       enviado: { label: 'Enviado', variant: 'default' as const, icon: CheckCircle2, color: 'bg-green-100 text-green-800 border-green-200' },
       fallido: { label: 'Fallido', variant: 'destructive' as const, icon: XCircle, color: 'bg-red-100 text-red-800 border-red-200' },
+      verificacion: { label: 'Verificación', variant: 'outline' as const, icon: Eye, color: 'bg-sky-100 text-sky-800 border-sky-200' },
     };
 
     const config = statusConfig[status] || statusConfig.pendiente;
     const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className={`flex items-center gap-1 ${config.color}`}>
+      <Badge variant={config.variant} className={`inline-flex w-fit items-center gap-1 ${config.color}`}>
         <Icon className="h-3 w-3" />
         {config.label}
       </Badge>
@@ -1288,11 +1278,10 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   // Handler para firma presidencial masiva
   const handleBulkSignAsPresident = async () => {
-    if (selectedTrackingIds.size === 0) return;
+    if (presidentSignEligibleSelectedIds.length === 0) return;
     setIsBulkSigning(true);
     try {
-      const selectedIds = Array.from(selectedTrackingIds);
-      const result = await signAsPresidentBulk(selectedIds);
+      const result = await signAsPresidentBulk(presidentSignEligibleSelectedIds);
       toast.success(`${result.accepted} convenio(s) encolados`, {
         description:
           result.rejected.length > 0
@@ -1300,9 +1289,13 @@ const AdminDocumentSigningPage: React.FC = () => {
             : 'Todos los convenios fueron enviados correctamente.',
       });
       const rejectedIds = new Set(result.rejected.map((item) => item.tracking_id));
-      const acceptedIds = selectedIds.filter((trackingId) => !rejectedIds.has(trackingId));
+      const acceptedIds = presidentSignEligibleSelectedIds.filter((trackingId) => !rejectedIds.has(trackingId));
       queuePresidentProcessingFeedback(acceptedIds);
-      setSelectedTrackingIds(new Set());
+      setSelectedTrackingIds((prev) => {
+        const next = new Set(prev);
+        presidentSignEligibleSelectedIds.forEach((id) => next.delete(id));
+        return next;
+      });
       void refetchHistory();
     } catch (err: any) {
       toast.error('Error en firma masiva', {
@@ -1316,6 +1309,32 @@ const AdminDocumentSigningPage: React.FC = () => {
   const isEligibleForPresidentSign = (tracking: ConvenioEmailTracking): boolean =>
     tracking.signing_estado === 'firmado_afiliado' ||
     tracking.signing_estado === 'error_firma_presidente';
+
+  const canDownloadOriginalTracking = (tracking: ConvenioEmailTracking): boolean =>
+    tracking.available_actions?.download_original ?? canDownloadOriginalConvenio(tracking);
+
+  const selectableTrackingIds = useMemo(() => {
+    const items = historyData?.data.data ?? [];
+    return items
+      .filter((t) => canResendTracking(t) || isEligibleForPresidentSign(t))
+      .map((t) => t.id);
+  }, [historyData]);
+
+  const resendEligibleSelectedIds = useMemo(() => {
+    const items = historyData?.data.data ?? [];
+    return Array.from(selectedTrackingIds).filter((id) => {
+      const tracking = items.find((t) => t.id === id);
+      return tracking ? canResendTracking(tracking) : false;
+    });
+  }, [selectedTrackingIds, historyData]);
+
+  const presidentSignEligibleSelectedIds = useMemo(() => {
+    const items = historyData?.data.data ?? [];
+    return Array.from(selectedTrackingIds).filter((id) => {
+      const tracking = items.find((t) => t.id === id);
+      return tracking ? isEligibleForPresidentSign(tracking) : false;
+    });
+  }, [selectedTrackingIds, historyData]);
 
   const isPresidentSigningProcessing = (tracking: ConvenioEmailTracking): boolean => {
     if (tracking.signing_estado === 'firmando_presidente') {
@@ -1414,9 +1433,9 @@ const AdminDocumentSigningPage: React.FC = () => {
   const canManageDocumentSigning = can('document_signing.manage');
   const convenioTabsListGridCols =
     canViewDocumentSigning && canManageDocumentSigning
-      ? 'grid-cols-5'
+      ? 'grid-cols-4'
       : canManageDocumentSigning
-        ? 'grid-cols-3'
+        ? 'grid-cols-2'
         : canViewDocumentSigning
           ? 'grid-cols-2'
           : 'grid-cols-1';
@@ -1429,10 +1448,16 @@ const AdminDocumentSigningPage: React.FC = () => {
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Firma de Convenios</h1>
               <p className="text-sm sm:text-base text-gray-600 mt-1">
-                Gestiona el envío masivo de correos para firma de convenios
+                Genera convenios en PDF, importa masivamente y gestiona envíos desde el historial
               </p>
             </div>
           </div>
+
+          {isTestDeliveryMode && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Modo test activo: al generar con envío de correo recibirás el PDF en tu usuario autenticado. Los reenvíos también llegan a tu correo, no al afiliado. Usa &quot;Ver detalle&quot; en el historial para revisar los datos ingresados.
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
             <TabsList
@@ -1459,12 +1484,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                   <span className="min-w-0 truncate">Importación Masiva</span>
                 </TabsTrigger>
               )}
-              {canManageDocumentSigning && (
-                <TabsTrigger value="send" className={CONVENIO_TAB_TRIGGER_CLASS}>
-                  <Send className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">Envío Masivo</span>
-                </TabsTrigger>
-              )}
               {canViewDocumentSigning && (
                 <TabsTrigger value="statistics" className={CONVENIO_TAB_TRIGGER_CLASS}>
                   <BarChart3 className="h-4 w-4 shrink-0" />
@@ -1473,19 +1492,16 @@ const AdminDocumentSigningPage: React.FC = () => {
               )}
             </TabsList>
 
-            {/* Tab: Historial (Manual) - Primero */}
+            {/* Tab: Historial */}
             {can('document_signing.view') && (
               <TabsContent value="history" className="space-y-6">
                 <Card>
                   <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                       <div className="min-w-0 flex-1">
-                        <CardTitle className="text-lg sm:text-xl">Historial de Envíos Manuales</CardTitle>
+                        <CardTitle className="text-lg sm:text-xl">Historial y seguimiento</CardTitle>
                         <CardDescription className="text-sm">
-                          Envíos, firma digital y descargas. La sede se toma del convenio activo del afiliado en datos
-                          maestros (código de cliente) o del formulario si generaste el convenio desde el panel; el
-                          envío masivo por lista de documentos rellena sede solo cuando el afiliado tiene convenio en el
-                          Excel.
+                          Consulta envíos, descarga PDFs, reenvía seleccionados y gestiona la firma digital desde un solo lugar.
                         </CardDescription>
                       </div>
                       <Button
@@ -1538,6 +1554,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                               <SelectItem value="pendiente">Pendiente de envío</SelectItem>
                               <SelectItem value="enviado">Enviado</SelectItem>
                               <SelectItem value="fallido">Fallido</SelectItem>
+                              <SelectItem value="verificacion">Verificación (modo test)</SelectItem>
                             </SelectGroup>
                             {digitalSigningEnabled && (
                               <SelectGroup>
@@ -1601,26 +1618,43 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </div>
                     ) : (
                       <>
-                        {/* Barra de acción sticky bulk (solo cuando auto_sign_enabled) */}
-                        {autoSignEnabled && can('document_signing.manage') && selectedTrackingIds.size > 0 && (
-                          <div className="sticky top-0 z-10 flex items-center gap-3 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur">
+                        {can('document_signing.manage') && selectedTrackingIds.size > 0 && (
+                          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur">
                             <Badge variant="secondary" className="gap-1">
                               <CheckSquare className="h-3.5 w-3.5" />
                               {selectedTrackingIds.size} seleccionado{selectedTrackingIds.size !== 1 ? 's' : ''}
                             </Badge>
-                            <Button
-                              size="sm"
-                              onClick={() => void handleBulkSignAsPresident()}
-                              disabled={isBulkSigning}
-                              className={cn('gap-1.5', presidentSignButtonClassName)}
-                            >
-                              {isBulkSigning ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <PenLine className="h-3.5 w-3.5" />
-                              )}
-                              Firmar como presidente
-                            </Button>
+                            {resendEligibleSelectedIds.length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleBulkResend()}
+                                disabled={isBulkResending}
+                                className="gap-1.5"
+                              >
+                                {isBulkResending ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                )}
+                                Reenviar seleccionados ({resendEligibleSelectedIds.length})
+                              </Button>
+                            )}
+                            {autoSignEnabled && presidentSignEligibleSelectedIds.length > 0 && (
+                              <Button
+                                size="sm"
+                                onClick={() => void handleBulkSignAsPresident()}
+                                disabled={isBulkSigning}
+                                className={cn('gap-1.5', presidentSignButtonClassName)}
+                              >
+                                {isBulkSigning ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <PenLine className="h-3.5 w-3.5" />
+                                )}
+                                Firmar como presidente ({presidentSignEligibleSelectedIds.length})
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1636,16 +1670,16 @@ const AdminDocumentSigningPage: React.FC = () => {
                           <Table className="table-fixed w-full">
                             <TableHeader>
                               <TableRow>
-                                {autoSignEnabled && can('document_signing.manage') && (
+                                {can('document_signing.manage') && (
                                   <TableHead className="w-[36px] px-2">
                                     <Checkbox
                                       checked={
-                                        eligibleTrackingIds.length > 0 &&
-                                        eligibleTrackingIds.every((id) => selectedTrackingIds.has(id))
+                                        selectableTrackingIds.length > 0 &&
+                                        selectableTrackingIds.every((id) => selectedTrackingIds.has(id))
                                       }
                                       onCheckedChange={(checked) => {
                                         if (checked) {
-                                          setSelectedTrackingIds(new Set(eligibleTrackingIds));
+                                          setSelectedTrackingIds(new Set(selectableTrackingIds));
                                         } else {
                                           setSelectedTrackingIds(new Set());
                                         }
@@ -1666,9 +1700,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 const signedDownloadCfg = getSignedDownloadButtonConfig(tracking);
                                 return (
                                 <TableRow key={tracking.id}>
-                                  {autoSignEnabled && can('document_signing.manage') && (
+                                  {can('document_signing.manage') && (
                                     <TableCell className="px-2 align-top py-3">
-                                      {isEligibleForPresidentSign(tracking) ? (
+                                      {(canResendTracking(tracking) || isEligibleForPresidentSign(tracking)) ? (
                                         <Checkbox
                                           checked={selectedTrackingIds.has(tracking.id)}
                                           onCheckedChange={(checked) => {
@@ -1763,7 +1797,26 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3 pl-2 pr-4">
                                     <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                      {shouldShowEmailResend(tracking) && (
+                                      {can('document_signing.view') && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-8 shrink-0 px-2"
+                                              onClick={() => void handleOpenTrackingDetail(tracking)}
+                                              aria-label="Ver detalle del convenio"
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              <span className="sr-only">Ver detalle</span>
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>Ver datos usados para generar el convenio</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                      {canResendTracking(tracking) && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button
@@ -1782,7 +1835,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TooltipContent>
                                         </Tooltip>
                                       )}
-                                      {can('document_signing.view') && canDownloadOriginalConvenio(tracking) && (
+                                      {can('document_signing.view') && canDownloadOriginalTracking(tracking) && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button
@@ -1854,136 +1907,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </>
                     )}
                     </TooltipProvider>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
-
-            {/* Tab: Envío Masivo (Manual) - Segundo */}
-            {can('document_signing.manage') && (
-              <TabsContent value="send" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg sm:text-xl">Enviar Correos de Convenio Manual</CardTitle>
-                    <CardDescription className="text-sm">
-                      Ingresa los números de documento de los afiliados a los que deseas enviar el correo con el PDF del convenio adjunto.
-                      El sistema buscará automáticamente el PDF y enviará el correo de forma asíncrona.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="documentNumber">Números de Documento *</Label>
-                      <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Input
-                            id="documentNumber"
-                            placeholder="Ingresa un número de documento y presiona Enter o haz clic en Agregar"
-                            value={currentDocumentNumber}
-                            onChange={(e) => setCurrentDocumentNumber(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            className="font-mono flex-1"
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleAddDocumentNumber}
-                            disabled={!currentDocumentNumber.trim()}
-                            variant="outline"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Agregar
-                          </Button>
-                        </div>
-                        
-                        {documentNumbersList.length > 0 && (
-                          <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[200px]">Número de Documento</TableHead>
-                                  <TableHead>Correo Electrónico (Opcional)</TableHead>
-                                  <TableHead className="w-[100px]">Acción</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {documentNumbersList.map((number) => (
-                                  <TableRow key={number}>
-                                    <TableCell className="font-mono">{number}</TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="email"
-                                        placeholder="email@ejemplo.com (opcional)"
-                                        value={emailsMap[number] || ''}
-                                        onChange={(e) => handleEmailChange(number, e.target.value)}
-                                        className="font-mono text-sm"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveDocumentNumber(number)}
-                                        className="text-red-600 hover:text-red-700"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-                        
-                        <p className="text-sm text-gray-500">
-                          Agrega números de documento uno por uno. Opcionalmente, puedes especificar un correo electrónico para cada documento.
-                          Si no proporcionas un correo, el sistema buscará automáticamente el email del afiliado en la base de datos.
-                          {documentNumbersList.length > 0 && (
-                            <span className="block mt-1 font-medium text-gray-700">
-                              Total: {documentNumbersList.length} documento(s) agregado(s)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border-2 border-blue-200 bg-blue-50/50 p-4">
-                      <div className="flex gap-3">
-                        <div className="flex-shrink-0">
-                          <div className="p-2 bg-blue-100 rounded-full">
-                            <AlertCircle className="h-5 w-5 text-blue-600" />
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-blue-900 mb-1">Información importante</h4>
-                          <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                            <li>Los correos se enviarán de forma asíncrona con el PDF del convenio adjunto.</li>
-                            <li>El proceso puede tardar varios minutos dependiendo de la cantidad de correos.</li>
-                            <li>Puedes ver el progreso y estado de cada envío en la pestaña "Historial".</li>
-                            <li>Si no proporcionas un correo, se usará el email del afiliado en la base de datos.</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleSendBulkEmailsManual}
-                      disabled={isSending || documentNumbersList.length === 0}
-                      className="w-full md:w-auto"
-                      size="lg"
-                    >
-                      {isSending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Iniciando envío masivo...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Enviar Correos de Convenio Manual
-                        </>
-                      )}
-                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -2888,7 +2811,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">Importación Masiva de Convenios</CardTitle>
                     <CardDescription className="text-sm">
-                      Descarga la plantilla Excel, complétala con los datos de los convenios y súbela para generar múltiples convenios de forma automática.
+                      Descarga la plantilla Excel, complétala con los datos de los convenios y súbela para generar PDFs.
+                      Opcionalmente puedes enviar correos al procesar; el seguimiento se hace desde el historial.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -2986,9 +2910,11 @@ const AdminDocumentSigningPage: React.FC = () => {
 
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 bg-slate-50 gap-3 sm:gap-0">
                               <div className="space-y-0.5 flex-1">
-                                <Label className="text-sm sm:text-base">Enviar por correo electrónico</Label>
+                                <Label className="text-sm sm:text-base">Enviar correos al procesar</Label>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
-                                  Si está activado, se enviarán correos cuando esté habilitado (actualmente deshabilitado).
+                                  {isTestDeliveryMode
+                                    ? 'En modo test no se envía al afiliado: los PDFs quedarán en el historial para verificación.'
+                                    : 'Si está activado, se generará el PDF y se enviará el correo a cada afiliado de forma asíncrona.'}
                                 </p>
                               </div>
                               <Switch
@@ -3013,7 +2939,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                               ) : (
                                 <>
                                   <Upload className="mr-2 h-4 w-4" />
-                                  Importar y Generar Convenios
+                                  {bulkSendEmail
+                                    ? isTestDeliveryMode
+                                      ? 'Importar y generar para verificación'
+                                      : 'Importar, generar y enviar'
+                                    : 'Importar y generar PDFs'}
                                 </>
                               )}
                             </Button>
@@ -3106,11 +3036,24 @@ const AdminDocumentSigningPage: React.FC = () => {
                             </Card>
                           )}
 
-                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <p className="text-sm text-blue-900">
                               <strong>Nota:</strong> Los convenios se están generando de forma asíncrona en segundo plano.
                               Puedes consultar el historial para ver el estado de los convenios generados.
                             </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 border-blue-300 bg-white hover:bg-blue-100"
+                              onClick={() => {
+                                setActiveTab('history');
+                                void refetchHistory();
+                              }}
+                            >
+                              <History className="h-4 w-4 mr-2" />
+                              Ver historial
+                            </Button>
                           </div>
                         </div>
                       </>
@@ -3515,6 +3458,94 @@ const AdminDocumentSigningPage: React.FC = () => {
               </TabsContent>
             )}
           </Tabs>
+
+          <Dialog open={trackingDetailOpen} onOpenChange={setTrackingDetailOpen}>
+            <DialogContent className="w-[95vw] max-w-5xl lg:max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Detalle del convenio</DialogTitle>
+                <DialogDescription>
+                  Datos registrados al generar el convenio. Útil para confirmar si hubo un error de captura o del sistema.
+                </DialogDescription>
+              </DialogHeader>
+
+              {isLoadingTrackingDetail ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Cargando detalle...</p>
+                </div>
+              ) : trackingDetail ? (
+                <div className="space-y-4 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Documento</span>
+                      <p className="font-mono">{trackingDetail.tracking.documento}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Estado</span>
+                      <div className="mt-1">{getManualStatusBadge(trackingDetail.tracking.estado)}</div>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Afiliado</span>
+                      <p>{trackingDetail.tracking.nombre_afiliado}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Convenio</span>
+                      <p>{trackingDetail.tracking.nombre_convenio}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Archivo</span>
+                      <p className="break-all text-xs">{trackingDetail.tracking.nombre_archivo}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-muted-foreground">Creado</span>
+                      <p>{formatDate(trackingDetail.tracking.created_at)}</p>
+                    </div>
+                    {trackingDetail.generated_by && (
+                      <div className="col-span-full">
+                        <span className="font-semibold text-muted-foreground">Generado por</span>
+                        <p>
+                          {trackingDetail.generated_by.name}{' '}
+                          <span className="text-muted-foreground">({trackingDetail.generated_by.email})</span>
+                        </p>
+                      </div>
+                    )}
+                    {trackingDetail.tracking.error_message && (
+                      <div className="col-span-full rounded-md border border-red-200 bg-red-50 p-3">
+                        <span className="font-semibold text-red-800">Error del sistema</span>
+                        <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{trackingDetail.tracking.error_message}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Datos de generación</h3>
+                    {trackingDetail.convenio_data_fields.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {trackingDetail.convenio_data_fields.map((field) => (
+                          <div key={field.key} className="rounded-md border bg-slate-50 px-3 py-2">
+                            <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
+                            <p className="text-sm break-words whitespace-pre-wrap">{String(field.value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No hay datos de generación guardados para este registro (puede ser un envío anterior a esta funcionalidad).
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setTrackingDetailOpen(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Modal de confirmación para reenvío */}
           <Dialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>

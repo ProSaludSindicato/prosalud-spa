@@ -1,30 +1,26 @@
 import { authenticatedApi } from './api';
 import axios, { AxiosError } from 'axios';
 
-/**
- * Request para envío masivo de correos
- */
-export interface SendBulkEmailsRequest {
-  document_numbers: string[];
-  emails?: Record<string, string>; // Objeto asociativo: { "documento": "email" }
-  email_subject?: string;
-  document_name?: string;
+export type ConvenioDeliveryMode = 'production' | 'test';
+
+export interface ConvenioTrackingAvailableActions {
+  resend: boolean;
+  download_original: boolean;
+  download_final: boolean;
 }
 
-/**
- * Response del envío masivo
- */
-export interface SendBulkEmailsResponse {
-  success: true;
-  message: string;
-  data: {
-    total_requested: number;
-    files_found: number;
-    enqueued: number;
-    errors: number;
-    status: 'queued';
-    note: string;
-  };
+export interface ConvenioHistoryUiMetadata {
+  tabs: Array<{ id: string; label: string }>;
+  bulk_actions: Array<{
+    id: string;
+    label: string;
+    endpoint: string;
+    method: string;
+    payload_key: string;
+  }>;
+  estado_filtros: Array<{ value: string; label: string }>;
+  deprecated_endpoints?: Array<{ endpoint: string; replacement: string }>;
+  alternative_flows?: Record<string, string>;
 }
 
 /**
@@ -46,7 +42,10 @@ export interface ConvenioEmailTracking {
   nombre_convenio: string;
   nombre_archivo: string;
   ruta_archivo_pdf: string;
-  estado: 'pendiente' | 'enviado' | 'fallido';
+  estado: 'pendiente' | 'enviado' | 'fallido' | 'verificacion';
+  available_actions?: ConvenioTrackingAvailableActions;
+  convenio_data?: Record<string, unknown> | null;
+  generated_by_user_id?: number | null;
   enviado_at: string | null;
   error_message: string | null;
   intentos: number;
@@ -76,8 +75,10 @@ export interface ConvenioEmailTracking {
  */
 export interface EmailHistoryResponse {
   success: true;
+  delivery_mode?: ConvenioDeliveryMode;
   digital_signing_enabled: boolean;
-  auto_sign_enabled: boolean;
+  auto_sign_enabled?: boolean;
+  ui?: ConvenioHistoryUiMetadata;
   data: {
     current_page: number;
     data: ConvenioEmailTracking[];
@@ -105,6 +106,7 @@ export type EmailHistoryEstadoFiltro =
   | 'pendiente'
   | 'enviado'
   | 'fallido'
+  | 'verificacion'
   | 'firma_pendiente_firma'
   | 'firma_firmado_afiliado'
   | 'firma_completado'
@@ -139,6 +141,8 @@ export interface ResendEmailsRequest {
  */
 export interface ResendEmailsResponse {
   success: true;
+  delivery_mode?: ConvenioDeliveryMode;
+  message?: string;
   data: {
     total: number;
     success_count: number;
@@ -169,6 +173,7 @@ export interface StatisticsParams {
  */
 export interface StatisticsResponse {
   success: true;
+  delivery_mode?: ConvenioDeliveryMode;
   data: {
     digital_signing_enabled: boolean;
     auto_sign_enabled: boolean;
@@ -208,58 +213,27 @@ export interface StatisticsResponse {
   };
 }
 
-/**
- * Envía correos masivos de convenio manual
- */
-export const sendBulkEmails = async (
-  requestData: SendBulkEmailsRequest
-): Promise<SendBulkEmailsResponse> => {
-  try {
-    const response = await authenticatedApi.post<SendBulkEmailsResponse>(
-      '/api/convenios-manual/send-bulk-emails',
-      requestData
-    );
+export interface ConvenioDataField {
+  key: string;
+  label: string;
+  value: unknown;
+}
 
-    return response.data;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{ 
-        success: false; 
-        message: string; 
-        errors?: Record<string, string[]> 
-      }>;
-      
-      if (axiosError.response?.status === 422) {
-        throw {
-          success: false,
-          message: axiosError.response.data?.message || 'Error de validación',
-          errors: axiosError.response.data?.errors || {},
-          isValidationError: true,
-        };
-      }
-      
-      if (axiosError.response?.status === 404) {
-        throw {
-          success: false,
-          message: axiosError.response.data?.message || 'No se encontraron archivos PDF',
-          errors: {},
-        };
-      }
-      
-      throw {
-        success: false,
-        message: axiosError.response?.data?.message || 'Error al enviar correos masivos',
-        errors: {},
-      };
-    }
-    
-    throw {
-      success: false,
-      message: 'Error desconocido al enviar correos masivos',
-      errors: {},
-    };
-  }
-};
+export interface TrackingDetailResponse {
+  success: true;
+  delivery_mode?: ConvenioDeliveryMode;
+  digital_signing_enabled: boolean;
+  data: {
+    tracking: ConvenioEmailTracking;
+    convenio_data: Record<string, unknown> | null;
+    convenio_data_fields: ConvenioDataField[];
+    generated_by: {
+      id: number;
+      name: string;
+      email: string;
+    } | null;
+  };
+}
 
 /**
  * Obtiene el historial de envíos de correos manuales
@@ -309,6 +283,32 @@ export const getEmailHistory = async (
     throw {
       success: false,
       message: 'Error desconocido al obtener el historial',
+    };
+  }
+};
+
+/**
+ * Obtiene el detalle de un registro del historial, incluyendo los datos usados para generar el convenio.
+ */
+export const getTrackingDetail = async (trackingId: number): Promise<TrackingDetailResponse> => {
+  try {
+    const response = await authenticatedApi.get<TrackingDetailResponse>(
+      `/api/convenios-manual/tracking/${trackingId}`,
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ success: false; message: string }>;
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al obtener el detalle del convenio',
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al obtener el detalle del convenio',
     };
   }
 };
@@ -455,7 +455,9 @@ export interface GenerateAndSendConvenioRequest {
 export interface GenerateAndSendConvenioResponse {
   success: boolean;
   message: string;
-  data?: any;
+  delivery_mode?: ConvenioDeliveryMode;
+  next_step?: string;
+  data?: Record<string, unknown>;
   warnings?: string[];
 }
 
@@ -609,6 +611,9 @@ export const downloadGeneratedConvenio = async (
 export interface ImportBulkConveniosResponse {
   success: true;
   message: string;
+  delivery_mode?: ConvenioDeliveryMode;
+  next_step?: string;
+  ui?: ConvenioHistoryUiMetadata;
   data: {
     procesados: number;
     exitosos: number;
