@@ -224,8 +224,8 @@ const convertApiRequestToRequest = (apiRequest: ApiRequest): Request => {
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB en bytes
 const MAX_COMPRESSED_FILE_SIZE = 20 * 1024 * 1024; // 20MB en bytes para archivos comprimidos
 const MAX_FILES = 4;
-/** Debe coincidir con validación Zod / API (RespondToRequestRequest actividades.* max:1200) */
-const MAX_ACTIVIDAD_CERTIFICADO_CHARS = 1200;
+/** Debe coincidir con validación Zod / API (RespondToRequestRequest::MAX_ACTIVIDAD_CHARS) */
+const MAX_ACTIVIDAD_CERTIFICADO_CHARS = 5000;
 
 // Tipos MIME de archivos comprimidos
 const COMPRESSED_FILE_TYPES = [
@@ -1384,29 +1384,47 @@ const AdminSolicitudesPage: React.FC = () => {
     }
   };
 
-  const handleOpenResponseDialog = (solicitud: Request) => {
+  const handleOpenResponseDialog = async (solicitud: Request) => {
     setIsSubmittingResponse(false); // Asegurar que el estado esté reseteado al abrir
-    setSolicitudToRespond(solicitud);
+
+    let solicitudParaResponder = solicitud;
+
+    // El listado puede traer un payload reducido sin infoCertificado; cargar detalle completo si hace falta
+    if (solicitud.request_type === 'certificado-convenio' && solicitud.payload?.infoCertificado === undefined) {
+      try {
+        const fullRequest = await requestsService.getRequestById(solicitud.id);
+        if (fullRequest) {
+          solicitudParaResponder = fullRequest;
+        }
+      } catch (loadError) {
+        logger.error(
+          'Error al cargar detalle de certificado de convenio para responder',
+          loadError instanceof Error ? loadError.message : loadError,
+        );
+      }
+    }
+
+    setSolicitudToRespond(solicitudParaResponder);
     
     // Determinar si necesita formulario de compensaciones manuales
-    const needsCompensaciones = requiresManualCompensaciones(solicitud);
-    const isFondoPensiones = isDirigidoFondoPensiones(solicitud);
-    const needsActividades = requiresAdicionarActividades(solicitud);
+    const needsCompensaciones = requiresManualCompensaciones(solicitudParaResponder);
+    const isFondoPensiones = isDirigidoFondoPensiones(solicitudParaResponder);
+    const needsActividades = requiresAdicionarActividades(solicitudParaResponder);
     setRequiresFondoPensionesAnnex(isFondoPensiones);
     setRequiresActividadesForm(needsActividades);
     setUseCompensacionesForm(isFondoPensiones || needsActividades ? false : needsCompensaciones);
     
     // Pre-llenar el formulario con valores por defecto basados en el estado actual
     // Para certificados de convenio, solo permitir "resolved" o "rejected"
-    const isCertificadoConvenio = solicitud.request_type === 'certificado-convenio';
+    const isCertificadoConvenio = solicitudParaResponder.request_type === 'certificado-convenio';
     let defaultStatus: "in_progress" | "resolved" | "rejected" = "in_progress";
     
     if (isCertificadoConvenio) {
       // Para certificados de convenio, solo permitir "resolved" o "rejected"
       // Si ya está resuelto o rechazado, mantener ese estado, sino usar "resolved" por defecto
-      if (solicitud.status === "resolved") {
+      if (solicitudParaResponder.status === "resolved") {
         defaultStatus = "resolved";
-      } else if (solicitud.status === "rejected") {
+      } else if (solicitudParaResponder.status === "rejected") {
         defaultStatus = "rejected";
       } else {
         // Para "pending" o "in_progress", usar "resolved" por defecto
@@ -1414,20 +1432,20 @@ const AdminSolicitudesPage: React.FC = () => {
       }
     } else {
       // Para otros tipos de solicitud, permitir "in_progress"
-      if (solicitud.status === "resolved") {
+      if (solicitudParaResponder.status === "resolved") {
         defaultStatus = "resolved";
-      } else if (solicitud.status === "rejected") {
+      } else if (solicitudParaResponder.status === "rejected") {
         defaultStatus = "rejected";
       } else {
         // Para "pending" o "in_progress", usar "in_progress"
         defaultStatus = "in_progress";
       }
     }
-    const requestTypeLabel = getRequestTypeLabel(solicitud.request_type);
+    const requestTypeLabel = getRequestTypeLabel(solicitudParaResponder.request_type);
     
     // Mensaje predefinido para solicitudes de actualización de datos personales
-    if (solicitud.request_type === 'actualizar-datos-personales') {
-      const emailSubject = `Actualización de Datos Personales - Solicitud #${solicitud.id}`;
+    if (solicitudParaResponder.request_type === 'actualizar-datos-personales') {
+      const emailSubject = `Actualización de Datos Personales - Solicitud #${solicitudParaResponder.id}`;
       const emailBody = `Su solicitud ha sido procesada y los datos han sido actualizados en nuestro sistema.\n`
       
       responseForm.reset({
@@ -1440,7 +1458,7 @@ const AdminSolicitudesPage: React.FC = () => {
       responseForm.setValue('newStatus', defaultStatus, { shouldValidate: false });
     } else if (needsCompensaciones) {
       // Generar sugerencias de texto según el tipo de certificado
-      const payload = solicitud.payload || {};
+      const payload = solicitudParaResponder.payload || {};
       let infoCertificado = payload.infoCertificado || {};
       if (typeof infoCertificado === 'string') {
         try {
@@ -1459,7 +1477,7 @@ const AdminSolicitudesPage: React.FC = () => {
         String(infoCertificado.paraSubsidioVivienda).toLowerCase() === 'true';
 
       // Generar asunto y cuerpo según el tipo
-      let emailSubject = `Certificado de Convenio - Solicitud #${solicitud.id}`;
+      let emailSubject = `Certificado de Convenio - Solicitud #${solicitudParaResponder.id}`;
       let emailBody = "";
 
       // Solo prediligenciar el mensaje si el estado es "resolved" (completado)
@@ -1467,10 +1485,10 @@ const AdminSolicitudesPage: React.FC = () => {
         emailBody = "Adjunto encontrará su certificado de convenio en formato PDF.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
 
         if (paraSubsidioDesempleo) {
-          emailSubject = `Certificado de Convenio - Subsidio de Desempleo - Solicitud #${solicitud.id}`;
+          emailSubject = `Certificado de Convenio - Subsidio de Desempleo - Solicitud #${solicitudParaResponder.id}`;
           emailBody = "Adjunto encontrará su certificado de convenio para subsidio de desempleo.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
         } else if (paraSubsidioVivienda) {
-          emailSubject = `Certificado de Convenio - Subsidio de Vivienda - Solicitud #${solicitud.id}`;
+          emailSubject = `Certificado de Convenio - Subsidio de Vivienda - Solicitud #${solicitudParaResponder.id}`;
           emailBody = "Adjunto encontrará su certificado de convenio para subsidio de vivienda con los valores de compensación.\n\nEste certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio.";
         }
 
@@ -1483,7 +1501,7 @@ const AdminSolicitudesPage: React.FC = () => {
         emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
       } else if (defaultStatus === 'rejected') {
         // Si es rechazado, usar un asunto genérico y dejar el cuerpo vacío
-        emailSubject = `Certificado de Convenio - Solicitud #${solicitud.id}`;
+        emailSubject = `Certificado de Convenio - Solicitud #${solicitudParaResponder.id}`;
         emailBody = "";
       }
 
@@ -1524,14 +1542,14 @@ const AdminSolicitudesPage: React.FC = () => {
       } else {
       // Usar formulario normal
       const documentInfo =
-        solicitud.id_type && solicitud.id_number
-          ? ` - ${solicitud.id_type} ${solicitud.id_number}`
+        solicitudParaResponder.id_type && solicitudParaResponder.id_number
+          ? ` - ${solicitudParaResponder.id_type} ${solicitudParaResponder.id_number}`
           : "";
-      let emailSubject = `Respuesta a su solicitud #${solicitud.id} de ${requestTypeLabel}${documentInfo}`;
+      let emailSubject = `Respuesta a su solicitud #${solicitudParaResponder.id} de ${requestTypeLabel}${documentInfo}`;
       let emailBody = "";
       
       // Si es microcrédito, NO prediligenciar mensaje - prefieren ingresarlo manualmente
-      // const isMicrocredito = solicitud.request_type === 'microcredito' || solicitud.request_type === 'solicitud-microcredito';
+      // const isMicrocredito = solicitudParaResponder.request_type === 'microcredito' || solicitudParaResponder.request_type === 'solicitud-microcredito';
       // if (isMicrocredito) {
       //   if (defaultStatus === 'in_progress' || defaultStatus === 'resolved') {
       //     emailBody = MICROCREDITO_EMAIL_BODY;
@@ -1542,14 +1560,14 @@ const AdminSolicitudesPage: React.FC = () => {
       
       // Si es retiro-sindical y el estado es "resolved", prediligenciar mensaje
       // El efecto se encargará de cargar el PDF automáticamente
-      const isRetiroSindical = solicitud.request_type === 'retiro-sindical' || solicitud.request_type === 'solicitud-retiro-sindical';
+      const isRetiroSindical = solicitudParaResponder.request_type === 'retiro-sindical' || solicitudParaResponder.request_type === 'solicitud-retiro-sindical';
       if (isRetiroSindical && defaultStatus === 'resolved') {
         emailBody = RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY;
       }
       
       // Si es dirigido a fondo de pensiones, prediligenciar mensaje solo si es "resolved"
       if (isFondoPensiones && defaultStatus === 'resolved') {
-        emailSubject = `Certificado de Convenio - Fondo de Pensiones - Solicitud #${solicitud.id}`;
+        emailSubject = `Certificado de Convenio - Fondo de Pensiones - Solicitud #${solicitudParaResponder.id}`;
         
         emailBody = "Adjunto encontrará su certificado de convenio dirigido al fondo de pensiones en formato PDF.\n\n";
         emailBody += "Este certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio para corrección de historia.";
@@ -1563,7 +1581,7 @@ const AdminSolicitudesPage: React.FC = () => {
         emailBody += `\n\nFecha de generación: ${fechaGeneracion}`;
       } else if (needsActividades && defaultStatus === 'resolved') {
         // Si requiere adicionar actividades, prediligenciar mensaje solo si es "resolved"
-        emailSubject = `Certificado de Convenio - Con Actividades - Solicitud #${solicitud.id}`;
+        emailSubject = `Certificado de Convenio - Con Actividades - Solicitud #${solicitudParaResponder.id}`;
         
         emailBody = "Adjunto encontrará su certificado de convenio en formato PDF con las actividades realizadas.\n\n";
         emailBody += "Este certificado ha sido generado automáticamente y contiene la información solicitada sobre su convenio, incluyendo las actividades que ha realizado.";
