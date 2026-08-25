@@ -673,6 +673,7 @@ const EncuestaVacunacionPage: React.FC = () => {
                         ref={signaturePadRef}
                         onChange={handleSignatureChange}
                         height={200}
+                        imageType="image/png"
                       />
                       <FormField
                         control={form.control}
