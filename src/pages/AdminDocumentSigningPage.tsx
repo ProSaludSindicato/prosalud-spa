@@ -240,7 +240,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   
   // Estados para importación masiva
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [bulkSendEmail, setBulkSendEmail] = useState(false);
+  const [bulkSendEmail, setBulkSendEmail] = useState(true);
   const [importResult, setImportResult] = useState<ImportBulkConveniosResponse | null>(null);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
@@ -2812,7 +2812,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                     <CardTitle className="text-lg sm:text-xl">Importación Masiva de Convenios</CardTitle>
                     <CardDescription className="text-sm">
                       Descarga la plantilla Excel, complétala con los datos de los convenios y súbela para generar PDFs.
-                      Opcionalmente puedes enviar correos al procesar; el seguimiento se hace desde el historial.
+                      Usa el interruptor de abajo para decidir si se envían correos al procesar; el seguimiento se hace desde el historial.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
