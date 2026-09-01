@@ -561,7 +561,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     statsData?.delivery_mode ??
     'production';
 
-  const isTestDeliveryMode = deliveryMode === 'test';
+  const isTestDeliveryMode = deliveryMode !== 'production';
 
   const presidentSignButtonClassName =
     'bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 focus-visible:ring-accent';
@@ -630,11 +630,12 @@ const AdminDocumentSigningPage: React.FC = () => {
         });
       }
       
-      const responseTestMode = response.delivery_mode === 'test' || isTestDeliveryMode;
+      const responseTestMode =
+        (response.delivery_mode != null && response.delivery_mode !== 'production') || isTestDeliveryMode;
 
       if (response.data?.email && responseTestMode) {
-        toast.info('Modo test', {
-          description: 'El convenio quedó en historial para verificación y el PDF se enviará a tu correo de usuario.',
+        toast.info('Modo TEST', {
+          description: 'El correo se enviará a tu usuario (con enlace de firma o PDF) y el registro quedará marcado como TEST en el historial.',
           duration: 5000,
         });
       } else if (response.data?.email) {
@@ -1040,7 +1041,7 @@ const AdminDocumentSigningPage: React.FC = () => {
             description:
               response.message ??
               (isTestDeliveryMode
-                ? 'En modo test los correos llegarán al usuario que realiza la solicitud.'
+                ? 'En modo TEST los correos llegarán al usuario que realiza la solicitud y quedarán marcados como TEST.'
                 : 'Consulte el historial para ver el estado.'),
           },
         );
@@ -1130,12 +1131,13 @@ const AdminDocumentSigningPage: React.FC = () => {
       const response = await resendEmailsManual(requestData);
 
       if (response.data.success_count > 0) {
-        const responseTestMode = response.delivery_mode === 'test' || isTestDeliveryMode;
+        const responseTestMode =
+        (response.delivery_mode != null && response.delivery_mode !== 'production') || isTestDeliveryMode;
         toast.success('Correo reenviado exitosamente', {
           description:
             response.message ??
             (responseTestMode
-              ? 'En modo test el correo llegará al usuario que realiza la solicitud.'
+              ? 'En modo TEST el correo llegará al usuario que realiza la solicitud y quedará marcado como TEST.'
               : 'Consulte el historial para ver el estado.'),
         });
         refetchHistory();
@@ -1187,6 +1189,15 @@ const AdminDocumentSigningPage: React.FC = () => {
       </Badge>
     );
   };
+
+  const getTestBadge = () => (
+    <Badge
+      variant="outline"
+      className="inline-flex w-fit items-center border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-50"
+    >
+      TEST
+    </Badge>
+  );
 
   const getSigningEstadoBadge = (tracking: ConvenioEmailTracking) => {
     const signingEstado = tracking.signing_estado;
@@ -1455,7 +1466,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
           {isTestDeliveryMode && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Modo test activo: al generar con envío de correo recibirás el PDF en tu usuario autenticado. Los reenvíos también llegan a tu correo, no al afiliado. Usa &quot;Ver detalle&quot; en el historial para revisar los datos ingresados.
+              Modo TEST activo: los correos no van al afiliado, llegan a tu usuario autenticado (con enlace de firma o PDF adjunto, igual que producción) e indican que son de prueba. En el historial quedan marcados como TEST para no mezclarlos con envíos reales.
             </div>
           )}
 
@@ -1554,7 +1565,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                               <SelectItem value="pendiente">Pendiente de envío</SelectItem>
                               <SelectItem value="enviado">Enviado</SelectItem>
                               <SelectItem value="fallido">Fallido</SelectItem>
-                              <SelectItem value="verificacion">Verificación (modo test)</SelectItem>
+                              <SelectItem value="test">TEST</SelectItem>
                             </SelectGroup>
                             {digitalSigningEnabled && (
                               <SelectGroup>
@@ -1744,6 +1755,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     <div className="flex flex-col gap-2">
                                       <div className="flex flex-wrap gap-1">
                                         {getManualStatusBadge(tracking.estado)}
+                                        {(tracking.is_test || tracking.estado === 'verificacion') && getTestBadge()}
                                         {digitalSigningEnabled && getSigningEstadoBadge(tracking)}
                                       </div>
                                       {autoSignEnabled && can('document_signing.manage') && isEligibleForPresidentSign(tracking) && (
@@ -2913,7 +2925,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <Label className="text-sm sm:text-base">Enviar correos al procesar</Label>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
                                   {isTestDeliveryMode
-                                    ? 'En modo test no se envía al afiliado: los PDFs quedarán en el historial para verificación.'
+                                    ? 'En modo TEST no se envía al afiliado: el correo (enlace de firma o PDF) llega a tu usuario y el historial queda marcado como TEST.'
                                     : 'Si está activado, se generará el PDF y se enviará el correo a cada afiliado de forma asíncrona.'}
                                 </p>
                               </div>
@@ -2941,7 +2953,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <Upload className="mr-2 h-4 w-4" />
                                   {bulkSendEmail
                                     ? isTestDeliveryMode
-                                      ? 'Importar y generar para verificación'
+                                      ? 'Importar, generar y enviar (TEST)'
                                       : 'Importar, generar y enviar'
                                     : 'Importar y generar PDFs'}
                                 </>
@@ -3482,7 +3494,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-semibold text-muted-foreground">Estado</span>
-                      <div className="mt-1">{getManualStatusBadge(trackingDetail.tracking.estado)}</div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {getManualStatusBadge(trackingDetail.tracking.estado)}
+                        {(trackingDetail.tracking.is_test || trackingDetail.tracking.estado === 'verificacion') && getTestBadge()}
+                      </div>
                     </div>
                     <div>
                       <span className="font-semibold text-muted-foreground">Afiliado</span>
@@ -3579,7 +3594,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-semibold">Estado actual:</span>
-                      <div>{getManualStatusBadge(selectedTrackingInfo.estado)}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {getManualStatusBadge(selectedTrackingInfo.estado)}
+                        {(selectedTrackingInfo.is_test || selectedTrackingInfo.estado === 'verificacion') && getTestBadge()}
+                      </div>
                     </div>
                     <div>
                       <span className="font-semibold">Reintentos:</span>

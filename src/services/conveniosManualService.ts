@@ -43,6 +43,7 @@ export interface ConvenioEmailTracking {
   nombre_archivo: string;
   ruta_archivo_pdf: string;
   estado: 'pendiente' | 'enviado' | 'fallido' | 'verificacion';
+  is_test?: boolean;
   available_actions?: ConvenioTrackingAvailableActions;
   convenio_data?: Record<string, unknown> | null;
   generated_by_user_id?: number | null;
@@ -107,6 +108,7 @@ export type EmailHistoryEstadoFiltro =
   | 'enviado'
   | 'fallido'
   | 'verificacion'
+  | 'test'
   | 'firma_pendiente_firma'
   | 'firma_firmado_afiliado'
   | 'firma_completado'
