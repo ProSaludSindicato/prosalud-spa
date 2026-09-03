@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,6 +21,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 import {
@@ -56,7 +62,6 @@ import {
   PenLine,
   CheckSquare,
 } from 'lucide-react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Checkbox } from '@/components/ui/checkbox';
 // Manual signing service (ACTIVE)
 import {
@@ -68,18 +73,21 @@ import {
   downloadGeneratedConvenio,
   exportTemplate,
   importBulkConvenios,
+  importPdfZip,
   downloadConvenioFinalPdf,
   downloadConvenioOriginalPdf,
   signAsPresident,
   signAsPresidentBulk,
   ConvenioEmailTracking,
   ConvenioDeliveryMode,
+  visibleConvenioSendError,
   EmailHistoryParams as ManualEmailHistoryParams,
   EmailHistoryEstadoFiltro,
   GenerateAndSendConvenioRequest,
   GenerateAndSendConvenioResponse,
   DownloadGeneratedConvenioResult,
   ImportBulkConveniosResponse,
+  ImportPdfZipResponse,
   TrackingDetailResponse,
 } from '@/services/conveniosManualService';
 import {
@@ -226,8 +234,33 @@ type CreateConvenioFormValues = z.infer<typeof createConvenioSchema>;
 const CONVENIO_TAB_TRIGGER_CLASS =
   'flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200';
 
+const AUDIT_EVENT_LABELS: Record<string, string> = {
+  document_opened: 'Documento abierto',
+  page_navigated: 'Navegó en el documento',
+  signature_area_clicked: 'Abrió el recuadro de firma',
+  signature_drawn: 'Dibujó su firma',
+  signature_uploaded: 'Subió una imagen de firma',
+  signature_positioned: 'Colocó la firma en el documento',
+  signature_cleared: 'Borró la firma',
+  terms_accepted: 'Aceptó términos y condiciones',
+  document_submitted: 'Envió el convenio firmado',
+  document_confirmed: 'Confirmó el envío',
+  document_downloaded: 'Descargó el documento firmado',
+};
+
+const auditEventLabel = (event: { type: string; label?: string; metadata?: Record<string, unknown> }): string => {
+  if (event.label) {
+    return event.label;
+  }
+  if (event.type === 'page_navigated' && event.metadata?.reason === 'signature_page') {
+    return 'Llegó a la página de firma';
+  }
+  return AUDIT_EVENT_LABELS[event.type] ?? 'Actividad en el visor';
+};
+
 const AdminDocumentSigningPage: React.FC = () => {
   const { can } = usePermissions();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('history');
 
   useEffect(() => {
@@ -240,8 +273,10 @@ const AdminDocumentSigningPage: React.FC = () => {
   
   // Estados para importación masiva
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [bulkImportMode, setBulkImportMode] = useState<'excel' | 'zip'>('excel');
   const [bulkSendEmail, setBulkSendEmail] = useState(true);
   const [importResult, setImportResult] = useState<ImportBulkConveniosResponse | null>(null);
+  const [importZipResult, setImportZipResult] = useState<ImportPdfZipResponse | null>(null);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
@@ -252,6 +287,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [trackingDetail, setTrackingDetail] = useState<TrackingDetailResponse['data'] | null>(null);
   const [isLoadingTrackingDetail, setIsLoadingTrackingDetail] = useState(false);
+  const [isManualRefreshingHistory, setIsManualRefreshingHistory] = useState(false);
   
   // Estado para consulta de afiliado
   const [consultTipoDocumento, setConsultTipoDocumento] = useState<string>('CC');
@@ -528,12 +564,20 @@ const AdminDocumentSigningPage: React.FC = () => {
     queryKey: ['convenios-manual-history', historyFilters],
     queryFn: () => getEmailHistoryManual(historyFilters),
     enabled: activeTab === 'history' && can('document_signing.view'),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    structuralSharing: false,
     refetchInterval: (query) => {
-      const data = query.state.data;
-      const inProgress = (data?.data.data ?? []).some(
-        (t) => t.signing_estado === 'firmando_presidente',
-      );
-      return inProgress || shouldForcePresidentPolling ? 8000 : false;
+      const rows = query.state.data?.data.data ?? [];
+      const presidentSigning = rows.some((t) => t.signing_estado === 'firmando_presidente');
+      const waitingAffiliate = rows.some((t) => t.signing_estado === 'pendiente_firma');
+      if (presidentSigning || shouldForcePresidentPolling) {
+        return 8000;
+      }
+      if (waitingAffiliate) {
+        return 15000;
+      }
+      return false;
     },
   });
 
@@ -910,29 +954,48 @@ const AdminDocumentSigningPage: React.FC = () => {
       return;
     }
 
-    // Validar tipo de archivo
-    const allowedExtensions = ['.xlsx', '.xls'];
-    const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
-    if (!allowedExtensions.includes(fileExtension)) {
-      toast.error('Archivo inválido', {
-        description: 'El archivo debe ser un Excel (.xlsx o .xls).',
-      });
-      setSelectedFile(null);
-      return;
-    }
+    if (bulkImportMode === 'excel') {
+      const allowedExtensions = ['.xlsx', '.xls'];
+      const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+      if (!allowedExtensions.includes(fileExtension)) {
+        toast.error('Archivo inválido', {
+          description: 'El archivo debe ser un Excel (.xlsx o .xls).',
+        });
+        setSelectedFile(null);
+        return;
+      }
 
-    // Validar tamaño (10MB máximo)
-    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSizeBytes) {
-      toast.error('Archivo muy grande', {
-        description: 'El archivo no puede ser mayor a 10MB.',
-      });
-      setSelectedFile(null);
-      return;
+      const maxSizeBytes = 10 * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        toast.error('Archivo muy grande', {
+          description: 'El archivo no puede ser mayor a 10MB.',
+        });
+        setSelectedFile(null);
+        return;
+      }
+    } else {
+      const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+      if (fileExtension !== '.zip') {
+        toast.error('Archivo inválido', {
+          description: 'El archivo debe ser un ZIP (.zip).',
+        });
+        setSelectedFile(null);
+        return;
+      }
+
+      const maxSizeBytes = 50 * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        toast.error('Archivo muy grande', {
+          description: 'El archivo no puede ser mayor a 50MB.',
+        });
+        setSelectedFile(null);
+        return;
+      }
     }
 
     setSelectedFile(file);
-    setImportResult(null); // Limpiar resultado anterior
+    setImportResult(null);
+    setImportZipResult(null);
   };
 
   // Mutación para importar convenios masivamente
@@ -941,6 +1004,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       importBulkConvenios(data.file, data.send_email),
     onSuccess: (response) => {
       setImportResult(response);
+      setImportZipResult(null);
       const { procesados, exitosos, errores } = response.data;
 
       if (exitosos === 0 && errores > 0) {
@@ -1008,16 +1072,76 @@ const AdminDocumentSigningPage: React.FC = () => {
     },
   });
 
+  const importZipMutation = useMutation({
+    mutationFn: (data: { file: File; send_email: boolean }) =>
+      importPdfZip(data.file, data.send_email),
+    onSuccess: (response) => {
+      setImportZipResult(response);
+      setImportResult(null);
+
+      if (response.data.validos > 0 && response.data.rechazados > 0) {
+        toast.warning('Importación parcial', {
+          description: response.message,
+          duration: 8000,
+        });
+      } else if (response.data.validos > 0) {
+        toast.success('ZIP procesado', {
+          description: response.message,
+          duration: 8000,
+        });
+      } else {
+        toast.error('No se importaron PDFs', {
+          description: response.message,
+          duration: 8000,
+        });
+      }
+
+      if (response.data.validos > 0) {
+        setTimeout(() => {
+          setActiveTab('history');
+          void refetchHistory();
+        }, 1000);
+      }
+
+      setSelectedFile(null);
+      const fileInput = document.getElementById('bulk-import-file') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    },
+    onError: (error: any) => {
+      if (error.isValidationError) {
+        toast.error('Error de validación', {
+          description: error.message || 'El ZIP no cumple con los requisitos.',
+        });
+      } else {
+        toast.error('Error al importar ZIP', {
+          description: error.message || 'Ocurrió un error al procesar el archivo.',
+        });
+      }
+    },
+  });
+
   // Función para importar convenios
   const handleImportBulk = () => {
     if (!selectedFile) {
       toast.error('Archivo requerido', {
-        description: 'Por favor, selecciona un archivo Excel para importar.',
+        description: bulkImportMode === 'excel'
+          ? 'Por favor, selecciona un archivo Excel para importar.'
+          : 'Por favor, selecciona un archivo ZIP con PDFs para importar.',
       });
       return;
     }
 
-    importBulkMutation.mutate({
+    if (bulkImportMode === 'excel') {
+      importBulkMutation.mutate({
+        file: selectedFile,
+        send_email: bulkSendEmail,
+      });
+      return;
+    }
+
+    importZipMutation.mutate({
       file: selectedFile,
       send_email: bulkSendEmail,
     });
@@ -1080,6 +1204,23 @@ const AdminDocumentSigningPage: React.FC = () => {
       setTrackingDetailOpen(false);
     } finally {
       setIsLoadingTrackingDetail(false);
+    }
+  };
+
+  const handleRefreshHistory = async (): Promise<void> => {
+    setIsManualRefreshingHistory(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['convenios-manual-history'] });
+      if (!trackingDetailOpen || !trackingDetail?.tracking.id) {
+        return;
+      }
+
+      const response = await getTrackingDetail(trackingDetail.tracking.id);
+      setTrackingDetail(response.data);
+    } catch {
+      // El listado ya se actualizó; el detalle se puede reabrir si falla este refresco.
+    } finally {
+      setIsManualRefreshingHistory(false);
     }
   };
 
@@ -1199,75 +1340,205 @@ const AdminDocumentSigningPage: React.FC = () => {
     </Badge>
   );
 
-  const getSigningEstadoBadge = (tracking: ConvenioEmailTracking) => {
+  type TrackingStatusTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
+
+  const TRACKING_STATUS_DOT: Record<TrackingStatusTone, string> = {
+    success: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    error: 'bg-red-500',
+    info: 'bg-sky-500',
+    neutral: 'bg-muted-foreground/50',
+  };
+
+  const TRACKING_STATUS_BADGE: Record<TrackingStatusTone, string> = {
+    success:
+      'border-emerald-400 bg-emerald-50 text-emerald-900 hover:bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100',
+    warning:
+      'border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-50 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-50',
+    error:
+      'border-red-400 bg-red-50 text-red-900 hover:bg-red-50 dark:border-red-600 dark:bg-red-950/40 dark:text-red-100',
+    info: 'border-sky-400 bg-sky-50 text-sky-900 hover:bg-sky-50 dark:border-sky-500 dark:bg-sky-950/50 dark:text-sky-100',
+    neutral:
+      'border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200',
+  };
+
+  const EMAIL_STATUS_CONFIG: Record<
+    ConvenioEmailTracking['estado'],
+    { label: string; tone: TrackingStatusTone; description: string }
+  > = {
+    pendiente: {
+      label: 'Pendiente envío',
+      tone: 'warning',
+      description: 'El convenio aún no se ha enviado por correo electrónico.',
+    },
+    enviado: {
+      label: 'Enviado',
+      tone: 'success',
+      description: 'El convenio fue enviado correctamente al correo del afiliado.',
+    },
+    fallido: {
+      label: 'Fallido',
+      tone: 'error',
+      description: 'No se pudo entregar el convenio por correo electrónico.',
+    },
+    verificacion: {
+      label: 'Verificación',
+      tone: 'info',
+      description: 'Envío de prueba para verificar el proceso, sin efecto legal.',
+    },
+  };
+
+  const getSigningStatusPresentation = (
+    tracking: ConvenioEmailTracking,
+  ): {
+    label: string;
+    tone: TrackingStatusTone;
+    description: string;
+    spinning?: boolean;
+    errorDetail?: string;
+  } => {
     const signingEstado = tracking.signing_estado;
     if (!signingEstado) {
-      return <span className="text-xs text-muted-foreground">—</span>;
+      return { label: '—', tone: 'neutral', description: 'Sin información de firma digital.' };
     }
 
     if (signingEstado === 'pendiente_firma') {
-      return (
-        <Badge
-          variant="outline"
-          className="border-amber-400 bg-amber-50 text-xs text-amber-950 hover:bg-amber-50 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-50 dark:hover:bg-amber-950/50"
-        >
-          Pendiente firma
-        </Badge>
-      );
+      return {
+        label: 'Pendiente firma',
+        tone: 'warning',
+        description: 'El afiliado recibió el convenio y aún no lo ha firmado.',
+      };
     }
 
     if (signingEstado === 'firmando_presidente') {
-      return (
-        <Badge
-          variant="outline"
-          className="border-blue-400 bg-blue-50 text-xs text-blue-900 hover:bg-blue-50 dark:border-blue-500 dark:bg-blue-950/50 dark:text-blue-100 dark:hover:bg-blue-950/50"
-        >
-          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-          Firmando presidente
-        </Badge>
-      );
+      return {
+        label: 'Firmando presidente',
+        tone: 'info',
+        spinning: true,
+        description: 'El afiliado ya firmó y se está aplicando la firma del presidente.',
+      };
     }
 
     if (signingEstado === 'error_firma_presidente') {
-      const errorMsg = tracking.president_sign_last_error;
-      const badge = (
-        <Badge variant="destructive" className="cursor-help text-xs">
-          Error firma presidente
-        </Badge>
-      );
-
-      if (errorMsg) {
-        return (
-          <HoverCard openDelay={200}>
-            <HoverCardTrigger asChild>{badge}</HoverCardTrigger>
-            <HoverCardContent className="max-w-xs text-xs" side="top">
-              <p className="font-medium text-destructive">Error al firmar</p>
-              <p className="mt-1 text-muted-foreground">{errorMsg}</p>
-              {tracking.president_sign_attempts != null && (
-                <p className="mt-1 text-muted-foreground">
-                  Intentos: {tracking.president_sign_attempts}
-                </p>
-              )}
-            </HoverCardContent>
-          </HoverCard>
-        );
-      }
-
-      return badge;
+      return {
+        label: 'Error firma presidente',
+        tone: 'error',
+        errorDetail: tracking.president_sign_last_error ?? undefined,
+        description: 'Falló la firma automática del presidente sobre el documento.',
+      };
     }
 
-    const map: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      firmado_afiliado: { label: 'Firmado afiliado', variant: 'default' },
-      completado: { label: 'Completado ✓', variant: 'outline' },
-      rechazado: { label: 'Rechazado', variant: 'destructive' },
+    const map: Record<string, { label: string; tone: TrackingStatusTone; description: string }> = {
+      firmado_afiliado: {
+        label: 'Firmado afiliado',
+        tone: 'info',
+        description: 'El afiliado firmó el convenio; falta la firma del presidente.',
+      },
+      completado: {
+        label: 'Completado',
+        tone: 'success',
+        description: 'El convenio fue firmado por el afiliado y el presidente.',
+      },
+      rechazado: {
+        label: 'Rechazado',
+        tone: 'error',
+        description: 'El afiliado rechazó firmar el convenio.',
+      },
     };
 
-    const cfg = map[signingEstado] ?? { label: signingEstado, variant: 'secondary' as const };
+    return (
+      map[signingEstado] ?? {
+        label: signingEstado,
+        tone: 'neutral',
+        description: 'Estado de firma digital registrado en el sistema.',
+      }
+    );
+  };
+
+  const renderTrackingStatusCell = (tracking: ConvenioEmailTracking) => {
+    const isTest = tracking.is_test || tracking.estado === 'verificacion';
+    const emailStatus = EMAIL_STATUS_CONFIG[tracking.estado] ?? EMAIL_STATUS_CONFIG.pendiente;
+    const sendError = visibleConvenioSendError(tracking);
+
+    const primary =
+      digitalSigningEnabled && tracking.signing_estado
+        ? getSigningStatusPresentation(tracking)
+        : {
+            label: emailStatus.label,
+            tone: emailStatus.tone,
+            description: emailStatus.description,
+          };
+
+    const secondaryParts: string[] = [];
+
+    if (digitalSigningEnabled && tracking.signing_estado) {
+      if (tracking.estado === 'enviado' && tracking.signing_estado !== 'rechazado') {
+        secondaryParts.push('Correo enviado');
+      } else if (tracking.estado !== 'enviado') {
+        secondaryParts.push(emailStatus.label);
+      }
+    }
+
+    if (digitalSigningEnabled && tracking.integrity_badge_label) {
+      secondaryParts.push(tracking.integrity_badge_label);
+    }
+
+    const statusBadge = (
+      <Badge
+        variant="outline"
+        className={cn(
+          'inline-flex w-fit cursor-help items-center gap-1.5 text-xs font-medium',
+          TRACKING_STATUS_BADGE[primary.tone],
+        )}
+      >
+        <span
+          className={cn('h-2.5 w-2.5 shrink-0 rounded-full', TRACKING_STATUS_DOT[primary.tone])}
+          aria-hidden
+        />
+        {primary.spinning && <Loader2 className="h-3 w-3 animate-spin" />}
+        {primary.label}
+      </Badge>
+    );
 
     return (
-      <Badge variant={cfg.variant} className="text-xs">
-        {cfg.label}
-      </Badge>
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>{statusBadge}</TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              <p className="font-medium">{primary.label}</p>
+              <p className="mt-1 text-muted-foreground">{primary.description}</p>
+              {primary.errorDetail && (
+                <>
+                  <p className="mt-2 font-medium text-destructive">Detalle del error</p>
+                  <p className="mt-1 text-muted-foreground">{primary.errorDetail}</p>
+                  {tracking.president_sign_attempts != null && (
+                    <p className="mt-1 text-muted-foreground">
+                      Intentos: {tracking.president_sign_attempts}
+                    </p>
+                  )}
+                </>
+              )}
+            </TooltipContent>
+          </Tooltip>
+          {isTest && (
+            <Badge
+              variant="outline"
+              className="border-amber-400 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-950 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-50"
+            >
+              Test
+            </Badge>
+          )}
+        </div>
+        {secondaryParts.length > 0 && (
+          <p className="text-xs leading-snug text-muted-foreground">{secondaryParts.join(' · ')}</p>
+        )}
+        {sendError && (
+          <p className="text-xs text-red-600 leading-snug" title={sendError}>
+            {sendError.length > 120 ? `${sendError.substring(0, 120)}…` : sendError}
+          </p>
+        )}
+      </div>
     );
   };
 
@@ -1451,6 +1722,10 @@ const AdminDocumentSigningPage: React.FC = () => {
           ? 'grid-cols-2'
           : 'grid-cols-1';
 
+  const trackingDetailSendError = trackingDetail
+    ? visibleConvenioSendError(trackingDetail.tracking)
+    : null;
+
   return (
     <AdminLayout>
       <div className="min-h-screen bg-slate-50">
@@ -1518,11 +1793,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => refetchHistory()}
-                        disabled={isLoadingHistory}
+                        onClick={() => void handleRefreshHistory()}
+                        disabled={isManualRefreshingHistory}
                         className="flex-shrink-0"
                       >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isManualRefreshingHistory ? 'animate-spin' : ''}`} />
                         Actualizar
                       </Button>
                     </div>
@@ -1709,6 +1984,14 @@ const AdminDocumentSigningPage: React.FC = () => {
                             <TableBody>
                               {historyData?.data.data.map((tracking) => {
                                 const signedDownloadCfg = getSignedDownloadButtonConfig(tracking);
+                                const canDownloadOriginal =
+                                  can('document_signing.view') && canDownloadOriginalTracking(tracking);
+                                const canDownloadSigned =
+                                  digitalSigningEnabled &&
+                                  can('document_signing.view') &&
+                                  (tracking.signing_estado === 'firmado_afiliado' ||
+                                    tracking.signing_estado === 'completado');
+                                const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
                                 return (
                                 <TableRow key={tracking.id}>
                                   {can('document_signing.manage') && (
@@ -1753,11 +2036,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3">
                                     <div className="flex flex-col gap-2">
-                                      <div className="flex flex-wrap gap-1">
-                                        {getManualStatusBadge(tracking.estado)}
-                                        {(tracking.is_test || tracking.estado === 'verificacion') && getTestBadge()}
-                                        {digitalSigningEnabled && getSigningEstadoBadge(tracking)}
-                                      </div>
+                                      {renderTrackingStatusCell(tracking)}
                                       {autoSignEnabled && can('document_signing.manage') && isEligibleForPresidentSign(tracking) && (
                                         <Button
                                           variant="default"
@@ -1778,13 +2057,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                                               : 'Firmar presidente'}
                                           </span>
                                         </Button>
-                                      )}
-                                      {tracking.error_message && (
-                                        <p className="text-xs text-red-600 leading-snug" title={tracking.error_message}>
-                                          {tracking.error_message.length > 120
-                                            ? `${tracking.error_message.substring(0, 120)}…`
-                                            : tracking.error_message}
-                                        </p>
                                       )}
                                     </div>
                                   </TableCell>
@@ -1847,51 +2119,40 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TooltipContent>
                                         </Tooltip>
                                       )}
-                                      {can('document_signing.view') && canDownloadOriginalTracking(tracking) && (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
+                                      {hasDownloadOptions && (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
                                             <Button
-                                              variant="outline"
+                                              variant="ghost"
                                               size="sm"
-                                              className="h-8 shrink-0 gap-1 px-2"
-                                              onClick={() => void handleDownloadConvenioOriginal(tracking)}
-                                              aria-label="Descargar convenio sin firmar"
+                                              className="h-8 shrink-0 px-2"
+                                              aria-label="Descargar archivos del convenio"
                                             >
-                                              <FileDown className="h-3.5 w-3.5" />
-                                              <span className="hidden xl:inline text-xs">Original</span>
+                                              <Download className="h-4 w-4" />
+                                              <span className="sr-only">Descargar</span>
                                             </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="bottom">
-                                            <p>Descargar convenio sin firmar</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      )}
-                                      {digitalSigningEnabled &&
-                                        can('document_signing.view') &&
-                                        (tracking.signing_estado === 'firmado_afiliado' ||
-                                          tracking.signing_estado === 'completado') && (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant={signedDownloadCfg.variant}
-                                              size="sm"
-                                              className={cn(
-                                                'h-8 shrink-0 gap-1 px-2',
-                                                signedDownloadCfg.buttonClassName,
-                                              )}
-                                              onClick={() => void handleDownloadConvenioFinal(tracking)}
-                                              aria-label={signedDownloadCfg.ariaLabel}
-                                            >
-                                              <Download className="h-3.5 w-3.5" />
-                                              <span className="hidden xl:inline text-xs">
-                                                {signedDownloadCfg.label}
-                                              </span>
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent side="bottom">
-                                            <p>{signedDownloadCfg.tooltip}</p>
-                                          </TooltipContent>
-                                        </Tooltip>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-52">
+                                            {canDownloadOriginal && (
+                                              <DropdownMenuItem
+                                                onClick={() => void handleDownloadConvenioOriginal(tracking)}
+                                              >
+                                                <FileDown className="mr-2 h-4 w-4" />
+                                                Convenio original
+                                              </DropdownMenuItem>
+                                            )}
+                                            {canDownloadSigned && (
+                                              <DropdownMenuItem
+                                                onClick={() => void handleDownloadConvenioFinal(tracking)}
+                                              >
+                                                <Download className="mr-2 h-4 w-4" />
+                                                {signedDownloadCfg.label === 'Final'
+                                                  ? 'Convenio final'
+                                                  : 'Firmado afiliado'}
+                                              </DropdownMenuItem>
+                                            )}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       )}
                                     </div>
                                   </TableCell>
@@ -2823,11 +3084,50 @@ const AdminDocumentSigningPage: React.FC = () => {
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">Importación Masiva de Convenios</CardTitle>
                     <CardDescription className="text-sm">
-                      Descarga la plantilla Excel, complétala con los datos de los convenios y súbela para generar PDFs.
-                      Usa el interruptor de abajo para decidir si se envían correos al procesar; el seguimiento se hace desde el historial.
+                      Genere convenios desde Excel o suba PDFs pregenerados en un ZIP.
+                      Use el interruptor para decidir si se envían correos al procesar; el seguimiento se hace desde el historial.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Origen de importación</Label>
+                      <RadioGroup
+                        value={bulkImportMode}
+                        onValueChange={(value) => {
+                          setBulkImportMode(value as 'excel' | 'zip');
+                          setSelectedFile(null);
+                          setImportResult(null);
+                          setImportZipResult(null);
+                          const fileInput = document.getElementById('bulk-import-file') as HTMLInputElement;
+                          if (fileInput) {
+                            fileInput.value = '';
+                          }
+                        }}
+                        className="grid gap-3 sm:grid-cols-2"
+                      >
+                        <div className="flex items-start space-x-3 rounded-lg border p-4">
+                          <RadioGroupItem value="excel" id="bulk-import-excel" className="mt-1" />
+                          <Label htmlFor="bulk-import-excel" className="cursor-pointer space-y-1">
+                            <span className="block font-medium">Excel (generación automática)</span>
+                            <span className="block text-sm text-muted-foreground">
+                              La plataforma genera los PDFs desde la plantilla Word.
+                            </span>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-3 rounded-lg border p-4">
+                          <RadioGroupItem value="zip" id="bulk-import-zip" className="mt-1" />
+                          <Label htmlFor="bulk-import-zip" className="cursor-pointer space-y-1">
+                            <span className="block font-medium">ZIP de PDFs pregenerados</span>
+                            <span className="block text-sm text-muted-foreground">
+                              ProSalud genera los PDFs manualmente y la plataforma los almacena y envía.
+                            </span>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    {bulkImportMode === 'excel' && (
+                    <>
                     {/* Paso 1: Descargar plantilla */}
                     <div className="p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
                       <div className="flex items-start gap-4">
@@ -2863,6 +3163,33 @@ const AdminDocumentSigningPage: React.FC = () => {
                     </div>
 
                     <Separator />
+                    </>
+                    )}
+
+                    {bulkImportMode === 'zip' && (
+                      <div className="p-6 border-2 border-amber-200 rounded-lg bg-amber-50/50">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0 p-2 bg-amber-100 rounded-full">
+                            <FileText className="h-5 w-5 text-amber-700" />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <h3 className="font-semibold text-amber-900">Formato de nombres en el ZIP</h3>
+                            <p className="text-sm text-amber-800">
+                              Cada PDF debe nombrarse así:
+                              <code className="mx-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs">
+                                SEDE - APELLIDOS NOMBRES - DOCUMENTO.pdf
+                              </code>
+                            </p>
+                            <p className="text-sm text-amber-800">
+                              Ejemplo: <strong>BELLO - ACEVEDO MONTOYA LUISA FERNANDA - 1035228093.pdf</strong>
+                            </p>
+                            <p className="text-sm text-amber-800">
+                              El correo del afiliado se consulta por número de documento (ProSanet). Máximo 50MB y 200 PDFs por ZIP.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Paso 2: Subir archivo */}
                     <div className="space-y-4">
@@ -2872,24 +3199,27 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </div>
                         <div className="flex-1 space-y-4">
                           <div>
-                            <h3 className="font-semibold text-green-900 mb-2">Paso 2: Importar Archivo</h3>
+                            <h3 className="font-semibold text-green-900 mb-2">
+                              {bulkImportMode === 'excel' ? 'Paso 2: Importar Archivo Excel' : 'Subir ZIP de PDFs'}
+                            </h3>
                             <p className="text-sm text-green-800 mb-4">
-                              Selecciona el archivo Excel que has completado con los datos de los convenios.
-                              El archivo debe ser .xlsx o .xls y no puede exceder 10MB.
+                              {bulkImportMode === 'excel'
+                                ? 'Selecciona el archivo Excel completado (.xlsx o .xls, máx. 10MB).'
+                                : 'Selecciona un archivo .zip con los PDFs pregenerados (máx. 50MB).'}
                             </p>
                           </div>
                           
                           <div className="space-y-4">
                             <div>
                               <Label htmlFor="bulk-import-file" className="text-base font-medium">
-                                Archivo Excel *
+                                {bulkImportMode === 'excel' ? 'Archivo Excel *' : 'Archivo ZIP *'}
                               </Label>
                               <Input
                                 id="bulk-import-file"
                                 type="file"
-                                accept=".xlsx,.xls"
+                                accept={bulkImportMode === 'excel' ? '.xlsx,.xls' : '.zip'}
                                 onChange={handleFileChange}
-                                disabled={importBulkMutation.isPending}
+                                disabled={importBulkMutation.isPending || importZipMutation.isPending}
                                 className="mt-2"
                               />
                               {selectedFile && (
@@ -2932,18 +3262,18 @@ const AdminDocumentSigningPage: React.FC = () => {
                               <Switch
                                 checked={bulkSendEmail}
                                 onCheckedChange={setBulkSendEmail}
-                                disabled={importBulkMutation.isPending}
+                                disabled={importBulkMutation.isPending || importZipMutation.isPending}
                               />
                             </div>
 
                             <Button
                               type="button"
                               onClick={handleImportBulk}
-                              disabled={!selectedFile || importBulkMutation.isPending}
+                              disabled={!selectedFile || importBulkMutation.isPending || importZipMutation.isPending}
                               size="lg"
                               className="w-full"
                             >
-                              {importBulkMutation.isPending ? (
+                              {(importBulkMutation.isPending || importZipMutation.isPending) ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   Procesando importación...
@@ -2951,11 +3281,17 @@ const AdminDocumentSigningPage: React.FC = () => {
                               ) : (
                                 <>
                                   <Upload className="mr-2 h-4 w-4" />
-                                  {bulkSendEmail
-                                    ? isTestDeliveryMode
-                                      ? 'Importar, generar y enviar (TEST)'
-                                      : 'Importar, generar y enviar'
-                                    : 'Importar y generar PDFs'}
+                                  {bulkImportMode === 'zip'
+                                    ? bulkSendEmail
+                                      ? isTestDeliveryMode
+                                        ? 'Importar PDFs y enviar (TEST)'
+                                        : 'Importar PDFs y enviar'
+                                      : 'Importar PDFs (sin enviar)'
+                                    : bulkSendEmail
+                                      ? isTestDeliveryMode
+                                        ? 'Importar, generar y enviar (TEST)'
+                                        : 'Importar, generar y enviar'
+                                      : 'Importar y generar PDFs'}
                                 </>
                               )}
                             </Button>
@@ -3052,6 +3388,95 @@ const AdminDocumentSigningPage: React.FC = () => {
                             <p className="text-sm text-blue-900">
                               <strong>Nota:</strong> Los convenios se están generando de forma asíncrona en segundo plano.
                               Puedes consultar el historial para ver el estado de los convenios generados.
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 border-blue-300 bg-white hover:bg-blue-100"
+                              onClick={() => {
+                                setActiveTab('history');
+                                void refetchHistory();
+                              }}
+                            >
+                              <History className="h-4 w-4 mr-2" />
+                              Ver historial
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {importZipResult && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="font-semibold text-lg">Resultados del ZIP</h3>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-green-600">
+                                    {importZipResult.data.validos}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    PDFs válidos
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-2xl font-bold text-red-600">
+                                    {importZipResult.data.rechazados}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Rechazados
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+
+                            <Card>
+                              <CardContent className="pt-6">
+                                <div className="text-center">
+                                  <div className="text-xs font-mono text-slate-600 break-all px-2">
+                                    {importZipResult.data.batch_id}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    Lote
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {importZipResult.data.rejected.length > 0 && (
+                            <Card className="border-red-200 bg-red-50">
+                              <CardHeader>
+                                <CardTitle className="text-red-900 flex items-center gap-2">
+                                  <AlertCircle className="h-5 w-5" />
+                                  Archivos rechazados
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <ul className="space-y-2">
+                                  {importZipResult.data.rejected.map((item, index) => (
+                                    <li key={index} className="text-sm text-red-800">
+                                      • <strong>{item.entry}</strong>: {item.reason}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-900">
+                              <strong>Nota:</strong> Los PDFs se almacenan y {importZipResult.data.send_email ? 'los envíos se procesan' : 'quedan disponibles para reenvío'} de forma asíncrona.
                             </p>
                             <Button
                               type="button"
@@ -3524,10 +3949,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </p>
                       </div>
                     )}
-                    {trackingDetail.tracking.error_message && (
+                    {trackingDetailSendError && (
                       <div className="col-span-full rounded-md border border-red-200 bg-red-50 p-3">
                         <span className="font-semibold text-red-800">Error del sistema</span>
-                        <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{trackingDetail.tracking.error_message}</p>
+                        <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{trackingDetailSendError}</p>
                       </div>
                     )}
                   </div>
@@ -3551,6 +3976,108 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </p>
                     )}
                   </div>
+
+                  {trackingDetail.integrity && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="text-sm font-semibold mb-3">Integridad y trazabilidad</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <span className="font-semibold text-muted-foreground">Estado de integridad</span>
+                            <p>{trackingDetail.integrity.text_integrity_label ?? '—'}</p>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-muted-foreground">Firmado afiliado</span>
+                            <p>{trackingDetail.integrity.firmado_afiliado_at ? formatDate(trackingDetail.integrity.firmado_afiliado_at) : '—'}</p>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-muted-foreground">IP de firma</span>
+                            <p className="font-mono text-xs break-all">{trackingDetail.integrity.signed_ip ?? '—'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <span className="font-semibold text-muted-foreground">User-Agent</span>
+                            <p className="text-xs break-all text-muted-foreground">{trackingDetail.integrity.signed_user_agent ?? '—'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <span className="font-semibold text-muted-foreground">SHA-256 original</span>
+                            <p className="font-mono text-xs break-all">{trackingDetail.integrity.pdf_original_sha256 ?? '—'}</p>
+                          </div>
+                          <div className="col-span-full">
+                            <span className="font-semibold text-muted-foreground">SHA-256 firmado afiliado</span>
+                            <p className="font-mono text-xs break-all">{trackingDetail.integrity.pdf_firmado_afiliado_sha256 ?? '—'}</p>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-muted-foreground">Términos y condiciones</span>
+                            {trackingDetail.integrity.terms_accepted_at ? (
+                              <p className="text-green-700">Aceptados el {formatDate(trackingDetail.integrity.terms_accepted_at)}</p>
+                            ) : (
+                              <p className="text-muted-foreground">—</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {trackingDetail.integrity.signing_audit_log && (
+                          <div className="mt-4 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <span className="font-semibold text-muted-foreground">Método de firma</span>
+                                <p>
+                                  {trackingDetail.integrity.signing_audit_log.summary.signatureMethodLabel
+                                    ?? (trackingDetail.integrity.signing_audit_log.summary.signatureMethod === 'draw'
+                                      ? 'Dibujada'
+                                      : trackingDetail.integrity.signing_audit_log.summary.signatureMethod === 'upload'
+                                        ? 'Imagen subida'
+                                        : 'No registrado')}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-muted-foreground">Página de firma</span>
+                                <p>
+                                  {trackingDetail.integrity.signing_audit_log.summary.signaturePage != null
+                                    ? `Página ${trackingDetail.integrity.signing_audit_log.summary.signaturePage}`
+                                    : 'No registrada'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-muted-foreground">Sesión</span>
+                                <p className="font-mono text-xs break-all">{trackingDetail.integrity.signing_audit_log.sessionId}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-muted-foreground">Inicio sesión</span>
+                                <p>{formatDate(trackingDetail.integrity.signing_audit_log.startedAt)}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="text-sm font-semibold">Bitácora del visor</span>
+                              <div className="mt-2 max-h-48 overflow-y-auto rounded-md border">
+                                {trackingDetail.integrity.signing_audit_log.events.length === 0 ? (
+                                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                                    No hay eventos registrados para esta firma.
+                                  </p>
+                                ) : (
+                                  <ul className="divide-y text-xs">
+                                    {trackingDetail.integrity.signing_audit_log.events.map((event) => (
+                                      <li key={event.id} className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <span>
+                                          <span className="font-medium">{auditEventLabel(event)}</span>
+                                          {event.detail ? (
+                                            <span className="ml-1 text-muted-foreground">· {event.detail}</span>
+                                          ) : null}
+                                        </span>
+                                        <span className="text-muted-foreground tabular-nums">{formatDate(event.timestamp)}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : null}
 

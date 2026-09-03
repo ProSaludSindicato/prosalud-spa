@@ -69,6 +69,55 @@ export interface ConvenioEmailTracking {
   president_sign_detection_method?: string | null;
   president_sign_queued_at?: string | null;
   president_sign_duration_ms?: number | null;
+  pdf_original_sha256?: string | null;
+  pdf_firmado_afiliado_sha256?: string | null;
+  text_integrity_status?: 'matched' | 'unavailable' | null;
+  signed_ip?: string | null;
+  integrity_badge_label?: string | null;
+}
+
+export function visibleConvenioSendError(
+  tracking: Pick<ConvenioEmailTracking, 'estado' | 'error_message'>,
+): string | null {
+  if (tracking.estado !== 'fallido') {
+    return null;
+  }
+
+  return tracking.error_message;
+}
+
+export type ConvenioSigningAuditEvent = {
+  id: string;
+  type: string;
+  timestamp: string;
+  label?: string;
+  detail?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export interface ConvenioSigningIntegrity {
+  text_integrity_status: 'matched' | 'unavailable' | null;
+  text_integrity_label: string | null;
+  pdf_original_sha256: string | null;
+  pdf_firmado_afiliado_sha256: string | null;
+  firmado_afiliado_at: string | null;
+  signed_ip: string | null;
+  signed_user_agent: string | null;
+  terms_accepted_at: string | null;
+  signing_audit_log: {
+    sessionId: string;
+    startedAt: string;
+    events: ConvenioSigningAuditEvent[];
+    summary: {
+      documentName: string | null;
+      totalPages: number;
+      signaturePage: number | null;
+      signatureMethod: 'draw' | 'upload' | null;
+      signatureMethodLabel?: string | null;
+      submittedAt: string | null;
+      downloadedAt: string | null;
+    };
+  } | null;
 }
 
 /**
@@ -227,6 +276,7 @@ export interface TrackingDetailResponse {
   digital_signing_enabled: boolean;
   data: {
     tracking: ConvenioEmailTracking;
+    integrity: ConvenioSigningIntegrity | null;
     convenio_data: Record<string, unknown> | null;
     convenio_data_fields: ConvenioDataField[];
     generated_by: {
@@ -269,7 +319,13 @@ export const getEmailHistory = async (
     }
 
     const response = await authenticatedApi.get<EmailHistoryResponse>(
-      `/api/convenios-manual/email-history?${queryParams.toString()}`
+      `/api/convenios-manual/email-history?${queryParams.toString()}`,
+      {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      },
     );
 
     return response.data;
@@ -296,6 +352,12 @@ export const getTrackingDetail = async (trackingId: number): Promise<TrackingDet
   try {
     const response = await authenticatedApi.get<TrackingDetailResponse>(
       `/api/convenios-manual/tracking/${trackingId}`,
+      {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      },
     );
 
     return response.data;
@@ -626,6 +688,21 @@ export interface ImportBulkConveniosResponse {
   };
 }
 
+export interface ImportPdfZipResponse {
+  success: true;
+  message: string;
+  delivery_mode?: ConvenioDeliveryMode;
+  next_step?: string;
+  ui?: ConvenioHistoryUiMetadata;
+  data: {
+    batch_id: string;
+    validos: number;
+    rechazados: number;
+    send_email: boolean;
+    rejected: Array<{ entry: string; reason: string }>;
+  };
+}
+
 /**
  * Descarga la plantilla Excel para importación masiva
  * GET /api/convenios-manual/export-template
@@ -742,6 +819,99 @@ export const importBulkConvenios = async (
     throw {
       success: false,
       message: 'Error desconocido al importar convenios',
+      errors: {},
+    };
+  }
+};
+
+/**
+ * Importa PDFs pregenerados desde un archivo ZIP
+ * POST /api/convenios-manual/import-pdf-zip
+ */
+export const importPdfZip = async (
+  file: File,
+  send_email?: boolean
+): Promise<ImportPdfZipResponse> => {
+  try {
+    const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (fileExtension !== '.zip') {
+      throw {
+        success: false,
+        message: 'El archivo debe ser un ZIP (.zip)',
+        isValidationError: true,
+      };
+    }
+
+    const maxSizeBytes = 50 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      throw {
+        success: false,
+        message: 'El archivo no puede ser mayor a 50MB',
+        isValidationError: true,
+      };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (send_email !== undefined) {
+      formData.append('send_email', send_email.toString());
+    }
+
+    const response = await authenticatedApi.post<ImportPdfZipResponse>(
+      '/api/convenios-manual/import-pdf-zip',
+      formData,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{
+        success: false;
+        message: string;
+        errors?: Record<string, string[]>;
+        data?: { rejected?: Array<{ entry: string; reason: string }> };
+      }>;
+
+      if (axiosError.response?.status === 422) {
+        throw {
+          success: false,
+          message: axiosError.response.data?.message || 'Error de validación',
+          errors: axiosError.response.data?.errors || {},
+          rejected: axiosError.response.data?.data?.rejected,
+          isValidationError: true,
+        };
+      }
+
+      if (axiosError.response?.status === 413) {
+        throw {
+          success: false,
+          message:
+            axiosError.response.data?.message ||
+            'El archivo ZIP supera el límite de carga del servidor. Intente con un ZIP más pequeño o pida al administrador aumentar los límites de PHP (post_max_size / upload_max_filesize).',
+          errors: {},
+          isValidationError: true,
+        };
+      }
+
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al importar el ZIP de PDFs',
+        errors: {},
+      };
+    }
+
+    if (typeof error === 'object' && error !== null && 'success' in error) {
+      throw error;
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al importar el ZIP de PDFs',
       errors: {},
     };
   }
