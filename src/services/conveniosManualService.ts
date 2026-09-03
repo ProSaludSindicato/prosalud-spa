@@ -1,6 +1,123 @@
 import { authenticatedApi } from './api';
 import axios, { AxiosError } from 'axios';
 
+function normalizeAxiosResponseHeaders(headers: unknown): Record<string, string> {
+  if (!headers || typeof headers !== 'object') {
+    return {};
+  }
+
+  const normalized: Record<string, string> = {};
+
+  if (typeof (headers as { get?: unknown }).get === 'function') {
+    const axiosHeaders = headers as {
+      get: (name: string) => string | undefined | null;
+    };
+
+    for (const name of ['x-download-filename', 'content-disposition']) {
+      const value = axiosHeaders.get(name) ?? axiosHeaders.get(name.toUpperCase());
+      if (typeof value === 'string' && value.length > 0) {
+        normalized[name] = value;
+      }
+    }
+
+    return normalized;
+  }
+
+  return Object.fromEntries(
+    Object.entries(headers as Record<string, unknown>).map(([key, value]) => [
+      key.toLowerCase(),
+      Array.isArray(value) ? value.join(', ') : String(value ?? ''),
+    ]),
+  );
+}
+
+function parseFilenameFromDownloadResponse(
+  headers: unknown,
+  fallbackFilename: string,
+): string {
+  const normalizedHeaders = normalizeAxiosResponseHeaders(headers);
+
+  const xFilename = normalizedHeaders['x-download-filename'];
+  if (typeof xFilename === 'string' && xFilename.length > 0) {
+    try {
+      return decodeURIComponent(xFilename);
+    } catch {
+      return xFilename;
+    }
+  }
+
+  const contentDisposition = normalizedHeaders['content-disposition'];
+  if (typeof contentDisposition === 'string' && contentDisposition.length > 0) {
+    const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (filenameStarMatch?.[1]) {
+      try {
+        return decodeURIComponent(filenameStarMatch[1]);
+      } catch {
+        return filenameStarMatch[1];
+      }
+    }
+
+    const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i);
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1];
+    }
+
+    const unquotedMatch = contentDisposition.match(/filename=([^;]+)/i);
+    if (unquotedMatch?.[1]) {
+      return unquotedMatch[1].trim();
+    }
+  }
+
+  return fallbackFilename;
+}
+
+function resolvePeriodoFromEnviadoAt(enviadoAt: string | null | undefined): string | null {
+  if (!enviadoAt) {
+    return null;
+  }
+
+  const parsed = new Date(enviadoAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const year = parsed.getFullYear();
+  const semester = parsed.getMonth() + 1 <= 6 ? '1' : '2';
+
+  return `${year}${semester}`;
+}
+
+export type ConvenioDownloadFilenameSource = Pick<
+  ConvenioEmailTracking,
+  | 'documento'
+  | 'nombre_afiliado'
+  | 'nombre_convenio'
+  | 'sede'
+  | 'enviado_at'
+  | 'download_filename'
+>;
+
+/** Resuelve el nombre nemotécnico de descarga a partir del tracking (fallback local). */
+export function resolveConvenioDownloadFilename(
+  tracking: ConvenioDownloadFilenameSource,
+): string {
+  if (typeof tracking.download_filename === 'string' && tracking.download_filename.trim() !== '') {
+    return tracking.download_filename.trim();
+  }
+
+  const location = (tracking.sede || tracking.nombre_convenio || 'CONVENIO').trim().toUpperCase();
+  const affiliateName = (tracking.nombre_afiliado || 'SIN NOMBRE').trim().toUpperCase();
+  const documento = tracking.documento.replace(/\D/g, '') || 'sin-documento';
+  const periodo = resolvePeriodoFromEnviadoAt(tracking.enviado_at);
+  const parts = [location, affiliateName, documento];
+
+  if (periodo) {
+    parts.push(periodo);
+  }
+
+  return `${parts.join(' - ')}.pdf`;
+}
+
 export type ConvenioDeliveryMode = 'production' | 'test';
 
 export interface ConvenioTrackingAvailableActions {
@@ -74,6 +191,9 @@ export interface ConvenioEmailTracking {
   text_integrity_status?: 'matched' | 'unavailable' | null;
   signed_ip?: string | null;
   integrity_badge_label?: string | null;
+  signing_satisfaction_score?: number | null;
+  download_filename?: string | null;
+  signing_satisfaction_rated_at?: string | null;
 }
 
 export function visibleConvenioSendError(
@@ -253,6 +373,13 @@ export interface StatisticsResponse {
       firmando_presidente: number;
       error_firma_presidente: number;
     } | null;
+    satisfaction?: {
+      ratings_count: number;
+      eligible_count: number;
+      response_rate: number | null;
+      average: number | null;
+      distribution: Record<1 | 2 | 3 | 4 | 5, number>;
+    } | null;
     by_sede?: Array<{
       sede: string;
       total: number;
@@ -260,6 +387,8 @@ export interface StatisticsResponse {
       firmado_afiliado?: number;
       completado?: number;
       rechazado?: number;
+      satisfaction_count?: number;
+      satisfaction_average?: number | null;
     }>;
   };
 }
@@ -919,20 +1048,21 @@ export const importPdfZip = async (
 
 /** Descarga el PDF original generado o copiado para el envío (antes de firma del afiliado). */
 export const downloadConvenioOriginalPdf = async (
-  trackingId: number,
-  documento: string,
+  tracking: ConvenioDownloadFilenameSource & { id: number },
 ): Promise<void> => {
   try {
     const response = await authenticatedApi.get<Blob>(
-      `/api/convenios-manual/tracking/${trackingId}/download-original`,
+      `/api/convenios-manual/tracking/${tracking.id}/download-original`,
       { responseType: 'blob' },
     );
 
+    const suggestedFilename = resolveConvenioDownloadFilename(tracking);
+    const filename = parseFilenameFromDownloadResponse(response.headers, suggestedFilename);
     const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Convenio_${documento}_original.pdf`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1025,23 +1155,21 @@ export const signAsPresidentBulk = async (
 
 /** Descarga el PDF firmado por el afiliado (o PDF final histórico si el estado es completado). */
 export const downloadConvenioFinalPdf = async (
-  trackingId: number,
-  documento: string,
-  signingEstado: ConvenioSigningEstado | null | undefined,
+  tracking: ConvenioDownloadFilenameSource & { id: number },
 ): Promise<void> => {
   try {
     const response = await authenticatedApi.get<Blob>(
-      `/api/convenios-manual/tracking/${trackingId}/download-final`,
+      `/api/convenios-manual/tracking/${tracking.id}/download-final`,
       { responseType: 'blob' },
     );
 
-    const suffix =
-      signingEstado === 'completado' ? 'final' : 'firmado_afiliado';
+    const suggestedFilename = resolveConvenioDownloadFilename(tracking);
+    const filename = parseFilenameFromDownloadResponse(response.headers, suggestedFilename);
     const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Convenio_${documento}_${suffix}.pdf`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();

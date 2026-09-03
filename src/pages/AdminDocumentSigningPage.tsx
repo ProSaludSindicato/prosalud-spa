@@ -61,6 +61,7 @@ import {
   FileSpreadsheet,
   PenLine,
   CheckSquare,
+  Star,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 // Manual signing service (ACTIVE)
@@ -257,6 +258,31 @@ const auditEventLabel = (event: { type: string; label?: string; metadata?: Recor
   }
   return AUDIT_EVENT_LABELS[event.type] ?? 'Actividad en el visor';
 };
+
+const SATISFACTION_SCORE_LABELS: Record<number, string> = {
+  1: 'Muy mala',
+  2: 'Mala',
+  3: 'Regular',
+  4: 'Buena',
+  5: 'Excelente',
+};
+
+function SatisfactionStars({ score, className }: { score: number; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-0.5', className)} aria-label={`${score} de 5`}>
+      {([1, 2, 3, 4, 5] as const).map((value) => (
+        <Star
+          key={value}
+          className={cn(
+            'h-4 w-4',
+            value <= score ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground/30',
+          )}
+          aria-hidden
+        />
+      ))}
+    </span>
+  );
+}
 
 const AdminDocumentSigningPage: React.FC = () => {
   const { can } = usePermissions();
@@ -815,7 +841,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   const handleDownloadConvenioFinal = async (tracking: ConvenioEmailTracking) => {
     try {
-      await downloadConvenioFinalPdf(tracking.id, tracking.documento, tracking.signing_estado);
+      await downloadConvenioFinalPdf(tracking);
       toast.success('Descarga iniciada');
     } catch (error: unknown) {
       const message =
@@ -831,7 +857,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   const handleDownloadConvenioOriginal = async (tracking: ConvenioEmailTracking) => {
     try {
-      await downloadConvenioOriginalPdf(tracking.id, tracking.documento);
+      await downloadConvenioOriginalPdf(tracking);
       toast.success('Descarga del PDF original iniciada');
     } catch (error: unknown) {
       const message =
@@ -1481,6 +1507,14 @@ const AdminDocumentSigningPage: React.FC = () => {
 
     if (digitalSigningEnabled && tracking.integrity_badge_label) {
       secondaryParts.push(tracking.integrity_badge_label);
+    }
+
+    if (
+      digitalSigningEnabled &&
+      tracking.signing_satisfaction_score != null &&
+      tracking.signing_satisfaction_score >= 1
+    ) {
+      secondaryParts.push(`Satisfacción ${tracking.signing_satisfaction_score}/5`);
     }
 
     const statusBadge = (
@@ -3679,6 +3713,79 @@ const AdminDocumentSigningPage: React.FC = () => {
                           )}
                         </div>
 
+                        {digitalSigningEnabled && statsData.data.satisfaction && (
+                          <Card className="border-slate-200">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Star className="h-4 w-4 text-amber-500" />
+                                Satisfacción del proceso de firma
+                              </CardTitle>
+                              <CardDescription>
+                                Puntuación de 1 a 5 que el afiliado deja después de enviar el convenio. Sirve para medir
+                                si el trámite digital mejora la experiencia frente al proceso manual o físico.
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-lg border bg-amber-50/80 p-3 dark:bg-amber-950/30">
+                                  <p className="text-xs text-muted-foreground">Promedio</p>
+                                  <p className="text-xl font-semibold tabular-nums text-amber-800 dark:text-amber-200">
+                                    {statsData.data.satisfaction.average != null
+                                      ? statsData.data.satisfaction.average.toFixed(1)
+                                      : '—'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">sobre 5</p>
+                                </div>
+                                <div className="rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-900/40">
+                                  <p className="text-xs text-muted-foreground">Calificaciones</p>
+                                  <p className="text-xl font-semibold tabular-nums">
+                                    {statsData.data.satisfaction.ratings_count}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border bg-sky-50/80 p-3 dark:bg-sky-950/30">
+                                  <p className="text-xs text-muted-foreground">Elegibles (ya firmaron)</p>
+                                  <p className="text-xl font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+                                    {statsData.data.satisfaction.eligible_count}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border bg-emerald-50/80 p-3 dark:bg-emerald-950/30">
+                                  <p className="text-xs text-muted-foreground">Tasa de respuesta</p>
+                                  <p className="text-xl font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
+                                    {statsData.data.satisfaction.response_rate != null
+                                      ? `${statsData.data.satisfaction.response_rate.toFixed(1)}%`
+                                      : '—'}
+                                  </p>
+                                </div>
+                              </div>
+                              {statsData.data.satisfaction.ratings_count > 0 && (
+                                <div className="space-y-2">
+                                  {([5, 4, 3, 2, 1] as const).map((score) => {
+                                    const count = statsData.data.satisfaction?.distribution[score] ?? 0;
+                                    const total = statsData.data.satisfaction?.ratings_count ?? 0;
+                                    const pct = total > 0 ? (count / total) * 100 : 0;
+                                    return (
+                                      <div key={score} className="grid grid-cols-[8rem_1fr_2.5rem] items-center gap-3">
+                                        <span className="text-xs text-muted-foreground">
+                                          {score} · {SATISFACTION_SCORE_LABELS[score]}
+                                        </span>
+                                        <Progress value={pct} className="h-2" />
+                                        <span className="text-right text-xs tabular-nums text-muted-foreground">
+                                          {count}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {statsData.data.satisfaction.ratings_count === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Aún no hay calificaciones en este periodo.
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+
                         {/* Firma automática del presidente */}
                         {autoSignEnabled && statsData.data.signing && (
                           <Card className="border-slate-200">
@@ -3746,6 +3853,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         <TableHead className="text-right w-28">Pend. firma</TableHead>
                                         <TableHead className="text-right w-28">Firmado</TableHead>
                                         <TableHead className="text-right w-28">Completado</TableHead>
+                                        <TableHead className="text-right w-28">Satisfacción</TableHead>
                                       </>
                                     )}
                                   </TableRow>
@@ -3767,6 +3875,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TableCell>
                                           <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-300">
                                             {row.completado ?? 0}
+                                          </TableCell>
+                                          <TableCell className="text-right tabular-nums">
+                                            {row.satisfaction_count
+                                              ? `${(row.satisfaction_average ?? 0).toFixed(1)} (${row.satisfaction_count})`
+                                              : '—'}
                                           </TableCell>
                                         </>
                                       )}
@@ -3955,6 +4068,26 @@ const AdminDocumentSigningPage: React.FC = () => {
                         <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{trackingDetailSendError}</p>
                       </div>
                     )}
+                    <div className="col-span-full rounded-md border bg-amber-50/60 px-3 py-3 dark:bg-amber-950/20">
+                      <span className="font-semibold text-muted-foreground">Satisfacción del proceso de firma</span>
+                      {trackingDetail.tracking.signing_satisfaction_score != null ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <SatisfactionStars score={trackingDetail.tracking.signing_satisfaction_score} />
+                          <p>
+                            {trackingDetail.tracking.signing_satisfaction_score}/5
+                            {' · '}
+                            {SATISFACTION_SCORE_LABELS[trackingDetail.tracking.signing_satisfaction_score] ?? 'Calificación'}
+                          </p>
+                          {trackingDetail.tracking.signing_satisfaction_rated_at && (
+                            <p className="text-muted-foreground">
+                              {formatDate(trackingDetail.tracking.signing_satisfaction_rated_at)}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-muted-foreground">El afiliado aún no calificó este proceso.</p>
+                      )}
+                    </div>
                   </div>
 
                   <Separator />
