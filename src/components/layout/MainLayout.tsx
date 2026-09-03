@@ -65,7 +65,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     if (!csp && import.meta.env.PROD) {
       const meta = document.createElement('meta');
       meta.httpEquiv = 'Content-Security-Policy';
-      meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: https://www.google.com https://www.gstatic.com; frame-src 'self' https://www.google.com https://www.youtube.com https://www.youtube-nocookie.com;";
+      meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: https://www.google.com https://www.gstatic.com; frame-src 'self' blob: https://www.google.com https://www.youtube.com https://www.youtube-nocookie.com;";
       document.head.appendChild(meta);
     }
   }, []);

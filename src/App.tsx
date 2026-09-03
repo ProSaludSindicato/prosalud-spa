@@ -68,6 +68,7 @@ import EstatutosBeneficiosPage from '@/pages/EstatutosBeneficiosPage';
 import ContratoSindicalPage from '@/pages/ContratoSindicalPage';
 import EpsSuraPage from '@/pages/EpsSuraPage';
 import AccesoDirectoMovilPage from '@/pages/AccesoDirectoMovilPage';
+import PoliticaTratamientoDatosPage from '@/pages/PoliticaTratamientoDatosPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
 import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
@@ -99,6 +100,7 @@ const AppRoutes = () => {
             <Route path="/nosotros/contrato-sindical" element={<ContratoSindicalPage />} />
             <Route path="/contacto" element={<ContactoPage />} />
             <Route path="/faq" element={<FAQPage />} />
+            <Route path="/politica-de-tratamiento-de-datos" element={<PoliticaTratamientoDatosPage />} />
             <Route path="/ayuda/acceso-directo-movil" element={<AccesoDirectoMovilPage />} />
 
             <Route path="/asamblea" element={<AssemblyDelegatePage />} />

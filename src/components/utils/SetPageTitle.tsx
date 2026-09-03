@@ -10,6 +10,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/nosotros/estatutos': 'Estatutos y beneficios - ProSalud',
   '/nosotros/contrato-sindical': 'Contrato sindical - ProSalud',
   '/faq': 'Preguntas frecuentes - ProSalud',
+  '/politica-de-tratamiento-de-datos': 'Política de tratamiento de datos - ProSalud',
   '/auth/login': 'Iniciar sesión - ProSalud',
   '/auth/forgot-password': 'Recuperar contraseña - ProSalud',
   '/auth/restablecer-contraseña': 'Restablecer contraseña - ProSalud',

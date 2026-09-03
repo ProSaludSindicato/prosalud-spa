@@ -47,13 +47,8 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/terminos" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
-                  Términos y Condiciones
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacidad" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
-                  Política de Privacidad
+                <Link to="/politica-de-tratamiento-de-datos" className="text-sm hover:text-secondary-prosaludgreen transition-colors cursor-pointer clickable">
+                  Política de Tratamiento de Datos
                 </Link>
               </li>
               <li>

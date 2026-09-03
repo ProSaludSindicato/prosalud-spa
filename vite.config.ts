@@ -8,8 +8,8 @@ import fs from "fs";
 export default defineConfig(({ mode }) => {
   // Configuración HTTPS para desarrollo
   const httpsConfig = mode === 'development' ? {
-    key: fs.readFileSync('./192.168.1.92-key.pem'),
-    cert: fs.readFileSync('./192.168.1.92.pem'),
+    key: fs.readFileSync('./192.168.1.60-key.pem'),
+    cert: fs.readFileSync('./192.168.1.60.pem'),
   } : undefined;
 
   return {
@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => {
       port: 8080,
       https: httpsConfig,
       headers: {
-        // Headers de seguridad (solo en desarrollo)
-        'X-Frame-Options': 'DENY',
+        // SAMEORIGIN permite incrustar PDFs propios (p. ej. política de datos) sin abrir a sitios externos.
+        'X-Frame-Options': 'SAMEORIGIN',
         'X-Content-Type-Options': 'nosniff',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin',

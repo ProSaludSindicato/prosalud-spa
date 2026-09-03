@@ -1,17 +1,17 @@
 {
     "rewrites": [
         {
-            "source": "/((?!sitemap\\.xml|robots\\.txt).*)",
+            "source": "/((?!sitemap\\.xml|robots\\.txt|documents/).*)",
             "destination": "/index.html"
         }
     ],
     "headers": [
         {
-            "source": "/((?!sitemap\\.xml|robots\\.txt).*)",
+            "source": "/((?!sitemap\\.xml|robots\\.txt|documents/).*)",
             "headers": [
                 {
                     "key": "X-Frame-Options",
-                    "value": "DENY"
+                    "value": "SAMEORIGIN"
                 },
                 {
                     "key": "X-Content-Type-Options",
@@ -24,6 +24,19 @@
                 {
                     "key": "Referrer-Policy",
                     "value": "strict-origin-when-cross-origin"
+                }
+            ]
+        },
+        {
+            "source": "/documents/(.*)",
+            "headers": [
+                {
+                    "key": "X-Frame-Options",
+                    "value": "SAMEORIGIN"
+                },
+                {
+                    "key": "X-Content-Type-Options",
+                    "value": "nosniff"
                 }
             ]
         }
