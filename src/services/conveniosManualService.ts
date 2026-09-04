@@ -331,6 +331,37 @@ export interface ResendEmailsResponse {
   };
 }
 
+export interface RetryFailedEmailsRequest {
+  tracking_ids?: number[];
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  sede?: string;
+  q?: string;
+}
+
+export interface RetryFailedEmailsResponse {
+  success: true;
+  delivery_mode?: ConvenioDeliveryMode;
+  message?: string;
+  data: {
+    total: number;
+    success_count: number;
+    failed_count: number;
+    fecha_desde: string | null;
+    fecha_hasta: string | null;
+    results: {
+      success: Array<{
+        tracking_id: number;
+        documento: string;
+      }>;
+      failed: Array<{
+        tracking_id: number;
+        error: string;
+      }>;
+    };
+  };
+}
+
 /**
  * Parámetros para estadísticas
  */
@@ -546,6 +577,48 @@ export const resendEmails = async (
     throw {
       success: false,
       message: 'Error desconocido al reenviar correos',
+      errors: {},
+    };
+  }
+};
+
+export const retryFailedEmails = async (
+  requestData: RetryFailedEmailsRequest = {},
+): Promise<RetryFailedEmailsResponse> => {
+  try {
+    const response = await authenticatedApi.post<RetryFailedEmailsResponse>(
+      '/api/convenios-manual/retry-failed-emails',
+      requestData,
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{
+        success: false;
+        message: string;
+        errors?: Record<string, string[]>;
+      }>;
+
+      if (axiosError.response?.status === 422) {
+        throw {
+          success: false,
+          message: axiosError.response.data?.message || 'Error de validación',
+          errors: axiosError.response.data?.errors || {},
+          isValidationError: true,
+        };
+      }
+
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al reintentar convenios fallidos',
+        errors: {},
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al reintentar convenios fallidos',
       errors: {},
     };
   }

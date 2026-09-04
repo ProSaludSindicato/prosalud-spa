@@ -68,6 +68,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   getEmailHistory as getEmailHistoryManual,
   resendEmails as resendEmailsManual,
+  retryFailedEmails,
   getStatistics as getStatisticsManual,
   getTrackingDetail,
   generateAndSendConvenio,
@@ -310,6 +311,8 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [resendEmailSubject, setResendEmailSubject] = useState('');
   const [isResending, setIsResending] = useState(false);
   const [isBulkResending, setIsBulkResending] = useState(false);
+  const [retryFailedDialogOpen, setRetryFailedDialogOpen] = useState(false);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [trackingDetail, setTrackingDetail] = useState<TrackingDetailResponse['data'] | null>(null);
   const [isLoadingTrackingDetail, setIsLoadingTrackingDetail] = useState(false);
@@ -1210,6 +1213,59 @@ const AdminDocumentSigningPage: React.FC = () => {
       toast.error('Error al reenviar', { description: message });
     } finally {
       setIsBulkResending(false);
+    }
+  };
+
+  const retryFailedDateRange = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    return {
+      fecha_desde: historyFilters.fecha_desde || today,
+      fecha_hasta: historyFilters.fecha_hasta || today,
+    };
+  }, [historyFilters.fecha_desde, historyFilters.fecha_hasta]);
+
+  const handleRetryFailedEmails = async () => {
+    setIsRetryingFailed(true);
+    try {
+      const response = await retryFailedEmails({
+        fecha_desde: retryFailedDateRange.fecha_desde,
+        fecha_hasta: retryFailedDateRange.fecha_hasta,
+        sede: historyFilters.sede,
+        q: historyFilters.q,
+      });
+
+      setRetryFailedDialogOpen(false);
+
+      if (response.data.success_count > 0) {
+        toast.success('Reintentos encolados', {
+          description:
+            response.message ??
+            `Se encolaron ${response.data.success_count} convenios fallidos.`,
+        });
+        setSelectedTrackingIds(new Set());
+        void refetchHistory();
+        return;
+      }
+
+      if (response.data.failed_count > 0) {
+        toast.error('No se pudieron reintentar algunos registros', {
+          description: response.data.results.failed[0]?.error ?? 'Revise el historial.',
+        });
+        return;
+      }
+
+      toast.info('Sin convenios para reintentar', {
+        description: response.message ?? 'No hay convenios fallidos en el período seleccionado.',
+      });
+    } catch (error: unknown) {
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
+          ? (error as { message: string }).message
+          : 'Ocurrió un error al reintentar los convenios fallidos.';
+      toast.error('Error al reintentar', { description: message });
+    } finally {
+      setIsRetryingFailed(false);
     }
   };
 
@@ -4217,6 +4273,63 @@ const AdminDocumentSigningPage: React.FC = () => {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setTrackingDetailOpen(false)}>
                   Cerrar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={retryFailedDialogOpen} onOpenChange={setRetryFailedDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reintentar convenios fallidos</DialogTitle>
+                <DialogDescription>
+                  Se encolarán de nuevo todos los convenios en estado fallido del período indicado.
+                  Si no hay fechas en los filtros, se usa el día de hoy.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                  <p>
+                    <span className="font-semibold">Período:</span>{' '}
+                    {retryFailedDateRange.fecha_desde === retryFailedDateRange.fecha_hasta
+                      ? retryFailedDateRange.fecha_desde
+                      : `${retryFailedDateRange.fecha_desde} a ${retryFailedDateRange.fecha_hasta}`}
+                  </p>
+                  {historyFilters.sede ? (
+                    <p>
+                      <span className="font-semibold">Sede:</span> {historyFilters.sede}
+                    </p>
+                  ) : null}
+                  {historyFilters.q ? (
+                    <p>
+                      <span className="font-semibold">Búsqueda:</span> {historyFilters.q}
+                    </p>
+                  ) : null}
+                </div>
+                <p className="text-muted-foreground">
+                  Los envíos respetan el límite por minuto. Los registros pasan a pendiente y se
+                  actualizan en el historial a medida que se envían.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setRetryFailedDialogOpen(false)}
+                  disabled={isRetryingFailed}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="gap-1.5"
+                  onClick={() => void handleRetryFailedEmails()}
+                  disabled={isRetryingFailed}
+                >
+                  {isRetryingFailed ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Encolar reintentos
                 </Button>
               </DialogFooter>
             </DialogContent>
