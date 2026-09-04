@@ -332,7 +332,6 @@ export interface EmailHistoryParams {
 export interface ResendEmailsRequest {
   tracking_ids: number[];
   emails?: Record<string, string>; // Objeto asociativo: { "tracking_id": "email" }
-  email_subject?: string;
 }
 
 /**

@@ -315,7 +315,6 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
   const [resendEmail, setResendEmail] = useState('');
-  const [resendEmailSubject, setResendEmailSubject] = useState('');
   const [isResending, setIsResending] = useState(false);
   const [isBulkResending, setIsBulkResending] = useState(false);
   const [retryFailedDialogOpen, setRetryFailedDialogOpen] = useState(false);
@@ -686,7 +685,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   };
 
   const canResendTracking = (tracking: ConvenioEmailTracking): boolean =>
-    tracking.available_actions?.resend ?? shouldShowEmailResend(tracking);
+    shouldShowEmailResend(tracking) && (tracking.available_actions?.resend ?? true);
 
   const queuePresidentProcessingFeedback = (trackingIds: number[], durationMs = 45000): void => {
     if (trackingIds.length === 0) {
@@ -1347,7 +1346,6 @@ const AdminDocumentSigningPage: React.FC = () => {
     setSelectedTrackingInfo(tracking);
     // Prediligenciar el correo actual si está disponible
     setResendEmail(tracking.email_afiliado || '');
-    setResendEmailSubject('');
     setResendDialogOpen(true);
   };
 
@@ -1382,11 +1380,6 @@ const AdminDocumentSigningPage: React.FC = () => {
         };
       }
 
-      // Agregar email_subject si se proporcionó
-      if (resendEmailSubject.trim()) {
-        requestData.email_subject = resendEmailSubject.trim();
-      }
-
       const response = await resendEmailsManual(requestData);
 
       if (response.data.success_count > 0) {
@@ -1404,7 +1397,6 @@ const AdminDocumentSigningPage: React.FC = () => {
         setSelectedTrackingId(null);
         setSelectedTrackingInfo(null);
         setResendEmail('');
-        setResendEmailSubject('');
       } else if (response.data.failed_count > 0) {
         const failed = response.data.results.failed.find(f => f.tracking_id === selectedTrackingId);
         toast.error('Error al reenviar', {
@@ -4216,6 +4208,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                 <div className="space-y-4 overflow-y-auto pr-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                     <div>
+                      <span className="font-semibold text-muted-foreground">ID de registro</span>
+                      <p className="font-mono">{trackingDetail.tracking.id}</p>
+                    </div>
+                    <div>
                       <span className="font-semibold text-muted-foreground">Documento</span>
                       <p className="font-mono">{trackingDetail.tracking.documento}</p>
                     </div>
@@ -4238,45 +4234,49 @@ const AdminDocumentSigningPage: React.FC = () => {
                       <span className="font-semibold text-muted-foreground">Archivo</span>
                       <p className="break-all text-xs">{trackingDetail.tracking.nombre_archivo}</p>
                     </div>
-                    <div>
-                      <span className="font-semibold text-muted-foreground">Creado</span>
-                      <p>{formatDate(trackingDetail.tracking.created_at)}</p>
-                    </div>
-                    {trackingDetail.generated_by && (
-                      <div className="col-span-full">
-                        <span className="font-semibold text-muted-foreground">Generado por</span>
-                        <p>
-                          {trackingDetail.generated_by.name}{' '}
-                          <span className="text-muted-foreground">({trackingDetail.generated_by.email})</span>
-                        </p>
+                    <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div>
+                        <span className="font-semibold text-muted-foreground">Creado</span>
+                        <p>{formatDate(trackingDetail.tracking.created_at)}</p>
                       </div>
-                    )}
+                      <div>
+                        <span className="font-semibold text-muted-foreground">Generado por</span>
+                        {trackingDetail.generated_by ? (
+                          <p>
+                            {trackingDetail.generated_by.name}{' '}
+                            <span className="text-muted-foreground">({trackingDetail.generated_by.email})</span>
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">—</p>
+                        )}
+                      </div>
+                      <div className="rounded-md border bg-amber-50/60 px-3 py-3 dark:bg-amber-950/20 sm:col-span-2 lg:col-span-1">
+                        <span className="font-semibold text-muted-foreground">Satisfacción del proceso de firma</span>
+                        {trackingDetail.tracking.signing_satisfaction_score != null ? (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <SatisfactionStars score={trackingDetail.tracking.signing_satisfaction_score} />
+                            <p>
+                              {trackingDetail.tracking.signing_satisfaction_score}/5
+                              {' · '}
+                              {SATISFACTION_SCORE_LABELS[trackingDetail.tracking.signing_satisfaction_score] ?? 'Calificación'}
+                            </p>
+                            {trackingDetail.tracking.signing_satisfaction_rated_at && (
+                              <p className="text-muted-foreground">
+                                {formatDate(trackingDetail.tracking.signing_satisfaction_rated_at)}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-muted-foreground">El afiliado aún no calificó este proceso.</p>
+                        )}
+                      </div>
+                    </div>
                     {trackingDetailSendError && (
                       <div className="col-span-full rounded-md border border-red-200 bg-red-50 p-3">
                         <span className="font-semibold text-red-800">Error del sistema</span>
                         <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{trackingDetailSendError}</p>
                       </div>
                     )}
-                    <div className="col-span-full rounded-md border bg-amber-50/60 px-3 py-3 dark:bg-amber-950/20">
-                      <span className="font-semibold text-muted-foreground">Satisfacción del proceso de firma</span>
-                      {trackingDetail.tracking.signing_satisfaction_score != null ? (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                          <SatisfactionStars score={trackingDetail.tracking.signing_satisfaction_score} />
-                          <p>
-                            {trackingDetail.tracking.signing_satisfaction_score}/5
-                            {' · '}
-                            {SATISFACTION_SCORE_LABELS[trackingDetail.tracking.signing_satisfaction_score] ?? 'Calificación'}
-                          </p>
-                          {trackingDetail.tracking.signing_satisfaction_rated_at && (
-                            <p className="text-muted-foreground">
-                              {formatDate(trackingDetail.tracking.signing_satisfaction_rated_at)}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-muted-foreground">El afiliado aún no calificó este proceso.</p>
-                      )}
-                    </div>
                   </div>
 
                   <Separator />
@@ -4568,19 +4568,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                           : 'Si no proporcionas un correo, se usará el email del afiliado en la base de datos o el del registro original.'}
                       </p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="resendEmailSubject">Asunto del Correo (Opcional)</Label>
-                      <Input
-                        id="resendEmailSubject"
-                        placeholder="Ej: Firma de Convenio de Afiliación"
-                        value={resendEmailSubject}
-                        onChange={(e) => setResendEmailSubject(e.target.value)}
-                      />
-                      <p className="text-xs text-gray-500">
-                        Si no se proporciona, se usará el asunto por defecto.
-                      </p>
-                    </div>
+                    <p className="text-xs text-gray-500">
+                      El asunto del correo se genera automáticamente con la fecha y hora de envío para que no se agrupe con envíos anteriores.
+                    </p>
                   </div>
                 </div>
               )}
@@ -4592,7 +4582,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                     setSelectedTrackingId(null);
                     setSelectedTrackingInfo(null);
                     setResendEmail('');
-                    setResendEmailSubject('');
                   }}
                   disabled={isResending}
                 >
