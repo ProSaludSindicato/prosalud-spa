@@ -1880,16 +1880,33 @@ const AdminDocumentSigningPage: React.FC = () => {
                           Consulta envíos, descarga PDFs, reenvía seleccionados y gestiona la firma digital desde un solo lugar.
                         </CardDescription>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleRefreshHistory()}
-                        disabled={isManualRefreshingHistory}
-                        className="flex-shrink-0"
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isManualRefreshingHistory ? 'animate-spin' : ''}`} />
-                        Actualizar
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                        {canManageDocumentSigning && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setRetryFailedDialogOpen(true)}
+                            disabled={isRetryingFailed}
+                            className="gap-1.5"
+                          >
+                            {isRetryingFailed ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                            Reintentar fallidos
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleRefreshHistory()}
+                          disabled={isManualRefreshingHistory}
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-2 ${isManualRefreshingHistory ? 'animate-spin' : ''}`} />
+                          Actualizar
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1980,6 +1997,34 @@ const AdminDocumentSigningPage: React.FC = () => {
                         />
                       </div>
                     </div>
+
+                    {canManageDocumentSigning && (
+                      <div className="flex flex-col gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">Reintentar envíos fallidos</p>
+                          <p className="text-xs text-muted-foreground">
+                            Encola de nuevo los convenios en estado fallido del período
+                            {retryFailedDateRange.fecha_desde === retryFailedDateRange.fecha_hasta
+                              ? ` (${retryFailedDateRange.fecha_desde})`
+                              : ` (${retryFailedDateRange.fecha_desde} a ${retryFailedDateRange.fecha_hasta})`}
+                            .
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setRetryFailedDialogOpen(true)}
+                          disabled={isRetryingFailed}
+                          className="gap-1.5 flex-shrink-0"
+                        >
+                          {isRetryingFailed ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          Reintentar fallidos
+                        </Button>
+                      </div>
+                    )}
 
                     {/* Tabla */}
                     {isLoadingHistory ? (
