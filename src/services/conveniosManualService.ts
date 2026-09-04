@@ -71,6 +71,31 @@ function parseFilenameFromDownloadResponse(
   return fallbackFilename;
 }
 
+async function messageFromBlobError(error: unknown, fallback: string): Promise<string> {
+  if (!axios.isAxiosError(error)) {
+    return fallback;
+  }
+
+  const data = error.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text()) as { message?: string };
+      return parsed.message || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  if (data && typeof data === 'object' && data !== null && 'message' in data) {
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
 function resolvePeriodoFromEnviadoAt(enviadoAt: string | null | undefined): string | null {
   if (!enviadoAt) {
     return null;
@@ -985,6 +1010,71 @@ export const exportTemplate = async (): Promise<Blob> => {
     throw {
       success: false,
       message: 'Error desconocido al descargar la plantilla',
+    };
+  }
+};
+
+export type ExportConvenioHistoryParams = Pick<
+  EmailHistoryParams,
+  'q' | 'estado_filtro' | 'sede' | 'fecha_desde' | 'fecha_hasta' | 'calificacion'
+> & {
+  is_test?: boolean;
+};
+
+/**
+ * Exporta el historial de convenios a Excel con los mismos filtros del panel.
+ * POST /api/convenios-manual/export/excel
+ */
+export const exportHistoryExcel = async (
+  params?: ExportConvenioHistoryParams,
+): Promise<{ blob: Blob; filename: string }> => {
+  try {
+    const payload: ExportConvenioHistoryParams = {};
+
+    if (params?.q?.trim()) {
+      payload.q = params.q.trim();
+    }
+    if (params?.estado_filtro && params.estado_filtro !== 'todos') {
+      payload.estado_filtro = params.estado_filtro;
+    }
+    if (params?.sede?.trim()) {
+      payload.sede = params.sede.trim();
+    }
+    if (params?.fecha_desde) {
+      payload.fecha_desde = params.fecha_desde;
+    }
+    if (params?.fecha_hasta) {
+      payload.fecha_hasta = params.fecha_hasta;
+    }
+    if (params?.calificacion) {
+      payload.calificacion = params.calificacion;
+    }
+    if (typeof params?.is_test === 'boolean') {
+      payload.is_test = params.is_test;
+    }
+
+    const response = await authenticatedApi.post(
+      '/api/convenios-manual/export/excel',
+      payload,
+      {
+        responseType: 'blob',
+        headers: {
+          Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      },
+    );
+
+    return {
+      blob: response.data as Blob,
+      filename: parseFilenameFromDownloadResponse(
+        response.headers,
+        'Reporte_Convenios_ProSalud.xlsx',
+      ),
+    };
+  } catch (error) {
+    throw {
+      success: false,
+      message: await messageFromBlobError(error, 'Error al generar el reporte de convenios'),
     };
   }
 };

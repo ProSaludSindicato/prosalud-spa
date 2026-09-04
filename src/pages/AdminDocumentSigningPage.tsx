@@ -107,6 +107,7 @@ import {
 // las importaciones y código relacionado.
 // import { sendBulkEmails, getEmailHistory, resendEmails, getStatistics, EmailTracking, EmailHistoryParams } from '@/services/documentSigningService';
 import DataPagination from '@/components/ui/data-pagination';
+import ExportConvenioHistoryDialog from '@/components/admin/convenios/ExportConvenioHistoryDialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -583,6 +584,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     per_page: 15,
     page: 1,
   });
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   
   // Filtros para estadísticas (Manual)
   const [statsFilters, setStatsFilters] = useState<{ fecha_desde?: string; fecha_hasta?: string }>({});
@@ -1915,6 +1917,17 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </CardDescription>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                        {can('document_signing.view') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setExportDialogOpen(true)}
+                            className="gap-1.5"
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Exportar reporte
+                          </Button>
+                        )}
                         {canManageDocumentSigning && hasFailedEmails && (
                           <Button
                             variant="default"
@@ -4604,6 +4617,12 @@ const AdminDocumentSigningPage: React.FC = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <ExportConvenioHistoryDialog
+            open={exportDialogOpen}
+            onOpenChange={setExportDialogOpen}
+            digitalSigningEnabled={digitalSigningEnabled}
+            initialFilters={historyFilters}
+          />
         </div>
       </div>
     </AdminLayout>
