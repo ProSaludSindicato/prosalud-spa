@@ -69,6 +69,7 @@ import {
   getEmailHistory as getEmailHistoryManual,
   resendEmails as resendEmailsManual,
   retryFailedEmails,
+  getFailedEmailDays,
   getStatistics as getStatisticsManual,
   getTrackingDetail,
   generateAndSendConvenio,
@@ -85,6 +86,7 @@ import {
   visibleConvenioSendError,
   EmailHistoryParams as ManualEmailHistoryParams,
   EmailHistoryEstadoFiltro,
+  EmailHistoryCalificacionFiltro,
   GenerateAndSendConvenioRequest,
   GenerateAndSendConvenioResponse,
   DownloadGeneratedConvenioResult,
@@ -268,6 +270,10 @@ const SATISFACTION_SCORE_LABELS: Record<number, string> = {
   5: 'Excelente',
 };
 
+function formatFailedEmailDayLabel(fecha: string): string {
+  return format(new Date(`${fecha}T12:00:00`), "d 'de' MMMM yyyy", { locale: es });
+}
+
 function SatisfactionStars({ score, className }: { score: number; className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-0.5', className)} aria-label={`${score} de 5`}>
@@ -313,6 +319,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [isBulkResending, setIsBulkResending] = useState(false);
   const [retryFailedDialogOpen, setRetryFailedDialogOpen] = useState(false);
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
+  const [selectedRetryDates, setSelectedRetryDates] = useState<string[]>([]);
   const [trackingDetailOpen, setTrackingDetailOpen] = useState(false);
   const [trackingDetail, setTrackingDetail] = useState<TrackingDetailResponse['data'] | null>(null);
   const [isLoadingTrackingDetail, setIsLoadingTrackingDetail] = useState(false);
@@ -616,6 +623,21 @@ const AdminDocumentSigningPage: React.FC = () => {
     queryFn: () => getStatisticsManual(statsFilters),
     enabled: activeTab === 'statistics' && can('document_signing.view'),
   });
+
+  const { data: failedEmailDaysData } = useQuery({
+    queryKey: ['convenios-manual-failed-email-days'],
+    queryFn: getFailedEmailDays,
+    enabled: activeTab === 'history' && can('document_signing.manage'),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  const failedEmailDays = failedEmailDaysData?.data.days ?? [];
+  const failedEmailTotal = failedEmailDaysData?.data.total ?? 0;
+  const hasFailedEmails = failedEmailTotal > 0;
+  const selectedRetryFailedCount = failedEmailDays
+    .filter((day) => selectedRetryDates.includes(day.fecha))
+    .reduce((sum, day) => sum + day.total, 0);
 
   // Feature flag: la firma digital se oculta cuando el backend la tiene deshabilitada.
   // Se obtiene desde la primera respuesta disponible (historial o estadísticas).
@@ -1216,23 +1238,31 @@ const AdminDocumentSigningPage: React.FC = () => {
     }
   };
 
-  const retryFailedDateRange = useMemo(() => {
+  const openRetryFailedDialog = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const hasToday = failedEmailDays.some((day) => day.fecha === today);
+    setSelectedRetryDates(hasToday ? [today] : failedEmailDays[0] ? [failedEmailDays[0].fecha] : []);
+    setRetryFailedDialogOpen(true);
+  };
 
-    return {
-      fecha_desde: historyFilters.fecha_desde || today,
-      fecha_hasta: historyFilters.fecha_hasta || today,
-    };
-  }, [historyFilters.fecha_desde, historyFilters.fecha_hasta]);
+  const toggleRetryDate = (fecha: string) => {
+    setSelectedRetryDates((current) =>
+      current.includes(fecha) ? current.filter((value) => value !== fecha) : [...current, fecha],
+    );
+  };
 
   const handleRetryFailedEmails = async () => {
+    if (selectedRetryDates.length === 0) {
+      toast.info('Seleccione al menos un día', {
+        description: 'Elija uno o más días con envíos fallidos para reintentar.',
+      });
+      return;
+    }
+
     setIsRetryingFailed(true);
     try {
       const response = await retryFailedEmails({
-        fecha_desde: retryFailedDateRange.fecha_desde,
-        fecha_hasta: retryFailedDateRange.fecha_hasta,
-        sede: historyFilters.sede,
-        q: historyFilters.q,
+        fechas: selectedRetryDates,
       });
 
       setRetryFailedDialogOpen(false);
@@ -1245,6 +1275,7 @@ const AdminDocumentSigningPage: React.FC = () => {
         });
         setSelectedTrackingIds(new Set());
         void refetchHistory();
+        void queryClient.invalidateQueries({ queryKey: ['convenios-manual-failed-email-days'] });
         return;
       }
 
@@ -1252,12 +1283,14 @@ const AdminDocumentSigningPage: React.FC = () => {
         toast.error('No se pudieron reintentar algunos registros', {
           description: response.data.results.failed[0]?.error ?? 'Revise el historial.',
         });
+        void queryClient.invalidateQueries({ queryKey: ['convenios-manual-failed-email-days'] });
         return;
       }
 
       toast.info('Sin convenios para reintentar', {
-        description: response.message ?? 'No hay convenios fallidos en el período seleccionado.',
+        description: response.message ?? 'No hay convenios fallidos en los días seleccionados.',
       });
+      void queryClient.invalidateQueries({ queryKey: ['convenios-manual-failed-email-days'] });
     } catch (error: unknown) {
       const message =
         typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
@@ -1293,6 +1326,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     setIsManualRefreshingHistory(true);
     try {
       await queryClient.invalidateQueries({ queryKey: ['convenios-manual-history'] });
+      await queryClient.invalidateQueries({ queryKey: ['convenios-manual-failed-email-days'] });
       if (!trackingDetailOpen || !trackingDetail?.tracking.id) {
         return;
       }
@@ -1881,11 +1915,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </CardDescription>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                        {canManageDocumentSigning && (
+                        {canManageDocumentSigning && hasFailedEmails && (
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => setRetryFailedDialogOpen(true)}
+                            onClick={openRetryFailedDialog}
                             disabled={isRetryingFailed}
                             className="gap-1.5"
                           >
@@ -1911,8 +1945,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <TooltipProvider delayDuration={300}>
-                    {/* Filtros: 7 columnas en xl para una sola fila (2+2+1+1+1) */}
-                    <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+                    {/* Filtros */}
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
                       <div className="space-y-2 sm:col-span-2 xl:col-span-2">
                         <Label>Buscar</Label>
                         <Input
@@ -1964,6 +1998,36 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </Select>
                       </div>
 
+                      {digitalSigningEnabled && (
+                        <div className="space-y-2 xl:col-span-1">
+                          <Label>Calificación</Label>
+                          <Select
+                            value={historyFilters.calificacion ?? 'todas'}
+                            onValueChange={(value) =>
+                              setHistoryFilters({
+                                ...historyFilters,
+                                calificacion:
+                                  value === 'todas' ? undefined : (value as EmailHistoryCalificacionFiltro),
+                                page: 1,
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Todas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todas">Todas</SelectItem>
+                              <SelectItem value="5">5 · Excelente</SelectItem>
+                              <SelectItem value="4">4 · Buena</SelectItem>
+                              <SelectItem value="3">3 · Regular</SelectItem>
+                              <SelectItem value="2">2 · Mala</SelectItem>
+                              <SelectItem value="1">1 · Muy mala</SelectItem>
+                              <SelectItem value="sin_calificar">Sin calificar</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
                       <div className="space-y-2 xl:col-span-1">
                         <Label>Fecha desde</Label>
                         <Input
@@ -1998,21 +2062,19 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {canManageDocumentSigning && (
+                    {canManageDocumentSigning && hasFailedEmails && (
                       <div className="flex flex-col gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <p className="text-sm font-medium">Reintentar envíos fallidos</p>
                           <p className="text-xs text-muted-foreground">
-                            Encola de nuevo los convenios en estado fallido del período
-                            {retryFailedDateRange.fecha_desde === retryFailedDateRange.fecha_hasta
-                              ? ` (${retryFailedDateRange.fecha_desde})`
-                              : ` (${retryFailedDateRange.fecha_desde} a ${retryFailedDateRange.fecha_hasta})`}
-                            .
+                            Hay {failedEmailTotal} {failedEmailTotal === 1 ? 'envío fallido' : 'envíos fallidos'} en{' '}
+                            {failedEmailDays.length} {failedEmailDays.length === 1 ? 'día' : 'días'}.
+                            Seleccione los días que desea reintentar.
                           </p>
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => setRetryFailedDialogOpen(true)}
+                          onClick={openRetryFailedDialog}
                           disabled={isRetryingFailed}
                           className="gap-1.5 flex-shrink-0"
                         >
@@ -3822,8 +3884,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 Satisfacción del proceso de firma
                               </CardTitle>
                               <CardDescription>
-                                Puntuación de 1 a 5 que el afiliado deja después de enviar el convenio. Sirve para medir
-                                si el trámite digital mejora la experiencia frente al proceso manual o físico.
+                                Puntuación de 1 a 5 que el afiliado deja después de enviar el convenio. Pulse una
+                                calificación para ver quiénes la dieron en el historial.
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -3865,7 +3927,20 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     const total = statsData.data.satisfaction?.ratings_count ?? 0;
                                     const pct = total > 0 ? (count / total) * 100 : 0;
                                     return (
-                                      <div key={score} className="grid grid-cols-[8rem_1fr_2.5rem] items-center gap-3">
+                                      <button
+                                        key={score}
+                                        type="button"
+                                        className="grid w-full grid-cols-[8rem_1fr_2.5rem] items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-muted/60"
+                                        aria-label={`Ver convenios calificados con ${score}`}
+                                        onClick={() => {
+                                          setHistoryFilters((previous) => ({
+                                            ...previous,
+                                            calificacion: String(score) as EmailHistoryCalificacionFiltro,
+                                            page: 1,
+                                          }));
+                                          setActiveTab('history');
+                                        }}
+                                      >
                                         <span className="text-xs text-muted-foreground">
                                           {score} · {SATISFACTION_SCORE_LABELS[score]}
                                         </span>
@@ -3873,7 +3948,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         <span className="text-right text-xs tabular-nums text-muted-foreground">
                                           {count}
                                         </span>
-                                      </div>
+                                      </button>
                                     );
                                   })}
                                 </div>
@@ -4324,33 +4399,73 @@ const AdminDocumentSigningPage: React.FC = () => {
           </Dialog>
 
           <Dialog open={retryFailedDialogOpen} onOpenChange={setRetryFailedDialogOpen}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Reintentar convenios fallidos</DialogTitle>
                 <DialogDescription>
-                  Se encolarán de nuevo todos los convenios en estado fallido del período indicado.
-                  Si no hay fechas en los filtros, se usa el día de hoy.
+                  Seleccione uno o más días con envíos fallidos. Solo se reintentarán los registros de esos días.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border bg-muted/40 p-3 space-y-1">
-                  <p>
-                    <span className="font-semibold">Período:</span>{' '}
-                    {retryFailedDateRange.fecha_desde === retryFailedDateRange.fecha_hasta
-                      ? retryFailedDateRange.fecha_desde
-                      : `${retryFailedDateRange.fecha_desde} a ${retryFailedDateRange.fecha_hasta}`}
-                  </p>
-                  {historyFilters.sede ? (
-                    <p>
-                      <span className="font-semibold">Sede:</span> {historyFilters.sede}
+                {failedEmailDays.length === 0 ? (
+                  <p className="text-muted-foreground">No hay envíos fallidos para reintentar.</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm font-medium">Días con envíos fallidos</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-2 py-1 text-xs"
+                        onClick={() =>
+                          setSelectedRetryDates(
+                            selectedRetryDates.length === failedEmailDays.length
+                              ? []
+                              : failedEmailDays.map((day) => day.fecha),
+                          )
+                        }
+                      >
+                        {selectedRetryDates.length === failedEmailDays.length
+                          ? 'Quitar selección'
+                          : 'Seleccionar todos'}
+                      </Button>
+                    </div>
+                    <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
+                      {failedEmailDays.map((day) => {
+                        const checkboxId = `retry-failed-day-${day.fecha}`;
+                        const isSelected = selectedRetryDates.includes(day.fecha);
+
+                        return (
+                          <label
+                            key={day.fecha}
+                            htmlFor={checkboxId}
+                            className="group flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <Checkbox
+                              id={checkboxId}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleRetryDate(day.fecha)}
+                            />
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="font-medium capitalize">
+                                {formatFailedEmailDayLabel(day.fecha)}
+                              </span>
+                              <span className="text-xs text-muted-foreground group-hover:text-accent-foreground/80">
+                                {day.total} {day.total === 1 ? 'envío fallido' : 'envíos fallidos'}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-muted-foreground">
+                      {selectedRetryDates.length === 0
+                        ? 'Seleccione al menos un día para continuar.'
+                        : `Se encolarán ${selectedRetryFailedCount} ${selectedRetryFailedCount === 1 ? 'convenio' : 'convenios'} de ${selectedRetryDates.length} ${selectedRetryDates.length === 1 ? 'día' : 'días'}.`}
                     </p>
-                  ) : null}
-                  {historyFilters.q ? (
-                    <p>
-                      <span className="font-semibold">Búsqueda:</span> {historyFilters.q}
-                    </p>
-                  ) : null}
-                </div>
+                  </>
+                )}
                 <p className="text-muted-foreground">
                   Los envíos respetan el límite por minuto. Los registros pasan a pendiente y se
                   actualizan en el historial a medida que se envían.
@@ -4367,7 +4482,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                 <Button
                   className="gap-1.5"
                   onClick={() => void handleRetryFailedEmails()}
-                  disabled={isRetryingFailed}
+                  disabled={isRetryingFailed || selectedRetryDates.length === 0}
                 >
                   {isRetryingFailed ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

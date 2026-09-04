@@ -283,6 +283,8 @@ export type EmailHistoryEstadoFiltro =
   | 'firma_completado'
   | 'firma_error_presidente';
 
+export type EmailHistoryCalificacionFiltro = '1' | '2' | '3' | '4' | '5' | 'sin_calificar';
+
 /**
  * Parámetros para filtrar el historial
  */
@@ -294,6 +296,7 @@ export interface EmailHistoryParams {
   sede?: string;
   fecha_desde?: string; // YYYY-MM-DD
   fecha_hasta?: string; // YYYY-MM-DD
+  calificacion?: EmailHistoryCalificacionFiltro;
   per_page?: number;
   page?: number;
 }
@@ -333,10 +336,24 @@ export interface ResendEmailsResponse {
 
 export interface RetryFailedEmailsRequest {
   tracking_ids?: number[];
+  fechas?: string[];
   fecha_desde?: string;
   fecha_hasta?: string;
   sede?: string;
   q?: string;
+}
+
+export interface FailedEmailDay {
+  fecha: string;
+  total: number;
+}
+
+export interface FailedEmailDaysResponse {
+  success: true;
+  data: {
+    days: FailedEmailDay[];
+    total: number;
+  };
 }
 
 export interface RetryFailedEmailsResponse {
@@ -347,6 +364,7 @@ export interface RetryFailedEmailsResponse {
     total: number;
     success_count: number;
     failed_count: number;
+    fechas?: string[] | null;
     fecha_desde: string | null;
     fecha_hasta: string | null;
     results: {
@@ -471,6 +489,9 @@ export const getEmailHistory = async (
     if (params?.fecha_hasta) {
       queryParams.append('fecha_hasta', params.fecha_hasta);
     }
+    if (params?.calificacion) {
+      queryParams.append('calificacion', params.calificacion);
+    }
     if (params?.per_page) {
       queryParams.append('per_page', params.per_page.toString());
     }
@@ -578,6 +599,35 @@ export const resendEmails = async (
       success: false,
       message: 'Error desconocido al reenviar correos',
       errors: {},
+    };
+  }
+};
+
+export const getFailedEmailDays = async (): Promise<FailedEmailDaysResponse> => {
+  try {
+    const response = await authenticatedApi.get<FailedEmailDaysResponse>(
+      '/api/convenios-manual/failed-email-days',
+      {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      },
+    );
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ success: false; message: string }>;
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'Error al obtener los días con envíos fallidos',
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'Error desconocido al obtener los días con envíos fallidos',
     };
   }
 };
