@@ -117,7 +117,7 @@ import ExportConvenioHistoryDialog from '@/components/admin/convenios/ExportConv
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Legend, ResponsiveContainer } from 'recharts';
 import { buildConvenioHospitalOptions } from '@/utils/hospitalDisplayName';
 
 // Opciones de hospitales / sedes (catálogo alineado con backend Laravel)
@@ -4400,33 +4400,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                               )
                             )}
                           </div>
-                        )}
-
-                        {chartData && chartData.statusData.length > 0 && (
-                          <Card className="min-w-0 overflow-hidden">
-                            <CardHeader>
-                              <CardTitle className="text-lg">Correo: volumen por estado</CardTitle>
-                              <CardDescription>Comparación numérica de los mismos totales del gráfico circular.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              <ChartContainer config={chartConfig} className="h-[280px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart data={chartData.statusData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis allowDecimals={false} />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Legend />
-                                    <Bar dataKey="cantidad" fill="#8884d8" name="Registros">
-                                      {chartData.statusData.map((entry, index) => (
-                                        <Cell key={`bar-mail-${index}`} fill={entry.color} />
-                                      ))}
-                                    </Bar>
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </ChartContainer>
-                            </CardContent>
-                          </Card>
                         )}
                       </div>
                     ) : (

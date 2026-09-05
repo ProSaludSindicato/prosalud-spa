@@ -30,13 +30,16 @@ const EXPORTABLE_ESTADO_FILTROS: EmailHistoryEstadoFiltro[] = [
   'pendiente',
   'enviado',
   'fallido',
-  'test',
   'firma_pendiente_firma',
   'firma_firmado_afiliado',
   'firma_completado',
 ];
 
 function normalizeEstadoFiltro(value?: EmailHistoryEstadoFiltro): EmailHistoryEstadoFiltro {
+  if (value === 'test') {
+    return 'todos';
+  }
+
   if (value && EXPORTABLE_ESTADO_FILTROS.includes(value)) {
     return value;
   }
@@ -59,7 +62,6 @@ export default function ExportConvenioHistoryDialog({
   const [includeAllDates, setIncludeAllDates] = useState(true);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [excludeTest, setExcludeTest] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -75,11 +77,9 @@ export default function ExportConvenioHistoryDialog({
     setFechaDesde(initialFilters.fecha_desde ?? '');
     setFechaHasta(initialFilters.fecha_hasta ?? '');
     setIncludeAllDates(!initialFilters.fecha_desde && !initialFilters.fecha_hasta);
-    setExcludeTest(initialFilters.estado_filtro !== 'test');
   }, [open, initialFilters]);
 
   const today = new Date().toISOString().split('T')[0];
-  const isTestFilter = estadoFiltro === 'test';
   const canExport = includeAllDates || (Boolean(fechaDesde) && Boolean(fechaHasta));
 
   const handleExport = async () => {
@@ -94,7 +94,7 @@ export default function ExportConvenioHistoryDialog({
         fecha_desde: includeAllDates ? undefined : fechaDesde || undefined,
         fecha_hasta: includeAllDates ? undefined : fechaHasta || undefined,
         calificacion: digitalSigningEnabled && calificacion !== 'todas' ? calificacion : undefined,
-        is_test: isTestFilter ? true : excludeTest ? false : undefined,
+        is_test: false,
       });
 
       const url = window.URL.createObjectURL(blob);
@@ -107,7 +107,7 @@ export default function ExportConvenioHistoryDialog({
       window.URL.revokeObjectURL(url);
 
       toast.success('Reporte Excel generado', {
-        description: 'El reporte de convenios se descargó. Use los filtros de la primera fila para acotar afiliados pendientes de firma.',
+        description: 'El reporte de convenios se descargó correctamente.',
       });
       onOpenChange(false);
     } catch (error) {
@@ -121,7 +121,7 @@ export default function ExportConvenioHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-lg bg-white max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className="max-sm:inset-x-4 sm:w-full sm:max-w-3xl xl:max-w-5xl bg-white p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-gray-900">
             Exportar reporte de convenios
@@ -132,186 +132,167 @@ export default function ExportConvenioHistoryDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <Filter className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Filtros del reporte</h4>
-                  <p className="text-sm text-gray-600">Se prellenan con los filtros actuales del historial.</p>
+          <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Filter className="h-5 w-5 shrink-0 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Filtros del reporte</h4>
+                    <p className="text-sm text-gray-600">Se prellenan con los filtros actuales del historial.</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Periodo (semestre)</Label>
-                <Select value={periodo} onValueChange={setPeriodo}>
-                  <SelectTrigger>
-                    <SelectValue>{convenioPeriodoLabel(periodo)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePeriodos.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {convenioPeriodoLabel(item)}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value={CONVENIO_PERIODO_TODOS}>Todos los semestres</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Buscar</Label>
-                <Input
-                  placeholder="Documento o nombre de convenio"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Estado (correo o firma)</Label>
-                <Select
-                  value={estadoFiltro}
-                  onValueChange={(value) => setEstadoFiltro(value as EmailHistoryEstadoFiltro)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectGroup>
-                      <SelectLabel>Envío del correo</SelectLabel>
-                      <SelectItem value="pendiente">Pendiente de envío</SelectItem>
-                      <SelectItem value="enviado">Enviado</SelectItem>
-                      <SelectItem value="fallido">Fallido</SelectItem>
-                      <SelectItem value="test">TEST</SelectItem>
-                    </SelectGroup>
-                    {digitalSigningEnabled && (
-                      <SelectGroup>
-                        <SelectLabel>Firma digital</SelectLabel>
-                        <SelectItem value="firma_pendiente_firma">Pendiente de firma</SelectItem>
-                        <SelectItem value="firma_firmado_afiliado">Firmado por afiliado</SelectItem>
-                        <SelectItem value="firma_completado">Completado</SelectItem>
-                      </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {digitalSigningEnabled && (
-                <div className="space-y-2">
-                  <Label>Calificación</Label>
-                  <Select
-                    value={calificacion}
-                    onValueChange={(value) => setCalificacion(value as EmailHistoryCalificacionFiltro | 'todas')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas</SelectItem>
-                      <SelectItem value="5">5 · Excelente</SelectItem>
-                      <SelectItem value="4">4 · Buena</SelectItem>
-                      <SelectItem value="3">3 · Regular</SelectItem>
-                      <SelectItem value="2">2 · Mala</SelectItem>
-                      <SelectItem value="1">1 · Muy mala</SelectItem>
-                      <SelectItem value="sin_calificar">Sin calificar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Hospital / Convenio</Label>
-                <Input
-                  placeholder="Coincide con sede o nombre de convenio"
-                  value={sede}
-                  onChange={(e) => setSede(e.target.value)}
-                />
-              </div>
-
-              {digitalSigningEnabled && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEstadoFiltro('firma_pendiente_firma')}
-                  className="w-full"
-                >
-                  Solo afiliados pendientes de firma
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border border-gray-200">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Rango de fechas</h4>
-                  <p className="text-sm text-gray-600">Opcional. Se cruza con el semestre seleccionado.</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="convenio-export-all-dates">Incluir todas las fechas</Label>
-                <Switch
-                  id="convenio-export-all-dates"
-                  checked={includeAllDates}
-                  onCheckedChange={setIncludeAllDates}
-                />
-              </div>
-
-              {!includeAllDates && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Fecha desde</Label>
+                    <Label>Periodo (semestre)</Label>
+                    <Select value={periodo} onValueChange={setPeriodo}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{convenioPeriodoLabel(periodo)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePeriodos.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {convenioPeriodoLabel(item)}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CONVENIO_PERIODO_TODOS}>Todos los semestres</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Buscar</Label>
                     <Input
-                      type="date"
-                      value={fechaDesde}
-                      max={fechaHasta || today}
-                      onChange={(e) => setFechaDesde(e.target.value)}
+                      className="w-full"
+                      placeholder="Documento o nombre de convenio"
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Fecha hasta</Label>
+                    <Label>Estado (correo o firma)</Label>
+                    <Select
+                      value={estadoFiltro}
+                      onValueChange={(value) => setEstadoFiltro(value as EmailHistoryEstadoFiltro)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectGroup>
+                          <SelectLabel>Envío del correo</SelectLabel>
+                          <SelectItem value="pendiente">Pendiente de envío</SelectItem>
+                          <SelectItem value="enviado">Enviado</SelectItem>
+                          <SelectItem value="fallido">Fallido</SelectItem>
+                        </SelectGroup>
+                        {digitalSigningEnabled && (
+                          <SelectGroup>
+                            <SelectLabel>Firma digital</SelectLabel>
+                            <SelectItem value="firma_pendiente_firma">Pendiente de firma</SelectItem>
+                            <SelectItem value="firma_firmado_afiliado">Firmado por afiliado</SelectItem>
+                            <SelectItem value="firma_completado">Completado</SelectItem>
+                          </SelectGroup>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {digitalSigningEnabled && (
+                    <div className="space-y-2">
+                      <Label>Calificación</Label>
+                      <Select
+                        value={calificacion}
+                        onValueChange={(value) => setCalificacion(value as EmailHistoryCalificacionFiltro | 'todas')}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Todas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="5">5 · Excelente</SelectItem>
+                          <SelectItem value="4">4 · Buena</SelectItem>
+                          <SelectItem value="3">3 · Regular</SelectItem>
+                          <SelectItem value="2">2 · Mala</SelectItem>
+                          <SelectItem value="1">1 · Muy mala</SelectItem>
+                          <SelectItem value="sin_calificar">Sin calificar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 xl:col-span-2">
+                    <Label>Hospital / Convenio</Label>
                     <Input
-                      type="date"
-                      value={fechaHasta}
-                      min={fechaDesde || undefined}
-                      max={today}
-                      onChange={(e) => setFechaHasta(e.target.value)}
+                      className="w-full"
+                      placeholder="Coincide con sede o nombre de convenio"
+                      value={sede}
+                      onChange={(e) => setSede(e.target.value)}
                     />
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-            <div>
-              <p className="text-sm font-medium">Excluir registros TEST</p>
-              <p className="text-xs text-muted-foreground">Recomendado para el reporte operativo de firmas.</p>
-            </div>
-            <Switch
-              checked={isTestFilter ? false : excludeTest}
-              disabled={isTestFilter}
-              onCheckedChange={setExcludeTest}
-            />
+            <Card className="border border-gray-200">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 shrink-0 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Rango de fechas</h4>
+                    <p className="text-sm text-gray-600">Opcional. Se cruza con el semestre seleccionado.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="convenio-export-all-dates">Incluir todas las fechas</Label>
+                  <Switch
+                    id="convenio-export-all-dates"
+                    checked={includeAllDates}
+                    onCheckedChange={setIncludeAllDates}
+                  />
+                </div>
+
+                {!includeAllDates && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Fecha desde</Label>
+                      <Input
+                        type="date"
+                        value={fechaDesde}
+                        max={fechaHasta || today}
+                        onChange={(e) => setFechaDesde(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fecha hasta</Label>
+                      <Input
+                        type="date"
+                        value={fechaHasta}
+                        min={fechaDesde || undefined}
+                        max={today}
+                        onChange={(e) => setFechaHasta(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Card className="border border-blue-200 bg-blue-50">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-blue-900 mb-1.5">El archivo incluye</h4>
+                    <ul className="text-sm text-blue-800 space-y-0.5">
+                      <li>• Resumen de envíos, firmas y pendientes por sede</li>
+                      <li>• Detalle de cada convenio con estado de firma</li>
+                      {digitalSigningEnabled && <li>• Hoja exclusiva de afiliados pendientes de firmar</li>}
+                      <li>• Filtros automáticos en los encabezados de Excel</li>
+                    </ul>
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
           </div>
-
-          <Card className="border border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <h4 className="font-medium text-blue-900 mb-2">El archivo incluye</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Resumen de envíos, firmas y pendientes por sede</li>
-                <li>• Detalle de cada convenio con estado de firma</li>
-                {digitalSigningEnabled && <li>• Hoja exclusiva de afiliados pendientes de firmar</li>}
-                <li>• Filtros automáticos en los encabezados de Excel</li>
-              </ul>
-            </CardContent>
-          </Card>
 
           <div className="flex justify-end gap-2 pt-2 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isGenerating}>
