@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Calendar, Download, Filter, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  CONVENIO_PERIODO_TODOS,
   EmailHistoryCalificacionFiltro,
   EmailHistoryEstadoFiltro,
   EmailHistoryParams,
+  convenioPeriodoLabel,
   exportHistoryExcel,
 } from '@/services/conveniosManualService';
 
@@ -20,6 +22,7 @@ interface ExportConvenioHistoryDialogProps {
   onOpenChange: (open: boolean) => void;
   digitalSigningEnabled: boolean;
   initialFilters: EmailHistoryParams;
+  availablePeriodos: string[];
 }
 
 const EXPORTABLE_ESTADO_FILTROS: EmailHistoryEstadoFiltro[] = [
@@ -46,11 +49,13 @@ export default function ExportConvenioHistoryDialog({
   onOpenChange,
   digitalSigningEnabled,
   initialFilters,
+  availablePeriodos,
 }: ExportConvenioHistoryDialogProps) {
   const [q, setQ] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<EmailHistoryEstadoFiltro>('todos');
   const [calificacion, setCalificacion] = useState<EmailHistoryCalificacionFiltro | 'todas'>('todas');
   const [sede, setSede] = useState('');
+  const [periodo, setPeriodo] = useState<string>(CONVENIO_PERIODO_TODOS);
   const [includeAllDates, setIncludeAllDates] = useState(true);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
@@ -66,6 +71,7 @@ export default function ExportConvenioHistoryDialog({
     setEstadoFiltro(normalizeEstadoFiltro(initialFilters.estado_filtro));
     setCalificacion(initialFilters.calificacion ?? 'todas');
     setSede(initialFilters.sede ?? '');
+    setPeriodo(initialFilters.periodo ?? CONVENIO_PERIODO_TODOS);
     setFechaDesde(initialFilters.fecha_desde ?? '');
     setFechaHasta(initialFilters.fecha_hasta ?? '');
     setIncludeAllDates(!initialFilters.fecha_desde && !initialFilters.fecha_hasta);
@@ -84,6 +90,7 @@ export default function ExportConvenioHistoryDialog({
         q: q.trim() || undefined,
         estado_filtro: estadoFiltro === 'todos' ? undefined : estadoFiltro,
         sede: sede.trim() || undefined,
+        periodo: periodo === CONVENIO_PERIODO_TODOS ? undefined : periodo,
         fecha_desde: includeAllDates ? undefined : fechaDesde || undefined,
         fecha_hasta: includeAllDates ? undefined : fechaHasta || undefined,
         calificacion: digitalSigningEnabled && calificacion !== 'todas' ? calificacion : undefined,
@@ -133,6 +140,23 @@ export default function ExportConvenioHistoryDialog({
                   <h4 className="font-medium text-gray-900">Filtros del reporte</h4>
                   <p className="text-sm text-gray-600">Se prellenan con los filtros actuales del historial.</p>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Periodo (semestre)</Label>
+                <Select value={periodo} onValueChange={setPeriodo}>
+                  <SelectTrigger>
+                    <SelectValue>{convenioPeriodoLabel(periodo)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePeriodos.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {convenioPeriodoLabel(item)}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={CONVENIO_PERIODO_TODOS}>Todos los semestres</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -226,7 +250,7 @@ export default function ExportConvenioHistoryDialog({
                 <Calendar className="h-5 w-5 text-gray-600" />
                 <div>
                   <h4 className="font-medium text-gray-900">Rango de fechas</h4>
-                  <p className="text-sm text-gray-600">Filtra por fecha de creación del convenio.</p>
+                  <p className="text-sm text-gray-600">Opcional. Se cruza con el semestre seleccionado.</p>
                 </div>
               </div>
 

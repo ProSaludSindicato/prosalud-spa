@@ -62,6 +62,8 @@ import {
   PenLine,
   CheckSquare,
   Star,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 // Manual signing service (ACTIVE)
@@ -93,6 +95,10 @@ import {
   ImportBulkConveniosResponse,
   ImportPdfZipResponse,
   TrackingDetailResponse,
+  CONVENIO_PERIODO_TODOS,
+  currentConvenioPeriodo,
+  convenioPeriodoLabel,
+  fallbackConvenioPeriodos,
 } from '@/services/conveniosManualService';
 import {
   authenticateForDataUpdate,
@@ -237,7 +243,7 @@ type CreateConvenioFormValues = z.infer<typeof createConvenioSchema>;
 
 /** Misma convención que AdminSolicitudBienestarPage / AdminUsuariosPage / AdminDashboard (grid en TabsList reparte el ancho). */
 const CONVENIO_TAB_TRIGGER_CLASS =
-  'flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200';
+  'flex h-auto w-full min-w-0 max-w-full items-center justify-center gap-1.5 sm:gap-2 overflow-hidden whitespace-normal py-2 text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all duration-200';
 
 const AUDIT_EVENT_LABELS: Record<string, string> = {
   document_opened: 'Documento abierto',
@@ -583,6 +589,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     per_page: 15,
     page: 1,
   });
+  const [periodoFilter, setPeriodoFilter] = useState<string>(() => currentConvenioPeriodo());
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   
   // Filtros para estadísticas (Manual)
@@ -596,10 +603,26 @@ const AdminDocumentSigningPage: React.FC = () => {
   const shouldForcePresidentPolling =
     forcePresidentPollingUntil !== null && Date.now() < forcePresidentPollingUntil;
 
+  const historyQueryFilters = useMemo(
+    () => ({
+      ...historyFilters,
+      periodo: periodoFilter === CONVENIO_PERIODO_TODOS ? undefined : periodoFilter,
+    }),
+    [historyFilters, periodoFilter],
+  );
+
+  const statsQueryFilters = useMemo(
+    () => ({
+      ...statsFilters,
+      periodo: periodoFilter === CONVENIO_PERIODO_TODOS ? undefined : periodoFilter,
+    }),
+    [statsFilters, periodoFilter],
+  );
+
   // Query para historial (Manual) — con polling automático cuando hay firmas en curso
   const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
-    queryKey: ['convenios-manual-history', historyFilters],
-    queryFn: () => getEmailHistoryManual(historyFilters),
+    queryKey: ['convenios-manual-history', historyQueryFilters],
+    queryFn: () => getEmailHistoryManual(historyQueryFilters),
     enabled: activeTab === 'history' && can('document_signing.view'),
     staleTime: 0,
     refetchOnMount: 'always',
@@ -620,8 +643,8 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   // Query para estadísticas (Manual)
   const { data: statsData, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
-    queryKey: ['convenios-manual-statistics', statsFilters],
-    queryFn: () => getStatisticsManual(statsFilters),
+    queryKey: ['convenios-manual-statistics', statsQueryFilters],
+    queryFn: () => getStatisticsManual(statsQueryFilters),
     enabled: activeTab === 'statistics' && can('document_signing.view'),
   });
 
@@ -656,6 +679,24 @@ const AdminDocumentSigningPage: React.FC = () => {
     historyData?.delivery_mode ??
     statsData?.delivery_mode ??
     'production';
+
+  const availablePeriodos = useMemo(() => {
+    const fromApi = historyData?.filter_options?.periodos?.length
+      ? historyData.filter_options.periodos
+      : statsData?.filter_options?.periodos ?? [];
+    const base = fromApi.length > 0 ? [...fromApi] : fallbackConvenioPeriodos();
+
+    if (periodoFilter !== CONVENIO_PERIODO_TODOS && !base.includes(periodoFilter)) {
+      base.push(periodoFilter);
+    }
+
+    return [...new Set(base)].sort((a, b) => b.localeCompare(a));
+  }, [historyData?.filter_options?.periodos, statsData?.filter_options?.periodos, periodoFilter]);
+
+  const handlePeriodoChange = (next: string) => {
+    setPeriodoFilter(next);
+    setHistoryFilters((previous) => ({ ...previous, page: 1 }));
+  };
 
   const isTestDeliveryMode = deliveryMode !== 'production';
 
@@ -1833,7 +1874,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   const canManageDocumentSigning = can('document_signing.manage');
   const convenioTabsListGridCols =
     canViewDocumentSigning && canManageDocumentSigning
-      ? 'grid-cols-4'
+      ? 'grid-cols-2 sm:grid-cols-4'
       : canManageDocumentSigning
         ? 'grid-cols-2'
         : canViewDocumentSigning
@@ -1846,72 +1887,130 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-slate-50">
-        <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="min-h-screen min-w-0 w-full overflow-x-hidden bg-slate-50">
+        <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 p-3 sm:space-y-6 sm:p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
             <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Firma de Convenios</h1>
-              <p className="text-sm sm:text-base text-gray-600 mt-1">
-                Genera convenios en PDF, importa masivamente y gestiona envíos desde el historial
+              <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
+                <span className="text-sm font-medium text-slate-600">Periodo:</span>
+                <div className="flex items-center gap-1 rounded-lg border bg-white p-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    aria-label="Semestre anterior"
+                    disabled={
+                      periodoFilter === CONVENIO_PERIODO_TODOS ||
+                      availablePeriodos.indexOf(periodoFilter) >= availablePeriodos.length - 1
+                    }
+                    onClick={() => {
+                      const idx = availablePeriodos.indexOf(periodoFilter);
+                      if (idx >= 0 && idx < availablePeriodos.length - 1) {
+                        handlePeriodoChange(availablePeriodos[idx + 1]);
+                      }
+                    }}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Select value={periodoFilter} onValueChange={handlePeriodoChange}>
+                    <SelectTrigger className="h-8 min-w-[10.5rem] border-0 shadow-none">
+                      <SelectValue>{convenioPeriodoLabel(periodoFilter)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePeriodos.map((periodo) => (
+                        <SelectItem key={periodo} value={periodo}>
+                          {convenioPeriodoLabel(periodo)}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={CONVENIO_PERIODO_TODOS}>Todos los semestres</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    aria-label="Semestre siguiente"
+                    disabled={periodoFilter === CONVENIO_PERIODO_TODOS || availablePeriodos.indexOf(periodoFilter) <= 0}
+                    onClick={() => {
+                      const idx = availablePeriodos.indexOf(periodoFilter);
+                      if (idx > 0) {
+                        handlePeriodoChange(availablePeriodos[idx - 1]);
+                      }
+                    }}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-1 break-words text-sm text-gray-600 sm:text-base">
+                Genera convenios en PDF, importa masivamente y gestiona envíos desde el historial.
+                Historial y estadísticas se agrupan por semestre de creación.
               </p>
             </div>
           </div>
 
           {isTestDeliveryMode && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 break-words">
               Modo TEST activo: los correos no van al afiliado, llegan a tu usuario autenticado (con enlace de firma o PDF adjunto, igual que producción) e indican que son de prueba. En el historial quedan marcados como TEST para no mezclarlos con envíos reales.
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 w-full space-y-4 sm:space-y-6">
             <TabsList
               className={cn(
-                'grid h-auto w-full items-stretch bg-gray-50 border p-1',
+                'grid h-auto w-full min-w-0 max-w-full gap-1 bg-gray-50 border p-1 [&>*]:min-w-0',
                 convenioTabsListGridCols,
               )}
             >
               {canViewDocumentSigning && (
                 <TabsTrigger value="history" className={CONVENIO_TAB_TRIGGER_CLASS}>
                   <History className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">Historial</span>
+                  <span className="min-w-0 truncate max-sm:sr-only">Historial</span>
                 </TabsTrigger>
               )}
               {canManageDocumentSigning && (
                 <TabsTrigger value="create" className={CONVENIO_TAB_TRIGGER_CLASS}>
                   <FilePlus className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">Crear Convenio</span>
+                  <span className="min-w-0 truncate max-sm:sr-only">Crear Convenio</span>
                 </TabsTrigger>
               )}
               {canManageDocumentSigning && (
                 <TabsTrigger value="bulk-import" className={CONVENIO_TAB_TRIGGER_CLASS}>
                   <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">Importación Masiva</span>
+                  <span className="min-w-0 truncate max-sm:sr-only">Importación Masiva</span>
                 </TabsTrigger>
               )}
               {canViewDocumentSigning && (
                 <TabsTrigger value="statistics" className={CONVENIO_TAB_TRIGGER_CLASS}>
                   <BarChart3 className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">Estadísticas</span>
+                  <span className="min-w-0 truncate max-sm:sr-only">Estadísticas</span>
                 </TabsTrigger>
               )}
             </TabsList>
 
             {/* Tab: Historial */}
             {can('document_signing.view') && (
-              <TabsContent value="history" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <TabsContent value="history" className="min-w-0 space-y-6">
+                <Card className="min-w-0 overflow-hidden">
+                  <CardHeader className="p-4 sm:p-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <CardTitle className="text-lg sm:text-xl">Historial y seguimiento</CardTitle>
-                        <CardDescription className="text-sm">
-                          Consulta envíos, descarga PDFs, reenvía seleccionados y gestiona la firma digital desde un solo lugar.
+                        <CardDescription className="mt-1 text-sm text-pretty">
+                          Consulta envíos, descarga PDFs, reenvía seleccionados y gestiona la firma digital del{' '}
+                          {periodoFilter === CONVENIO_PERIODO_TODOS
+                            ? 'historial completo'
+                            : convenioPeriodoLabel(periodoFilter).toLowerCase()}
+                          .
                         </CardDescription>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {can('document_signing.view') && (
                           <Button
-                            variant="outline"
+                            variant="default"
                             size="sm"
                             onClick={() => setExportDialogOpen(true)}
                             className="gap-1.5"
@@ -1922,7 +2021,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                         )}
                         {canManageDocumentSigning && hasFailedEmails && (
                           <Button
-                            variant="default"
+                            variant="secondary"
                             size="sm"
                             onClick={openRetryFailedDialog}
                             disabled={isRetryingFailed}
@@ -1948,7 +2047,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="min-w-0 space-y-4 p-4 sm:p-6 sm:pt-0">
                     <TooltipProvider delayDuration={300}>
                     {/* Filtros */}
                     <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
@@ -2154,8 +2253,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="border rounded-lg overflow-hidden">
-                          <Table className="table-fixed w-full">
+                        <div className="hidden lg:block border rounded-lg overflow-x-auto">
+                          <Table className="table-fixed w-full min-w-[900px]">
                             <TableHeader>
                               <TableRow>
                                 {can('document_signing.manage') && (
@@ -2365,6 +2464,156 @@ const AdminDocumentSigningPage: React.FC = () => {
                           </Table>
                         </div>
 
+                        <div className="lg:hidden space-y-3">
+                          {historyData?.data.data.map((tracking) => {
+                            const signedDownloadCfg = getSignedDownloadButtonConfig(tracking);
+                            const canDownloadOriginal =
+                              can('document_signing.view') && canDownloadOriginalTracking(tracking);
+                            const canDownloadSigned =
+                              digitalSigningEnabled &&
+                              can('document_signing.view') &&
+                              (tracking.signing_estado === 'firmado_afiliado' ||
+                                tracking.signing_estado === 'completado');
+                            const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
+
+                            return (
+                              <Card key={tracking.id} className="border shadow-sm">
+                                <CardContent className="p-4">
+                                  <div className="space-y-3">
+                                    <div className="flex items-start gap-3">
+                                      {can('document_signing.manage') &&
+                                        (canResendTracking(tracking) || isEligibleForPresidentSign(tracking)) && (
+                                          <Checkbox
+                                            checked={selectedTrackingIds.has(tracking.id)}
+                                            onCheckedChange={(checked) => {
+                                              setSelectedTrackingIds((prev) => {
+                                                const next = new Set(prev);
+                                                if (checked) {
+                                                  next.add(tracking.id);
+                                                } else {
+                                                  next.delete(tracking.id);
+                                                }
+                                                return next;
+                                              });
+                                            }}
+                                            aria-label={`Seleccionar convenio de ${tracking.nombre_afiliado}`}
+                                            className="mt-1"
+                                          />
+                                        )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-mono text-sm font-medium">{tracking.documento}</p>
+                                        <p className="text-sm font-medium leading-snug">{tracking.nombre_afiliado}</p>
+                                        <p className="text-xs text-muted-foreground break-all">{tracking.email_afiliado}</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="border-t pt-2">
+                                      <p className="text-xs font-medium text-muted-foreground mb-1">Convenio</p>
+                                      <p className="text-sm leading-snug">{tracking.nombre_convenio}</p>
+                                    </div>
+
+                                    <div className="border-t pt-2">
+                                      <p className="text-xs font-medium text-muted-foreground mb-1">Estado envío y firma</p>
+                                      <div className="flex flex-col gap-2">
+                                        {renderTrackingStatusCell(tracking)}
+                                        {autoSignEnabled &&
+                                          can('document_signing.manage') &&
+                                          isEligibleForPresidentSign(tracking) && (
+                                            <Button
+                                              variant="default"
+                                              size="sm"
+                                              className={cn('h-8 w-fit gap-1.5 px-2.5', presidentSignButtonClassName)}
+                                              onClick={() => void handleSignAsPresident(tracking)}
+                                              disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
+                                            >
+                                              {isPresidentSigningProcessing(tracking) ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                              ) : (
+                                                <PenLine className="h-3.5 w-3.5" />
+                                              )}
+                                              <span className="text-xs">
+                                                {isPresidentSigningProcessing(tracking)
+                                                  ? 'Procesando firma...'
+                                                  : 'Firmar presidente'}
+                                              </span>
+                                            </Button>
+                                          )}
+                                      </div>
+                                    </div>
+
+                                    <div className="border-t pt-2">
+                                      <p className="text-xs font-medium text-muted-foreground mb-1">Sede y envío</p>
+                                      <p className="text-sm font-medium">{tracking.sede?.trim() ? tracking.sede : '—'}</p>
+                                      <p className="text-sm tabular-nums text-muted-foreground mt-1">
+                                        {formatDate(tracking.enviado_at)}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Reintentos:{' '}
+                                        <span className="tabular-nums font-semibold">{tracking.intentos}</span>
+                                      </p>
+                                    </div>
+
+                                    <div className="border-t pt-2 flex flex-wrap gap-2">
+                                      {can('document_signing.view') && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 gap-1.5 px-2.5"
+                                          onClick={() => void handleOpenTrackingDetail(tracking)}
+                                        >
+                                          <Eye className="h-3.5 w-3.5" />
+                                          Ver detalle
+                                        </Button>
+                                      )}
+                                      {canResendTracking(tracking) && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 gap-1.5 px-2.5"
+                                          onClick={() => handleOpenResendDialog(tracking)}
+                                        >
+                                          <RefreshCw className="h-3.5 w-3.5" />
+                                          Reenviar
+                                        </Button>
+                                      )}
+                                      {hasDownloadOptions && (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5">
+                                              <Download className="h-3.5 w-3.5" />
+                                              Descargar
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-52">
+                                            {canDownloadOriginal && (
+                                              <DropdownMenuItem
+                                                onClick={() => void handleDownloadConvenioOriginal(tracking)}
+                                              >
+                                                <FileDown className="mr-2 h-4 w-4" />
+                                                Convenio original
+                                              </DropdownMenuItem>
+                                            )}
+                                            {canDownloadSigned && (
+                                              <DropdownMenuItem
+                                                onClick={() => void handleDownloadConvenioFinal(tracking)}
+                                              >
+                                                <Download className="mr-2 h-4 w-4" />
+                                                {signedDownloadCfg.label === 'Final'
+                                                  ? 'Convenio final'
+                                                  : 'Firmado afiliado'}
+                                              </DropdownMenuItem>
+                                            )}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+
                         {historyData?.data && (
                           <DataPagination
                             currentPage={historyData.data.current_page}
@@ -2400,7 +2649,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     {/* Sección de Consulta de Afiliado */}
-                    <div className="mb-8 p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
+                    <div className="mb-8 p-4 sm:p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
                       <div className="flex items-start gap-3 mb-4">
                         <div className="flex-shrink-0 p-2 bg-blue-100 rounded-full">
                           <Search className="h-5 w-5 text-blue-600" />
@@ -3331,7 +3580,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                     {bulkImportMode === 'excel' && (
                     <>
                     {/* Paso 1: Descargar plantilla */}
-                    <div className="p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
+                    <div className="p-4 sm:p-6 border-2 border-blue-200 rounded-lg bg-blue-50/50">
                       <div className="flex items-start gap-4">
                         <div className="flex-shrink-0 p-2 bg-blue-100 rounded-full">
                           <Download className="h-5 w-5 text-blue-600" />
@@ -3369,7 +3618,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                     )}
 
                     {bulkImportMode === 'zip' && (
-                      <div className="p-6 border-2 border-amber-200 rounded-lg bg-amber-50/50">
+                      <div className="p-4 sm:p-6 border-2 border-amber-200 rounded-lg bg-amber-50/50">
                         <div className="flex items-start gap-4">
                           <div className="flex-shrink-0 p-2 bg-amber-100 rounded-full">
                             <FileText className="h-5 w-5 text-amber-700" />
@@ -3704,18 +3953,20 @@ const AdminDocumentSigningPage: React.FC = () => {
 
             {/* Tab: Estadísticas (Manual) */}
             {can('document_signing.view') && (
-              <TabsContent value="statistics" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <TabsContent value="statistics" className="min-w-0 space-y-6">
+                <Card className="min-w-0 overflow-hidden">
+                  <CardHeader className="p-4 sm:p-6">
+                    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 space-y-1">
-                        <CardTitle>Estadísticas de Envíos Manuales</CardTitle>
-                        <CardDescription className="max-w-2xl">
-                          Los totales respetan el rango de fechas (opcional) según la fecha de creación de cada registro.
-                          Compara el estado del correo (cola de envío) con el avance de la firma digital del afiliado.
+                        <CardTitle className="text-lg sm:text-xl">Estadísticas de Envíos Manuales</CardTitle>
+                        <CardDescription className="break-words">
+                          Totales del {periodoFilter === CONVENIO_PERIODO_TODOS
+                            ? 'historial completo'
+                            : convenioPeriodoLabel(periodoFilter).toLowerCase()}
+                          . El rango de fechas es opcional y se cruza con el semestre seleccionado.
                         </CardDescription>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <div className="flex min-w-0 w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
                         <Input
                           type="date"
                           aria-label="Fecha desde"
@@ -3723,7 +3974,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                           onChange={(e) =>
                             setStatsFilters({ ...statsFilters, fecha_desde: e.target.value || undefined })
                           }
-                          className="w-[11rem]"
+                          className="w-full sm:w-[11rem]"
                         />
                         <Input
                           type="date"
@@ -3732,7 +3983,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                           onChange={(e) =>
                             setStatsFilters({ ...statsFilters, fecha_hasta: e.target.value || undefined })
                           }
-                          className="w-[11rem]"
+                          className="w-full sm:w-[11rem]"
                         />
                         <Button
                           variant="outline"
@@ -3745,60 +3996,60 @@ const AdminDocumentSigningPage: React.FC = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="min-w-0 p-4 sm:p-6 sm:pt-0">
                     {isLoadingStats ? (
                       <div className="text-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
                         <p className="text-gray-500 mt-2">Cargando estadísticas...</p>
                       </div>
                     ) : statsData?.data ? (
-                      <div className="space-y-6">
-                        <div className="grid gap-4 lg:grid-cols-2">
-                          <Card className="border-slate-200">
-                            <CardHeader className="pb-2">
+                      <div className="min-w-0 space-y-6">
+                        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                          <Card className="min-w-0 overflow-hidden border-slate-200">
+                            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                               <CardTitle className="text-base flex items-center gap-2">
-                                <Mail className="h-4 w-4 text-slate-600" />
+                                <Mail className="h-4 w-4 shrink-0 text-slate-600" />
                                 Estado del correo
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className="break-words">
                                 Indica si el sistema ya despachó el mensaje con el PDF. Los fallidos suelen requerir
                                 corrección o reintento desde el historial.
                               </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                               {statsData.data.total > 0 && (
                                 <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Correos enviados con éxito</span>
-                                    <span className="font-medium tabular-nums">
+                                  <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                                    <span className="min-w-0 break-words text-muted-foreground">Correos enviados con éxito</span>
+                                    <span className="shrink-0 font-medium tabular-nums">
                                       {statsEmailSuccessPct.toFixed(1)}%
                                     </span>
                                   </div>
                                   <Progress value={statsEmailSuccessPct} className="h-2" />
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="break-words text-xs text-muted-foreground">
                                     {statsData.data.sent} de {statsData.data.total} registros en el periodo tienen estado
                                     &quot;Enviado&quot;.
                                   </p>
                                 </div>
                               )}
-                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div className="rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-900/40">
+                              <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+                                <div className="min-w-0 rounded-lg border bg-slate-50/80 p-2.5 sm:p-3 dark:bg-slate-900/40">
                                   <p className="text-xs text-muted-foreground">Total registros</p>
                                   <p className="text-xl font-semibold tabular-nums">{statsData.data.total}</p>
                                 </div>
-                                <div className="rounded-lg border bg-blue-50/80 p-3 dark:bg-blue-950/30">
+                                <div className="min-w-0 rounded-lg border bg-blue-50/80 p-2.5 sm:p-3 dark:bg-blue-950/30">
                                   <p className="text-xs text-muted-foreground">Enviados hoy</p>
                                   <p className="text-xl font-semibold tabular-nums text-blue-700 dark:text-blue-300">
                                     {statsData.data.sent_today}
                                   </p>
                                 </div>
-                                <div className="rounded-lg border bg-amber-50/80 p-3 dark:bg-amber-950/30">
+                                <div className="min-w-0 rounded-lg border bg-amber-50/80 p-2.5 sm:p-3 dark:bg-amber-950/30">
                                   <p className="text-xs text-muted-foreground">Pendiente envío</p>
                                   <p className="text-xl font-semibold tabular-nums text-amber-800 dark:text-amber-200">
                                     {statsData.data.pending}
                                   </p>
                                 </div>
-                                <div className="rounded-lg border bg-red-50/80 p-3 dark:bg-red-950/30">
+                                <div className="min-w-0 rounded-lg border bg-red-50/80 p-2.5 sm:p-3 dark:bg-red-950/30">
                                   <p className="text-xs text-muted-foreground">Fallido</p>
                                   <p className="text-xl font-semibold tabular-nums text-red-700 dark:text-red-300">
                                     {statsData.data.failed}
@@ -3809,18 +4060,18 @@ const AdminDocumentSigningPage: React.FC = () => {
                           </Card>
 
                           {digitalSigningEnabled && (
-                            <Card className="border-slate-200">
-                              <CardHeader className="pb-2">
+                            <Card className="min-w-0 overflow-hidden border-slate-200">
+                              <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                                 <CardTitle className="text-base flex items-center gap-2">
-                                  <FileSignature className="h-4 w-4 text-slate-600" />
+                                  <FileSignature className="h-4 w-4 shrink-0 text-slate-600" />
                                   Firma digital del afiliado
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="break-words">
                                   Solo aplica a envíos con enlace de firma. &quot;Firmado&quot; y &quot;Completado&quot; indican que el
                                   afiliado ya firmó o que el flujo quedó cerrado con PDF final.
                                 </CardDescription>
                               </CardHeader>
-                              <CardContent className="space-y-4">
+                              <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                                 {statsData.data.signing && (
                                   <>
                                     {statsData.data.signing_derived &&
@@ -3829,11 +4080,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         statsData.data.signing.completado >
                                         0 && (
                                         <div className="space-y-2">
-                                          <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">
+                                          <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                                            <span className="min-w-0 break-words text-muted-foreground">
                                               Firmados o finalizados frente a pendientes de firma
                                             </span>
-                                            <span className="font-medium tabular-nums">
+                                            <span className="shrink-0 font-medium tabular-nums">
                                               {statsSigningProgressPct.toFixed(1)}%
                                             </span>
                                           </div>
@@ -3842,27 +4093,27 @@ const AdminDocumentSigningPage: React.FC = () => {
                                             className="h-2.5 bg-amber-100 dark:bg-amber-950/50"
                                             indicatorClassName="bg-emerald-600 dark:bg-emerald-500"
                                           />
-                                          <p className="text-xs text-muted-foreground">
+                                          <p className="break-words text-xs text-muted-foreground">
                                             {statsData.data.signing_derived.firmados_afiliado_o_finalizados} con firma del
                                             afiliado o proceso cerrado; {statsData.data.signing_derived.pendientes_firma}{' '}
                                             aún esperan la firma en el visor.
                                           </p>
                                         </div>
                                       )}
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                      <div className="rounded-lg border bg-amber-50/80 p-3 dark:bg-amber-950/30">
+                                    <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+                                      <div className="min-w-0 rounded-lg border bg-amber-50/80 p-2.5 sm:p-3 dark:bg-amber-950/30">
                                         <p className="text-xs text-muted-foreground">Pendiente firma</p>
                                         <p className="text-xl font-semibold tabular-nums text-amber-800 dark:text-amber-200">
                                           {statsData.data.signing.pendiente_firma}
                                         </p>
                                       </div>
-                                      <div className="rounded-lg border bg-sky-50/80 p-3 dark:bg-sky-950/30">
+                                      <div className="min-w-0 rounded-lg border bg-sky-50/80 p-2.5 sm:p-3 dark:bg-sky-950/30">
                                         <p className="text-xs text-muted-foreground">Firmado afiliado</p>
                                         <p className="text-xl font-semibold tabular-nums text-sky-800 dark:text-sky-200">
                                           {statsData.data.signing.firmado_afiliado}
                                         </p>
                                       </div>
-                                      <div className="rounded-lg border bg-emerald-50/80 p-3 dark:bg-emerald-950/30">
+                                      <div className="min-w-0 rounded-lg border bg-emerald-50/80 p-2.5 sm:p-3 dark:bg-emerald-950/30 sm:col-span-2 lg:col-span-1">
                                         <p className="text-xs text-muted-foreground">Completado</p>
                                         <p className="text-xl font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
                                           {statsData.data.signing.completado}
@@ -3882,20 +4133,20 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </div>
 
                         {digitalSigningEnabled && statsData.data.satisfaction && (
-                          <Card className="border-slate-200">
-                            <CardHeader className="pb-2">
+                          <Card className="min-w-0 overflow-hidden border-slate-200">
+                            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                               <CardTitle className="text-base flex items-center gap-2">
-                                <Star className="h-4 w-4 text-amber-500" />
+                                <Star className="h-4 w-4 shrink-0 text-amber-500" />
                                 Satisfacción del proceso de firma
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className="break-words">
                                 Puntuación de 1 a 5 que el afiliado deja después de enviar el convenio. Pulse una
                                 calificación para ver quiénes la dieron en el historial.
                               </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div className="rounded-lg border bg-amber-50/80 p-3 dark:bg-amber-950/30">
+                            <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+                              <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+                                <div className="min-w-0 rounded-lg border bg-amber-50/80 p-2.5 sm:p-3 dark:bg-amber-950/30">
                                   <p className="text-xs text-muted-foreground">Promedio</p>
                                   <p className="text-xl font-semibold tabular-nums text-amber-800 dark:text-amber-200">
                                     {statsData.data.satisfaction.average != null
@@ -3904,19 +4155,19 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   </p>
                                   <p className="text-xs text-muted-foreground">sobre 5</p>
                                 </div>
-                                <div className="rounded-lg border bg-slate-50/80 p-3 dark:bg-slate-900/40">
+                                <div className="min-w-0 rounded-lg border bg-slate-50/80 p-2.5 sm:p-3 dark:bg-slate-900/40">
                                   <p className="text-xs text-muted-foreground">Calificaciones</p>
                                   <p className="text-xl font-semibold tabular-nums">
                                     {statsData.data.satisfaction.ratings_count}
                                   </p>
                                 </div>
-                                <div className="rounded-lg border bg-sky-50/80 p-3 dark:bg-sky-950/30">
+                                <div className="min-w-0 rounded-lg border bg-sky-50/80 p-2.5 sm:p-3 dark:bg-sky-950/30">
                                   <p className="text-xs text-muted-foreground">Elegibles (ya firmaron)</p>
                                   <p className="text-xl font-semibold tabular-nums text-sky-800 dark:text-sky-200">
                                     {statsData.data.satisfaction.eligible_count}
                                   </p>
                                 </div>
-                                <div className="rounded-lg border bg-emerald-50/80 p-3 dark:bg-emerald-950/30">
+                                <div className="min-w-0 rounded-lg border bg-emerald-50/80 p-2.5 sm:p-3 dark:bg-emerald-950/30">
                                   <p className="text-xs text-muted-foreground">Tasa de respuesta</p>
                                   <p className="text-xl font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
                                     {statsData.data.satisfaction.response_rate != null
@@ -3935,7 +4186,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <button
                                         key={score}
                                         type="button"
-                                        className="grid w-full grid-cols-[8rem_1fr_2.5rem] items-center gap-3 rounded-md px-1 py-1 text-left hover:bg-muted/60"
+                                        className="flex w-full min-w-0 flex-col gap-2 rounded-md px-1 py-2 text-left hover:bg-muted/60 sm:grid sm:grid-cols-[minmax(0,7.5rem)_1fr_2.5rem] sm:items-center sm:gap-3"
                                         aria-label={`Ver convenios calificados con ${score}`}
                                         onClick={() => {
                                           setHistoryFilters((previous) => ({
@@ -3969,19 +4220,19 @@ const AdminDocumentSigningPage: React.FC = () => {
 
                         {/* Firma automática del presidente */}
                         {autoSignEnabled && statsData.data.signing && (
-                          <Card className="border-slate-200">
-                            <CardHeader className="pb-2">
+                          <Card className="min-w-0 overflow-hidden border-slate-200">
+                            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                               <CardTitle className="text-base flex items-center gap-2">
-                                <PenLine className="h-4 w-4 text-slate-600" />
+                                <PenLine className="h-4 w-4 shrink-0 text-slate-600" />
                                 Firma automática del presidente
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className="break-words">
                                 Estado de la segunda etapa de firma. &quot;Completado&quot; indica que el documento tiene ambas firmas
                                 y el proceso está cerrado.
                               </CardDescription>
                             </CardHeader>
-                            <CardContent>
-                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
+                              <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                                 <div className="rounded-lg border bg-sky-50/80 p-3 dark:bg-sky-950/30">
                                   <p className="text-xs text-muted-foreground">Pend. firma presidente</p>
                                   <p className="text-xl font-semibold tabular-nums text-sky-800 dark:text-sky-200">
@@ -4012,18 +4263,18 @@ const AdminDocumentSigningPage: React.FC = () => {
                         )}
 
                         {statsData.data.by_sede && statsData.data.by_sede.length > 0 && (
-                          <Card>
-                            <CardHeader className="pb-2">
+                          <Card className="min-w-0 overflow-hidden">
+                            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
                               <CardTitle className="text-base flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-slate-600" />
+                                <Building2 className="h-4 w-4 shrink-0 text-slate-600" />
                                 Por sede u hospital
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className="break-words">
                                 Agrupa los mismos registros del periodo según el campo sede guardado en el tracking (hasta
                                 50 sedes con más volumen).
                               </CardDescription>
                             </CardHeader>
-                            <CardContent className="overflow-x-auto">
+                            <CardContent className="min-w-0 overflow-x-auto p-4 pt-0 sm:p-6 sm:pt-0">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
@@ -4073,8 +4324,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                         )}
 
                         {chartData && chartData.statusData.length > 0 && (
-                          <div className={`grid grid-cols-1 gap-4 sm:gap-6 ${digitalSigningEnabled ? 'lg:grid-cols-2' : ''}`}>
-                            <Card>
+                          <div className={`grid min-w-0 grid-cols-1 gap-4 sm:gap-6 ${digitalSigningEnabled ? 'lg:grid-cols-2' : ''}`}>
+                            <Card className="min-w-0 overflow-hidden">
                               <CardHeader>
                                 <CardTitle className="text-lg">Correo: proporción por estado</CardTitle>
                                 <CardDescription>Distribución de pendiente, enviado y fallido.</CardDescription>
@@ -4107,7 +4358,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
                             {digitalSigningEnabled && (
                               signingChartData ? (
-                                <Card>
+                                <Card className="min-w-0 overflow-hidden">
                                   <CardHeader>
                                     <CardTitle className="text-lg">Firma digital: proporción por estado</CardTitle>
                                     <CardDescription>
@@ -4152,7 +4403,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                         )}
 
                         {chartData && chartData.statusData.length > 0 && (
-                          <Card>
+                          <Card className="min-w-0 overflow-hidden">
                             <CardHeader>
                               <CardTitle className="text-lg">Correo: volumen por estado</CardTitle>
                               <CardDescription>Comparación numérica de los mismos totales del gráfico circular.</CardDescription>
@@ -4284,9 +4535,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                   <div>
                     <h3 className="text-sm font-semibold mb-3">Datos de generación</h3>
                     {trackingDetail.convenio_data_fields.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
                         {trackingDetail.convenio_data_fields.map((field) => (
-                          <div key={field.key} className="rounded-md border bg-slate-50 px-3 py-2">
+                          <div key={field.key} className="min-w-0 rounded-md border bg-slate-50 px-2.5 py-2 sm:px-3">
                             <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
                             <p className="text-sm break-words whitespace-pre-wrap">{String(field.value)}</p>
                           </div>
@@ -4412,7 +4663,7 @@ const AdminDocumentSigningPage: React.FC = () => {
           </Dialog>
 
           <Dialog open={retryFailedDialogOpen} onOpenChange={setRetryFailedDialogOpen}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Reintentar convenios fallidos</DialogTitle>
                 <DialogDescription>
@@ -4510,7 +4761,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
           {/* Modal de confirmación para reenvío */}
           <Dialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
-            <DialogContent>
+            <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Confirmar Reenvío de Correo</DialogTitle>
                 <DialogDescription>
@@ -4519,7 +4770,7 @@ const AdminDocumentSigningPage: React.FC = () => {
               </DialogHeader>
               {selectedTrackingInfo && (
                 <div className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-semibold">Documento:</span>
                       <p className="font-mono">{selectedTrackingInfo.documento}</p>
@@ -4610,7 +4861,8 @@ const AdminDocumentSigningPage: React.FC = () => {
             open={exportDialogOpen}
             onOpenChange={setExportDialogOpen}
             digitalSigningEnabled={digitalSigningEnabled}
-            initialFilters={historyFilters}
+            initialFilters={{ ...historyFilters, periodo: periodoFilter }}
+            availablePeriodos={availablePeriodos}
           />
         </div>
       </div>

@@ -265,6 +265,11 @@ export interface ConvenioSigningIntegrity {
   } | null;
 }
 
+export interface ConvenioPeriodFilterOptions {
+  periodos: string[];
+  current: string;
+}
+
 /**
  * Response del historial de correos
  */
@@ -274,6 +279,7 @@ export interface EmailHistoryResponse {
   digital_signing_enabled: boolean;
   auto_sign_enabled?: boolean;
   ui?: ConvenioHistoryUiMetadata;
+  filter_options?: ConvenioPeriodFilterOptions;
   data: {
     current_page: number;
     data: ConvenioEmailTracking[];
@@ -310,6 +316,63 @@ export type EmailHistoryEstadoFiltro =
 
 export type EmailHistoryCalificacionFiltro = '1' | '2' | '3' | '4' | '5' | 'sin_calificar';
 
+export const CONVENIO_PERIODO_TODOS = 'todos';
+
+export function currentConvenioPeriodo(now: Date = new Date()): string {
+  const semester = now.getMonth() + 1 <= 6 ? '1' : '2';
+
+  return `${now.getFullYear()}${semester}`;
+}
+
+export function isValidConvenioPeriodo(periodo: string): boolean {
+  return /^\d{4}[12]$/.test(periodo);
+}
+
+export function convenioPeriodoLabel(periodo: string): string {
+  if (periodo === CONVENIO_PERIODO_TODOS) {
+    return 'Todos los semestres';
+  }
+
+  if (!isValidConvenioPeriodo(periodo)) {
+    return periodo;
+  }
+
+  const year = periodo.slice(0, 4);
+
+  return periodo.slice(4) === '1' ? `1.er semestre ${year}` : `2.º semestre ${year}`;
+}
+
+export function shiftConvenioPeriodo(periodo: string, delta: number): string | null {
+  if (!isValidConvenioPeriodo(periodo)) {
+    return null;
+  }
+
+  const year = Number(periodo.slice(0, 4));
+  const semester = Number(periodo.slice(4));
+  const index = year * 2 + (semester - 1) + delta;
+  const newYear = Math.floor(index / 2);
+  const newSemester = (index % 2) + 1;
+
+  return `${newYear}${newSemester}`;
+}
+
+export function fallbackConvenioPeriodos(now: Date = new Date()): string[] {
+  const current = currentConvenioPeriodo(now);
+  const periods = [current];
+  let cursor = current;
+
+  for (let i = 0; i < 3; i += 1) {
+    const previous = shiftConvenioPeriodo(cursor, -1);
+    if (!previous) {
+      break;
+    }
+    periods.push(previous);
+    cursor = previous;
+  }
+
+  return periods;
+}
+
 /**
  * Parámetros para filtrar el historial
  */
@@ -321,6 +384,8 @@ export interface EmailHistoryParams {
   sede?: string;
   fecha_desde?: string; // YYYY-MM-DD
   fecha_hasta?: string; // YYYY-MM-DD
+  /** Semestre YYYY1 / YYYY2. Omitir o "todos" para no filtrar por periodo. */
+  periodo?: string;
   calificacion?: EmailHistoryCalificacionFiltro;
   per_page?: number;
   page?: number;
@@ -410,6 +475,7 @@ export interface RetryFailedEmailsResponse {
 export interface StatisticsParams {
   fecha_desde?: string; // YYYY-MM-DD
   fecha_hasta?: string; // YYYY-MM-DD
+  periodo?: string;
 }
 
 /**
@@ -418,6 +484,7 @@ export interface StatisticsParams {
 export interface StatisticsResponse {
   success: true;
   delivery_mode?: ConvenioDeliveryMode;
+  filter_options?: ConvenioPeriodFilterOptions;
   data: {
     digital_signing_enabled: boolean;
     auto_sign_enabled: boolean;
@@ -512,6 +579,9 @@ export const getEmailHistory = async (
     }
     if (params?.fecha_hasta) {
       queryParams.append('fecha_hasta', params.fecha_hasta);
+    }
+    if (params?.periodo && params.periodo !== CONVENIO_PERIODO_TODOS) {
+      queryParams.append('periodo', params.periodo);
     }
     if (params?.calificacion) {
       queryParams.append('calificacion', params.calificacion);
@@ -712,6 +782,9 @@ export const getStatistics = async (
     }
     if (params?.fecha_hasta) {
       queryParams.append('fecha_hasta', params.fecha_hasta);
+    }
+    if (params?.periodo && params.periodo !== CONVENIO_PERIODO_TODOS) {
+      queryParams.append('periodo', params.periodo);
     }
 
     const response = await authenticatedApi.get<StatisticsResponse>(
@@ -1015,7 +1088,7 @@ export const exportTemplate = async (): Promise<Blob> => {
 
 export type ExportConvenioHistoryParams = Pick<
   EmailHistoryParams,
-  'q' | 'estado_filtro' | 'sede' | 'fecha_desde' | 'fecha_hasta' | 'calificacion'
+  'q' | 'estado_filtro' | 'sede' | 'fecha_desde' | 'fecha_hasta' | 'calificacion' | 'periodo'
 > & {
   is_test?: boolean;
 };
@@ -1044,6 +1117,9 @@ export const exportHistoryExcel = async (
     }
     if (params?.fecha_hasta) {
       payload.fecha_hasta = params.fecha_hasta;
+    }
+    if (params?.periodo && params.periodo !== CONVENIO_PERIODO_TODOS) {
+      payload.periodo = params.periodo;
     }
     if (params?.calificacion) {
       payload.calificacion = params.calificacion;
