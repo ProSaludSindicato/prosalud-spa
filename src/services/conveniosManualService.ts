@@ -206,11 +206,7 @@ export interface ConvenioEmailTracking {
   rechazado_at?: string | null;
   motivo_rechazo?: string | null;
   sede?: string | null;
-  president_sign_attempts?: number;
   president_sign_last_error?: string | null;
-  president_sign_detection_method?: string | null;
-  president_sign_queued_at?: string | null;
-  president_sign_duration_ms?: number | null;
   pdf_original_sha256?: string | null;
   pdf_firmado_afiliado_sha256?: string | null;
   text_integrity_status?: 'matched' | 'unavailable' | null;

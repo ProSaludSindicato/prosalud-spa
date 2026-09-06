@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -84,6 +84,7 @@ import {
   signAsPresident,
   signAsPresidentBulk,
   ConvenioEmailTracking,
+  ConvenioSigningEstado,
   ConvenioDeliveryMode,
   visibleConvenioSendError,
   EmailHistoryParams as ManualEmailHistoryParams,
@@ -599,6 +600,235 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [isBulkSigning, setIsBulkSigning] = useState(false);
   const [forcePresidentPollingUntil, setForcePresidentPollingUntil] = useState<number | null>(null);
   const [pendingPresidentQueueUntil, setPendingPresidentQueueUntil] = useState<Record<number, number>>({});
+  const [highlightedPresidentSignIds, setHighlightedPresidentSignIds] = useState<
+    Record<number, 'success' | 'error'>
+  >({});
+
+  type PresidentSignWatch = {
+    id: number;
+    nombre_afiliado: string;
+    documento: string;
+    lastKnownEstado: ConvenioSigningEstado | null | undefined;
+  };
+
+  const watchedPresidentSignsRef = useRef<Map<number, PresidentSignWatch>>(new Map());
+  const presidentSignHighlightTimeoutsRef = useRef<Record<number, number>>({});
+
+  const clearPresidentSignHighlight = useCallback((trackingId: number) => {
+    setHighlightedPresidentSignIds((previous) => {
+      if (!(trackingId in previous)) {
+        return previous;
+      }
+      const next = { ...previous };
+      delete next[trackingId];
+      return next;
+    });
+  }, []);
+
+  const schedulePresidentSignHighlightClear = useCallback(
+    (trackingId: number) => {
+      const existing = presidentSignHighlightTimeoutsRef.current[trackingId];
+      if (existing) {
+        window.clearTimeout(existing);
+      }
+      presidentSignHighlightTimeoutsRef.current[trackingId] = window.setTimeout(() => {
+        clearPresidentSignHighlight(trackingId);
+        delete presidentSignHighlightTimeoutsRef.current[trackingId];
+      }, 15000);
+    },
+    [clearPresidentSignHighlight],
+  );
+
+  const applyPresidentSignHighlights = useCallback(
+    (entries: Array<{ id: number; outcome: 'success' | 'error' }>) => {
+      if (entries.length === 0) {
+        return;
+      }
+
+      setHighlightedPresidentSignIds((previous) => {
+        const next = { ...previous };
+        entries.forEach(({ id, outcome }) => {
+          next[id] = outcome;
+        });
+        return next;
+      });
+      entries.forEach(({ id }) => schedulePresidentSignHighlightClear(id));
+    },
+    [schedulePresidentSignHighlightClear],
+  );
+
+  const unregisterPresidentSignWatch = useCallback((trackingId: number) => {
+    watchedPresidentSignsRef.current.delete(trackingId);
+    setPendingPresidentQueueUntil((previous) => {
+      if (!(trackingId in previous)) {
+        return previous;
+      }
+      const next = { ...previous };
+      delete next[trackingId];
+      return next;
+    });
+  }, []);
+
+  const notifyPresidentSignCompletions = useCallback(
+    (completions: Array<Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'>>) => {
+      if (completions.length === 0) {
+        return;
+      }
+
+      if (completions.length === 1) {
+        const tracking = completions[0];
+        toast.success('Firma presidencial completada', {
+          description: `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) ya está listo para descargar.`,
+          duration: 10000,
+        });
+      } else {
+        toast.success(`${completions.length} convenios completados`, {
+          description: completions
+            .map((tracking) => `${tracking.nombre_afiliado} (${tracking.documento})`)
+            .join(' · '),
+          duration: 12000,
+        });
+      }
+
+      applyPresidentSignHighlights(
+        completions.map((tracking) => ({ id: tracking.id, outcome: 'success' as const })),
+      );
+      completions.forEach((tracking) => unregisterPresidentSignWatch(tracking.id));
+    },
+    [applyPresidentSignHighlights, unregisterPresidentSignWatch],
+  );
+
+  const notifyPresidentSignErrors = useCallback(
+    (
+      errors: Array<
+        Pick<
+          ConvenioEmailTracking,
+          'id' | 'nombre_afiliado' | 'documento' | 'president_sign_last_error'
+        >
+      >,
+    ) => {
+      if (errors.length === 0) {
+        return;
+      }
+
+      errors.forEach((tracking) => {
+        toast.error('Error en firma presidencial', {
+          description: `${tracking.nombre_afiliado} (${tracking.documento}): ${
+            tracking.president_sign_last_error ?? 'No se pudo aplicar la firma del presidente.'
+          }`,
+          duration: 10000,
+        });
+      });
+
+      applyPresidentSignHighlights(
+        errors.map((tracking) => ({ id: tracking.id, outcome: 'error' as const })),
+      );
+      errors.forEach((tracking) => unregisterPresidentSignWatch(tracking.id));
+    },
+    [applyPresidentSignHighlights, unregisterPresidentSignWatch],
+  );
+
+  const processPresidentSignWatchUpdates = useCallback(
+    (
+      trackings: Array<
+        Pick<
+          ConvenioEmailTracking,
+          'id' | 'nombre_afiliado' | 'documento' | 'signing_estado' | 'president_sign_last_error'
+        >
+      >,
+    ) => {
+      const watched = watchedPresidentSignsRef.current;
+      if (watched.size === 0) {
+        return;
+      }
+
+      const completions: Array<Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'>> =
+        [];
+      const errors: Array<
+        Pick<
+          ConvenioEmailTracking,
+          'id' | 'nombre_afiliado' | 'documento' | 'president_sign_last_error'
+        >
+      > = [];
+
+      trackings.forEach((tracking) => {
+        const watch = watched.get(tracking.id);
+        if (!watch) {
+          return;
+        }
+
+        const previousEstado = watch.lastKnownEstado;
+        const currentEstado = tracking.signing_estado;
+        watch.lastKnownEstado = currentEstado;
+
+        if (currentEstado === 'completado' && previousEstado !== 'completado') {
+          completions.push(tracking);
+        } else if (
+          currentEstado === 'error_firma_presidente' &&
+          previousEstado !== 'error_firma_presidente'
+        ) {
+          errors.push(tracking);
+        }
+      });
+
+      notifyPresidentSignCompletions(completions);
+      notifyPresidentSignErrors(errors);
+
+      const firstUpdatedId = (completions[0] ?? errors[0])?.id;
+      if (firstUpdatedId) {
+        window.requestAnimationFrame(() => {
+          document
+            .querySelector(`[data-president-sign-tracking-id="${firstUpdatedId}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+    },
+    [notifyPresidentSignCompletions, notifyPresidentSignErrors],
+  );
+
+  const registerPresidentSignWatch = useCallback(
+    (
+      trackings: Array<
+        Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento' | 'signing_estado'>
+      >,
+      durationMs = 45000,
+    ) => {
+      if (trackings.length === 0) {
+        return;
+      }
+
+      const until = Date.now() + durationMs;
+      setPendingPresidentQueueUntil((previous) => {
+        const next = { ...previous };
+        trackings.forEach((tracking) => {
+          next[tracking.id] = until;
+          watchedPresidentSignsRef.current.set(tracking.id, {
+            id: tracking.id,
+            nombre_afiliado: tracking.nombre_afiliado,
+            documento: tracking.documento,
+            lastKnownEstado: tracking.signing_estado ?? 'firmado_afiliado',
+          });
+        });
+        return next;
+      });
+      setForcePresidentPollingUntil(until);
+    },
+    [],
+  );
+
+  const presidentSignHighlightClassName = useCallback(
+    (trackingId: number) => {
+      const highlight = highlightedPresidentSignIds[trackingId];
+      if (highlight === 'success') {
+        return 'bg-emerald-50/90 ring-2 ring-inset ring-emerald-400/70 transition-colors duration-500 dark:bg-emerald-950/40 dark:ring-emerald-600/50';
+      }
+      if (highlight === 'error') {
+        return 'bg-red-50/90 ring-2 ring-inset ring-red-400/70 transition-colors duration-500 dark:bg-red-950/40 dark:ring-red-600/50';
+      }
+      return undefined;
+    },
+    [highlightedPresidentSignIds],
+  );
 
   const shouldForcePresidentPolling =
     forcePresidentPollingUntil !== null && Date.now() < forcePresidentPollingUntil;
@@ -640,6 +870,78 @@ const AdminDocumentSigningPage: React.FC = () => {
       return false;
     },
   });
+
+  useEffect(() => {
+    const rows = historyData?.data.data ?? [];
+    processPresidentSignWatchUpdates(rows);
+  }, [historyData, processPresidentSignWatchUpdates]);
+
+  useEffect(() => {
+    if (watchedPresidentSignsRef.current.size === 0) {
+      return;
+    }
+
+    const pollOffPageWatches = async () => {
+      const watched = watchedPresidentSignsRef.current;
+      if (watched.size === 0) {
+        return;
+      }
+
+      const visibleIds = new Set((historyData?.data.data ?? []).map((row) => row.id));
+      const offPageIds = Array.from(watched.keys()).filter((trackingId) => !visibleIds.has(trackingId));
+      if (offPageIds.length === 0) {
+        return;
+      }
+
+      const updates: ConvenioEmailTracking[] = [];
+      await Promise.all(
+        offPageIds.map(async (trackingId) => {
+          try {
+            const detail = await getTrackingDetail(trackingId);
+            updates.push(detail.data.tracking);
+          } catch {
+            // Ignorar fallos puntuales de consulta individual.
+          }
+        }),
+      );
+
+      if (updates.length === 0) {
+        return;
+      }
+
+      processPresidentSignWatchUpdates(updates);
+      if (
+        updates.some(
+          (tracking) =>
+            tracking.signing_estado === 'completado' ||
+            tracking.signing_estado === 'error_firma_presidente',
+        )
+      ) {
+        void refetchHistory();
+      }
+    };
+
+    void pollOffPageWatches();
+
+    if (!shouldForcePresidentPolling) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void pollOffPageWatches();
+    }, 8000);
+
+    return () => window.clearInterval(intervalId);
+  }, [historyData, shouldForcePresidentPolling, processPresidentSignWatchUpdates, refetchHistory]);
+
+  useEffect(
+    () => () => {
+      Object.values(presidentSignHighlightTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+    },
+    [],
+  );
 
   // Query para estadísticas (Manual)
   const { data: statsData, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
@@ -727,22 +1029,6 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   const canResendTracking = (tracking: ConvenioEmailTracking): boolean =>
     shouldShowEmailResend(tracking) && (tracking.available_actions?.resend ?? true);
-
-  const queuePresidentProcessingFeedback = (trackingIds: number[], durationMs = 45000): void => {
-    if (trackingIds.length === 0) {
-      return;
-    }
-
-    const until = Date.now() + durationMs;
-    setPendingPresidentQueueUntil((previous) => {
-      const next = { ...previous };
-      trackingIds.forEach((trackingId) => {
-        next[trackingId] = until;
-      });
-      return next;
-    });
-    setForcePresidentPollingUntil(until);
-  };
 
   // Estado para controlar descarga asíncrona
   const [isDownloadingConvenio, setIsDownloadingConvenio] = useState(false);
@@ -1639,7 +1925,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       tracking.signing_satisfaction_score != null &&
       tracking.signing_satisfaction_score >= 1
     ) {
-      secondaryParts.push(`Satisfacción ${tracking.signing_satisfaction_score}/5`);
+      secondaryParts.push(`${tracking.signing_satisfaction_score}/5`);
     }
 
     const statusBadge = (
@@ -1671,11 +1957,6 @@ const AdminDocumentSigningPage: React.FC = () => {
                 <>
                   <p className="mt-2 font-medium text-destructive">Detalle del error</p>
                   <p className="mt-1 text-muted-foreground">{primary.errorDetail}</p>
-                  {tracking.president_sign_attempts != null && (
-                    <p className="mt-1 text-muted-foreground">
-                      Intentos: {tracking.president_sign_attempts}
-                    </p>
-                  )}
                 </>
               )}
             </TooltipContent>
@@ -1708,7 +1989,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       toast.success('Firma encolada', {
         description: `El convenio de ${tracking.nombre_afiliado} fue enviado a la cola de firma presidencial.`,
       });
-      queuePresidentProcessingFeedback([tracking.id]);
+      registerPresidentSignWatch([tracking]);
       void refetchHistory();
     } catch (err: any) {
       toast.error('Error al encolar firma', {
@@ -1731,7 +2012,11 @@ const AdminDocumentSigningPage: React.FC = () => {
       });
       const rejectedIds = new Set(result.rejected.map((item) => item.tracking_id));
       const acceptedIds = presidentSignEligibleSelectedIds.filter((trackingId) => !rejectedIds.has(trackingId));
-      queuePresidentProcessingFeedback(acceptedIds);
+      const historyItems = historyData?.data.data ?? [];
+      const acceptedTrackings = acceptedIds
+        .map((trackingId) => historyItems.find((item) => item.id === trackingId))
+        .filter((item): item is ConvenioEmailTracking => Boolean(item));
+      registerPresidentSignWatch(acceptedTrackings);
       setSelectedTrackingIds((prev) => {
         const next = new Set(prev);
         presidentSignEligibleSelectedIds.forEach((id) => next.delete(id));
@@ -2294,7 +2579,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     tracking.signing_estado === 'completado');
                                 const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
                                 return (
-                                <TableRow key={tracking.id}>
+                                <TableRow
+                                  key={tracking.id}
+                                  data-president-sign-tracking-id={tracking.id}
+                                  className={presidentSignHighlightClassName(tracking.id)}
+                                >
                                   {can('document_signing.manage') && (
                                     <TableCell className="px-2 align-top py-3">
                                       {(canResendTracking(tracking) || isEligibleForPresidentSign(tracking)) ? (
@@ -2336,30 +2625,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     </p>
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3">
-                                    <div className="flex flex-col gap-2">
-                                      {renderTrackingStatusCell(tracking)}
-                                      {autoSignEnabled && can('document_signing.manage') && isEligibleForPresidentSign(tracking) && (
-                                        <Button
-                                          variant="default"
-                                          size="sm"
-                                          className={cn('h-8 w-fit gap-1.5 px-2.5', presidentSignButtonClassName)}
-                                          onClick={() => void handleSignAsPresident(tracking)}
-                                          disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
-                                          aria-label="Firmar como presidente"
-                                        >
-                                          {isPresidentSigningProcessing(tracking) ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                          ) : (
-                                            <PenLine className="h-3.5 w-3.5" />
-                                          )}
-                                          <span className="text-xs">
-                                            {isPresidentSigningProcessing(tracking)
-                                              ? 'Procesando firma...'
-                                              : 'Firmar presidente'}
-                                          </span>
-                                        </Button>
-                                      )}
-                                    </div>
+                                    {renderTrackingStatusCell(tracking)}
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3">
                                     <div className="space-y-1.5">
@@ -2382,6 +2648,38 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3 pl-2 pr-4">
                                     <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                      {autoSignEnabled && can('document_signing.manage') && isEligibleForPresidentSign(tracking) && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="default"
+                                              size="sm"
+                                              className={cn('h-8 shrink-0 px-2', presidentSignButtonClassName)}
+                                              onClick={() => void handleSignAsPresident(tracking)}
+                                              disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
+                                              aria-label="Firmar como presidente"
+                                            >
+                                              {isPresidentSigningProcessing(tracking) ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <PenLine className="h-4 w-4" />
+                                              )}
+                                              <span className="sr-only">
+                                                {isPresidentSigningProcessing(tracking)
+                                                  ? 'Procesando firma...'
+                                                  : 'Firmar presidente'}
+                                              </span>
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>
+                                              {isPresidentSigningProcessing(tracking)
+                                                ? 'Procesando firma...'
+                                                : 'Firmar presidente'}
+                                            </p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
                                       {can('document_signing.view') && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
@@ -2477,7 +2775,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                             const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
 
                             return (
-                              <Card key={tracking.id} className="border shadow-sm">
+                              <Card
+                                key={tracking.id}
+                                data-president-sign-tracking-id={tracking.id}
+                                className={cn('border shadow-sm', presidentSignHighlightClassName(tracking.id))}
+                              >
                                 <CardContent className="p-4">
                                   <div className="space-y-3">
                                     <div className="flex items-start gap-3">
@@ -2514,31 +2816,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
                                     <div className="border-t pt-2">
                                       <p className="text-xs font-medium text-muted-foreground mb-1">Estado envío y firma</p>
-                                      <div className="flex flex-col gap-2">
-                                        {renderTrackingStatusCell(tracking)}
-                                        {autoSignEnabled &&
-                                          can('document_signing.manage') &&
-                                          isEligibleForPresidentSign(tracking) && (
-                                            <Button
-                                              variant="default"
-                                              size="sm"
-                                              className={cn('h-8 w-fit gap-1.5 px-2.5', presidentSignButtonClassName)}
-                                              onClick={() => void handleSignAsPresident(tracking)}
-                                              disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
-                                            >
-                                              {isPresidentSigningProcessing(tracking) ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                              ) : (
-                                                <PenLine className="h-3.5 w-3.5" />
-                                              )}
-                                              <span className="text-xs">
-                                                {isPresidentSigningProcessing(tracking)
-                                                  ? 'Procesando firma...'
-                                                  : 'Firmar presidente'}
-                                              </span>
-                                            </Button>
-                                          )}
-                                      </div>
+                                      {renderTrackingStatusCell(tracking)}
                                     </div>
 
                                     <div className="border-t pt-2">
@@ -2554,6 +2832,29 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     </div>
 
                                     <div className="border-t pt-2 flex flex-wrap gap-2">
+                                      {autoSignEnabled &&
+                                        can('document_signing.manage') &&
+                                        isEligibleForPresidentSign(tracking) && (
+                                          <Button
+                                            variant="default"
+                                            size="sm"
+                                            className={cn('h-8 shrink-0 px-2', presidentSignButtonClassName)}
+                                            onClick={() => void handleSignAsPresident(tracking)}
+                                            disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
+                                            aria-label="Firmar como presidente"
+                                          >
+                                            {isPresidentSigningProcessing(tracking) ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <PenLine className="h-4 w-4" />
+                                            )}
+                                            <span className="sr-only">
+                                              {isPresidentSigningProcessing(tracking)
+                                                ? 'Procesando firma...'
+                                                : 'Firmar presidente'}
+                                            </span>
+                                          </Button>
+                                        )}
                                       {can('document_signing.view') && (
                                         <Button
                                           variant="outline"
