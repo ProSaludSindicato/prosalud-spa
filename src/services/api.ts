@@ -179,12 +179,21 @@ authenticatedApi.interceptors.response.use(
           }, 2000);
         }, 100);
       }
+    } else if (isNetworkErrorWithoutResponse(error)) {
+      (error as { isSuspectedCors?: boolean }).isSuspectedCors = isExplicitCorsError(error);
+
+      logger.error('Authenticated API network error without response', {
+        url,
+        code: error.code,
+        message: error.message,
+        isSuspectedCors: (error as { isSuspectedCors?: boolean }).isSuspectedCors,
+      });
     } else {
       // Para otros errores, sanitizar para logging en producción
       const sanitizedError = sanitizeErrorForLogging(error);
       logger.error("Authenticated API request error", sanitizedError);
     }
-    
+
     return Promise.reject(error);
   },
 );

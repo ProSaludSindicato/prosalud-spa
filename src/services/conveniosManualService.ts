@@ -149,6 +149,10 @@ export interface ConvenioTrackingAvailableActions {
   resend: boolean;
   download_original: boolean;
   download_final: boolean;
+  president_sign?: boolean;
+  complete_review?: boolean;
+  mark_review_error?: boolean;
+  preview_pdf?: boolean;
 }
 
 export interface ConvenioHistoryUiMetadata {
@@ -161,6 +165,8 @@ export interface ConvenioHistoryUiMetadata {
     payload_key: string;
   }>;
   estado_filtros: Array<{ value: string; label: string }>;
+  president_sign_bulk_enabled?: boolean;
+  president_sign_require_review?: boolean;
   deprecated_endpoints?: Array<{ endpoint: string; replacement: string }>;
   alternative_flows?: Record<string, string>;
 }
@@ -172,6 +178,7 @@ export type ConvenioSigningEstado =
   | 'pendiente_firma'
   | 'firmado_afiliado'
   | 'firmando_presidente'
+  | 'pendiente_revision'
   | 'error_firma_presidente'
   | 'completado'
   | 'rechazado';
@@ -274,6 +281,8 @@ export interface EmailHistoryResponse {
   delivery_mode?: ConvenioDeliveryMode;
   digital_signing_enabled: boolean;
   auto_sign_enabled?: boolean;
+  president_sign_bulk_enabled?: boolean;
+  president_sign_require_review?: boolean;
   ui?: ConvenioHistoryUiMetadata;
   filter_options?: ConvenioPeriodFilterOptions;
   data: {
@@ -307,6 +316,7 @@ export type EmailHistoryEstadoFiltro =
   | 'test'
   | 'firma_pendiente_firma'
   | 'firma_firmado_afiliado'
+  | 'firma_pendiente_revision'
   | 'firma_completado'
   | 'firma_error_presidente';
 
@@ -484,6 +494,8 @@ export interface StatisticsResponse {
   data: {
     digital_signing_enabled: boolean;
     auto_sign_enabled: boolean;
+    president_sign_bulk_enabled?: boolean;
+    president_sign_require_review?: boolean;
     total: number;
     by_status: {
       pendiente: number;
@@ -498,6 +510,7 @@ export interface StatisticsResponse {
       pendiente_firma: number;
       firmado_afiliado: number;
       firmando_presidente: number;
+      pendiente_revision?: number;
       error_firma_presidente: number;
       completado: number;
       rechazado: number;
@@ -507,6 +520,7 @@ export interface StatisticsResponse {
       firmados_afiliado_o_finalizados: number;
       por_firmar_presidente: number;
       firmando_presidente: number;
+      pendiente_revision?: number;
       error_firma_presidente: number;
     } | null;
     satisfaction?: {
@@ -1409,6 +1423,78 @@ export interface BulkPresidentSignResponse {
   success: boolean;
   accepted: number;
   rejected: Array<{ tracking_id: number; reason: string }>;
+  batch_id?: number | null;
+}
+
+export interface PresidentSignBatchProgress {
+  id: number;
+  scope: string;
+  date_from: string | null;
+  date_to: string | null;
+  include_errors: boolean;
+  total: number;
+  signing: number;
+  ready_for_review: number;
+  errors: number;
+  completed: number;
+  status: 'processing' | 'finished';
+  require_review: boolean;
+  processed: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PresidentSignCampaignPreviewResponse {
+  success: boolean;
+  count: number;
+  message?: string;
+}
+
+export interface PresidentSignCampaignStartResponse {
+  success: boolean;
+  batch_id: number;
+  accepted: number;
+  message?: string;
+}
+
+export interface BulkReviewActionResponse {
+  success: boolean;
+  accepted: number;
+  rejected: Array<{ tracking_id: number; reason: string }>;
+}
+
+export type ConvenioReviewTrackingItem = Pick<
+  ConvenioEmailTracking,
+  'id' | 'documento' | 'nombre_afiliado' | 'nombre_convenio' | 'signing_estado'
+> & {
+  firmado_presidente_at?: string | null;
+};
+
+export interface ConvenioReviewTrackingsParams {
+  page?: number;
+  per_page?: number;
+  q?: string;
+}
+
+export interface ConvenioReviewTrackingsPage {
+  current_page: number;
+  data: ConvenioReviewTrackingItem[];
+  from: number | null;
+  last_page: number;
+  per_page: number;
+  to: number | null;
+  total: number;
+}
+
+export interface ConvenioReviewTrackingsPaginatedResponse {
+  success: boolean;
+  data: ConvenioReviewTrackingsPage;
+}
+
+export interface ConvenioReviewTrackingIdsResponse {
+  success: boolean;
+  data: number[];
+  total: number;
 }
 
 export const signAsPresidentBulk = async (
@@ -1435,6 +1521,173 @@ export const signAsPresidentBulk = async (
       message: 'Error desconocido al enviar a firma presidencial masiva',
     };
   }
+};
+
+export const previewPresidentSignCampaign = async (params: {
+  scope: 'all' | 'date_range';
+  date_from?: string;
+  date_to?: string;
+  include_errors?: boolean;
+}): Promise<PresidentSignCampaignPreviewResponse> => {
+  try {
+    const response = await authenticatedApi.get<PresidentSignCampaignPreviewResponse>(
+      '/api/convenios-manual/tracking/president-sign-bulk/preview',
+      { params },
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string; count?: number }>;
+      throw {
+        success: false,
+        message:
+          axiosError.response?.data?.message ||
+          'No se pudo obtener el conteo de convenios elegibles',
+        count: axiosError.response?.data?.count,
+        status: axiosError.response?.status,
+      };
+    }
+    throw {
+      success: false,
+      message: 'No se pudo obtener el conteo de convenios elegibles',
+    };
+  }
+};
+
+export const startPresidentSignCampaign = async (payload: {
+  scope: 'all' | 'date_range';
+  date_from?: string;
+  date_to?: string;
+  include_errors?: boolean;
+}): Promise<PresidentSignCampaignStartResponse> => {
+  try {
+    const response = await authenticatedApi.post<PresidentSignCampaignStartResponse>(
+      '/api/convenios-manual/tracking/president-sign-campaign',
+      payload,
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string; batch_id?: number }>;
+      throw {
+        success: false,
+        message:
+          axiosError.response?.data?.message ||
+          'No se pudo iniciar la firma masiva del presidente',
+        batch_id: axiosError.response?.data?.batch_id,
+        status: axiosError.response?.status,
+      };
+    }
+    throw {
+      success: false,
+      message: 'Error desconocido al iniciar la firma masiva',
+    };
+  }
+};
+
+export const fetchActivePresidentSignBatch = async (): Promise<{
+  success: boolean;
+  batch: PresidentSignBatchProgress | null;
+}> => {
+  const response = await authenticatedApi.get<{
+    success: boolean;
+    batch: PresidentSignBatchProgress | null;
+  }>('/api/convenios-manual/president-sign-batches/active');
+  return response.data;
+};
+
+export const fetchPresidentSignBatch = async (
+  batchId: number,
+): Promise<{ success: boolean; batch: PresidentSignBatchProgress }> => {
+  const response = await authenticatedApi.get<{ success: boolean; batch: PresidentSignBatchProgress }>(
+    `/api/convenios-manual/president-sign-batches/${batchId}`,
+  );
+  return response.data;
+};
+
+export const fetchPresidentSignBatchTrackings = async (
+  batchId: number,
+  params?: ConvenioReviewTrackingsParams,
+): Promise<ConvenioReviewTrackingsPaginatedResponse> => {
+  const queryParams = new URLSearchParams();
+
+  if (params?.page) {
+    queryParams.append('page', params.page.toString());
+  }
+  if (params?.per_page) {
+    queryParams.append('per_page', params.per_page.toString());
+  }
+  if (params?.q?.trim()) {
+    queryParams.append('q', params.q.trim());
+  }
+
+  const query = queryParams.toString();
+  const response = await authenticatedApi.get<ConvenioReviewTrackingsPaginatedResponse>(
+    `/api/convenios-manual/president-sign-batches/${batchId}/trackings${query ? `?${query}` : ''}`,
+  );
+
+  return response.data;
+};
+
+export const fetchPresidentSignBatchTrackingIds = async (
+  batchId: number,
+  params?: Pick<ConvenioReviewTrackingsParams, 'q'>,
+): Promise<ConvenioReviewTrackingIdsResponse> => {
+  const queryParams = new URLSearchParams({ ids_only: '1' });
+
+  if (params?.q?.trim()) {
+    queryParams.append('q', params.q.trim());
+  }
+
+  const response = await authenticatedApi.get<ConvenioReviewTrackingIdsResponse>(
+    `/api/convenios-manual/president-sign-batches/${batchId}/trackings?${queryParams.toString()}`,
+  );
+
+  return response.data;
+};
+
+export const completeConvenio = async (trackingId: number): Promise<void> => {
+  await authenticatedApi.post(`/api/convenios-manual/tracking/${trackingId}/complete`);
+};
+
+export const completeConvenioBulk = async (
+  trackingIds: number[],
+): Promise<BulkReviewActionResponse> => {
+  const response = await authenticatedApi.post<BulkReviewActionResponse>(
+    '/api/convenios-manual/tracking/complete-bulk',
+    { tracking_ids: trackingIds },
+  );
+  return response.data;
+};
+
+export const markConvenioReviewError = async (
+  trackingId: number,
+  reason?: string,
+): Promise<void> => {
+  await authenticatedApi.post(`/api/convenios-manual/tracking/${trackingId}/review-error`, {
+    reason,
+  });
+};
+
+export const markConvenioReviewErrorBulk = async (
+  trackingIds: number[],
+  reason?: string,
+): Promise<BulkReviewActionResponse> => {
+  const response = await authenticatedApi.post<BulkReviewActionResponse>(
+    '/api/convenios-manual/tracking/review-error-bulk',
+    { tracking_ids: trackingIds, reason },
+  );
+  return response.data;
+};
+
+export const fetchConvenioPreviewPdfBlob = async (
+  trackingId: number,
+): Promise<Blob> => {
+  const response = await authenticatedApi.get<Blob>(
+    `/api/convenios-manual/tracking/${trackingId}/preview-pdf`,
+    { responseType: 'blob', timeout: 120000 },
+  );
+  return response.data;
 };
 
 /** Descarga el PDF firmado por el afiliado (o PDF final histórico si el estado es completado). */

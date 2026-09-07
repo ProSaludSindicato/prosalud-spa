@@ -72,6 +72,8 @@ export const isNetworkErrorWithoutResponse = (error: unknown): boolean => {
 
   return (
     err?.code === 'ERR_NETWORK' ||
+    err?.code === 'ERR_NETWORK_CHANGED' ||
+    err?.code === 'ERR_FAILED' ||
     /network error/i.test(message) ||
     /failed to fetch/i.test(message)
   );

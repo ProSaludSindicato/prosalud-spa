@@ -83,6 +83,9 @@ import {
   downloadConvenioOriginalPdf,
   signAsPresident,
   signAsPresidentBulk,
+  completeConvenioBulk,
+  fetchActivePresidentSignBatch,
+  ConvenioReviewTrackingItem,
   ConvenioEmailTracking,
   ConvenioSigningEstado,
   ConvenioDeliveryMode,
@@ -115,6 +118,9 @@ import {
 // import { sendBulkEmails, getEmailHistory, resendEmails, getStatistics, EmailTracking, EmailHistoryParams } from '@/services/documentSigningService';
 import DataPagination from '@/components/ui/data-pagination';
 import ExportConvenioHistoryDialog from '@/components/admin/convenios/ExportConvenioHistoryDialog';
+import PresidentSignCampaignDialog from '@/components/admin/convenios/PresidentSignCampaignDialog';
+import PresidentSignBatchProgressBar from '@/components/admin/convenios/PresidentSignBatchProgressBar';
+import ConvenioReviewDialog from '@/components/admin/convenios/ConvenioReviewDialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -331,6 +337,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [trackingDetail, setTrackingDetail] = useState<TrackingDetailResponse['data'] | null>(null);
   const [isLoadingTrackingDetail, setIsLoadingTrackingDetail] = useState(false);
   const [isManualRefreshingHistory, setIsManualRefreshingHistory] = useState(false);
+  const [isManualRefreshingStats, setIsManualRefreshingStats] = useState(false);
   
   // Estado para consulta de afiliado
   const [consultTipoDocumento, setConsultTipoDocumento] = useState<string>('CC');
@@ -598,6 +605,13 @@ const AdminDocumentSigningPage: React.FC = () => {
   // Estado para selección múltiple (firma presidencial bulk)
   const [selectedTrackingIds, setSelectedTrackingIds] = useState<Set<number>>(new Set());
   const [isBulkSigning, setIsBulkSigning] = useState(false);
+  const [isBulkCompletingReview, setIsBulkCompletingReview] = useState(false);
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewBatchId, setReviewBatchId] = useState<number | null>(null);
+  const [reviewInitialTrackings, setReviewInitialTrackings] = useState<ConvenioReviewTrackingItem[]>([]);
+  const [activePresidentBatchId, setActivePresidentBatchId] = useState<number | null>(null);
+  const [showPresidentBatchBar, setShowPresidentBatchBar] = useState(false);
   const [forcePresidentPollingUntil, setForcePresidentPollingUntil] = useState<number | null>(null);
   const [pendingPresidentQueueUntil, setPendingPresidentQueueUntil] = useState<Record<number, number>>({});
   const [highlightedPresidentSignIds, setHighlightedPresidentSignIds] = useState<
@@ -670,24 +684,41 @@ const AdminDocumentSigningPage: React.FC = () => {
   }, []);
 
   const notifyPresidentSignCompletions = useCallback(
-    (completions: Array<Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'>>) => {
+    (
+      completions: Array<
+        Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'> & {
+          reviewReady?: boolean;
+        }
+      >,
+    ) => {
       if (completions.length === 0) {
         return;
       }
 
       if (completions.length === 1) {
         const tracking = completions[0];
-        toast.success('Firma presidencial completada', {
-          description: `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) ya está listo para descargar.`,
-          duration: 10000,
-        });
+        toast.success(
+          tracking.reviewReady ? 'Listo para revisión' : 'Firma presidencial completada',
+          {
+            description: tracking.reviewReady
+              ? `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) está pendiente de revisión.`
+              : `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) ya está listo para descargar.`,
+            duration: 10000,
+          },
+        );
       } else {
-        toast.success(`${completions.length} convenios completados`, {
-          description: completions
-            .map((tracking) => `${tracking.nombre_afiliado} (${tracking.documento})`)
-            .join(' · '),
-          duration: 12000,
-        });
+        const reviewCount = completions.filter((tracking) => tracking.reviewReady).length;
+        toast.success(
+          reviewCount > 0
+            ? `${completions.length} convenios listos (${reviewCount} para revisión)`
+            : `${completions.length} convenios completados`,
+          {
+            description: completions
+              .map((tracking) => `${tracking.nombre_afiliado} (${tracking.documento})`)
+              .join(' · '),
+            duration: 12000,
+          },
+        );
       }
 
       applyPresidentSignHighlights(
@@ -742,8 +773,11 @@ const AdminDocumentSigningPage: React.FC = () => {
         return;
       }
 
-      const completions: Array<Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'>> =
-        [];
+      const completions: Array<
+        Pick<ConvenioEmailTracking, 'id' | 'nombre_afiliado' | 'documento'> & {
+          reviewReady?: boolean;
+        }
+      > = [];
       const errors: Array<
         Pick<
           ConvenioEmailTracking,
@@ -762,7 +796,12 @@ const AdminDocumentSigningPage: React.FC = () => {
         watch.lastKnownEstado = currentEstado;
 
         if (currentEstado === 'completado' && previousEstado !== 'completado') {
-          completions.push(tracking);
+          completions.push({ ...tracking, reviewReady: false });
+        } else if (
+          currentEstado === 'pendiente_revision' &&
+          previousEstado !== 'pendiente_revision'
+        ) {
+          completions.push({ ...tracking, reviewReady: true });
         } else if (
           currentEstado === 'error_firma_presidente' &&
           previousEstado !== 'error_firma_presidente'
@@ -861,7 +900,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       const rows = query.state.data?.data.data ?? [];
       const presidentSigning = rows.some((t) => t.signing_estado === 'firmando_presidente');
       const waitingAffiliate = rows.some((t) => t.signing_estado === 'pendiente_firma');
-      if (presidentSigning || shouldForcePresidentPolling) {
+      if (presidentSigning || shouldForcePresidentPolling || showPresidentBatchBar) {
         return 8000;
       }
       if (waitingAffiliate) {
@@ -976,6 +1015,41 @@ const AdminDocumentSigningPage: React.FC = () => {
     historyData?.auto_sign_enabled ??
     statsData?.data?.auto_sign_enabled ??
     false;
+
+  const presidentSignBulkEnabled: boolean =
+    historyData?.president_sign_bulk_enabled ??
+    historyData?.ui?.president_sign_bulk_enabled ??
+    statsData?.data?.president_sign_bulk_enabled ??
+    false;
+
+  const presidentSignRequireReview: boolean =
+    historyData?.president_sign_require_review ??
+    historyData?.ui?.president_sign_require_review ??
+    statsData?.data?.president_sign_require_review ??
+    true;
+
+  useEffect(() => {
+    if (activeTab !== 'history' || !presidentSignBulkEnabled || !can('document_signing.manage')) {
+      return;
+    }
+
+    void fetchActivePresidentSignBatch().then((result) => {
+      const batch = result.batch;
+      if (!batch) {
+        return;
+      }
+
+      const needsBar =
+        batch.status === 'processing' ||
+        batch.signing > 0 ||
+        (presidentSignRequireReview && batch.ready_for_review > 0);
+
+      if (needsBar) {
+        setActivePresidentBatchId(batch.id);
+        setShowPresidentBatchBar(true);
+      }
+    });
+  }, [activeTab, presidentSignBulkEnabled, presidentSignRequireReview, can]);
 
   const deliveryMode: ConvenioDeliveryMode =
     historyData?.delivery_mode ??
@@ -1653,8 +1727,11 @@ const AdminDocumentSigningPage: React.FC = () => {
   const handleRefreshHistory = async (): Promise<void> => {
     setIsManualRefreshingHistory(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['convenios-manual-history'] });
-      await queryClient.invalidateQueries({ queryKey: ['convenios-manual-failed-email-days'] });
+      await Promise.all([
+        refetchHistory(),
+        queryClient.refetchQueries({ queryKey: ['convenios-manual-failed-email-days'] }),
+      ]);
+
       if (!trackingDetailOpen || !trackingDetail?.tracking.id) {
         return;
       }
@@ -1667,6 +1744,18 @@ const AdminDocumentSigningPage: React.FC = () => {
       setIsManualRefreshingHistory(false);
     }
   };
+
+  const handleRefreshStats = async (): Promise<void> => {
+    setIsManualRefreshingStats(true);
+    try {
+      await refetchStats();
+    } finally {
+      setIsManualRefreshingStats(false);
+    }
+  };
+
+  const isRefreshingHistory = isManualRefreshingHistory;
+  const isRefreshingStats = isManualRefreshingStats;
 
   const handleOpenResendDialog = (tracking: ConvenioEmailTracking) => {
     setSelectedTrackingId(tracking.id);
@@ -1865,6 +1954,14 @@ const AdminDocumentSigningPage: React.FC = () => {
       };
     }
 
+    if (signingEstado === 'pendiente_revision') {
+      return {
+        label: 'Pendiente revisión',
+        tone: 'warning',
+        description: 'La firma del presidente fue aplicada y espera validación antes de completar.',
+      };
+    }
+
     const map: Record<string, { label: string; tone: TrackingStatusTone; description: string }> = {
       firmado_afiliado: {
         label: 'Firmado afiliado',
@@ -2010,6 +2107,10 @@ const AdminDocumentSigningPage: React.FC = () => {
             ? `${result.rejected.length} rechazados por estado inválido.`
             : 'Todos los convenios fueron enviados correctamente.',
       });
+      if (result.batch_id) {
+        setActivePresidentBatchId(result.batch_id);
+        setShowPresidentBatchBar(true);
+      }
       const rejectedIds = new Set(result.rejected.map((item) => item.tracking_id));
       const acceptedIds = presidentSignEligibleSelectedIds.filter((trackingId) => !rejectedIds.has(trackingId));
       const historyItems = historyData?.data.data ?? [];
@@ -2033,8 +2134,53 @@ const AdminDocumentSigningPage: React.FC = () => {
   };
 
   const isEligibleForPresidentSign = (tracking: ConvenioEmailTracking): boolean =>
-    tracking.signing_estado === 'firmado_afiliado' ||
-    tracking.signing_estado === 'error_firma_presidente';
+    tracking.available_actions?.president_sign ??
+    (tracking.signing_estado === 'firmado_afiliado' ||
+      tracking.signing_estado === 'error_firma_presidente');
+
+  const isEligibleForReviewComplete = (tracking: ConvenioEmailTracking): boolean =>
+    tracking.available_actions?.complete_review ?? tracking.signing_estado === 'pendiente_revision';
+
+  const openReviewDialog = (batchId: number | null, trackings: ConvenioReviewTrackingItem[] = []) => {
+    setReviewBatchId(batchId);
+    setReviewInitialTrackings(trackings);
+    setReviewDialogOpen(true);
+  };
+
+  const handleBulkCompleteReview = async () => {
+    if (reviewCompleteEligibleSelectedIds.length === 0) {
+      return;
+    }
+    setIsBulkCompletingReview(true);
+    try {
+      const result = await completeConvenioBulk(reviewCompleteEligibleSelectedIds);
+      toast.success(`${result.accepted} convenio(s) completados`);
+      setSelectedTrackingIds(new Set());
+      void refetchHistory();
+    } catch (err: any) {
+      toast.error('Error al completar en lote', { description: err?.message });
+    } finally {
+      setIsBulkCompletingReview(false);
+    }
+  };
+
+  const handleOpenReviewForTracking = (tracking: ConvenioEmailTracking) => {
+    openReviewDialog(null, [
+      {
+        id: tracking.id,
+        documento: tracking.documento,
+        nombre_afiliado: tracking.nombre_afiliado,
+        nombre_convenio: tracking.nombre_convenio,
+        signing_estado: tracking.signing_estado,
+      },
+    ]);
+  };
+
+  const handleCampaignStarted = (batchId: number) => {
+    setActivePresidentBatchId(batchId);
+    setShowPresidentBatchBar(true);
+    void refetchHistory();
+  };
 
   const canDownloadOriginalTracking = (tracking: ConvenioEmailTracking): boolean =>
     tracking.available_actions?.download_original ?? canDownloadOriginalConvenio(tracking);
@@ -2042,9 +2188,14 @@ const AdminDocumentSigningPage: React.FC = () => {
   const selectableTrackingIds = useMemo(() => {
     const items = historyData?.data.data ?? [];
     return items
-      .filter((t) => canResendTracking(t) || isEligibleForPresidentSign(t))
+      .filter(
+        (t) =>
+          canResendTracking(t) ||
+          (presidentSignBulkEnabled && isEligibleForPresidentSign(t)) ||
+          isEligibleForReviewComplete(t),
+      )
       .map((t) => t.id);
-  }, [historyData]);
+  }, [historyData, presidentSignBulkEnabled]);
 
   const resendEligibleSelectedIds = useMemo(() => {
     const items = historyData?.data.data ?? [];
@@ -2058,7 +2209,15 @@ const AdminDocumentSigningPage: React.FC = () => {
     const items = historyData?.data.data ?? [];
     return Array.from(selectedTrackingIds).filter((id) => {
       const tracking = items.find((t) => t.id === id);
-      return tracking ? isEligibleForPresidentSign(tracking) : false;
+      return tracking ? presidentSignBulkEnabled && isEligibleForPresidentSign(tracking) : false;
+    });
+  }, [selectedTrackingIds, historyData, presidentSignBulkEnabled]);
+
+  const reviewCompleteEligibleSelectedIds = useMemo(() => {
+    const items = historyData?.data.data ?? [];
+    return Array.from(selectedTrackingIds).filter((id) => {
+      const tracking = items.find((t) => t.id === id);
+      return tracking ? isEligibleForReviewComplete(tracking) : false;
     });
   }, [selectedTrackingIds, historyData]);
 
@@ -2293,6 +2452,17 @@ const AdminDocumentSigningPage: React.FC = () => {
                         </CardDescription>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {canManageDocumentSigning && presidentSignBulkEnabled && autoSignEnabled && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setCampaignDialogOpen(true)}
+                            className={`gap-1.5 ${presidentSignButtonClassName}`}
+                          >
+                            <PenLine className="h-4 w-4" />
+                            Firma masiva
+                          </Button>
+                        )}
                         {can('document_signing.view') && (
                           <Button
                             variant="default"
@@ -2324,15 +2494,32 @@ const AdminDocumentSigningPage: React.FC = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => void handleRefreshHistory()}
-                          disabled={isManualRefreshingHistory}
+                          disabled={isRefreshingHistory}
+                          className="gap-1.5"
                         >
-                          <RefreshCw className={`h-4 w-4 mr-2 ${isManualRefreshingHistory ? 'animate-spin' : ''}`} />
-                          Actualizar
+                          {isRefreshingHistory ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          {isRefreshingHistory ? 'Actualizando...' : 'Actualizar'}
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="min-w-0 space-y-4 p-4 sm:p-6 sm:pt-0">
+                    {showPresidentBatchBar && presidentSignBulkEnabled && (
+                      <PresidentSignBatchProgressBar
+                        activeBatchId={activePresidentBatchId}
+                        requireReview={presidentSignRequireReview}
+                        onReview={(batchId) => openReviewDialog(batchId)}
+                        onBatchFullyManaged={() => {
+                          setShowPresidentBatchBar(false);
+                          setActivePresidentBatchId(null);
+                        }}
+                        onBatchFinished={() => void refetchHistory()}
+                      />
+                    )}
                     <TooltipProvider delayDuration={300}>
                     {/* Filtros */}
                     <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
@@ -2379,6 +2566,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <SelectItem value="firma_firmado_afiliado">Firmado por afiliado</SelectItem>
                                 {autoSignEnabled && (
                                   <SelectItem value="firma_error_presidente">Error firma presidente</SelectItem>
+                                )}
+                                {autoSignEnabled && presidentSignRequireReview && (
+                                  <SelectItem value="firma_pendiente_revision">Pendiente revisión</SelectItem>
                                 )}
                                 <SelectItem value="firma_completado">Completado</SelectItem>
                               </SelectGroup>
@@ -2512,7 +2702,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 Reenviar seleccionados ({resendEligibleSelectedIds.length})
                               </Button>
                             )}
-                            {autoSignEnabled && presidentSignEligibleSelectedIds.length > 0 && (
+                            {autoSignEnabled && presidentSignBulkEnabled && presidentSignEligibleSelectedIds.length > 0 && (
                               <Button
                                 size="sm"
                                 onClick={() => void handleBulkSignAsPresident()}
@@ -2525,6 +2715,22 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <PenLine className="h-3.5 w-3.5" />
                                 )}
                                 Firmar como presidente ({presidentSignEligibleSelectedIds.length})
+                              </Button>
+                            )}
+                            {reviewCompleteEligibleSelectedIds.length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleBulkCompleteReview()}
+                                disabled={isBulkCompletingReview}
+                                className="gap-1.5"
+                              >
+                                {isBulkCompletingReview ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                )}
+                                Completar revisión ({reviewCompleteEligibleSelectedIds.length})
                               </Button>
                             )}
                             <Button
@@ -2648,6 +2854,24 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   </TableCell>
                                   <TableCell className="align-top min-w-0 py-3 pl-2 pr-4">
                                     <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                      {autoSignEnabled && can('document_signing.manage') && isEligibleForReviewComplete(tracking) && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="secondary"
+                                              size="sm"
+                                              className="h-8 shrink-0 px-2"
+                                              onClick={() => handleOpenReviewForTracking(tracking)}
+                                              aria-label="Revisar convenio"
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>Revisar y completar</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
                                       {autoSignEnabled && can('document_signing.manage') && isEligibleForPresidentSign(tracking) && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
@@ -2832,6 +3056,19 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     </div>
 
                                     <div className="border-t pt-2 flex flex-wrap gap-2">
+                                      {autoSignEnabled &&
+                                        can('document_signing.manage') &&
+                                        isEligibleForReviewComplete(tracking) && (
+                                          <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 shrink-0 px-2"
+                                            onClick={() => handleOpenReviewForTracking(tracking)}
+                                            aria-label="Revisar convenio"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                        )}
                                       {autoSignEnabled &&
                                         can('document_signing.manage') &&
                                         isEligibleForPresidentSign(tracking) && (
@@ -4289,10 +4526,16 @@ const AdminDocumentSigningPage: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => refetchStats()}
-                          disabled={isLoadingStats}
+                          onClick={() => void handleRefreshStats()}
+                          disabled={isRefreshingStats}
+                          className="gap-1.5"
                         >
-                          <RefreshCw className={`h-4 w-4 ${isLoadingStats ? 'animate-spin' : ''}`} />
+                          {isRefreshingStats ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          {isRefreshingStats ? 'Actualizando...' : 'Actualizar'}
                         </Button>
                       </div>
                     </div>
@@ -5137,6 +5380,18 @@ const AdminDocumentSigningPage: React.FC = () => {
             digitalSigningEnabled={digitalSigningEnabled}
             initialFilters={{ ...historyFilters, periodo: periodoFilter }}
             availablePeriodos={availablePeriodos}
+          />
+          <PresidentSignCampaignDialog
+            open={campaignDialogOpen}
+            onOpenChange={setCampaignDialogOpen}
+            onStarted={handleCampaignStarted}
+          />
+          <ConvenioReviewDialog
+            open={reviewDialogOpen}
+            onOpenChange={setReviewDialogOpen}
+            batchId={reviewBatchId}
+            initialTrackings={reviewInitialTrackings}
+            onUpdated={() => void refetchHistory()}
           />
         </div>
       </div>
