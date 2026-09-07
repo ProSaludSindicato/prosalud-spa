@@ -1681,6 +1681,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                         ...tracking.available_actions,
                         resend: false,
                         mark_invalid: false,
+                        president_sign: false,
+                        complete_review: false,
+                        mark_review_error: false,
                       },
                     }
                   : tracking,
@@ -1703,15 +1706,7 @@ const AdminDocumentSigningPage: React.FC = () => {
   });
 
   const canInvalidateTracking = (tracking: ConvenioEmailTracking): boolean =>
-    can('document_signing.manage')
-    && (tracking.available_actions?.mark_invalid
-      ?? (tracking.signing_estado !== 'rechazado'
-        && tracking.signing_estado !== 'firmado_afiliado'
-        && tracking.signing_estado !== 'firmando_presidente'
-        && tracking.signing_estado !== 'pendiente_revision'
-        && tracking.signing_estado !== 'error_firma_presidente'
-        && tracking.signing_estado !== 'completado'
-        && !tracking.firmado_afiliado_at));
+    can('document_signing.manage') && (tracking.available_actions?.mark_invalid ?? false);
 
   // Función para importar convenios
   const handleImportBulk = () => {

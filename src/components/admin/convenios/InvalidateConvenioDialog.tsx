@@ -48,7 +48,12 @@ export default function InvalidateConvenioDialog({
         <DialogHeader>
           <DialogTitle>Invalidar convenio</DialogTitle>
           <DialogDescription>
-            El afiliado ya no podrá firmar este registro. Use esta acción si el convenio se envió por error o fue reemplazado por uno nuevo.
+            {tracking?.firmado_afiliado_at || tracking?.signing_estado === 'firmado_afiliado'
+              || tracking?.signing_estado === 'firmando_presidente'
+              || tracking?.signing_estado === 'pendiente_revision'
+              || tracking?.signing_estado === 'error_firma_presidente'
+              ? 'Este convenio ya fue firmado por el afiliado. Al invalidarlo no podrá completarse ni firmarse por el presidente. Use esta acción solo si fue reemplazado por uno nuevo.'
+              : 'El afiliado ya no podrá firmar este registro. Use esta acción si el convenio se envió por error o fue reemplazado por uno nuevo.'}
           </DialogDescription>
         </DialogHeader>
 
