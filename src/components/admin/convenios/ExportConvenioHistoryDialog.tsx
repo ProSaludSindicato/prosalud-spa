@@ -33,6 +33,7 @@ const EXPORTABLE_ESTADO_FILTROS: EmailHistoryEstadoFiltro[] = [
   'firma_pendiente_firma',
   'firma_firmado_afiliado',
   'firma_completado',
+  'firma_rechazado',
 ];
 
 function normalizeEstadoFiltro(value?: EmailHistoryEstadoFiltro): EmailHistoryEstadoFiltro {
@@ -194,6 +195,7 @@ export default function ExportConvenioHistoryDialog({
                             <SelectItem value="firma_pendiente_firma">Pendiente de firma</SelectItem>
                             <SelectItem value="firma_firmado_afiliado">Firmado por afiliado</SelectItem>
                             <SelectItem value="firma_completado">Completado</SelectItem>
+                            <SelectItem value="firma_rechazado">Invalidado</SelectItem>
                           </SelectGroup>
                         )}
                       </SelectContent>

@@ -64,6 +64,7 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  Ban,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 // Manual signing service (ACTIVE)
@@ -79,18 +80,23 @@ import {
   exportTemplate,
   importBulkConvenios,
   importPdfZip,
+  invalidateConvenio,
+  CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED,
+  isConvenioDuplicateImportError,
   downloadConvenioFinalPdf,
   downloadConvenioOriginalPdf,
   signAsPresident,
   signAsPresidentBulk,
   completeConvenioBulk,
   fetchActivePresidentSignBatch,
+  isPresidentSignBatchDismissed,
   ConvenioReviewTrackingItem,
   ConvenioEmailTracking,
   ConvenioSigningEstado,
   ConvenioDeliveryMode,
   visibleConvenioSendError,
   EmailHistoryParams as ManualEmailHistoryParams,
+  EmailHistoryResponse,
   EmailHistoryEstadoFiltro,
   EmailHistoryCalificacionFiltro,
   GenerateAndSendConvenioRequest,
@@ -98,6 +104,9 @@ import {
   DownloadGeneratedConvenioResult,
   ImportBulkConveniosResponse,
   ImportPdfZipResponse,
+  ConvenioDuplicateAction,
+  ConvenioDuplicateConflict,
+  ConvenioImportConfirmation,
   TrackingDetailResponse,
   CONVENIO_PERIODO_TODOS,
   currentConvenioPeriodo,
@@ -121,6 +130,8 @@ import ExportConvenioHistoryDialog from '@/components/admin/convenios/ExportConv
 import PresidentSignCampaignDialog from '@/components/admin/convenios/PresidentSignCampaignDialog';
 import PresidentSignBatchProgressBar from '@/components/admin/convenios/PresidentSignBatchProgressBar';
 import ConvenioReviewDialog from '@/components/admin/convenios/ConvenioReviewDialog';
+import ImportDuplicateConfirmDialog from '@/components/admin/convenios/ImportDuplicateConfirmDialog';
+import InvalidateConvenioDialog from '@/components/admin/convenios/InvalidateConvenioDialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -324,6 +335,11 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [bulkSendEmail, setBulkSendEmail] = useState(true);
   const [importResult, setImportResult] = useState<ImportBulkConveniosResponse | null>(null);
   const [importZipResult, setImportZipResult] = useState<ImportPdfZipResponse | null>(null);
+  // TODO: reactivar cuando retomen confirmación de duplicados en importación.
+  const [duplicateImportOpen, setDuplicateImportOpen] = useState(false);
+  const [duplicateConflicts, setDuplicateConflicts] = useState<ConvenioDuplicateConflict[]>([]);
+  const [invalidateDialogOpen, setInvalidateDialogOpen] = useState(false);
+  const [trackingToInvalidate, setTrackingToInvalidate] = useState<ConvenioEmailTracking | null>(null);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
@@ -1044,7 +1060,7 @@ const AdminDocumentSigningPage: React.FC = () => {
         batch.signing > 0 ||
         (presidentSignRequireReview && batch.ready_for_review > 0);
 
-      if (needsBar) {
+      if (needsBar && !isPresidentSignBatchDismissed(batch.id)) {
         setActivePresidentBatchId(batch.id);
         setShowPresidentBatchBar(true);
       }
@@ -1453,11 +1469,17 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   // Mutación para importar convenios masivamente
   const importBulkMutation = useMutation({
-    mutationFn: (data: { file: File; send_email: boolean }) => 
-      importBulkConvenios(data.file, data.send_email),
+    mutationFn: (data: { file: File; send_email: boolean } & ConvenioImportConfirmation) =>
+      importBulkConvenios(data.file, data.send_email, CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED ? {
+        confirm_duplicates: data.confirm_duplicates,
+        duplicate_actions: data.duplicate_actions,
+        invalidation_reason: data.invalidation_reason,
+      } : undefined),
     onSuccess: (response) => {
       setImportResult(response);
       setImportZipResult(null);
+      setDuplicateImportOpen(false);
+      setDuplicateConflicts([]);
       const { procesados, exitosos, errores } = response.data;
 
       if (exitosos === 0 && errores > 0) {
@@ -1496,15 +1518,28 @@ const AdminDocumentSigningPage: React.FC = () => {
         fileInput.value = '';
       }
     },
-    onError: (error: any) => {
-      if (error.isValidationError) {
-        if (error.missing_columns && error.missing_columns.length > 0) {
+    onError: (error: unknown) => {
+      if (CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED && isConvenioDuplicateImportError(error)) {
+        setDuplicateConflicts(error.duplicates);
+        setDuplicateImportOpen(true);
+        return;
+      }
+
+      const importError = error as {
+        isValidationError?: boolean;
+        missing_columns?: string[];
+        errors?: Record<string, string[]>;
+        message?: string;
+      };
+
+      if (importError.isValidationError) {
+        if (importError.missing_columns && importError.missing_columns.length > 0) {
           toast.error('Columnas requeridas faltantes', {
-            description: `Faltan las siguientes columnas: ${error.missing_columns.join(', ')}. Descarga la plantilla para ver el formato correcto.`,
+            description: `Faltan las siguientes columnas: ${importError.missing_columns.join(', ')}. Descarga la plantilla para ver el formato correcto.`,
             duration: 10000,
           });
-        } else if (error.errors) {
-          Object.entries(error.errors).forEach(([field, messages]) => {
+        } else if (importError.errors) {
+          Object.entries(importError.errors).forEach(([field, messages]) => {
             const fieldMessages = Array.isArray(messages) ? messages : [messages];
             fieldMessages.forEach((message: string) => {
               toast.error(`Error en ${field}`, {
@@ -1514,23 +1549,29 @@ const AdminDocumentSigningPage: React.FC = () => {
           });
         } else {
           toast.error('Error de validación', {
-            description: error.message || 'El archivo no cumple con los requisitos.',
+            description: importError.message || 'El archivo no cumple con los requisitos.',
           });
         }
       } else {
         toast.error('Error al importar convenios', {
-          description: error.message || 'Ocurrió un error al procesar el archivo.',
+          description: importError.message || 'Ocurrió un error al procesar el archivo.',
         });
       }
     },
   });
 
   const importZipMutation = useMutation({
-    mutationFn: (data: { file: File; send_email: boolean }) =>
-      importPdfZip(data.file, data.send_email),
+    mutationFn: (data: { file: File; send_email: boolean } & ConvenioImportConfirmation) =>
+      importPdfZip(data.file, data.send_email, CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED ? {
+        confirm_duplicates: data.confirm_duplicates,
+        duplicate_actions: data.duplicate_actions,
+        invalidation_reason: data.invalidation_reason,
+      } : undefined),
     onSuccess: (response) => {
       setImportZipResult(response);
       setImportResult(null);
+      setDuplicateImportOpen(false);
+      setDuplicateConflicts([]);
 
       if (response.data.validos > 0 && response.data.rechazados > 0) {
         toast.warning('Importación parcial', {
@@ -1562,18 +1603,115 @@ const AdminDocumentSigningPage: React.FC = () => {
         fileInput.value = '';
       }
     },
-    onError: (error: any) => {
-      if (error.isValidationError) {
+    onError: (error: unknown) => {
+      if (CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED && isConvenioDuplicateImportError(error)) {
+        setDuplicateConflicts(error.duplicates);
+        setDuplicateImportOpen(true);
+        return;
+      }
+
+      const importError = error as { isValidationError?: boolean; message?: string };
+      if (importError.isValidationError) {
         toast.error('Error de validación', {
-          description: error.message || 'El ZIP no cumple con los requisitos.',
+          description: importError.message || 'El ZIP no cumple con los requisitos.',
         });
       } else {
         toast.error('Error al importar ZIP', {
-          description: error.message || 'Ocurrió un error al procesar el archivo.',
+          description: importError.message || 'Ocurrió un error al procesar el archivo.',
         });
       }
     },
   });
+
+  const handleConfirmDuplicateImport = (actions: ConvenioDuplicateAction[]) => {
+    if (!CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED) {
+      return;
+    }
+
+    if (!selectedFile) {
+      toast.error('Archivo requerido', {
+        description: 'Vuelva a seleccionar el archivo para continuar la importación.',
+      });
+      return;
+    }
+
+    const payload = {
+      file: selectedFile,
+      send_email: bulkSendEmail,
+      confirm_duplicates: true,
+      duplicate_actions: actions,
+    };
+
+    if (bulkImportMode === 'excel') {
+      importBulkMutation.mutate(payload);
+      return;
+    }
+
+    importZipMutation.mutate(payload);
+  };
+
+  const invalidateMutation = useMutation({
+    mutationFn: ({ trackingId, reason }: { trackingId: number; reason: string }) =>
+      invalidateConvenio(trackingId, reason),
+    onSuccess: (_data, variables) => {
+      toast.success('Convenio invalidado', {
+        description: 'El afiliado ya no puede firmar este registro.',
+      });
+      setInvalidateDialogOpen(false);
+      setTrackingToInvalidate(null);
+
+      queryClient.setQueryData<EmailHistoryResponse>(
+        ['convenios-manual-history', historyQueryFilters],
+        (old) => {
+          if (!old?.data?.data) {
+            return old;
+          }
+
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              data: old.data.data.map((tracking) =>
+                tracking.id === variables.trackingId
+                  ? {
+                      ...tracking,
+                      signing_estado: 'rechazado',
+                      rechazado_at: new Date().toISOString(),
+                      available_actions: {
+                        ...tracking.available_actions,
+                        resend: false,
+                        mark_invalid: false,
+                      },
+                    }
+                  : tracking,
+              ),
+            },
+          };
+        },
+      );
+
+      window.setTimeout(() => {
+        void refetchHistory();
+      }, 1500);
+    },
+    onError: (error: unknown) => {
+      const message = error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: string }).message)
+        : 'No se pudo invalidar el convenio.';
+      toast.error('No se pudo invalidar', { description: message });
+    },
+  });
+
+  const canInvalidateTracking = (tracking: ConvenioEmailTracking): boolean =>
+    can('document_signing.manage')
+    && (tracking.available_actions?.mark_invalid
+      ?? (tracking.signing_estado !== 'rechazado'
+        && tracking.signing_estado !== 'firmado_afiliado'
+        && tracking.signing_estado !== 'firmando_presidente'
+        && tracking.signing_estado !== 'pendiente_revision'
+        && tracking.signing_estado !== 'error_firma_presidente'
+        && tracking.signing_estado !== 'completado'
+        && !tracking.firmado_afiliado_at));
 
   // Función para importar convenios
   const handleImportBulk = () => {
@@ -1974,9 +2112,11 @@ const AdminDocumentSigningPage: React.FC = () => {
         description: 'El convenio fue firmado por el afiliado y el presidente.',
       },
       rechazado: {
-        label: 'Rechazado',
+        label: 'Invalidado',
         tone: 'error',
-        description: 'El afiliado rechazó firmar el convenio.',
+        description: tracking.motivo_rechazo?.trim()
+          ? tracking.motivo_rechazo
+          : 'Este convenio fue invalidado y ya no admite firma del afiliado.',
       },
     };
 
@@ -2518,6 +2658,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                           setActivePresidentBatchId(null);
                         }}
                         onBatchFinished={() => void refetchHistory()}
+                        onDismiss={() => {
+                          setShowPresidentBatchBar(false);
+                          setActivePresidentBatchId(null);
+                        }}
                       />
                     )}
                     <TooltipProvider delayDuration={300}>
@@ -2571,6 +2715,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <SelectItem value="firma_pendiente_revision">Pendiente revisión</SelectItem>
                                 )}
                                 <SelectItem value="firma_completado">Completado</SelectItem>
+                                <SelectItem value="firma_rechazado">Invalidado</SelectItem>
                               </SelectGroup>
                             )}
                           </SelectContent>
@@ -2745,7 +2890,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                         )}
 
                         <div className="hidden lg:block border rounded-lg overflow-x-auto">
-                          <Table className="table-fixed w-full min-w-[900px]">
+                          <Table className="table-fixed w-full min-w-[960px]">
                             <TableHeader>
                               <TableRow>
                                 {can('document_signing.manage') && (
@@ -2766,11 +2911,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                                     />
                                   </TableHead>
                                 )}
-                                <TableHead className="w-[25%] min-w-0">Afiliado</TableHead>
-                                <TableHead className="w-[20%] min-w-0">Convenio</TableHead>
-                                <TableHead className="w-[24%] min-w-0">Estado envío y firma</TableHead>
-                                <TableHead className="w-[17%] min-w-0">Sede y envío</TableHead>
-                                <TableHead className="w-[14%] min-w-0 text-right pl-2 pr-4">Acciones</TableHead>
+                                <TableHead className="w-[24%] min-w-0">Afiliado</TableHead>
+                                <TableHead className="w-[19%] min-w-0">Convenio</TableHead>
+                                <TableHead className="w-[23%] min-w-0">Estado envío y firma</TableHead>
+                                <TableHead className="w-[16%] min-w-0">Sede y envío</TableHead>
+                                <TableHead className="w-[14rem] text-right pl-2 pr-4">Acciones</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2852,15 +2997,15 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       </p>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="align-top min-w-0 py-3 pl-2 pr-4">
-                                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                  <TableCell className="align-top w-[14rem] whitespace-nowrap py-3 pl-2 pr-4">
+                                    <div className="flex flex-nowrap items-center justify-end gap-0.5">
                                       {autoSignEnabled && can('document_signing.manage') && isEligibleForReviewComplete(tracking) && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button
                                               variant="secondary"
-                                              size="sm"
-                                              className="h-8 shrink-0 px-2"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
                                               onClick={() => handleOpenReviewForTracking(tracking)}
                                               aria-label="Revisar convenio"
                                             >
@@ -2877,8 +3022,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           <TooltipTrigger asChild>
                                             <Button
                                               variant="default"
-                                              size="sm"
-                                              className={cn('h-8 shrink-0 px-2', presidentSignButtonClassName)}
+                                              size="icon"
+                                              className={cn('h-8 w-8 shrink-0', presidentSignButtonClassName)}
                                               onClick={() => void handleSignAsPresident(tracking)}
                                               disabled={isPresidentSigningProcessing(tracking) || isBulkSigning}
                                               aria-label="Firmar como presidente"
@@ -2909,8 +3054,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           <TooltipTrigger asChild>
                                             <Button
                                               variant="ghost"
-                                              size="sm"
-                                              className="h-8 shrink-0 px-2"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
                                               onClick={() => void handleOpenTrackingDetail(tracking)}
                                               aria-label="Ver detalle del convenio"
                                             >
@@ -2928,8 +3073,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           <TooltipTrigger asChild>
                                             <Button
                                               variant="ghost"
-                                              size="sm"
-                                              className="h-8 shrink-0 px-2"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
                                               onClick={() => handleOpenResendDialog(tracking)}
                                               aria-label="Reintento de envío"
                                             >
@@ -2942,13 +3087,35 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TooltipContent>
                                         </Tooltip>
                                       )}
+                                      {canInvalidateTracking(tracking) && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                                              onClick={() => {
+                                                setTrackingToInvalidate(tracking);
+                                                setInvalidateDialogOpen(true);
+                                              }}
+                                              aria-label="Invalidar convenio"
+                                            >
+                                              <Ban className="h-4 w-4" />
+                                              <span className="sr-only">Invalidar convenio</span>
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>Invalidar convenio</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
                                       {hasDownloadOptions && (
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <Button
                                               variant="ghost"
-                                              size="sm"
-                                              className="h-8 shrink-0 px-2"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
                                               aria-label="Descargar archivos del convenio"
                                             >
                                               <Download className="h-4 w-4" />
@@ -3112,6 +3279,20 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         >
                                           <RefreshCw className="h-3.5 w-3.5" />
                                           Reenviar
+                                        </Button>
+                                      )}
+                                      {canInvalidateTracking(tracking) && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 gap-1.5 px-2.5 text-destructive"
+                                          onClick={() => {
+                                            setTrackingToInvalidate(tracking);
+                                            setInvalidateDialogOpen(true);
+                                          }}
+                                        >
+                                          <Ban className="h-3.5 w-3.5" />
+                                          Invalidar
                                         </Button>
                                       )}
                                       {hasDownloadOptions && (
@@ -4989,13 +5170,17 @@ const AdminDocumentSigningPage: React.FC = () => {
                       <span className="font-semibold text-muted-foreground">Documento</span>
                       <p className="font-mono">{trackingDetail.tracking.documento}</p>
                     </div>
-                    <div>
-                      <span className="font-semibold text-muted-foreground">Estado</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {getManualStatusBadge(trackingDetail.tracking.estado)}
-                        {(trackingDetail.tracking.is_test || trackingDetail.tracking.estado === 'verificacion') && getTestBadge()}
+                      <div>
+                        <span className="font-semibold text-muted-foreground">Estado envío y firma</span>
+                        <div className="mt-1">
+                          <TooltipProvider delayDuration={300}>
+                            {renderTrackingStatusCell(trackingDetail.tracking)}
+                          </TooltipProvider>
+                        </div>
+                        {trackingDetail.tracking.signing_estado === 'rechazado' && trackingDetail.tracking.motivo_rechazo && (
+                          <p className="mt-2 text-sm text-destructive">{trackingDetail.tracking.motivo_rechazo}</p>
+                        )}
                       </div>
-                    </div>
                     <div>
                       <span className="font-semibold text-muted-foreground">Afiliado</span>
                       <p>{trackingDetail.tracking.nombre_afiliado}</p>
@@ -5398,6 +5583,32 @@ const AdminDocumentSigningPage: React.FC = () => {
             batchId={reviewBatchId}
             initialTrackings={reviewInitialTrackings}
             onUpdated={() => void refetchHistory()}
+          />
+          {CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED && (
+            <ImportDuplicateConfirmDialog
+              open={duplicateImportOpen}
+              conflicts={duplicateConflicts}
+              isSubmitting={importBulkMutation.isPending || importZipMutation.isPending}
+              onOpenChange={setDuplicateImportOpen}
+              onConfirm={handleConfirmDuplicateImport}
+            />
+          )}
+          <InvalidateConvenioDialog
+            open={invalidateDialogOpen}
+            tracking={trackingToInvalidate}
+            isSubmitting={invalidateMutation.isPending}
+            onOpenChange={(open) => {
+              setInvalidateDialogOpen(open);
+              if (!open) {
+                setTrackingToInvalidate(null);
+              }
+            }}
+            onConfirm={(reason) => {
+              if (!trackingToInvalidate) {
+                return;
+              }
+              invalidateMutation.mutate({ trackingId: trackingToInvalidate.id, reason });
+            }}
           />
         </div>
       </div>

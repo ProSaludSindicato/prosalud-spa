@@ -152,6 +152,7 @@ export interface ConvenioTrackingAvailableActions {
   president_sign?: boolean;
   complete_review?: boolean;
   mark_review_error?: boolean;
+  mark_invalid?: boolean;
   preview_pdf?: boolean;
 }
 
@@ -318,7 +319,8 @@ export type EmailHistoryEstadoFiltro =
   | 'firma_firmado_afiliado'
   | 'firma_pendiente_revision'
   | 'firma_completado'
-  | 'firma_error_presidente';
+  | 'firma_error_presidente'
+  | 'firma_rechazado';
 
 export type EmailHistoryCalificacionFiltro = '1' | '2' | '3' | '4' | '5' | 'sin_calificar';
 
@@ -1044,6 +1046,7 @@ export interface ImportBulkConveniosResponse {
     filas_vacias: number;
     send_email: boolean;
     errors?: string[];
+    omitidos?: number;
   };
 }
 
@@ -1059,8 +1062,71 @@ export interface ImportPdfZipResponse {
     rechazados: number;
     send_email: boolean;
     rejected: Array<{ entry: string; reason: string }>;
+    omitidos?: number;
   };
 }
+
+export type ConvenioDuplicateActionType =
+  | 'invalidate_and_proceed'
+  | 'skip'
+  | 'proceed_anyway';
+
+/**
+ * Validación de duplicados al importar ZIP/Excel.
+ * Desactivado temporalmente: importación directa e invalidación manual desde historial.
+ * Reactivar en true cuando retomen el flujo de confirmación en importación.
+ */
+export const CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED = false;
+
+export interface ConvenioDuplicateAction {
+  documento: string;
+  sede: string;
+  action: ConvenioDuplicateActionType;
+  invalidation_reason?: string;
+}
+
+export interface ConvenioDuplicateExisting {
+  tracking_id: number;
+  nombre_afiliado: string;
+  signing_estado: ConvenioSigningEstado | null;
+  estado: string;
+  created_at: string | null;
+  affiliate_has_signed: boolean;
+  can_invalidate: boolean;
+}
+
+export interface ConvenioDuplicateConflict {
+  key: string;
+  documento: string;
+  sede: string;
+  incoming_label?: string | null;
+  incoming_nombre?: string | null;
+  can_invalidate: boolean;
+  has_signed: boolean;
+  recommended_action: ConvenioDuplicateActionType;
+  existing: ConvenioDuplicateExisting[];
+}
+
+export interface ConvenioImportConfirmation {
+  confirm_duplicates?: boolean;
+  duplicate_actions?: ConvenioDuplicateAction[];
+  invalidation_reason?: string;
+}
+
+export interface ConvenioDuplicateImportError {
+  success: false;
+  code: 'duplicate_convenios';
+  message: string;
+  duplicates: ConvenioDuplicateConflict[];
+}
+
+export const isConvenioDuplicateImportError = (
+  error: unknown,
+): error is ConvenioDuplicateImportError =>
+  typeof error === 'object'
+  && error !== null
+  && 'code' in error
+  && (error as { code?: string }).code === 'duplicate_convenios';
 
 /**
  * Descarga la plantilla Excel para importación masiva
@@ -1170,7 +1236,8 @@ export const exportHistoryExcel = async (
  */
 export const importBulkConvenios = async (
   file: File,
-  send_email?: boolean
+  send_email?: boolean,
+  confirmation?: ConvenioImportConfirmation,
 ): Promise<ImportBulkConveniosResponse> => {
   try {
     // Validar tipo de archivo
@@ -1200,6 +1267,7 @@ export const importBulkConvenios = async (
     if (send_email !== undefined) {
       formData.append('send_email', send_email.toString());
     }
+    appendImportConfirmation(formData, confirmation);
 
     const response = await authenticatedApi.post<ImportBulkConveniosResponse>(
       '/api/convenios-manual/import-bulk',
@@ -1213,41 +1281,7 @@ export const importBulkConvenios = async (
 
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{ 
-        success: false; 
-        message: string; 
-        errors?: Record<string, string[]>;
-        missing_columns?: string[];
-      }>;
-      
-      if (axiosError.response?.status === 422) {
-        throw {
-          success: false,
-          message: axiosError.response.data?.message || 'Error de validación',
-          errors: axiosError.response.data?.errors || {},
-          missing_columns: axiosError.response.data?.missing_columns,
-          isValidationError: true,
-        };
-      }
-      
-      throw {
-        success: false,
-        message: axiosError.response?.data?.message || 'Error al importar convenios',
-        errors: {},
-      };
-    }
-    
-    // Si el error ya tiene la estructura esperada, re-lanzarlo
-    if (typeof error === 'object' && error !== null && 'success' in error) {
-      throw error;
-    }
-    
-    throw {
-      success: false,
-      message: 'Error desconocido al importar convenios',
-      errors: {},
-    };
+    throwConvenioImportError(error, 'Error al importar convenios');
   }
 };
 
@@ -1257,7 +1291,8 @@ export const importBulkConvenios = async (
  */
 export const importPdfZip = async (
   file: File,
-  send_email?: boolean
+  send_email?: boolean,
+  confirmation?: ConvenioImportConfirmation,
 ): Promise<ImportPdfZipResponse> => {
   try {
     const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
@@ -1283,6 +1318,7 @@ export const importPdfZip = async (
     if (send_email !== undefined) {
       formData.append('send_email', send_email.toString());
     }
+    appendImportConfirmation(formData, confirmation);
 
     const response = await authenticatedApi.post<ImportPdfZipResponse>(
       '/api/convenios-manual/import-pdf-zip',
@@ -1296,53 +1332,93 @@ export const importPdfZip = async (
 
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{
-        success: false;
-        message: string;
-        errors?: Record<string, string[]>;
-        data?: { rejected?: Array<{ entry: string; reason: string }> };
-      }>;
-
-      if (axiosError.response?.status === 422) {
-        throw {
-          success: false,
-          message: axiosError.response.data?.message || 'Error de validación',
-          errors: axiosError.response.data?.errors || {},
-          rejected: axiosError.response.data?.data?.rejected,
-          isValidationError: true,
-        };
-      }
-
-      if (axiosError.response?.status === 413) {
-        throw {
-          success: false,
-          message:
-            axiosError.response.data?.message ||
-            'El archivo ZIP supera el límite de carga del servidor. Intente con un ZIP más pequeño o pida al administrador aumentar los límites de PHP (post_max_size / upload_max_filesize).',
-          errors: {},
-          isValidationError: true,
-        };
-      }
-
+    if (axios.isAxiosError(error) && error.response?.status === 413) {
       throw {
         success: false,
-        message: axiosError.response?.data?.message || 'Error al importar el ZIP de PDFs',
+        message:
+          (error.response.data as { message?: string } | undefined)?.message ||
+          'El archivo ZIP supera el límite de carga del servidor. Intente con un ZIP más pequeño o pida al administrador aumentar los límites de PHP (post_max_size / upload_max_filesize).',
         errors: {},
+        isValidationError: true,
       };
     }
 
-    if (typeof error === 'object' && error !== null && 'success' in error) {
-      throw error;
+    throwConvenioImportError(error, 'Error al importar el ZIP de PDFs');
+  }
+};
+
+const appendImportConfirmation = (
+  formData: FormData,
+  confirmation?: ConvenioImportConfirmation,
+): void => {
+  if (!confirmation) {
+    return;
+  }
+
+  if (confirmation.confirm_duplicates) {
+    formData.append('confirm_duplicates', 'true');
+  }
+
+  if (confirmation.duplicate_actions && confirmation.duplicate_actions.length > 0) {
+    formData.append('duplicate_actions', JSON.stringify(confirmation.duplicate_actions));
+  }
+
+  if (confirmation.invalidation_reason && confirmation.invalidation_reason.trim() !== '') {
+    formData.append('invalidation_reason', confirmation.invalidation_reason.trim());
+  }
+};
+
+function throwConvenioImportError(error: unknown, fallbackMessage: string): never {
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError<{
+      success: false;
+      code?: string;
+      message: string;
+      errors?: Record<string, string[]>;
+      missing_columns?: string[];
+      data?: {
+        duplicates?: ConvenioDuplicateConflict[];
+        rejected?: Array<{ entry: string; reason: string }>;
+      };
+    }>;
+
+    if (axiosError.response?.status === 409 && axiosError.response.data?.code === 'duplicate_convenios') {
+      throw {
+        success: false,
+        code: 'duplicate_convenios',
+        message: axiosError.response.data.message || 'Hay convenios duplicados.',
+        duplicates: axiosError.response.data.data?.duplicates ?? [],
+      } satisfies ConvenioDuplicateImportError;
+    }
+
+    if (axiosError.response?.status === 422) {
+      throw {
+        success: false,
+        message: axiosError.response.data?.message || 'Error de validación',
+        errors: axiosError.response.data?.errors || {},
+        missing_columns: axiosError.response.data?.missing_columns,
+        rejected: axiosError.response.data?.data?.rejected,
+        isValidationError: true,
+      };
     }
 
     throw {
       success: false,
-      message: 'Error desconocido al importar el ZIP de PDFs',
+      message: axiosError.response?.data?.message || fallbackMessage,
       errors: {},
     };
   }
-};
+
+  if (typeof error === 'object' && error !== null && 'success' in error) {
+    throw error;
+  }
+
+  throw {
+    success: false,
+    message: fallbackMessage,
+    errors: {},
+  };
+}
 
 /** Descarga el PDF original generado o copiado para el envío (antes de firma del afiliado). */
 export const downloadConvenioOriginalPdf = async (
@@ -1442,6 +1518,30 @@ export interface PresidentSignBatchProgress {
   processed: number;
   created_at: string | null;
   updated_at: string | null;
+}
+
+const PRESIDENT_SIGN_BATCH_DISMISSED_KEY = 'prosalud.president-sign-batch.dismissed';
+
+export function isPresidentSignBatchDismissed(batchId: number): boolean {
+  try {
+    const raw = sessionStorage.getItem(PRESIDENT_SIGN_BATCH_DISMISSED_KEY);
+    const ids = JSON.parse(raw ?? '[]') as number[];
+
+    return ids.includes(batchId);
+  } catch {
+    return false;
+  }
+}
+
+export function dismissPresidentSignBatch(batchId: number): void {
+  try {
+    const raw = sessionStorage.getItem(PRESIDENT_SIGN_BATCH_DISMISSED_KEY);
+    const ids = new Set(JSON.parse(raw ?? '[]') as number[]);
+    ids.add(batchId);
+    sessionStorage.setItem(PRESIDENT_SIGN_BATCH_DISMISSED_KEY, JSON.stringify([...ids]));
+  } catch {
+    sessionStorage.setItem(PRESIDENT_SIGN_BATCH_DISMISSED_KEY, JSON.stringify([batchId]));
+  }
 }
 
 export interface PresidentSignCampaignPreviewResponse {
@@ -1678,6 +1778,30 @@ export const markConvenioReviewErrorBulk = async (
     { tracking_ids: trackingIds, reason },
   );
   return response.data;
+};
+
+export const invalidateConvenio = async (
+  trackingId: number,
+  reason: string,
+): Promise<void> => {
+  try {
+    await authenticatedApi.post(`/api/convenios-manual/tracking/${trackingId}/invalidate`, {
+      reason,
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw {
+        success: false,
+        message: axiosError.response?.data?.message || 'No se pudo invalidar el convenio.',
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'No se pudo invalidar el convenio.',
+    };
+  }
 };
 
 export const fetchConvenioPreviewPdfBlob = async (

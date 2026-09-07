@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye } from 'lucide-react';
 import {
+  dismissPresidentSignBatch,
   fetchActivePresidentSignBatch,
   fetchPresidentSignBatch,
   PresidentSignBatchProgress,
@@ -15,6 +16,7 @@ interface PresidentSignBatchProgressBarProps {
   onReview: (batchId: number, readyCount: number) => void;
   onBatchFullyManaged?: () => void;
   onBatchFinished?: () => void;
+  onDismiss?: () => void;
 }
 
 function isBatchFullyManaged(
@@ -32,16 +34,41 @@ function isBatchFullyManaged(
   return batch.processed >= batch.total && batch.total > 0;
 }
 
+function shouldPollBatch(
+  batch: PresidentSignBatchProgress | null,
+  requireReview: boolean,
+): boolean {
+  if (!batch) {
+    return true;
+  }
+
+  if (batch.status === 'finished') {
+    return false;
+  }
+
+  return !isBatchFullyManaged(batch, requireReview);
+}
+
 export default function PresidentSignBatchProgressBar({
   activeBatchId,
   requireReview,
   onReview,
   onBatchFullyManaged,
   onBatchFinished,
+  onDismiss,
 }: PresidentSignBatchProgressBarProps) {
   const [batch, setBatch] = useState<PresidentSignBatchProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const batchRef = useRef<PresidentSignBatchProgress | null>(null);
   const fullyManagedNotifiedRef = useRef(false);
+  const finishedNotifiedRef = useRef(false);
+
+  const handleDismiss = useCallback(() => {
+    if (batchRef.current?.id) {
+      dismissPresidentSignBatch(batchRef.current.id);
+    }
+    onDismiss?.();
+  }, [onDismiss]);
 
   const loadBatch = useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -49,7 +76,9 @@ export default function PresidentSignBatchProgressBar({
       if (activeBatchId !== null) {
         const result = await fetchPresidentSignBatch(activeBatchId);
         setBatch(result.batch);
-        if (result.batch.status === 'finished') {
+        batchRef.current = result.batch;
+        if (result.batch.status === 'finished' && !finishedNotifiedRef.current) {
+          finishedNotifiedRef.current = true;
           onBatchFinished?.();
         }
         return;
@@ -57,7 +86,9 @@ export default function PresidentSignBatchProgressBar({
 
       const result = await fetchActivePresidentSignBatch();
       setBatch(result.batch);
-      if (result.batch?.status === 'finished') {
+      batchRef.current = result.batch;
+      if (result.batch?.status === 'finished' && !finishedNotifiedRef.current) {
+        finishedNotifiedRef.current = true;
         onBatchFinished?.();
       }
     } finally {
@@ -67,12 +98,18 @@ export default function PresidentSignBatchProgressBar({
 
   useEffect(() => {
     void loadBatch();
+
     const interval = window.setInterval(() => {
+      if (!shouldPollBatch(batchRef.current, requireReview)) {
+        window.clearInterval(interval);
+        return;
+      }
+
       void loadBatch();
     }, 4000);
 
     return () => window.clearInterval(interval);
-  }, [loadBatch]);
+  }, [loadBatch, requireReview]);
 
   useEffect(() => {
     if (!batch || fullyManagedNotifiedRef.current) {
@@ -97,6 +134,7 @@ export default function PresidentSignBatchProgressBar({
   const total = batch?.total ?? 0;
   const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
   const isFinished = batch?.status === 'finished';
+  const isIncomplete = isFinished && processed < total;
 
   return (
     <div className="sticky top-0 z-20 mb-4 rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm">
@@ -107,9 +145,15 @@ export default function PresidentSignBatchProgressBar({
             {batch && (
               <Badge
                 variant={isFinished ? 'secondary' : 'default'}
-                className={isFinished ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' : 'bg-sky-600'}
+                className={
+                  isIncomplete
+                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-100'
+                    : isFinished
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100'
+                      : 'bg-sky-600'
+                }
               >
-                {isFinished ? 'Finalizado' : 'En progreso'}
+                {isIncomplete ? 'Detenido' : isFinished ? 'Finalizado' : 'En progreso'}
               </Badge>
             )}
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-sky-600" />}
@@ -127,21 +171,36 @@ export default function PresidentSignBatchProgressBar({
                 <span>Errores: {batch.errors}</span>
                 <span>Completados: {batch.completed}</span>
               </div>
+              {isIncomplete && (
+                <p className="text-xs text-amber-900/80">
+                  Quedaron registros sin procesar. Si detuvo los jobs manualmente,{' '}
+                  <button
+                    type="button"
+                    className="text-amber-900/60 underline-offset-2 hover:text-amber-950 hover:underline"
+                    onClick={handleDismiss}
+                  >
+                    ocultar aviso
+                  </button>
+                  .
+                </p>
+              )}
             </>
           )}
         </div>
 
-        {batch && requireReview && batch.ready_for_review > 0 && (
-          <Button
-            size="sm"
-            className="shrink-0 gap-1.5 bg-sky-700 shadow-sm hover:bg-sky-800"
-            onClick={() => onReview(batch.id, batch.ready_for_review)}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            Revisar ({batch.ready_for_review})
-          </Button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {batch && requireReview && batch.ready_for_review > 0 && (
+            <Button
+              size="sm"
+              className="gap-1.5 bg-sky-700 shadow-sm hover:bg-sky-800"
+              onClick={() => onReview(batch.id, batch.ready_for_review)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Revisar ({batch.ready_for_review})
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
-}
+};
