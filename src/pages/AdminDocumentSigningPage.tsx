@@ -4828,6 +4828,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                       <>
                                         <TableHead className="text-right w-28">Pend. firma</TableHead>
                                         <TableHead className="text-right w-28">Firmado</TableHead>
+                                        <TableHead className="text-right min-w-[5.5rem] whitespace-nowrap">% Firmado</TableHead>
                                         <TableHead className="text-right w-28">Completado</TableHead>
                                         <TableHead className="text-right w-28">Satisfacción</TableHead>
                                       </>
@@ -4848,6 +4849,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TableCell>
                                           <TableCell className="text-right tabular-nums text-sky-700 dark:text-sky-300">
                                             {row.firmado_afiliado ?? 0}
+                                          </TableCell>
+                                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                                            {row.total > 0
+                                              ? `${(((row.firmado_afiliado ?? 0) / row.total) * 100).toFixed(1)}%`
+                                              : '—'}
                                           </TableCell>
                                           <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-300">
                                             {row.completado ?? 0}
