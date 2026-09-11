@@ -687,8 +687,8 @@ export default function ConvenioReviewDialog({
     try {
       await markConvenioReviewError(selectedTracking.id);
       reviewActionToastSuccess(
-        'Marcado con error',
-        'Podrá reintentar la autofirma desde el historial.',
+        'Rechazado en revisión',
+        'Quedó en el historial para corrección (invalidar, regenerar o gestionar según el caso).',
       );
 
       if (isBatchMode) {
@@ -754,7 +754,7 @@ export default function ConvenioReviewDialog({
     setIsSubmitting(true);
     try {
       const result = await markConvenioReviewErrorBulk(remainingIds);
-      toast.success(`${result.accepted} convenio(s) marcados con error`);
+      toast.success(`${result.accepted} convenio(s) rechazados en revisión`);
       onOpenChange(false);
       onUpdated();
     } catch (err: unknown) {
@@ -784,7 +784,9 @@ export default function ConvenioReviewDialog({
               Revisión de convenios firmados
             </DialogTitle>
             <DialogDescription>
-              Verifique el PDF antes de completar el ciclo o marcar error para reintentar la autofirma.
+              Revise el convenio completo: contenido, firma del afiliado y ubicación de las firmas. Si
+              todo está correcto, complételo; si detecta un problema, rechácelo para gestionarlo desde
+              el historial.
               {displayTotal > 1 && (
                 <span className="mt-1 block">
                   Use la búsqueda, «Ir a» o las flechas del teclado (← →) para moverse entre convenios.
@@ -908,7 +910,7 @@ export default function ConvenioReviewDialog({
                               disabled={isSubmitting}
                               onClick={() => setConfirmAllErrorOpen(true)}
                             >
-                              Marcar error todos
+                              Rechazar todos
                             </Button>
                           </>
                         )}
@@ -921,7 +923,7 @@ export default function ConvenioReviewDialog({
                           className="gap-1.5"
                         >
                           <XCircle className="h-4 w-4" />
-                          Marcar error
+                          Rechazar
                         </Button>
                         <Button
                           disabled={isSubmitting}
@@ -966,16 +968,16 @@ export default function ConvenioReviewDialog({
       <AlertDialog open={confirmAllErrorOpen} onOpenChange={setConfirmAllErrorOpen}>
         <AlertDialogContent className={CONVENIO_CONFIRM_CONTENT_CLASS} overlayClassName={CONVENIO_CONFIRM_OVERLAY_CLASS}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Marcar todos con error</AlertDialogTitle>
+            <AlertDialogTitle>Rechazar todos los convenios</AlertDialogTitle>
             <AlertDialogDescription>
-              Los {displayTotal} convenio(s) volverán a error de firma presidencial para poder
-              reintentar la autofirma. Esta acción no se puede deshacer. ¿Desea continuar?
+              Los {displayTotal} convenio(s) se marcarán como rechazados en revisión y volverán al
+              historial para corrección. Esta acción no se puede deshacer. ¿Desea continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
             <Button variant="destructive" disabled={isSubmitting} onClick={() => void handleMarkErrorAll()}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Marcar error todos'}
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rechazar todos'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

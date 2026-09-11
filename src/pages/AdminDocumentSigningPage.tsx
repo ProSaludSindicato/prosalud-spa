@@ -56,6 +56,7 @@ import {
   IdCard,
   Hash,
   Download,
+  ExternalLink,
   FileDown,
   Upload,
   FileSpreadsheet,
@@ -85,6 +86,8 @@ import {
   isConvenioDuplicateImportError,
   downloadConvenioFinalPdf,
   downloadConvenioOriginalPdf,
+  openBlankConvenioPreviewTab,
+  openPdfBlobInNewTab,
   signAsPresident,
   signAsPresidentBulk,
   completeConvenioBulk,
@@ -717,7 +720,7 @@ const AdminDocumentSigningPage: React.FC = () => {
           tracking.reviewReady ? 'Listo para revisión' : 'Firma presidencial completada',
           {
             description: tracking.reviewReady
-              ? `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) está pendiente de revisión.`
+              ? `Revise el convenio completo de ${tracking.nombre_afiliado} (${tracking.documento}) antes de completarlo.`
               : `El convenio de ${tracking.nombre_afiliado} (${tracking.documento}) ya está listo para descargar.`,
             duration: 10000,
           },
@@ -1120,9 +1123,15 @@ const AdminDocumentSigningPage: React.FC = () => {
   const canResendTracking = (tracking: ConvenioEmailTracking): boolean =>
     shouldShowEmailResend(tracking) && (tracking.available_actions?.resend ?? true);
 
-  // Estado para controlar descarga asíncrona
+  // Estado para controlar apertura asíncrona del PDF generado
   const [isDownloadingConvenio, setIsDownloadingConvenio] = useState(false);
-  const [lastCreateOptions, setLastCreateOptions] = useState<{ numero_documento: string; download: boolean } | null>(null);
+  const pendingConvenioPreviewWindowRef = useRef<Window | null>(null);
+  const pendingGeneratedConvenioRef = useRef<{ numero_documento: string; download: boolean } | null>(null);
+
+  const closePendingConvenioPreviewWindow = () => {
+    pendingConvenioPreviewWindowRef.current?.close();
+    pendingConvenioPreviewWindowRef.current = null;
+  };
 
   // Mutación para crear convenio
   const createConvenioMutation = useMutation({
@@ -1165,9 +1174,9 @@ const AdminDocumentSigningPage: React.FC = () => {
         }, 800);
       }
 
-      // Si el usuario activó la descarga, iniciar polling para descargar el convenio generado
-      if (lastCreateOptions?.download && lastCreateOptions.numero_documento) {
-        const numeroDocumento = lastCreateOptions.numero_documento;
+      // Si el usuario activó abrir el PDF, esperar a que esté listo y mostrarlo en la pestaña ya abierta
+      if (pendingGeneratedConvenioRef.current?.download && pendingGeneratedConvenioRef.current.numero_documento) {
+        const numeroDocumento = pendingGeneratedConvenioRef.current.numero_documento;
         setIsDownloadingConvenio(true);
 
         const pollDownload = async (attempt: number = 1) => {
@@ -1175,19 +1184,20 @@ const AdminDocumentSigningPage: React.FC = () => {
             const result: DownloadGeneratedConvenioResult = await downloadGeneratedConvenio(numeroDocumento);
 
             if (result.status === 200 && result.blob) {
-              // Archivo listo, descargar
-              const blobUrl = window.URL.createObjectURL(result.blob);
-              const link = document.createElement('a');
-              link.href = blobUrl;
-              link.download = `Convenio_${numeroDocumento}.pdf`;
-              document.body.appendChild(link);
-              link.click();
-              link.remove();
-              window.URL.revokeObjectURL(blobUrl);
+              const filename = `Convenio_${numeroDocumento}.pdf`;
+              const previewWindow = pendingConvenioPreviewWindowRef.current;
+              const opened = openPdfBlobInNewTab(result.blob, filename, previewWindow);
+              pendingConvenioPreviewWindowRef.current = null;
 
-              toast.success('Convenio descargado', {
-                description: 'El convenio ha sido generado y descargado correctamente.',
-              });
+              if (opened) {
+                toast.success('Convenio abierto', {
+                  description: 'El convenio se abrió en una pestaña nueva.',
+                });
+              } else {
+                toast.error('No se pudo abrir el convenio', {
+                  description: 'El navegador bloqueó la pestaña nueva. Permite ventanas emergentes o ábrelo desde el historial.',
+                });
+              }
               setIsDownloadingConvenio(false);
               return;
             }
@@ -1196,6 +1206,7 @@ const AdminDocumentSigningPage: React.FC = () => {
             if (result.status === 404 && result.processing === true) {
               // Máximo 20 intentos = ~1 minuto (cada 3 segundos)
               if (attempt >= 20) {
+                closePendingConvenioPreviewWindow();
                 toast.error('Tiempo de espera agotado', {
                   description: 'El convenio está tardando más de lo esperado. Por favor, intente nuevamente más tarde desde el historial.',
                   duration: 8000,
@@ -1207,7 +1218,7 @@ const AdminDocumentSigningPage: React.FC = () => {
               // Mostrar mensaje informativo cada 5 intentos (cada 15 segundos)
               if (attempt % 5 === 1 && attempt > 1) {
                 toast.info('Generando convenio...', {
-                  description: `El convenio está en proceso. Intentando descargar... (${attempt}/20)`,
+                  description: `El convenio está en proceso. Intentando abrir... (${attempt}/20)`,
                   duration: 3000,
                 });
               }
@@ -1218,15 +1229,17 @@ const AdminDocumentSigningPage: React.FC = () => {
             }
 
             // Si es 404 pero no está en proceso, o cualquier otro error
+            closePendingConvenioPreviewWindow();
             const errorMessage = result.message || `El servidor respondió con estado ${result.status}`;
-            toast.error('Error al descargar el convenio', {
+            toast.error('Error al abrir el convenio', {
               description: errorMessage,
               duration: 8000,
             });
             setIsDownloadingConvenio(false);
           } catch (error: any) {
-            toast.error('Error al descargar el convenio', {
-              description: error?.message || 'Ocurrió un error al intentar descargar el convenio generado.',
+            closePendingConvenioPreviewWindow();
+            toast.error('Error al abrir el convenio', {
+              description: error?.message || 'Ocurrió un error al intentar abrir el convenio generado.',
               duration: 8000,
             });
             setIsDownloadingConvenio(false);
@@ -1264,6 +1277,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       }, 2000);
     },
     onError: (error: any) => {
+      closePendingConvenioPreviewWindow();
       if (error.isValidationError && error.errors) {
         // Mostrar errores de validación
         Object.entries(error.errors).forEach(([field, messages]) => {
@@ -1282,44 +1296,57 @@ const AdminDocumentSigningPage: React.FC = () => {
     },
   });
 
-  const handleDownloadConvenioFinal = async (tracking: ConvenioEmailTracking) => {
-    try {
-      await downloadConvenioFinalPdf(tracking);
-      toast.success('Descarga iniciada');
-    } catch (error: unknown) {
-      const message =
-        typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
-          ? (error as { message: string }).message
-          : 'No se pudo descargar el convenio firmado';
-      toast.error(message);
-    }
+  const handleDownloadConvenioFinal = (tracking: ConvenioEmailTracking) => {
+    const previewWindow = openBlankConvenioPreviewTab();
+    void (async () => {
+      try {
+        await downloadConvenioFinalPdf(tracking, previewWindow);
+        toast.success('Convenio abierto en una pestaña nueva');
+      } catch (error: unknown) {
+        previewWindow?.close();
+        const message =
+          typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
+            ? (error as { message: string }).message
+            : 'No se pudo abrir el convenio firmado';
+        toast.error(message);
+      }
+    })();
   };
 
   const canDownloadOriginalConvenio = (tracking: ConvenioEmailTracking): boolean =>
     tracking.signing_estado !== 'firmado_afiliado' && tracking.signing_estado !== 'completado';
 
-  const handleDownloadConvenioOriginal = async (tracking: ConvenioEmailTracking) => {
-    try {
-      await downloadConvenioOriginalPdf(tracking);
-      toast.success('Descarga del PDF original iniciada');
-    } catch (error: unknown) {
-      const message =
-        typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
-          ? (error as { message: string }).message
-          : 'No se pudo descargar el PDF original';
-      toast.error(message);
-    }
+  const handleDownloadConvenioOriginal = (tracking: ConvenioEmailTracking) => {
+    const previewWindow = openBlankConvenioPreviewTab();
+    void (async () => {
+      try {
+        await downloadConvenioOriginalPdf(tracking, previewWindow);
+        toast.success('Convenio original abierto en una pestaña nueva');
+      } catch (error: unknown) {
+        previewWindow?.close();
+        const message =
+          typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: string }).message === 'string'
+            ? (error as { message: string }).message
+            : 'No se pudo abrir el PDF original';
+        toast.error(message);
+      }
+    })();
   };
   
   // Handler para crear convenio
   const handleCreateConvenio = (data: CreateConvenioFormValues) => {
     const toUpperTrim = (value: string) => value ? value.trim().toUpperCase() : value;
 
-    // Guardar última configuración para saber si debemos descargar automáticamente
-    setLastCreateOptions({
+    // Guardar última configuración para saber si debemos abrir el PDF automáticamente
+    const shouldOpenGeneratedPdf = data.download ?? true;
+    const pendingGeneratedConvenio = {
       numero_documento: data.numero_documento,
-      download: data.download ?? true,
-    });
+      download: shouldOpenGeneratedPdf,
+    };
+    pendingGeneratedConvenioRef.current = pendingGeneratedConvenio;
+    pendingConvenioPreviewWindowRef.current = shouldOpenGeneratedPdf
+      ? openBlankConvenioPreviewTab('Generando convenio…')
+      : null;
 
     // Preparar datos para el API
     const requestData: GenerateAndSendConvenioRequest = {
@@ -2079,6 +2106,16 @@ const AdminDocumentSigningPage: React.FC = () => {
     }
 
     if (signingEstado === 'error_firma_presidente') {
+      if (tracking.firmado_presidente_at) {
+        return {
+          label: 'Rechazado en revisión',
+          tone: 'error',
+          errorDetail: tracking.president_sign_last_error ?? undefined,
+          description:
+            'El convenio no pasó la revisión (p. ej. firma del afiliado, ubicación o contenido). Gestione la corrección desde el historial.',
+        };
+      }
+
       return {
         label: 'Error firma presidente',
         tone: 'error',
@@ -2091,7 +2128,8 @@ const AdminDocumentSigningPage: React.FC = () => {
       return {
         label: 'Pendiente revisión',
         tone: 'warning',
-        description: 'La firma del presidente fue aplicada y espera validación antes de completar.',
+        description:
+          'El convenio fue autofirmado y espera una revisión general antes de completar y notificar al afiliado.',
       };
     }
 
@@ -2320,6 +2358,30 @@ const AdminDocumentSigningPage: React.FC = () => {
   const canDownloadOriginalTracking = (tracking: ConvenioEmailTracking): boolean =>
     tracking.available_actions?.download_original ?? canDownloadOriginalConvenio(tracking);
 
+  const canDownloadSignedTracking = (tracking: ConvenioEmailTracking): boolean => {
+    if (!digitalSigningEnabled || !can('document_signing.view')) {
+      return false;
+    }
+
+    if (tracking.available_actions?.download_final === true) {
+      return true;
+    }
+
+    if (tracking.available_actions?.download_final === false) {
+      return (
+        tracking.signing_estado === 'error_firma_presidente' &&
+        Boolean(tracking.firmado_afiliado_at)
+      );
+    }
+
+    return (
+      tracking.signing_estado === 'firmado_afiliado' ||
+      tracking.signing_estado === 'firmando_presidente' ||
+      tracking.signing_estado === 'error_firma_presidente' ||
+      tracking.signing_estado === 'completado'
+    );
+  };
+
   const selectableTrackingIds = useMemo(() => {
     const items = historyData?.data.data ?? [];
     return items
@@ -2377,17 +2439,17 @@ const AdminDocumentSigningPage: React.FC = () => {
     if (tracking.signing_estado === 'completado') {
       return {
         label: 'Final',
-        tooltip: 'Descargar convenio final (afiliado + presidente)',
+        tooltip: 'Abrir convenio final (afiliado + presidente)',
         variant: 'default',
-        ariaLabel: 'Descargar convenio final con ambas firmas',
+        ariaLabel: 'Abrir convenio final con ambas firmas',
       };
     }
 
     return {
       label: 'Afiliado',
-      tooltip: 'Descargar convenio firmado solo por afiliado',
+      tooltip: 'Abrir convenio firmado solo por afiliado',
       variant: 'default',
-      ariaLabel: 'Descargar convenio firmado por afiliado',
+      ariaLabel: 'Abrir convenio firmado por afiliado',
       buttonClassName:
         'border border-emerald-700/30 bg-emerald-600 text-white hover:bg-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-700 dark:hover:bg-emerald-600',
     };
@@ -2704,7 +2766,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <SelectItem value="firma_pendiente_firma">Pendiente de firma</SelectItem>
                                 <SelectItem value="firma_firmado_afiliado">Firmado por afiliado</SelectItem>
                                 {autoSignEnabled && (
-                                  <SelectItem value="firma_error_presidente">Error firma presidente</SelectItem>
+                                  <SelectItem value="firma_error_presidente">Con observaciones</SelectItem>
                                 )}
                                 {autoSignEnabled && presidentSignRequireReview && (
                                   <SelectItem value="firma_pendiente_revision">Pendiente revisión</SelectItem>
@@ -2918,11 +2980,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 const signedDownloadCfg = getSignedDownloadButtonConfig(tracking);
                                 const canDownloadOriginal =
                                   can('document_signing.view') && canDownloadOriginalTracking(tracking);
-                                const canDownloadSigned =
-                                  digitalSigningEnabled &&
-                                  can('document_signing.view') &&
-                                  (tracking.signing_estado === 'firmado_afiliado' ||
-                                    tracking.signing_estado === 'completado');
+                                const canDownloadSigned = canDownloadSignedTracking(tracking);
                                 const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
                                 return (
                                 <TableRow
@@ -3111,10 +3169,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                                               variant="ghost"
                                               size="icon"
                                               className="h-8 w-8 shrink-0"
-                                              aria-label="Descargar archivos del convenio"
+                                              aria-label="Ver archivos del convenio"
                                             >
-                                              <Download className="h-4 w-4" />
-                                              <span className="sr-only">Descargar</span>
+                                              <ExternalLink className="h-4 w-4" />
+                                              <span className="sr-only">Ver PDF</span>
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end" className="w-52">
@@ -3153,11 +3211,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                             const signedDownloadCfg = getSignedDownloadButtonConfig(tracking);
                             const canDownloadOriginal =
                               can('document_signing.view') && canDownloadOriginalTracking(tracking);
-                            const canDownloadSigned =
-                              digitalSigningEnabled &&
-                              can('document_signing.view') &&
-                              (tracking.signing_estado === 'firmado_afiliado' ||
-                                tracking.signing_estado === 'completado');
+                            const canDownloadSigned = canDownloadSignedTracking(tracking);
                             const hasDownloadOptions = canDownloadOriginal || canDownloadSigned;
 
                             return (
@@ -3294,8 +3348,8 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
                                             <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5">
-                                              <Download className="h-3.5 w-3.5" />
-                                              Descargar
+                                              <ExternalLink className="h-3.5 w-3.5" />
+                                              Ver PDF
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end" className="w-52">
@@ -4187,9 +4241,9 @@ const AdminDocumentSigningPage: React.FC = () => {
                               render={({ field }) => (
                                 <FormItem className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-lg border p-3 sm:p-4 gap-3 sm:gap-0">
                                   <div className="space-y-0.5 flex-1">
-                                    <FormLabel className="text-sm sm:text-base">Descargar convenio generado</FormLabel>
+                                    <FormLabel className="text-sm sm:text-base">Abrir convenio generado</FormLabel>
                                     <FormDescription className="text-xs sm:text-sm">
-                                      Si está activado, el sistema descargará automáticamente el convenio cuando esté listo. De lo contrario, solo se generará en segundo plano.
+                                      Si está activado, el sistema abrirá el convenio en una pestaña nueva cuando esté listo. De lo contrario, solo se generará en segundo plano.
                                     </FormDescription>
                                   </div>
                                   <FormControl>

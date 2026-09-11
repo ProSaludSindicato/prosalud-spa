@@ -96,6 +96,53 @@ async function messageFromBlobError(error: unknown, fallback: string): Promise<s
   return fallback;
 }
 
+const CONVENIO_PDF_TAB_REVOKE_MS = 60_000;
+const CONVENIO_PDF_POPUP_BLOCKED_MESSAGE =
+  'El navegador bloqueó la pestaña nueva. Permite ventanas emergentes para ver el convenio.';
+
+export function openBlankConvenioPreviewTab(title = 'Cargando convenio…'): Window | null {
+  const previewWindow = window.open('about:blank', '_blank');
+  if (!previewWindow) {
+    return null;
+  }
+
+  try {
+    previewWindow.document.title = title;
+    previewWindow.document.body.innerHTML =
+      '<p style="font-family:sans-serif;padding:1.5rem;color:#444">Cargando convenio…</p>';
+  } catch {
+    // Some browsers restrict document access on about:blank.
+  }
+
+  return previewWindow;
+}
+
+export function openPdfBlobInNewTab(
+  blob: Blob,
+  filename: string,
+  previewWindow?: Window | null,
+): boolean {
+  const pdfBlob =
+    blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+  const namedFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(namedFile);
+
+  if (previewWindow && !previewWindow.closed) {
+    previewWindow.location.replace(url);
+    window.setTimeout(() => window.URL.revokeObjectURL(url), CONVENIO_PDF_TAB_REVOKE_MS);
+    return true;
+  }
+
+  const opened = window.open(url, '_blank');
+  if (!opened) {
+    window.URL.revokeObjectURL(url);
+    return false;
+  }
+
+  window.setTimeout(() => window.URL.revokeObjectURL(url), CONVENIO_PDF_TAB_REVOKE_MS);
+  return true;
+}
+
 function resolvePeriodoFromEnviadoAt(enviadoAt: string | null | undefined): string | null {
   if (!enviadoAt) {
     return null;
@@ -1420,9 +1467,10 @@ function throwConvenioImportError(error: unknown, fallbackMessage: string): neve
   };
 }
 
-/** Descarga el PDF original generado o copiado para el envío (antes de firma del afiliado). */
+/** Abre el PDF original generado o copiado para el envío (antes de firma del afiliado). */
 export const downloadConvenioOriginalPdf = async (
   tracking: ConvenioDownloadFilenameSource & { id: number },
+  previewWindow?: Window | null,
 ): Promise<void> => {
   try {
     const response = await authenticatedApi.get<Blob>(
@@ -1433,40 +1481,20 @@ export const downloadConvenioOriginalPdf = async (
     const suggestedFilename = resolveConvenioDownloadFilename(tracking);
     const filename = parseFilenameFromDownloadResponse(response.headers, suggestedFilename);
     const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{ message?: string }>;
-      let message = 'No se pudo descargar el PDF original';
-      if (axiosError.response?.data) {
-        const data = axiosError.response.data;
-        if (typeof data === 'string') {
-          try {
-            const parsed = JSON.parse(data) as { message?: string };
-            message = parsed.message ?? message;
-          } catch {
-            message = data;
-          }
-        } else if (typeof data === 'object' && data !== null && 'message' in data) {
-          message = (data as { message: string }).message;
-        }
-      }
+    if (!openPdfBlobInNewTab(blob, filename, previewWindow)) {
       throw {
         success: false,
-        message,
+        message: CONVENIO_PDF_POPUP_BLOCKED_MESSAGE,
       };
+    }
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'success' in error && 'message' in error) {
+      throw error;
     }
 
     throw {
       success: false,
-      message: 'Error desconocido al descargar el PDF original',
+      message: await messageFromBlobError(error, 'No se pudo abrir el PDF original'),
     };
   }
 };
@@ -1814,9 +1842,10 @@ export const fetchConvenioPreviewPdfBlob = async (
   return response.data;
 };
 
-/** Descarga el PDF firmado por el afiliado (o PDF final histórico si el estado es completado). */
+/** Abre el PDF firmado por el afiliado (o PDF final histórico si el estado es completado). */
 export const downloadConvenioFinalPdf = async (
   tracking: ConvenioDownloadFilenameSource & { id: number },
+  previewWindow?: Window | null,
 ): Promise<void> => {
   try {
     const response = await authenticatedApi.get<Blob>(
@@ -1827,26 +1856,20 @@ export const downloadConvenioFinalPdf = async (
     const suggestedFilename = resolveConvenioDownloadFilename(tracking);
     const filename = parseFilenameFromDownloadResponse(response.headers, suggestedFilename);
     const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<{ message?: string }>;
+    if (!openPdfBlobInNewTab(blob, filename, previewWindow)) {
       throw {
         success: false,
-        message: axiosError.response?.data?.message || 'No se pudo descargar el convenio firmado',
+        message: CONVENIO_PDF_POPUP_BLOCKED_MESSAGE,
       };
+    }
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'success' in error && 'message' in error) {
+      throw error;
     }
 
     throw {
       success: false,
-      message: 'Error desconocido al descargar el convenio firmado',
+      message: await messageFromBlobError(error, 'No se pudo abrir el convenio firmado'),
     };
   }
 };
