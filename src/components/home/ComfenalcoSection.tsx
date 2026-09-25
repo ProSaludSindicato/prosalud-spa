@@ -254,11 +254,12 @@ const ComfenalcoSection: React.FC = () => {
                 <div
                   key={event.id}
                   className={`absolute inset-0 transition-all duration-700 ease-in-out cursor-pointer ${
-                    index === currentSlide 
-                      ? 'opacity-100 scale-100' 
-                      : 'opacity-0 scale-105'
+                    index === currentSlide
+                      ? 'opacity-100 scale-100 z-10 pointer-events-auto'
+                      : 'opacity-0 scale-105 z-0 pointer-events-none'
                   }`}
                   onClick={() => handleEventClick(event)}
+                  aria-hidden={index !== currentSlide}
                 >
                   <div 
                     className="absolute inset-0 bg-cover bg-center"
@@ -326,27 +327,34 @@ const ComfenalcoSection: React.FC = () => {
               {featuredEvents.length > 1 && (
                 <>
                   <button
+                    type="button"
                     onClick={() => setCurrentSlide((prev) => (prev - 1 + featuredEvents.length) % featuredEvents.length)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-sm text-white border-2 border-white p-2 rounded-full hover:bg-white/30 transition-all cursor-pointer"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 backdrop-blur-sm text-white border-2 border-white p-2 rounded-full hover:bg-white/30 transition-all cursor-pointer"
+                    aria-label="Evento anterior"
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setCurrentSlide((prev) => (prev + 1) % featuredEvents.length)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-sm text-white border-2 border-white p-2 rounded-full hover:bg-white/30 transition-all cursor-pointer"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 backdrop-blur-sm text-white border-2 border-white p-2 rounded-full hover:bg-white/30 transition-all cursor-pointer"
+                    aria-label="Siguiente evento"
                   >
                     <ChevronRight className="h-6 w-6" />
                   </button>
 
                   {/* Dots Indicator */}
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-                    {featuredEvents.map((_, index) => (
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {featuredEvents.map((event, index) => (
                       <button
-                        key={index}
+                        key={event.id}
+                        type="button"
                         onClick={() => setCurrentSlide(index)}
                         className={`w-3 h-3 rounded-full transition-all cursor-pointer ${
                           index === currentSlide ? 'bg-white' : 'bg-white/50'
                         }`}
+                        aria-label={`Ir al evento ${index + 1}`}
+                        aria-current={index === currentSlide}
                       />
                     ))}
                   </div>
