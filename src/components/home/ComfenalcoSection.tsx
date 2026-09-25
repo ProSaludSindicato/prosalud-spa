@@ -219,7 +219,7 @@ const ComfenalcoSection: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            {filteredEvents.length > 0 && (
+            {filteredEvents.length > 4 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -265,15 +265,15 @@ const ComfenalcoSection: React.FC = () => {
                     className="absolute inset-0 bg-cover bg-center"
                     style={{ backgroundImage: `url(${event.banner_image})` }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/25" />
                   
                   {/* Content Overlay */}
                   <div className="absolute inset-0 flex items-center">
                     <div className="container mx-auto px-8">
-                      <div className="max-w-2xl text-white flex flex-col h-full justify-between">
+                      <div className="max-w-2xl text-white flex flex-col h-full justify-between [text-shadow:0_1px_2px_rgb(0_0_0_/_0.8),0_2px_8px_rgb(0_0_0_/_0.45)]">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-4">
-                            <Badge className={`${getCategoryColor(event.category)} text-white`}>
+                            <Badge className={`${getCategoryColor(event.category)} text-white shadow-md`}>
                               {getCategoryLabel(event.category)}
                             </Badge>
                           </div>
@@ -283,21 +283,21 @@ const ComfenalcoSection: React.FC = () => {
                           </h3>
                           
                           {event.description && (
-                            <p className="text-base md:text-lg lg:text-xl mb-4 text-gray-200 line-clamp-3">
+                            <p className="text-base md:text-lg lg:text-xl mb-4 text-white/95 line-clamp-3">
                               {event.description}
                             </p>
                           )}
 
                           <div className="flex flex-wrap gap-4 mb-4">
                             {event.event_date && (
-                              <div className="flex items-center text-white/90 text-sm md:text-base">
-                                <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                              <div className="flex items-center text-white text-sm md:text-base">
+                                <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
                                 <span>{formatDate(event.event_date)}</span>
                               </div>
                             )}
                             {event.registration_deadline && (
-                              <div className="flex items-center text-white/90 text-sm md:text-base">
-                                <Clock className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                              <div className="flex items-center text-white text-sm md:text-base">
+                                <Clock className="h-4 w-4 md:h-5 md:w-5 mr-2 shrink-0" />
                                 <span>Hasta: {formatDate(event.registration_deadline)}</span>
                               </div>
                             )}
@@ -384,11 +384,13 @@ const ComfenalcoSection: React.FC = () => {
                       role="img"
                       aria-label={event.title}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    {/* Capas de contraste: oscurece zona inferior donde va el texto */}
+                    <div className="absolute inset-0 bg-black/25" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
                     
-                    <div className="absolute inset-0 p-4 flex flex-col justify-end text-white">
+                    <div className="absolute inset-0 p-4 flex flex-col justify-end text-white [text-shadow:0_1px_2px_rgb(0_0_0_/_0.9),0_2px_6px_rgb(0_0_0_/_0.55)]">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge className={`${getCategoryColor(event.category)} text-white text-xs`}>
+                        <Badge className={`${getCategoryColor(event.category)} text-white text-xs shadow-md`}>
                           {getCategoryLabel(event.category)}
                         </Badge>
                       </div>
@@ -397,24 +399,23 @@ const ComfenalcoSection: React.FC = () => {
                         {event.title}
                       </h4>
                       
-                      {/* Agregar descripción para mejor UX */}
                       {event.description && (
-                        <p className="text-sm text-white/90 mb-2 line-clamp-2">
+                        <p className="text-sm text-white/95 mb-2 line-clamp-2">
                           {event.description}
                         </p>
                       )}
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         {event.event_date && (
-                          <div className="flex items-center text-white/90 text-xs md:text-sm">
-                            <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-                            <span>{formatDate(event.event_date)}</span>
+                          <div className="flex items-center text-white text-xs md:text-sm min-w-0">
+                            <Calendar className="h-3 w-3 md:h-4 md:w-4 mr-1 shrink-0" />
+                            <span className="truncate">{formatDate(event.event_date)}</span>
                           </div>
                         )}
                         
                         <Button
                           size="sm"
-                          className="bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 border border-white/30"
+                          className="shrink-0 bg-black/45 backdrop-blur-sm text-white hover:bg-black/60 border border-white/40 shadow-md"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEventClick(event);
