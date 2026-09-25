@@ -82,6 +82,7 @@ import {
   importBulkConvenios,
   importPdfZip,
   invalidateConvenio,
+  requestAffiliateResign,
   CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED,
   isConvenioDuplicateImportError,
   downloadConvenioFinalPdf,
@@ -135,6 +136,7 @@ import PresidentSignBatchProgressBar from '@/components/admin/convenios/Presiden
 import ConvenioReviewDialog from '@/components/admin/convenios/ConvenioReviewDialog';
 import ImportDuplicateConfirmDialog from '@/components/admin/convenios/ImportDuplicateConfirmDialog';
 import InvalidateConvenioDialog from '@/components/admin/convenios/InvalidateConvenioDialog';
+import RequestAffiliateResignDialog from '@/components/admin/convenios/RequestAffiliateResignDialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -343,6 +345,8 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [duplicateConflicts, setDuplicateConflicts] = useState<ConvenioDuplicateConflict[]>([]);
   const [invalidateDialogOpen, setInvalidateDialogOpen] = useState(false);
   const [trackingToInvalidate, setTrackingToInvalidate] = useState<ConvenioEmailTracking | null>(null);
+  const [affiliateResignDialogOpen, setAffiliateResignDialogOpen] = useState(false);
+  const [trackingToAffiliateResign, setTrackingToAffiliateResign] = useState<ConvenioEmailTracking | null>(null);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [selectedTrackingId, setSelectedTrackingId] = useState<number | null>(null);
   const [selectedTrackingInfo, setSelectedTrackingInfo] = useState<ConvenioEmailTracking | null>(null);
@@ -1735,6 +1739,28 @@ const AdminDocumentSigningPage: React.FC = () => {
   const canInvalidateTracking = (tracking: ConvenioEmailTracking): boolean =>
     can('document_signing.manage') && (tracking.available_actions?.mark_invalid ?? false);
 
+  const canRequestAffiliateResignTracking = (tracking: ConvenioEmailTracking): boolean =>
+    can('document_signing.manage') && (tracking.available_actions?.request_affiliate_resign ?? false);
+
+  const affiliateResignMutation = useMutation({
+    mutationFn: (trackingId: number) => requestAffiliateResign(trackingId),
+    onSuccess: () => {
+      toast.success('Nueva firma solicitada', {
+        description: 'Se reenvió el convenio original al afiliado para que lo firme nuevamente.',
+      });
+      setAffiliateResignDialogOpen(false);
+      setTrackingToAffiliateResign(null);
+      void refetchHistory();
+    },
+    onError: (error: unknown) => {
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: string }).message)
+          : 'No se pudo solicitar la nueva firma del afiliado.';
+      toast.error('No se pudo solicitar la nueva firma', { description: message });
+    },
+  });
+
   // Función para importar convenios
   const handleImportBulk = () => {
     if (!selectedFile) {
@@ -2112,7 +2138,7 @@ const AdminDocumentSigningPage: React.FC = () => {
           tone: 'error',
           errorDetail: tracking.president_sign_last_error ?? undefined,
           description:
-            'El convenio no pasó la revisión (p. ej. firma del afiliado, ubicación o contenido). Gestione la corrección desde el historial.',
+            'El convenio no pasó la revisión (p. ej. firma del afiliado mal ubicada). Use «Solicitar nueva firma del afiliado» para reenviar el documento original.',
         };
       }
 
@@ -3140,6 +3166,28 @@ const AdminDocumentSigningPage: React.FC = () => {
                                           </TooltipContent>
                                         </Tooltip>
                                       )}
+                                      {canRequestAffiliateResignTracking(tracking) && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8 shrink-0"
+                                              onClick={() => {
+                                                setTrackingToAffiliateResign(tracking);
+                                                setAffiliateResignDialogOpen(true);
+                                              }}
+                                              aria-label="Solicitar nueva firma del afiliado"
+                                            >
+                                              <FileSignature className="h-4 w-4" />
+                                              <span className="sr-only">Solicitar nueva firma del afiliado</span>
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="bottom">
+                                            <p>Solicitar nueva firma del afiliado</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
                                       {canInvalidateTracking(tracking) && (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
@@ -3328,6 +3376,20 @@ const AdminDocumentSigningPage: React.FC = () => {
                                         >
                                           <RefreshCw className="h-3.5 w-3.5" />
                                           Reenviar
+                                        </Button>
+                                      )}
+                                      {canRequestAffiliateResignTracking(tracking) && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 gap-1.5 px-2.5"
+                                          onClick={() => {
+                                            setTrackingToAffiliateResign(tracking);
+                                            setAffiliateResignDialogOpen(true);
+                                          }}
+                                        >
+                                          <FileSignature className="h-3.5 w-3.5" />
+                                          Nueva firma afiliado
                                         </Button>
                                       )}
                                       {canInvalidateTracking(tracking) && (
@@ -5657,6 +5719,23 @@ const AdminDocumentSigningPage: React.FC = () => {
                 return;
               }
               invalidateMutation.mutate({ trackingId: trackingToInvalidate.id, reason });
+            }}
+          />
+          <RequestAffiliateResignDialog
+            open={affiliateResignDialogOpen}
+            tracking={trackingToAffiliateResign}
+            isSubmitting={affiliateResignMutation.isPending}
+            onOpenChange={(open) => {
+              setAffiliateResignDialogOpen(open);
+              if (!open) {
+                setTrackingToAffiliateResign(null);
+              }
+            }}
+            onConfirm={() => {
+              if (!trackingToAffiliateResign) {
+                return;
+              }
+              affiliateResignMutation.mutate(trackingToAffiliateResign.id);
             }}
           />
         </div>

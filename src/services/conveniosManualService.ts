@@ -201,6 +201,7 @@ export interface ConvenioTrackingAvailableActions {
   mark_review_error?: boolean;
   mark_invalid?: boolean;
   preview_pdf?: boolean;
+  request_affiliate_resign?: boolean;
 }
 
 export interface ConvenioHistoryUiMetadata {
@@ -1806,6 +1807,26 @@ export const markConvenioReviewErrorBulk = async (
     { tracking_ids: trackingIds, reason },
   );
   return response.data;
+};
+
+export const requestAffiliateResign = async (trackingId: number): Promise<void> => {
+  try {
+    await authenticatedApi.post(`/api/convenios-manual/tracking/${trackingId}/request-affiliate-resign`);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      throw {
+        success: false,
+        message:
+          axiosError.response?.data?.message || 'No se pudo solicitar la nueva firma del afiliado.',
+      };
+    }
+
+    throw {
+      success: false,
+      message: 'No se pudo solicitar la nueva firma del afiliado.',
+    };
+  }
 };
 
 export const invalidateConvenio = async (

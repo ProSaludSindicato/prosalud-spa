@@ -688,7 +688,7 @@ export default function ConvenioReviewDialog({
       await markConvenioReviewError(selectedTracking.id);
       reviewActionToastSuccess(
         'Rechazado en revisión',
-        'Quedó en el historial para corrección (invalidar, regenerar o gestionar según el caso).',
+        'Use «Solicitar nueva firma del afiliado» en el historial si debe firmar de nuevo el documento original.',
       );
 
       if (isBatchMode) {

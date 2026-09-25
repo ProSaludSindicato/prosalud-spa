@@ -61,8 +61,11 @@ export const publicComfenalcoApi = {
       const events: any[] = await response.json();
       
       // Transform API response to match our interface and filter visible events
+      const isVisible = (value: unknown): boolean =>
+        value === true || value === 1 || value === '1';
+
       const transformedEvents = events
-        .filter(event => event.is_visible === 1) // Only visible events
+        .filter(event => isVisible(event.is_visible))
         .map(event => ({
           id: event.id,
           title: event.title,
@@ -73,7 +76,7 @@ export const publicComfenalcoApi = {
           registration_link: event.registration_link,
           category: event.category,
           display_size: event.display_size,
-          is_visible: event.is_visible === 1, // Convert 1/0 to boolean
+          is_visible: true,
           created_at: event.created_at,
           updated_at: event.updated_at,
         }));

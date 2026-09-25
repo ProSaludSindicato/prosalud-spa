@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { logger } from '@/utils/logger';
 
 // Bandera para activar/desactivar temporalmente la consulta de eventos de Comfenalco
-// Cambiar a true cuando se quiera mostrar eventos nuevamente
-const ENABLE_COMFENALCO_EVENTS = false;
+// Cambiar a false para ocultar la sección sin eliminar el código
+const ENABLE_COMFENALCO_EVENTS = true;
 
 const ComfenalcoSection: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement | null>(null);
