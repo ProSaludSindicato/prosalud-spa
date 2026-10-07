@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { format } from 'date-fns';
 import {
   SstAffiliate,
@@ -179,7 +180,7 @@ const AdminSstPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [exportHospital, setExportHospital] = useState<string>('all');
+  const [exportHospitals, setExportHospitals] = useState<string[]>([]);
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
   const [exportDocumentNumber, setExportDocumentNumber] = useState('');
@@ -470,7 +471,9 @@ const AdminSstPage: React.FC = () => {
 
   const exportHospitalOptions = useMemo(() => {
     const options = new Set(hospitalOptions.filter((option) => option && option.trim().length > 0));
-    return ['all', ...Array.from(options).sort((a, b) => a.localeCompare(b))];
+    return Array.from(options)
+      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }))
+      .map((hospital) => ({ value: hospital, label: hospital }));
   }, [hospitalOptions]);
 
   const handleSelectAffiliate = (affiliate: SstAffiliate) => {
@@ -570,7 +573,7 @@ const AdminSstPage: React.FC = () => {
   };
 
   const handleOpenExportDialog = () => {
-    setExportHospital('all');
+    setExportHospitals([]);
     setExportStartDate('');
     setExportEndDate('');
     setExportDocumentNumber('');
@@ -929,9 +932,10 @@ const AdminSstPage: React.FC = () => {
       // Construir parámetros de consulta
       const params = new URLSearchParams();
       
-      if (exportHospital && exportHospital !== 'all') {
-        params.append('hospital', exportHospital);
-      }
+      // Sin selección = todos los hospitales
+      exportHospitals.forEach((hospital) => {
+        params.append('hospitals[]', hospital);
+      });
       if (exportStartDate) {
         params.append('startDate', exportStartDate);
       }
@@ -1633,23 +1637,20 @@ const AdminSstPage: React.FC = () => {
             <form onSubmit={handleExportDeliveries} className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="export-hospital">Hospital</Label>
-                  <Select
-                    value={exportHospital}
-                    onValueChange={(value) => setExportHospital(value)}
-                    disabled={isExporting}
-                  >
-                    <SelectTrigger id="export-hospital">
-                      <SelectValue placeholder="Selecciona un hospital" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {exportHospitalOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option === 'all' ? 'Todos los hospitales' : option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Hospitales</Label>
+                  <MultiSelect
+                    options={exportHospitalOptions}
+                    selected={exportHospitals}
+                    onSelectionChange={setExportHospitals}
+                    placeholder={isLoadingDeliveredByUsers ? 'Cargando hospitales...' : 'Todos los hospitales'}
+                    emptyText="No hay hospitales"
+                    disabled={isExporting || isLoadingDeliveredByUsers}
+                    maxDisplay={2}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Puedes seleccionar uno o varios. Sin selección se incluyen todos.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="export-delivered-by">Responsable que registró (opcional)</Label>
