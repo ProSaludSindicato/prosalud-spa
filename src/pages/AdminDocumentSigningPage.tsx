@@ -81,6 +81,7 @@ import {
   exportTemplate,
   importBulkConvenios,
   importPdfZip,
+  getConvenioDeliveryConfig,
   invalidateConvenio,
   requestAffiliateResign,
   CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED,
@@ -137,6 +138,7 @@ import ConvenioReviewDialog from '@/components/admin/convenios/ConvenioReviewDia
 import ImportDuplicateConfirmDialog from '@/components/admin/convenios/ImportDuplicateConfirmDialog';
 import InvalidateConvenioDialog from '@/components/admin/convenios/InvalidateConvenioDialog';
 import RequestAffiliateResignDialog from '@/components/admin/convenios/RequestAffiliateResignDialog';
+import ConvenioTestOrRealDialog from '@/components/admin/convenios/ConvenioTestOrRealDialog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -338,6 +340,14 @@ const AdminDocumentSigningPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [bulkImportMode, setBulkImportMode] = useState<'excel' | 'zip'>('excel');
   const [bulkSendEmail, setBulkSendEmail] = useState(true);
+  // Con modo TEST habilitado, acción en espera de que el usuario elija si es de prueba o real.
+  const [pendingDeliveryChoice, setPendingDeliveryChoice] = useState<
+    | { kind: 'create'; data: CreateConvenioFormValues }
+    | { kind: 'import' }
+    | { kind: 'bulk_resend' }
+    | null
+  >(null);
+  const lastImportIsTestRef = useRef<boolean | undefined>(undefined);
   const [importResult, setImportResult] = useState<ImportBulkConveniosResponse | null>(null);
   const [importZipResult, setImportZipResult] = useState<ImportPdfZipResponse | null>(null);
   // TODO: reactivar cuando retomen confirmación de duplicados en importación.
@@ -372,14 +382,6 @@ const AdminDocumentSigningPage: React.FC = () => {
     convenios: ConvenioDataForUpdate[];
   } | null>(null);
   
-  // Función para obtener el primer día del mes actual
-  const getFirstDayOfCurrentMonth = (): string => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}-01`;
-  };
-
   // Form para crear convenio
   const createConvenioForm = useForm<CreateConvenioFormValues>({
     resolver: zodResolver(createConvenioSchema),
@@ -392,7 +394,7 @@ const AdminDocumentSigningPage: React.FC = () => {
       proceso: '',
       ciudad: '',
       sede: '',
-      fecha_inicio: getFirstDayOfCurrentMonth(),
+      fecha_inicio: '',
       direccion: '',
       celular: '',
       send_email: true,
@@ -576,8 +578,8 @@ const AdminDocumentSigningPage: React.FC = () => {
         }
         
         // Importante: no sobrescribir fecha_inicio.
-        // Conservamos el valor actual del formulario (que por defecto es el primer día del mes en curso).
-        const currentFechaInicio = createConvenioForm.getValues('fecha_inicio') || getFirstDayOfCurrentMonth();
+        // Conservamos el valor actual del formulario (por defecto vacío: la fecha debe ingresarla el usuario).
+        const currentFechaInicio = createConvenioForm.getValues('fecha_inicio') || '';
         const currentFechaNacimiento = createConvenioForm.getValues('fecha_nacimiento') || '';
         const currentLugarNacimiento = createConvenioForm.getValues('lugar_nacimiento') || '';
 
@@ -1074,7 +1076,18 @@ const AdminDocumentSigningPage: React.FC = () => {
     });
   }, [activeTab, presidentSignBulkEnabled, presidentSignRequireReview, can]);
 
+  // Si no se obtiene la configuración, no se envía is_test y el backend aplica el modo global
+  // (TEST cuando está habilitado), así que el fallback nunca termina en un envío real al afiliado.
+  const { data: deliveryConfigData } = useQuery({
+    queryKey: ['convenios-manual-delivery-config'],
+    queryFn: getConvenioDeliveryConfig,
+    enabled: can('document_signing.view'),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const deliveryMode: ConvenioDeliveryMode =
+    deliveryConfigData?.delivery_mode ??
     historyData?.delivery_mode ??
     statsData?.delivery_mode ??
     'production';
@@ -1157,7 +1170,9 @@ const AdminDocumentSigningPage: React.FC = () => {
       }
       
       const responseTestMode =
-        (response.delivery_mode != null && response.delivery_mode !== 'production') || isTestDeliveryMode;
+        typeof response.data?.is_test === 'boolean'
+          ? response.data.is_test
+          : (response.delivery_mode != null && response.delivery_mode !== 'production') || isTestDeliveryMode;
 
       if (response.data?.email && responseTestMode) {
         toast.info('Modo TEST', {
@@ -1181,11 +1196,13 @@ const AdminDocumentSigningPage: React.FC = () => {
       // Si el usuario activó abrir el PDF, esperar a que esté listo y mostrarlo en la pestaña ya abierta
       if (pendingGeneratedConvenioRef.current?.download && pendingGeneratedConvenioRef.current.numero_documento) {
         const numeroDocumento = pendingGeneratedConvenioRef.current.numero_documento;
+        const previewToken =
+          typeof response.data?.preview_token === 'string' ? response.data.preview_token : undefined;
         setIsDownloadingConvenio(true);
 
         const pollDownload = async (attempt: number = 1) => {
           try {
-            const result: DownloadGeneratedConvenioResult = await downloadGeneratedConvenio(numeroDocumento);
+            const result: DownloadGeneratedConvenioResult = await downloadGeneratedConvenio(numeroDocumento, previewToken);
 
             if (result.status === 200 && result.blob) {
               const filename = `Convenio_${numeroDocumento}.pdf`;
@@ -1264,7 +1281,7 @@ const AdminDocumentSigningPage: React.FC = () => {
         proceso: '',
         ciudad: '',
         sede: '',
-        fecha_inicio: getFirstDayOfCurrentMonth(),
+        fecha_inicio: '',
         fecha_finalizacion: '',
         direccion: '',
         celular: '',
@@ -1337,8 +1354,18 @@ const AdminDocumentSigningPage: React.FC = () => {
     })();
   };
   
-  // Handler para crear convenio
+  // Handler para crear convenio: con modo TEST habilitado y envío de correo, primero se pide
+  // confirmar si es de prueba o real.
   const handleCreateConvenio = (data: CreateConvenioFormValues) => {
+    if (isTestDeliveryMode && data.send_email) {
+      setPendingDeliveryChoice({ kind: 'create', data });
+      return;
+    }
+
+    submitCreateConvenio(data);
+  };
+
+  const submitCreateConvenio = (data: CreateConvenioFormValues, isTest?: boolean) => {
     const toUpperTrim = (value: string) => value ? value.trim().toUpperCase() : value;
 
     // Guardar última configuración para saber si debemos abrir el PDF automáticamente
@@ -1405,6 +1432,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     if (data.email) requestData.email = data.email;
     // Siempre usamos flujo asíncrono desde el frontend (download=false)
     requestData.download = false;
+    if (isTest !== undefined) requestData.is_test = isTest;
     
     createConvenioMutation.mutate(requestData);
   };
@@ -1500,12 +1528,12 @@ const AdminDocumentSigningPage: React.FC = () => {
 
   // Mutación para importar convenios masivamente
   const importBulkMutation = useMutation({
-    mutationFn: (data: { file: File; send_email: boolean } & ConvenioImportConfirmation) =>
+    mutationFn: (data: { file: File; send_email: boolean; is_test?: boolean } & ConvenioImportConfirmation) =>
       importBulkConvenios(data.file, data.send_email, CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED ? {
         confirm_duplicates: data.confirm_duplicates,
         duplicate_actions: data.duplicate_actions,
         invalidation_reason: data.invalidation_reason,
-      } : undefined),
+      } : undefined, data.is_test),
     onSuccess: (response) => {
       setImportResult(response);
       setImportZipResult(null);
@@ -1592,12 +1620,12 @@ const AdminDocumentSigningPage: React.FC = () => {
   });
 
   const importZipMutation = useMutation({
-    mutationFn: (data: { file: File; send_email: boolean } & ConvenioImportConfirmation) =>
+    mutationFn: (data: { file: File; send_email: boolean; is_test?: boolean } & ConvenioImportConfirmation) =>
       importPdfZip(data.file, data.send_email, CONVENIO_DUPLICATE_IMPORT_CHECK_ENABLED ? {
         confirm_duplicates: data.confirm_duplicates,
         duplicate_actions: data.duplicate_actions,
         invalidation_reason: data.invalidation_reason,
-      } : undefined),
+      } : undefined, data.is_test),
     onSuccess: (response) => {
       setImportZipResult(response);
       setImportResult(null);
@@ -1669,6 +1697,7 @@ const AdminDocumentSigningPage: React.FC = () => {
     const payload = {
       file: selectedFile,
       send_email: bulkSendEmail,
+      is_test: lastImportIsTestRef.current,
       confirm_duplicates: true,
       duplicate_actions: actions,
     };
@@ -1761,7 +1790,8 @@ const AdminDocumentSigningPage: React.FC = () => {
     },
   });
 
-  // Función para importar convenios
+  // Función para importar convenios. Con modo TEST habilitado se pide confirmar si es prueba o real
+  // cuando la importación envía correos o crea registros (el ZIP siempre crea registros).
   const handleImportBulk = () => {
     if (!selectedFile) {
       toast.error('Archivo requerido', {
@@ -1772,10 +1802,26 @@ const AdminDocumentSigningPage: React.FC = () => {
       return;
     }
 
+    if (isTestDeliveryMode && (bulkSendEmail || bulkImportMode === 'zip')) {
+      setPendingDeliveryChoice({ kind: 'import' });
+      return;
+    }
+
+    submitImportBulk();
+  };
+
+  const submitImportBulk = (isTest?: boolean) => {
+    if (!selectedFile) {
+      return;
+    }
+
+    lastImportIsTestRef.current = isTest;
+
     if (bulkImportMode === 'excel') {
       importBulkMutation.mutate({
         file: selectedFile,
         send_email: bulkSendEmail,
+        is_test: isTest,
       });
       return;
     }
@@ -1783,10 +1829,26 @@ const AdminDocumentSigningPage: React.FC = () => {
     importZipMutation.mutate({
       file: selectedFile,
       send_email: bulkSendEmail,
+      is_test: isTest,
     });
   };
 
-  const handleBulkResend = async () => {
+  const handleBulkResend = () => {
+    if (resendEligibleSelectedIds.length === 0) {
+      return;
+    }
+
+    // En modo TEST los reenvíos respetan el tipo de cada registro: si hay reales, confirmar que
+    // esos sí llegarán a los afiliados.
+    if (isTestDeliveryMode && resendSelectedRealCount > 0) {
+      setPendingDeliveryChoice({ kind: 'bulk_resend' });
+      return;
+    }
+
+    void submitBulkResend();
+  };
+
+  const submitBulkResend = async () => {
     if (resendEligibleSelectedIds.length === 0) {
       return;
     }
@@ -1803,9 +1865,7 @@ const AdminDocumentSigningPage: React.FC = () => {
           {
             description:
               response.message ??
-              (isTestDeliveryMode
-                ? 'En modo TEST los correos llegarán al usuario que realiza la solicitud y quedarán marcados como TEST.'
-                : 'Consulte el historial para ver el estado.'),
+              'Los registros TEST llegan a tu usuario y los reales a los afiliados. Consulte el historial para ver el estado.',
           },
         );
         setSelectedTrackingIds(new Set());
@@ -1986,12 +2046,13 @@ const AdminDocumentSigningPage: React.FC = () => {
 
       if (response.data.success_count > 0) {
         const responseTestMode =
-        (response.delivery_mode != null && response.delivery_mode !== 'production') || isTestDeliveryMode;
+          (response.data.test_count ?? 0) > 0 ||
+          Boolean(selectedTrackingInfo?.is_test || selectedTrackingInfo?.estado === 'verificacion');
         toast.success('Correo reenviado exitosamente', {
           description:
             response.message ??
             (responseTestMode
-              ? 'En modo TEST el correo llegará al usuario que realiza la solicitud y quedará marcado como TEST.'
+              ? 'El correo del registro TEST llegará a tu usuario, no al afiliado.'
               : 'Consulte el historial para ver el estado.'),
         });
         refetchHistory();
@@ -2428,6 +2489,14 @@ const AdminDocumentSigningPage: React.FC = () => {
     });
   }, [selectedTrackingIds, historyData]);
 
+  const resendSelectedRealCount = useMemo(() => {
+    const items = historyData?.data.data ?? [];
+    return resendEligibleSelectedIds.filter((id) => {
+      const tracking = items.find((t) => t.id === id);
+      return tracking ? !(tracking.is_test || tracking.estado === 'verificacion') : false;
+    }).length;
+  }, [resendEligibleSelectedIds, historyData]);
+
   const presidentSignEligibleSelectedIds = useMemo(() => {
     const items = historyData?.data.data ?? [];
     return Array.from(selectedTrackingIds).filter((id) => {
@@ -2621,7 +2690,7 @@ const AdminDocumentSigningPage: React.FC = () => {
 
           {isTestDeliveryMode && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 break-words">
-              Modo TEST activo: los correos no van al afiliado, llegan a tu usuario autenticado (con enlace de firma o PDF adjunto, igual que producción) e indican que son de prueba. En el historial quedan marcados como TEST para no mezclarlos con envíos reales.
+              Modo TEST habilitado: al crear o importar convenios con envío de correo se te preguntará si son de <strong>prueba</strong> o <strong>reales</strong>. Los de prueba llegan a tu usuario (nunca al afiliado), indican que son de prueba y quedan marcados como TEST en el historial; los reales siguen el flujo normal hacia el afiliado. Los reenvíos respetan el tipo de cada registro.
             </div>
           )}
 
@@ -2918,7 +2987,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => void handleBulkResend()}
+                                onClick={handleBulkResend}
                                 disabled={isBulkResending}
                                 className="gap-1.5"
                               >
@@ -4536,7 +4605,7 @@ const AdminDocumentSigningPage: React.FC = () => {
                                 <Label className="text-sm sm:text-base">Enviar correos al procesar</Label>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
                                   {isTestDeliveryMode
-                                    ? 'En modo TEST no se envía al afiliado: el correo (enlace de firma o PDF) llega a tu usuario y el historial queda marcado como TEST.'
+                                    ? 'Modo TEST habilitado: al importar se te preguntará si es una prueba (correos a tu usuario, marcados como TEST) o real (correos a cada afiliado).'
                                     : 'Si está activado, se generará el PDF y se enviará el correo a cada afiliado de forma asíncrona.'}
                                 </p>
                               </div>
@@ -4564,14 +4633,10 @@ const AdminDocumentSigningPage: React.FC = () => {
                                   <Upload className="mr-2 h-4 w-4" />
                                   {bulkImportMode === 'zip'
                                     ? bulkSendEmail
-                                      ? isTestDeliveryMode
-                                        ? 'Importar PDFs y enviar (TEST)'
-                                        : 'Importar PDFs y enviar'
+                                      ? 'Importar PDFs y enviar'
                                       : 'Importar PDFs (sin enviar)'
                                     : bulkSendEmail
-                                      ? isTestDeliveryMode
-                                        ? 'Importar, generar y enviar (TEST)'
-                                        : 'Importar, generar y enviar'
+                                      ? 'Importar, generar y enviar'
                                       : 'Importar y generar PDFs'}
                                 </>
                               )}
@@ -5490,6 +5555,11 @@ const AdminDocumentSigningPage: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm">
+                {isTestDeliveryMode && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 break-words">
+                    Cada registro conserva su tipo: los fallidos de <strong>prueba (TEST)</strong> se reintentan hacia tu usuario y los <strong>reales</strong> hacia los afiliados.
+                  </div>
+                )}
                 {failedEmailDays.length === 0 ? (
                   <p className="text-muted-foreground">No hay envíos fallidos para reintentar.</p>
                 ) : (
@@ -5621,6 +5691,16 @@ const AdminDocumentSigningPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {(selectedTrackingInfo.is_test || selectedTrackingInfo.estado === 'verificacion') ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 break-words">
+                      Registro de <strong>prueba (TEST)</strong>: el correo llegará a tu usuario, nunca al afiliado. El correo indicado abajo no se usa.
+                    </div>
+                  ) : isTestDeliveryMode ? (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm break-words">
+                      Registro <strong>real</strong>: el correo llegará al afiliado (o al correo indicado abajo), igual que en producción.
+                    </div>
+                  ) : null}
+
                   <div className="border-t pt-4 space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="resendEmail">Correo Electrónico (Opcional)</Label>
@@ -5672,6 +5752,78 @@ const AdminDocumentSigningPage: React.FC = () => {
                       Confirmar Reenvío
                     </>
                   )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <ConvenioTestOrRealDialog
+            open={pendingDeliveryChoice !== null && pendingDeliveryChoice.kind !== 'bulk_resend'}
+            actionLabel={
+              pendingDeliveryChoice?.kind === 'create'
+                ? `Vas a generar y enviar el convenio de ${pendingDeliveryChoice.data.numero_documento} - ${pendingDeliveryChoice.data.nombres} ${pendingDeliveryChoice.data.apellidos}`.trim()
+                : bulkImportMode === 'zip'
+                  ? `Vas a importar los PDFs del ZIP${bulkSendEmail ? ' y enviarlos' : ''}`
+                  : 'Vas a importar, generar y enviar los convenios del Excel'
+            }
+            realRecipientLabel={
+              pendingDeliveryChoice?.kind === 'create' && pendingDeliveryChoice.data.email
+                ? pendingDeliveryChoice.data.email
+                : 'cada afiliado'
+            }
+            sendsEmail={pendingDeliveryChoice?.kind === 'create' ? true : bulkSendEmail}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPendingDeliveryChoice(null);
+              }
+            }}
+            onConfirm={(isTest) => {
+              const pending = pendingDeliveryChoice;
+              setPendingDeliveryChoice(null);
+              if (pending?.kind === 'create') {
+                submitCreateConvenio(pending.data, isTest);
+              } else if (pending?.kind === 'import') {
+                submitImportBulk(isTest);
+              }
+            }}
+          />
+          <Dialog
+            open={pendingDeliveryChoice?.kind === 'bulk_resend'}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPendingDeliveryChoice(null);
+              }
+            }}
+          >
+            <DialogContent className="w-[95vw] max-w-md">
+              <DialogHeader>
+                <DialogTitle>Confirmar reenvío</DialogTitle>
+                <DialogDescription>
+                  El modo TEST está habilitado, pero los reenvíos respetan el tipo de cada registro.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p>
+                  <strong>{resendSelectedRealCount}</strong> registro{resendSelectedRealCount !== 1 ? 's' : ''}{' '}
+                  <strong>real{resendSelectedRealCount !== 1 ? 'es' : ''}</strong>: el correo llegará al afiliado.
+                </p>
+                {resendEligibleSelectedIds.length - resendSelectedRealCount > 0 && (
+                  <p>
+                    <strong>{resendEligibleSelectedIds.length - resendSelectedRealCount}</strong> de prueba (TEST): el correo llegará a tu usuario.
+                  </p>
+                )}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={() => setPendingDeliveryChoice(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setPendingDeliveryChoice(null);
+                    void submitBulkResend();
+                  }}
+                >
+                  Reenviar ({resendEligibleSelectedIds.length})
                 </Button>
               </DialogFooter>
             </DialogContent>

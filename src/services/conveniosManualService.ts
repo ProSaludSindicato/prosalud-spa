@@ -96,7 +96,9 @@ async function messageFromBlobError(error: unknown, fallback: string): Promise<s
   return fallback;
 }
 
-const CONVENIO_PDF_TAB_REVOKE_MS = 60_000;
+// El visor de PDF del navegador vuelve a pedir la URL blob al descargar o imprimir; si se revoca antes,
+// la descarga falla. Se mantiene viva mientras la pestaña de origen siga abierta.
+const CONVENIO_PDF_TAB_REVOKE_MS = 30 * 60_000;
 const CONVENIO_PDF_POPUP_BLOCKED_MESSAGE =
   'El navegador bloqueó la pestaña nueva. Permite ventanas emergentes para ver el convenio.';
 
@@ -191,6 +193,25 @@ export function resolveConvenioDownloadFilename(
 }
 
 export type ConvenioDeliveryMode = 'production' | 'test';
+
+export interface ConvenioDeliveryConfigResponse {
+  success: boolean;
+  delivery_mode: ConvenioDeliveryMode;
+  /** Modo TEST habilitado: el panel debe pedir si cada convenio creado/enviado es de prueba o real. */
+  test_mode_enabled: boolean;
+}
+
+/**
+ * Configuración de entrega de convenios (modo TEST habilitado o no).
+ * GET /api/convenios-manual/delivery-config
+ */
+export const getConvenioDeliveryConfig = async (): Promise<ConvenioDeliveryConfigResponse> => {
+  const response = await authenticatedApi.get<ConvenioDeliveryConfigResponse>(
+    '/api/convenios-manual/delivery-config'
+  );
+
+  return response.data;
+};
 
 export interface ConvenioTrackingAvailableActions {
   resend: boolean;
@@ -466,10 +487,15 @@ export interface ResendEmailsResponse {
     total: number;
     success_count: number;
     failed_count: number;
+    /** Reenvíos de registros TEST (llegan al usuario que solicita, nunca al afiliado). */
+    test_count?: number;
+    /** Reenvíos de registros reales (llegan al afiliado). */
+    real_count?: number;
     results: {
       success: Array<{
         tracking_id: number;
         documento: string;
+        is_test?: boolean;
       }>;
       failed: Array<{
         tracking_id: number;
@@ -919,6 +945,9 @@ export interface GenerateAndSendConvenioRequest {
   email?: string;
   // Nuevo flag de control para modo síncrono/asíncrono (por ahora usamos siempre asíncrono desde el frontend)
   download?: boolean;
+  // Con modo TEST habilitado: true = convenio de prueba (correo al usuario), false = real (correo al afiliado).
+  // Si se omite, el backend asume el modo global (TEST cuando está habilitado).
+  is_test?: boolean;
 }
 
 /**
@@ -997,14 +1026,15 @@ export interface DownloadGeneratedConvenioResult {
  * - 500: Error del servidor
  */
 export const downloadGeneratedConvenio = async (
-  numero_documento: string
+  numero_documento: string,
+  preview_token?: string,
 ): Promise<DownloadGeneratedConvenioResult> => {
   try {
     // Primero intentar como blob (si está listo)
     const response = await authenticatedApi.get(
       '/api/convenios-manual/download-generated',
       {
-        params: { numero_documento },
+        params: preview_token ? { numero_documento, preview_token } : { numero_documento },
         responseType: 'blob',
         // Aceptar cualquier status para poder manejar 404 sin lanzar excepción automática
         validateStatus: () => true,
@@ -1286,6 +1316,7 @@ export const importBulkConvenios = async (
   file: File,
   send_email?: boolean,
   confirmation?: ConvenioImportConfirmation,
+  is_test?: boolean,
 ): Promise<ImportBulkConveniosResponse> => {
   try {
     // Validar tipo de archivo
@@ -1315,6 +1346,9 @@ export const importBulkConvenios = async (
     if (send_email !== undefined) {
       formData.append('send_email', send_email.toString());
     }
+    if (is_test !== undefined) {
+      formData.append('is_test', is_test.toString());
+    }
     appendImportConfirmation(formData, confirmation);
 
     const response = await authenticatedApi.post<ImportBulkConveniosResponse>(
@@ -1341,6 +1375,7 @@ export const importPdfZip = async (
   file: File,
   send_email?: boolean,
   confirmation?: ConvenioImportConfirmation,
+  is_test?: boolean,
 ): Promise<ImportPdfZipResponse> => {
   try {
     const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
@@ -1365,6 +1400,9 @@ export const importPdfZip = async (
     formData.append('file', file);
     if (send_email !== undefined) {
       formData.append('send_email', send_email.toString());
+    }
+    if (is_test !== undefined) {
+      formData.append('is_test', is_test.toString());
     }
     appendImportConfirmation(formData, confirmation);
 

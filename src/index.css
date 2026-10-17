@@ -133,8 +133,10 @@ body.show-recaptcha-badge .grecaptcha-badge {
     --secondary: 122 39% 49%; /* ProSalud Green - #4CAF50 */
     --secondary-foreground: 0 0% 100%; /* White text on secondary */
 
-    --muted: 220 9% 45%; /* Muted text - #555555 */
-    --muted-foreground: 220 9% 65%; /* Lighter muted text */
+    /* `muted` es una SUPERFICIE clara (hover, skeleton, tabs); `muted-foreground` es el texto secundario
+       sobre ella. Mantener contraste >= 4.5:1 entre ambos y sobre blanco: nunca invertirlos. */
+    --muted: 220 14% 89%;
+    --muted-foreground: 220 9% 38%;
 
     --accent: 190 80% 47%; /* ProSalud Teal - #17a2b8 */
     --accent-foreground: 0 0% 100%;
