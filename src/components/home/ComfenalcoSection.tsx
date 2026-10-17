@@ -7,6 +7,7 @@ import { Gift, Sparkles, Calendar, Clock, ExternalLink, ChevronLeft, ChevronRigh
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/utils/logger';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 // Bandera para activar/desactivar temporalmente la consulta de eventos de Comfenalco
 // Cambiar a false para ocultar la sección sin eliminar el código
@@ -133,7 +134,7 @@ const ComfenalcoSection: React.FC = () => {
 
   const handleEventClick = (event: any) => {
     if (event.registration_link) {
-      window.open(event.registration_link, '_blank');
+      openExternalUrl(event.registration_link);
     }
   };
 

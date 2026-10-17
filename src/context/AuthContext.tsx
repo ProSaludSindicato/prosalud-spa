@@ -110,7 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Solo limpiar si realmente no hay usuario en caché válido
           // Si hay usuario en caché y acabamos de hacer login, puede ser un problema temporal
-          if (!cachedUser) {
+          // Cuenta desactivada (403): no se conserva la sesión en caché
+          if (!cachedUser || errorStatus === 403) {
             authService.clearSession();
             setUser(null);
             setLoading(false);

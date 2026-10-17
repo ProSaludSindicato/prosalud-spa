@@ -1,4 +1,5 @@
 import { logger } from "@/utils/logger";
+import { stashAffiliatePrefill } from "@/utils/affiliatePrefill";
 
 /**
  * Generadores de respuestas para consultas de incapacidades y liquidaciones
@@ -7,14 +8,9 @@ import { logger } from "@/utils/logger";
  * Genera respuesta cuando no se encuentran datos
  */
 export const generateNoDataResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `ℹ️ **No se encontraron registros de incapacidad**
 
@@ -43,14 +39,9 @@ Nuestro equipo revisará tu solicitud y te responderá con la información dispo
  * Genera respuesta de error del servidor
  */
 export const generateServerErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `ℹ️ **No se pudo realizar la consulta en este momento**
 
@@ -77,14 +68,9 @@ Nuestro equipo revisará tu solicitud y te responderá con la información dispo
  * Genera respuesta de error de validación
  */
 export const generateValidationErrorResponse = (errors: any, formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `❌ **Error en los datos ingresados**
 
@@ -114,14 +100,9 @@ Nuestro equipo revisará tu solicitud y te responderá con la información dispo
  * Genera respuesta de error específica para compensación final
  */
 export const generateLiquidacionErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `ℹ️ **No se pudo realizar la consulta en este momento**
 
@@ -148,14 +129,9 @@ Nuestro equipo revisará tu solicitud y te responderá con la información dispo
  * Genera respuesta genérica de error
  */
 export const generateGenericErrorResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `ℹ️ **No se pudo realizar la consulta en este momento**
 
@@ -379,14 +355,9 @@ ${fueReconocida ? "✅ Reconocida" : "⏳ Pendiente por reconocer"}
  * Genera respuesta para liquidación no encontrada
  */
 export const generateLiquidacionNoDataResponse = (formData?: { tipoDocumento?: string; numeroDocumento?: string; fechaExpedicion?: string }): string => {
-  // Construir query params si hay datos del formulario
-  const queryParams = formData && (formData.tipoDocumento || formData.numeroDocumento || formData.fechaExpedicion)
-    ? `?${new URLSearchParams({
-        ...(formData.tipoDocumento && { tipoDocumento: formData.tipoDocumento }),
-        ...(formData.numeroDocumento && { numeroDocumento: formData.numeroDocumento }),
-        ...(formData.fechaExpedicion && { fechaExpedicion: formData.fechaExpedicion }),
-      }).toString()}`
-    : '';
+  // Los datos de identificación no viajan en la URL: se guardan brevemente para prellenar el formulario
+  stashAffiliatePrefill(formData);
+  const queryParams = '';
 
   return `ℹ️ **No se encontró información de compensación final**
 

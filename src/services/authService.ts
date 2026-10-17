@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { API_CONFIG } from '@/config/api';
 import { logger } from '@/utils/logger';
+import { queryClient } from '@/lib/queryClient';
 
 /**
  * Tipos de respuesta del backend
@@ -348,6 +349,13 @@ class AuthService {
    */
   clearSession(): void {
     this.removeUser();
+    // Evitar que datos de la sesión anterior queden en memoria o disponibles para el siguiente usuario
+    queryClient.clear();
+    try {
+      sessionStorage.removeItem('afiliado_auth');
+    } catch {
+      // almacenamiento no disponible
+    }
     // El backend maneja la limpieza de cookies HttpOnly en el endpoint de logout
   }
 

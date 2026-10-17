@@ -19,6 +19,7 @@ import { BienestarEvent } from '@/types/admin';
 import BienestarEventForm from '@/components/admin/bienestar/BienestarEventForm';
 import { formatDateReadable } from '@/utils/dateFormatter';
 import { logger } from '@/utils/logger';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 const AdminBienestarPage: React.FC = () => {
   const { can } = usePermissions();
@@ -385,7 +386,7 @@ const AdminBienestarPage: React.FC = () => {
                                   variant="outline"
                                   onClick={() => {
                                     if (event.attendanceList?.fileUrl) {
-                                      window.open(event.attendanceList.fileUrl, '_blank');
+                                      openExternalUrl(event.attendanceList.fileUrl);
                                     } else {
                                       toast({
                                         title: "Listado de asistencia",

@@ -41,6 +41,7 @@ import { FieldError } from '@/components/ui/field-error';
 import DeleteComfenalcoEventDialog from '@/components/admin/comfenalco/DeleteComfenalcoEventDialog';
 import { logger } from '@/utils/logger';
 import { usePermissions } from '@/hooks/usePermissions';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 const AdminComfenalcoPage: React.FC = () => {
   const { can } = usePermissions();
@@ -706,7 +707,7 @@ const AdminComfenalcoPage: React.FC = () => {
                               </Button>
                             )}
                             {event.registration_link && (
-                              <a href={event.registration_link} target="_blank" rel="noopener noreferrer">
+                              <a href={sanitizeExternalUrl(event.registration_link)} target="_blank" rel="noopener noreferrer">
                                 <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
                                   <ExternalLink className="h-3.5 w-3.5 mr-1" />
                                   Link
@@ -819,7 +820,7 @@ const AdminComfenalcoPage: React.FC = () => {
                           <div>
                             <label className="text-sm font-medium text-gray-600">Enlace de Registro</label>
                             <a
-                              href={selectedEvent.registration_link}
+                              href={sanitizeExternalUrl(selectedEvent.registration_link)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-sm text-blue-500 hover:underline flex items-center gap-1"

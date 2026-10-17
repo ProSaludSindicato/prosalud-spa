@@ -77,6 +77,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ChevronDown, ClipboardPaste } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DOMPurify from 'dompurify';
 
 // Subtipos válidos para verificación de pagos
 // Estos valores deben coincidir exactamente con los valores del backend (case-sensitive)
@@ -548,6 +549,21 @@ const MICROCREDITO_REJECTED_EMAIL_BODY = "NO TIENE CAPACIDAD DE ENDEUDAMIENTO";
 // Mensaje prediligenciado para solicitudes de retiro-sindical completadas
 const RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY = "Se recibe notificación de retiro libre y voluntario como afiliado(a) del sindicato PROSALUD, a continuación, compartimos información de su interés y solicitamos amablemente diligenciar la siguiente encuesta de retiro, con esto usted nos ayuda a identificar que procesos y factores influyen en la deserción de PROSALUD y los hospitales, y así podremos evaluar e implementar procesos de mejora.\n\nhttps://forms.gle/i8CBCi4Jrc9sG23h8";
 
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// El HTML de tabla puede haber sido editado a mano: se sanea antes de renderizarlo
+const sanitizeTableHtml = (html: string): string =>
+  DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'b', 'strong', 'i', 'em'],
+    ALLOWED_ATTR: ['style', 'colspan', 'rowspan'],
+  });
+
 // Función para convertir texto pegado de Excel a HTML de tabla
 const convertExcelPasteToHtmlTable = (text: string): string => {
   // Dividir el texto en líneas
@@ -630,7 +646,7 @@ const convertExcelPasteToHtmlTable = (text: string): string => {
       // Combinar todos los estilos
       const finalStyle = `${baseStyle} ${firstColumnStyle} ${plazoRowStyle} ${alignment}`.trim();
       
-      htmlTable += `    <${tag} style="${finalStyle}">${cellValue}</${tag}>\n`;
+      htmlTable += `    <${tag} style="${finalStyle}">${escapeHtml(cellValue)}</${tag}>\n`;
     }
     
     htmlTable += '  </tr>\n';
@@ -4769,7 +4785,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </div>
                                     <div 
                                       className="bg-white p-3 rounded border border-gray-200 overflow-x-auto"
-                                      dangerouslySetInnerHTML={{ __html: tableHtml }}
+                                      dangerouslySetInnerHTML={{ __html: sanitizeTableHtml(tableHtml) }}
                                     />
                                   </div>
                                 ) : (
@@ -5604,7 +5620,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                     </div>
                                     <div 
                                       className="bg-white p-3 rounded border border-gray-200 overflow-x-auto"
-                                      dangerouslySetInnerHTML={{ __html: tableHtml }}
+                                      dangerouslySetInnerHTML={{ __html: sanitizeTableHtml(tableHtml) }}
                                     />
                                   </div>
                                 ) : (

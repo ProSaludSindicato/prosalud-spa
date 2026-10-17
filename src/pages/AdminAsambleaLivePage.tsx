@@ -72,6 +72,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildPortalUrl } from "@/config/site";
 import { ASSEMBLY_DELEGATE_KIOSK_PATH, ASSEMBLY_DELEGATE_VOTE_PATH } from "@/constants/assemblyDelegateAccess";
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 const STATUS_STYLES: Record<AssemblyQuestion["status"], { label: string; className: string }> = {
   OPEN: { label: "Abierta", className: "bg-emerald-100 text-emerald-700" },
   CLOSED: { label: "Cerrada", className: "bg-slate-200 text-slate-800" },
@@ -1587,7 +1588,7 @@ export default function AdminAsambleaLivePage() {
                             <td className="py-3">
                               {record.signature_url ? (
                                 <a
-                                  href={record.signature_url}
+                                  href={sanitizeExternalUrl(record.signature_url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"

@@ -18,6 +18,9 @@ const originalConsole = {
 
 type Primitive = string | number | boolean | null | undefined;
 
+const SENSITIVE_KEY_PATTERN =
+  /(documento|cedula|numero_cuenta|cuenta|password|contrasena|token|otp|fecha_expedicion|fechaexpedicion|authorization|secret|email|correo|celular|telefono)/i;
+
 const sanitizePayload = (value: unknown): Primitive | Record<string, Primitive> => {
   if (value === null || value === undefined) {
     return value as Primitive;
@@ -34,7 +37,7 @@ const sanitizePayload = (value: unknown): Primitive | Record<string, Primitive> 
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
       .slice(0, 6)
-      .map(([key, val]) => [key, sanitizePayload(val)]);
+      .map(([key, val]) => [key, SENSITIVE_KEY_PATTERN.test(key) ? '[REDACTED]' : sanitizePayload(val)]);
     return Object.fromEntries(entries);
   }
 

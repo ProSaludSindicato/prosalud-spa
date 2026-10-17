@@ -4,6 +4,7 @@ import { ComfenalcoEvent } from '@/types/comfenalco';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, ExternalLink } from 'lucide-react';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 interface ComfenalcoEventCardProps {
   event: ComfenalcoEvent;
@@ -91,7 +92,7 @@ const ComfenalcoEventCard: React.FC<ComfenalcoEventCardProps> = ({ event }) => {
         {event.registration_link && (
           <Button 
             className="w-full bg-[#00529B] hover:bg-[#003A70] text-white"
-            onClick={() => window.open(event.registration_link, '_blank')}
+            onClick={() => openExternalUrl(event.registration_link)}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             Ver más información

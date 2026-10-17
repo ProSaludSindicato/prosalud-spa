@@ -82,6 +82,7 @@ import WellnessDeliveryTypeFormDialog, { WellnessDeliveryTypeFormValues } from '
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 const isSolicitudPropia = (
   solicitud: WellnessRequest,
@@ -2754,7 +2755,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => window.open(selectedSolicitud.actividad_realizada!.listado_asistencia!.file_url, '_blank')}
+                                  onClick={() => openExternalUrl(selectedSolicitud.actividad_realizada!.listado_asistencia!.file_url)}
                                   className="mt-2"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />

@@ -36,6 +36,7 @@ import {
   WellnessActivityRealized,
   UpdateWellnessActivityRealizedData,
 } from '@/services/wellnessRequestsApi';
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 const reviewSchema = z.object({
   title: z.string().min(1, 'El título es obligatorio').max(255),
@@ -518,7 +519,7 @@ const WellnessActivityReviewDialog: React.FC<WellnessActivityReviewDialogProps> 
                                     
                                     // Si no puede ser embebido, abrir en nueva pestaña
                                     if (!canEmbedFile(refreshed.listado_asistencia.original_name)) {
-                                      window.open(refreshed.listado_asistencia.file_url, '_blank');
+                                      openExternalUrl(refreshed.listado_asistencia.file_url);
                                     }
                                   }
                                 } catch (error) {

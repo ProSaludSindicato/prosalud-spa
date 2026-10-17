@@ -23,6 +23,7 @@ import { logger } from "@/utils/logger";
 import { optimizeImages, isImageFile } from "@/utils/imageOptimizer";
 import { useSanitizedInput } from "@/hooks/useSanitizedInput";
 import { usePermissions } from "@/hooks/usePermissions";
+import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
 
 const formSchema = z.object({
   title: z.string().min(1, "El título es obligatorio").max(255, "El título no puede exceder 255 caracteres").trim(),
@@ -1058,7 +1059,7 @@ const BienestarEventForm: React.FC<BienestarEventFormProps> = ({ event, onClose 
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  window.open(event.attendanceList?.fileUrl, '_blank');
+                                  openExternalUrl(event.attendanceList?.fileUrl);
                                 }}
                                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                 title="Ver/Descargar listado de asistencia"

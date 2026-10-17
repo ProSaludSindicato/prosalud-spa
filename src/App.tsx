@@ -72,15 +72,8 @@ import PoliticaTratamientoDatosPage from '@/pages/PoliticaTratamientoDatosPage';
 import './App.css';
 import ProtectedRoute from '@/components/admin/ProtectedRoute';
 import { useApiErrorHandler } from '@/hooks/useApiErrorHandler';
+import { queryClient } from '@/lib/queryClient';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 const AppRoutes = () => {
   useApiErrorHandler();

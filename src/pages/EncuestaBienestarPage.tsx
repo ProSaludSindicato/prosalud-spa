@@ -1245,25 +1245,14 @@ const EncuestaBienestarPageContent: React.FC = () => {
     }
   }, [currentStep, form]);
 
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H1',location:'EncuestaBienestarPage.tsx:step-change',message:'Current step changed',data:{currentStep},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [currentStep]);
 
   useEffect(() => {
     const onWindowError = (event: ErrorEvent) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H4',location:'EncuestaBienestarPage.tsx:window-error',message:'Unhandled window error',data:{message:event.message,filename:event.filename,line:event.lineno,column:event.colno},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     };
 
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const reasonMessage = reason instanceof Error ? reason.message : String(reason ?? 'unknown');
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H4',location:'EncuestaBienestarPage.tsx:unhandled-rejection',message:'Unhandled promise rejection',data:{reasonMessage},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     };
 
     window.addEventListener('error', onWindowError);
@@ -1329,9 +1318,6 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const handleSignatureChange = (dataUrl: string | null) => {
     setHasSignature(Boolean(dataUrl));
     form.setValue('firma', dataUrl || '');
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H3',location:'EncuestaBienestarPage.tsx:handleSignatureChange',message:'Signature changed',data:{hasData:Boolean(dataUrl),length:dataUrl?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   };
 
   // Campos por paso para validación
@@ -1467,9 +1453,6 @@ const EncuestaBienestarPageContent: React.FC = () => {
     // para ejecutar las validaciones condicionales con superRefine
     // Esto es necesario porque las validaciones condicionales están a nivel del objeto completo
     if (step === 3) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H2',location:'EncuestaBienestarPage.tsx:validateStep-step3-entry',message:'Validating step 3',data:{step,fieldCount:fields.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       // Validar primero los campos específicos del paso
       const fieldsResult = await form.trigger(fields as any);
       if (!fieldsResult) return false;
@@ -1518,14 +1501,8 @@ const EncuestaBienestarPageContent: React.FC = () => {
           
           // Si hay errores relevantes al paso actual, retornar false
           // Si solo hay errores de otros pasos, ignorarlos y continuar
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H2',location:'EncuestaBienestarPage.tsx:validateStep-step3-zoderror',message:'Step 3 schema validation result',data:{zodErrors:error.errors.length,hasRelevantError},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           return !hasRelevantError;
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H2',location:'EncuestaBienestarPage.tsx:validateStep-step3-unknown-error',message:'Unknown error validating step 3',data:{errorType:error instanceof Error ? error.name : typeof error},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         return false;
       }
     }
@@ -1537,13 +1514,7 @@ const EncuestaBienestarPageContent: React.FC = () => {
 
   // Navegar al siguiente paso
   const handleNext = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H1',location:'EncuestaBienestarPage.tsx:handleNext-entry',message:'Next pressed',data:{currentStep},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const isValid = await validateStep(currentStep);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H1',location:'EncuestaBienestarPage.tsx:handleNext-result',message:'Next validation result',data:{currentStep,isValid},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (isValid) {
       if (currentStep < TOTAL_STEPS - 1) {
         setCurrentStep(currentStep + 1);
@@ -1568,9 +1539,6 @@ const EncuestaBienestarPageContent: React.FC = () => {
   const progress = currentStep === 0 ? 0 : ((currentStep) / (TOTAL_STEPS - 1)) * 100;
 
   const onSubmit = async (data: EncuestaFormValues) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H3',location:'EncuestaBienestarPage.tsx:onSubmit-entry',message:'Submit attempt',data:{hasAuthData:Boolean(authData),hasSignature,firmaLength:data.firma?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     console.log('onSubmit llamado', { 
       hasAfiliadoData: !!afiliadoData,
       hasSignature,
@@ -3921,9 +3889,6 @@ const EncuestaBienestarPageContent: React.FC = () => {
                 <AlertDialogCancel>No, continuar aquí</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/1847af3a-f3f9-4f52-8df1-8104dc2411d0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4cb810'},body:JSON.stringify({sessionId:'4cb810',runId:debugRunIdRef.current,hypothesisId:'H5',location:'EncuestaBienestarPage.tsx:cancel-confirm-action',message:'User confirmed cancel navigation',data:{currentStep},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     setShowCancelConfirm(false);
                     navigate('/');
                   }}
