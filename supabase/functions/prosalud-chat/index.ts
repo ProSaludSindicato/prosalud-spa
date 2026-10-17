@@ -11,8 +11,12 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // @ts-ignore
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// TEMPORALMENTE DESHABILITADO - Rate limiting
 const ENABLE_RATE_LIMITING = true;
+
+// Límites de entrada (el cliente envía 1 system + últimos 8 mensajes)
+const MAX_MESSAGES = 12;
+const MAX_SYSTEM_CHARS = 100000;
+const MAX_MESSAGE_CHARS = 8000;
 
 const RATE_LIMITS = {
   messagesPerHour: 10,
@@ -46,7 +50,8 @@ function getCorsHeaders(req: Request) {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
     "Content-Type": "application/json",
   };
 }
@@ -66,7 +71,12 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
 
   if (error) {
     console.error("⚠️ Error verificando rate limit:", error);
-    return { allowed: true }; // En caso de error, permitir (fail-open)
+    // Fail-closed: si no se puede verificar el límite, no se consume el LLM
+    return {
+      allowed: false,
+      reason: "rate_limit_unavailable",
+      message: "El asistente no está disponible en este momento. Intenta de nuevo en unos minutos.",
+    };
   }
 
   // Si no existe registro, crear uno nuevo
@@ -143,6 +153,10 @@ async function checkRateLimit(supabase: any, userIp: string, userAgent: string) 
 
   if (newConsecutive > RATE_LIMITS.maxConsecutive) {
     newCooldown = new Date(now.getTime() + RATE_LIMITS.cooldownMinutes * 60 * 1000).toISOString();
+    await supabase
+      .from("chatbot_rate_limits")
+      .update({ cooldown_until: newCooldown, consecutive_messages: 0, updated_at: now.toISOString() })
+      .eq("user_ip", userIp);
     return {
       allowed: false,
       reason: "too_fast",
@@ -187,8 +201,13 @@ serve(async (req) => {
 
   try {
     // Obtener IP y user agent para rate limiting
+    // La IP del cliente la fija el proxy de confianza; el primer valor de x-forwarded-for lo controla el cliente.
+    const xff = req.headers.get("x-forwarded-for");
     const userIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("x-real-ip") ||
+      xff?.split(",").pop()?.trim() ||
+      "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
     // Verificar rate limit si está habilitado
@@ -230,6 +249,21 @@ serve(async (req) => {
         headers: corsHeaders,
       });
     }
+
+    // Validación de entrada: roles permitidos, un único system al inicio, tamaños acotados
+    const invalidInput =
+      messages.length === 0 ||
+      messages.length > MAX_MESSAGES ||
+      messages.some((m: any, i: number) => {
+        if (!m || typeof m.content !== "string") return true;
+        if (m.role === "system") return i !== 0 || m.content.length > MAX_SYSTEM_CHARS;
+        return (m.role !== "user" && m.role !== "assistant") || m.content.length > MAX_MESSAGE_CHARS;
+      });
+    if (invalidInput) {
+      return new Response(JSON.stringify({ error: "Solicitud inválida" }), { status: 400, headers: corsHeaders });
+    }
+    // Solo se reenvían role y content
+    messages = messages.map((m: any) => ({ role: m.role, content: m.content }));
 
     console.log("📨 Recibiendo mensajes:", messages.length);
 
@@ -640,7 +674,7 @@ RECUERDA: Tu función es ayudar con TODA la información disponible de ProSalud.
     console.error("❌ Error en prosalud-chat:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Error inesperado en el servidor",
+        error: "Error inesperado en el servidor",
       }),
       {
         status: 500,

@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const MAX_INPUT_CHARS = 2000;
 
 // Lista de dominios permitidos para CORS
 const ALLOWED_ORIGINS = [
@@ -28,7 +29,8 @@ function getCorsHeaders(req: Request) {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
   };
 }
 
@@ -49,7 +51,14 @@ serve(async (req) => {
       );
     }
 
-    console.log('📊 Generando embedding para:', input.substring(0, 100) + '...');
+    if (input.length > MAX_INPUT_CHARS) {
+      return new Response(
+        JSON.stringify({ error: 'Texto demasiado largo' }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('📊 Generando embedding, caracteres:', input.length);
 
     // Usar Lovable AI para generar embeddings vía OpenAI
     const response = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
@@ -92,7 +101,7 @@ serve(async (req) => {
     console.error('❌ Error en prosalud-embedding:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Error interno del servidor'
+        error: 'Error interno del servidor'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

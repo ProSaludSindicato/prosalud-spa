@@ -83,6 +83,24 @@ const SESSION_DURATION = 15 * 60 * 1000; // 15 minutos en milisegundos
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos de inactividad para expirar sesión
 const STORAGE_KEY = 'afiliado_auth';
 
+// Datos bancarios: no se persisten en el almacenamiento del navegador (auditoría H-03)
+const SENSITIVE_PERSIST_KEYS = ['numero_cuenta', 'tipo_cuenta', 'banco'] as const;
+
+const stripSensitiveForStorage = <T extends object>(afiliado: T): T => {
+  const copy = { ...afiliado } as Record<string, unknown>;
+  SENSITIVE_PERSIST_KEYS.forEach((key) => {
+    if (key in copy) copy[key] = null;
+  });
+  return copy as T;
+};
+
+// Purga sesiones previas guardadas en localStorage (versión anterior persistía la ficha completa)
+try {
+  localStorage.removeItem(STORAGE_KEY);
+} catch {
+  // almacenamiento no disponible
+}
+
 // Función mejorada para parsear el campo de contacto de emergencia
 // Maneja múltiples formatos: nombre puede estar primero, teléfono puede estar en cualquier posición
 // El nombre siempre está antes del parentesco/relación
@@ -263,7 +281,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setIsOtpAuthenticated(false);
       setIsDataUpdateAuthenticated(false);
       setFechaExpedicion(null);
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
       
       // Mostrar toast y redirigir
       toast.warning('Sesión expirada', {
@@ -280,7 +298,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Restaurar sesión del localStorage al cargar
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const { afiliado: storedAfiliado, expiresAt: storedExpiry, isOtpAuthenticated: storedOtpAuth, isDataUpdateAuthenticated: storedDataUpdateAuth, fechaExpedicion: storedFechaExp } = JSON.parse(stored);
@@ -293,10 +311,10 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
           lastActivityRef.current = Date.now();
           hasShownExpirationToastRef.current = false;
         } else {
-          localStorage.removeItem(STORAGE_KEY);
+          sessionStorage.removeItem(STORAGE_KEY);
         }
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
       }
     }
   }, []);
@@ -322,7 +340,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const newExpiresAt = Date.now() + SESSION_DURATION;
         setExpiresAt(newExpiresAt);
         // Actualizar en localStorage
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = sessionStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
             const data = JSON.parse(stored);
@@ -337,7 +355,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (data.fechaExpedicion === undefined) {
           data.fechaExpedicion = fechaExpedicion;
         }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           } catch {
             // Ignorar errores de parsing
           }
@@ -408,8 +426,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hasShownExpirationToastRef.current = false;
 
       // Guardar en localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        afiliado: data.afiliado,
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        afiliado: stripSensitiveForStorage(data.afiliado),
         expiresAt: newExpiresAt,
         isOtpAuthenticated: false,
         isDataUpdateAuthenticated: false,
@@ -455,7 +473,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setFechaExpedicion(null);
     lastActivityRef.current = Date.now();
     hasShownExpirationToastRef.current = false;
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
     if (expirationTimerRef.current) {
       clearInterval(expirationTimerRef.current);
       expirationTimerRef.current = null;
@@ -590,8 +608,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hasShownExpirationToastRef.current = false;
 
       // Guardar en localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        afiliado: afiliadoData,
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        afiliado: stripSensitiveForStorage(afiliadoData),
         expiresAt: newExpiresAt,
         isOtpAuthenticated: true,
         isDataUpdateAuthenticated: false,
@@ -725,8 +743,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hasShownExpirationToastRef.current = false;
 
       // Guardar en localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        afiliado: afiliadoData,
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        afiliado: stripSensitiveForStorage(afiliadoData),
         expiresAt: newExpiresAt,
         isOtpAuthenticated: false,
         isDataUpdateAuthenticated: true,
