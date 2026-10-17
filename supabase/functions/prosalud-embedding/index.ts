@@ -1,8 +1,66 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const MAX_INPUT_CHARS = 2000;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Límite por IP (el chat ya limita a 10 mensajes/hora; cada mensaje genera ~1 embedding)
+const EMBEDDINGS_PER_HOUR = 40;
+
+// Reutiliza chatbot_rate_limits con clave "emb:<ip>". Fail-closed si no se puede verificar.
+async function allowEmbeddingRequest(req: Request): Promise<boolean> {
+  try {
+    const ip =
+      req.headers.get('cf-connecting-ip') ||
+      req.headers.get('x-real-ip') ||
+      req.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ||
+      'unknown';
+    const key = `emb:${ip}`;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const now = new Date();
+    const { data, error } = await supabase
+      .from('chatbot_rate_limits')
+      .select('message_count_hour,last_message_at')
+      .eq('user_ip', key)
+      .maybeSingle();
+    if (error) throw error;
+
+    if (!data) {
+      const { error: insertError } = await supabase.from('chatbot_rate_limits').insert({
+        user_ip: key,
+        message_count_hour: 1,
+        message_count_day: 1,
+        consecutive_messages: 0,
+        last_message_at: now.toISOString(),
+      });
+      if (insertError) throw insertError;
+      return true;
+    }
+
+    const windowExpired = now.getTime() - new Date(data.last_message_at).getTime() > 60 * 60 * 1000;
+    const count = windowExpired ? 0 : data.message_count_hour;
+    if (count >= EMBEDDINGS_PER_HOUR) return false;
+
+    const { error: updateError } = await supabase
+      .from('chatbot_rate_limits')
+      .update({
+        message_count_hour: count + 1,
+        // En esta ventana last_message_at marca el inicio del conteo; solo se reinicia al expirar
+        last_message_at: windowExpired ? now.toISOString() : data.last_message_at,
+        updated_at: now.toISOString(),
+      })
+      .eq('user_ip', key);
+    if (updateError) throw updateError;
+    return true;
+  } catch (error) {
+    console.error('⚠️ Error verificando rate limit de embeddings:', error);
+    return false;
+  }
+}
 
 // Lista de dominios permitidos para CORS
 const ALLOWED_ORIGINS = [
@@ -42,6 +100,13 @@ serve(async (req) => {
   }
 
   try {
+    if (!(await allowEmbeddingRequest(req))) {
+      return new Response(
+        JSON.stringify({ error: 'Demasiadas solicitudes. Intenta más tarde.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { input } = await req.json();
 
     if (!input || typeof input !== 'string') {

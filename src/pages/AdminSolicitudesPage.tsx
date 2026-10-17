@@ -3557,6 +3557,24 @@ const AdminSolicitudesPage: React.FC = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-6 w-full overflow-x-hidden">
+                        {selectedSolicitud.request_type === 'actualizar-datos-personales' &&
+                          selectedSolicitud.payload &&
+                          typeof selectedSolicitud.payload === 'object' &&
+                          ['numeroCuenta', 'numero_cuenta', 'tipoCuenta', 'tipo_cuenta', 'banco'].some(
+                            (key) => (selectedSolicitud.payload as Record<string, unknown>)[key]
+                          ) && (
+                            <div
+                              role="alert"
+                              className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+                            >
+                              <p className="font-semibold">Cambio de información bancaria</p>
+                              <p className="mt-1">
+                                Esta solicitud modifica datos de la cuenta bancaria. Antes de aprobar, confirme la identidad
+                                del afiliado por el canal registrado (llamada o correo previo) y verifique la certificación
+                                bancaria adjunta.
+                              </p>
+                            </div>
+                          )}
                         <div className="bg-white border border-gray-200 rounded-lg p-4 w-full overflow-x-hidden">
                           {selectedSolicitud.payload &&
                           typeof selectedSolicitud.payload === "object" &&

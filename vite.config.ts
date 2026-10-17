@@ -7,9 +7,13 @@ import fs from "fs";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Configuración HTTPS para desarrollo
-  const httpsConfig = mode === 'development' ? {
-    key: fs.readFileSync('./192.168.1.60-key.pem'),
-    cert: fs.readFileSync('./192.168.1.60.pem'),
+  // Rutas por variable de entorno (DEV_HTTPS_KEY / DEV_HTTPS_CERT) para mantener los certificados fuera del repo.
+  // Si no existen los archivos, el servidor de desarrollo arranca sin HTTPS.
+  const keyPath = process.env.DEV_HTTPS_KEY || './192.168.1.60-key.pem';
+  const certPath = process.env.DEV_HTTPS_CERT || './192.168.1.60.pem';
+  const httpsConfig = mode === 'development' && fs.existsSync(keyPath) && fs.existsSync(certPath) ? {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
   } : undefined;
 
   return {

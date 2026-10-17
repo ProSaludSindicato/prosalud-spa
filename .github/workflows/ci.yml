@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Valores de relleno: solo se necesitan para compilar; no son secretos
+      VITE_API_BASE_URL: https://api.example.test
+      VITE_RECAPTCHA_SITE_KEY: ci-placeholder
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      # Falla solo ante vulnerabilidades críticas en dependencias de producción
+      - run: npm audit --omit=dev --audit-level=critical
