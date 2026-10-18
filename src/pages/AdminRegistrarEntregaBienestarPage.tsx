@@ -229,7 +229,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
           firma: signature,
           tipo_firma: 'digital',
           ...(typeId != null && { wellness_delivery_type_id: typeId }),
-        });
+        }, { withAdminSession: true });
         if (response.success && response.data) {
           setSuccessData({ tipo_entrega_text: response.data.tipo_entrega_text, estado: response.data.estado, created_at: response.data.created_at });
           setShowSuccessModal(true);

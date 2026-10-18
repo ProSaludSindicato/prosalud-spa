@@ -1,4 +1,5 @@
 import publicApi from './publicApi';
+import { authenticatedApi } from './api';
 import { logger } from '@/utils/logger';
 import axios from 'axios';
 
@@ -238,7 +239,10 @@ class EntregasBienestarService {
    * POST /api/kit-bienestar/request
    * El tipo de entrega no se envía; el backend asigna el tipo activo para la fecha actual.
    */
-  async submitInscription(data: SubmitInscriptionRequest): Promise<SubmitInscriptionResponse> {
+  async submitInscription(
+    data: SubmitInscriptionRequest,
+    options: { withAdminSession?: boolean } = {},
+  ): Promise<SubmitInscriptionResponse> {
     try {
       logger.debug('Enviando solicitud de entrega de bienestar', {
         documento: data.documento_afiliado,
@@ -257,7 +261,9 @@ class EntregasBienestarService {
         requestData.wellness_delivery_type_id = data.wellness_delivery_type_id;
       }
 
-      const response = await publicApi.post<SubmitInscriptionResponse>(
+      // Con sesión de administrador el backend registra quién entregó (cookie HttpOnly); público: sin credenciales.
+      const client = options.withAdminSession ? authenticatedApi : publicApi;
+      const response = await client.post<SubmitInscriptionResponse>(
         '/api/kit-bienestar/request',
         requestData,
         {
