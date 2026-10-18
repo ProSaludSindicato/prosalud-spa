@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { UserSession } from "@/types/assemblyVoting";
 import { LIVE_VOTE_OPTIONS, type AssemblyQuestion, type AssemblyVote } from "@/types/assembly";
 import { assemblyApi } from "@/services/assemblyApi";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
+import axios from "axios";
 import { toast } from "sonner";
 import { Loader2, Clock, Info, Activity, SendHorizontal } from "lucide-react";
 import { getAssemblyEcho } from "@/lib/assemblyEcho";
@@ -85,7 +86,6 @@ function questionsDelegateViewEqual(a: AssemblyQuestion[], b: AssemblyQuestion[]
 }
 
 export default function AssemblyVoting({ session, onLogout }: Props) {
-  void onLogout;
   const [questions, setQuestions] = useState<AssemblyQuestion[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, AssemblyVote>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -97,10 +97,6 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeChannelRef = useRef<{ stopListening: (e: string) => void; leave?: () => void } | null>(null);
   const initialFetchDoneRef = useRef(false);
-  const voterIdentifier = useMemo(
-    () => `${session.documentType}-${session.documentNumber}`,
-    [session.documentType, session.documentNumber],
-  );
 
   const loadQuestions = useCallback(async (mode: "initial" | "refresh" = "refresh") => {
     const isInitial = mode === "initial" || !initialFetchDoneRef.current;
@@ -123,7 +119,7 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
 
       const votes: Record<string, AssemblyVote> = {};
       for (const q of questionsData) {
-        const vote = await assemblyApi.getUserVote(q.id, voterIdentifier);
+        const vote = await assemblyApi.getUserVote(q.id, session.voterToken);
         if (vote) {
           votes[q.id] = vote;
         }
@@ -157,7 +153,7 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
         setIsLoading(false);
       }
     }
-  }, [voterIdentifier]);
+  }, [session.voterToken]);
 
   useEffect(() => {
     const echo = getAssemblyEcho();
@@ -286,12 +282,7 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
 
     try {
       setSubmittingQuestionId(activeQuestionId);
-      await assemblyApi.submitVote(
-        activeQuestionId,
-        voterIdentifier,
-        voterIdentifier,
-        [selectedAnswers[activeQuestionId]],
-      );
+      await assemblyApi.submitVote(activeQuestionId, [selectedAnswers[activeQuestionId]], session.voterToken);
 
       toast.success("Voto registrado", {
         description: "Su voto ha sido registrado exitosamente",
@@ -300,6 +291,11 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       await loadQuestions("refresh");
       setSelectedAnswers({});
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.error_code === "VOTER_SESSION_INVALID") {
+        toast.error("Su sesión de votación expiró. Valide nuevamente su documento.");
+        onLogout();
+        return;
+      }
       toast.error(error instanceof Error ? error.message : "No se pudo registrar el voto");
     } finally {
       setSubmittingQuestionId(null);

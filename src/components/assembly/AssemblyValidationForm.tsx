@@ -94,6 +94,7 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
           documentType: formData.documentType,
           documentNumber: formData.documentNumber,
           hasVoted: false,
+          voterToken: data.voter_token,
         };
 
         toast.success(`¡Bienvenido, ${delegateName}!`, {

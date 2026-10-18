@@ -426,23 +426,22 @@ export const assemblyApi = {
 
   submitVote: async (
     questionId: string,
-    voterId: string,
-    voterName: string,
     selectedOptions: string[],
+    voterToken: string | undefined,
   ): Promise<void> => {
-    await api.post(`${PREFIX}/questions/${questionId}/votes`, {
-      voterId,
-      voterName,
-      selectedOptions,
-    });
+    await api.post(
+      `${PREFIX}/questions/${questionId}/votes`,
+      { selectedOptions },
+      { headers: voterToken ? { "X-Voter-Token": voterToken } : {} },
+    );
   },
 
-  getUserVote: async (questionId: string, voterId: string): Promise<AssemblyVote | null> => {
+  getUserVote: async (questionId: string, voterToken: string | undefined): Promise<AssemblyVote | null> => {
     try {
       const { data, status } = await api.get<VoteResponse>(
         `${PREFIX}/questions/${questionId}/votes/me`,
         {
-          params: { voterId },
+          headers: voterToken ? { "X-Voter-Token": voterToken } : {},
           validateStatus: (s) => s === 404 || (s >= 200 && s < 300),
         } as AxiosRequestConfig,
       );
