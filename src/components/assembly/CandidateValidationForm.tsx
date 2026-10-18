@@ -83,7 +83,11 @@ export function CandidateValidationForm({ onValidation }: CandidateValidationFor
         throw new Error("No se encontró la información del afiliado en la respuesta.");
       }
 
-      const voteStatus = await checkDelegateVoteStatus(formData.documentType, formData.documentNumber);
+      const voteStatus = await checkDelegateVoteStatus(
+        formData.documentType,
+        formData.documentNumber,
+        searchResult.voter_token,
+      );
       const hasVoted = voteStatus.success === true && voteStatus.has_voted === true;
 
       const session: UserSession = {

@@ -18,6 +18,7 @@ export type CheckVoteResponse = {
   has_voted?: boolean;
   selected_candidate_election_key?: string | null;
   active_candidate_election_key?: string | null;
+  error_code?: string;
   message?: string;
   errors?: Record<string, string[]>;
 };
@@ -82,7 +83,8 @@ export async function searchCandidateVoting(payload: {
 
 export async function checkDelegateVoteStatus(
   documentType: DocumentType,
-  documentNumber: string
+  documentNumber: string,
+  voterToken?: string
 ): Promise<CheckVoteResponse> {
   const params = new URLSearchParams({
     document_type: documentType,
@@ -90,7 +92,10 @@ export async function checkDelegateVoteStatus(
   });
   const response = await fetch(buildPublicApiUrl(`/api/votes/check?${params.toString()}`), {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      ...(voterToken ? { "X-Voter-Token": voterToken } : {}),
+    },
   });
   const data = await parseJson<CheckVoteResponse>(response);
   if (!response.ok) {

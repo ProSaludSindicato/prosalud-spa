@@ -61,8 +61,13 @@ export default function DelegateCandidateVoting({ session, onLogout, onVoteRecor
       setVoteCheckDone(false);
       setVerificationError(null);
       try {
-        const status = await checkDelegateVoteStatus(session.documentType, session.documentNumber);
+        const status = await checkDelegateVoteStatus(session.documentType, session.documentNumber, session.voterToken);
         if (cancelled) {
+          return;
+        }
+        if (!status.success && status.error_code === "VOTER_SESSION_INVALID") {
+          toast.error("Su sesión de votación expiró. Valide nuevamente su documento.");
+          onLogout();
           return;
         }
         if (!status.success) {
