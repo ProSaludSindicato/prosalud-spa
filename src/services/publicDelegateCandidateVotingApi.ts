@@ -8,6 +8,7 @@ export type SearchCandidateVotingResponse = {
     hospital: string;
   } | null;
   found?: boolean;
+  voter_token?: string;
   message?: string;
   errors?: Record<string, string[]>;
 };
@@ -159,12 +160,14 @@ export async function submitDelegateVote(payload: {
   };
   candidate: Candidate;
   timestamp: string;
+  voterToken?: string;
 }): Promise<SubmitVoteResponse & { status: number }> {
   const response = await fetch(buildPublicApiUrl("/api/votes"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      ...(payload.voterToken ? { "X-Voter-Token": payload.voterToken } : {}),
     },
     body: JSON.stringify({
       voter: {

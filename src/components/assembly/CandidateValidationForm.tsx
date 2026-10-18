@@ -92,6 +92,7 @@ export function CandidateValidationForm({ onValidation }: CandidateValidationFor
         documentType: formData.documentType,
         documentNumber: formData.documentNumber,
         hasVoted,
+        voterToken: searchResult.voter_token,
       };
 
       toast.success(`¡Bienvenido, ${affiliateName}!`, {

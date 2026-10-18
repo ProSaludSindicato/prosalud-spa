@@ -30,6 +30,8 @@ export interface UserSession {
   documentType: DocumentType;
   documentNumber: string;
   hasVoted: boolean;
+  /** Token firmado emitido por el servidor tras validar al votante (votación de delegados). */
+  voterToken?: string;
 }
 
 export interface VoteSubmission {

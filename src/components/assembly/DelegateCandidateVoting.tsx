@@ -167,6 +167,7 @@ export default function DelegateCandidateVoting({ session, onLogout, onVoteRecor
         },
         candidate: selectedCandidateData,
         timestamp: buildVoteTimestampIso(),
+        voterToken: session.voterToken,
       });
 
       if (!result.success) {
@@ -174,6 +175,12 @@ export default function DelegateCandidateVoting({ session, onLogout, onVoteRecor
           setHasVoted(true);
           onVoteRecorded?.();
           setShowConfirmDialog(false);
+          return;
+        }
+        if (result.status === 401 && result.error_code === "VOTER_SESSION_INVALID") {
+          toast.error("Su sesión de votación expiró. Valide nuevamente su documento.");
+          setShowConfirmDialog(false);
+          onLogout();
           return;
         }
         toast.error(result.message || "Error al registrar el voto", {
