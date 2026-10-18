@@ -175,16 +175,20 @@ export const AssemblyDataProvider = ({ children }: { children: React.ReactNode }
   }, [currentAssembly, isAssemblyLoading, loadQuestionsAndResults, loadQuorum]);
 
   useEffect(() => {
+    // Siempre se hace polling: el backend solo emite "vote.registered"; apertura/cierre de preguntas
+    // y quórum no se transmiten, así que sin polling quedarían desactualizados al activar Reverb.
+    const pollingInterval = setInterval(() => {
+      void loadQuestionsAndResults();
+      void loadQuorum();
+    }, 15000);
+    fallbackIntervalRef.current = pollingInterval;
+
     const echo = getAssemblyEcho();
 
     if (!echo) {
-      if (!fallbackIntervalRef.current) {
-        fallbackIntervalRef.current = setInterval(loadQuestionsAndResults, 15000);
-      }
       return () => {
-        if (fallbackIntervalRef.current) {
-          clearInterval(fallbackIntervalRef.current);
-        }
+        clearInterval(pollingInterval);
+        fallbackIntervalRef.current = null;
       };
     }
 
@@ -218,6 +222,9 @@ export const AssemblyDataProvider = ({ children }: { children: React.ReactNode }
     quorumChannel.listen(".assembly.quorum.updated", handleQuorumEvent);
 
     return () => {
+      clearInterval(pollingInterval);
+      fallbackIntervalRef.current = null;
+
       resultsChannel.stopListening(".vote.registered");
       echo.leave("assembly.results");
 
@@ -229,7 +236,7 @@ export const AssemblyDataProvider = ({ children }: { children: React.ReactNode }
       quorumChannel.stopListening(".assembly.quorum.updated");
       echo.leave("assembly.quorum");
     };
-  }, [applyQuestionUpdate, applyResultsUpdate, loadQuestionsAndResults]);
+  }, [applyQuestionUpdate, applyResultsUpdate, loadQuestionsAndResults, loadQuorum]);
 
   const isLoading = isQuestionsLoading || isQuorumLoading || isAssemblyLoading;
 
