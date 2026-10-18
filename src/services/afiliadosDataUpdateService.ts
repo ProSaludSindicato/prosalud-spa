@@ -73,6 +73,7 @@ export interface BeneficiarioDataForUpdate {
 export interface AuthenticateForDataUpdateResponse {
   success: boolean;
   message: string;
+  affiliate_token?: string;
   data: {
     afiliado: AfiliadoDataForUpdate;
     convenios: ConvenioDataForUpdate[];

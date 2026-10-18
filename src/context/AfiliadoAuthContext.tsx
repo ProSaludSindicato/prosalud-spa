@@ -4,6 +4,7 @@ import { API_CONFIG } from '@/config/api';
 import { toast } from 'sonner';
 import { verifyOtp, VerifyOtpResponse } from '@/services/afiliadosOtpService';
 import { authenticateForDataUpdate, AuthenticateForDataUpdateResponse } from '@/services/afiliadosDataUpdateService';
+import { clearAffiliateSessionToken, setAffiliateSessionToken } from '@/utils/affiliateSessionToken';
 import {
   createClientFacingError,
   isNetworkErrorWithoutResponse,
@@ -474,6 +475,7 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
     lastActivityRef.current = Date.now();
     hasShownExpirationToastRef.current = false;
     sessionStorage.removeItem(STORAGE_KEY);
+    clearAffiliateSessionToken();
     if (expirationTimerRef.current) {
       clearInterval(expirationTimerRef.current);
       expirationTimerRef.current = null;
@@ -638,6 +640,8 @@ export const AfiliadoAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!response.success || !response.data?.afiliado) {
         throw new Error('Respuesta inválida del servidor');
       }
+
+      setAffiliateSessionToken(response.affiliate_token);
 
       // Transformar los datos de la API al formato esperado por el contexto
       const afiliadoData: AfiliadoData = {

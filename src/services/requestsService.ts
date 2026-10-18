@@ -1,4 +1,5 @@
 import publicApi from './publicApi';
+import { getAffiliateSessionToken } from '@/utils/affiliateSessionToken';
 import axios, { AxiosError } from 'axios';
 
 export interface RequestData {
@@ -188,6 +189,7 @@ export const submitRequest = async (requestData: RequestData): Promise<SuccessRe
       {
         headers: {
           'Accept': 'application/json',
+          ...(getAffiliateSessionToken() ? { 'X-Voter-Token': getAffiliateSessionToken() as string } : {}),
           // Don't set Content-Type - let axios set it automatically with boundary
         },
         withCredentials: false,
