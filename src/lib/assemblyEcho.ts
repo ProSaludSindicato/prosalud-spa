@@ -3,18 +3,18 @@ import Pusher from "pusher-js";
 
 declare global {
   interface Window {
-    assemblyEcho?: Echo;
+    assemblyEcho?: Echo<"reverb">;
     Pusher?: typeof Pusher;
   }
 }
 
-let echoInstance: Echo | null = null;
+let echoInstance: Echo<"reverb"> | null = null;
 
 /**
  * Instancia singleton de Echo para canales de asamblea (Reverb).
  * Sin variables de entorno, devuelve null y los consumidores deben usar polling.
  */
-export const getAssemblyEcho = (): Echo | null => {
+export const getAssemblyEcho = (): Echo<"reverb"> | null => {
   if (echoInstance) {
     return echoInstance;
   }

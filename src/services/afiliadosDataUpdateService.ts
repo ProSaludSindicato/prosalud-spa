@@ -24,6 +24,9 @@ export interface AuthenticateForDataUpdateRequest {
 }
 
 export interface AfiliadoDataForUpdate {
+  fecha_expedicion?: string | null;
+  rh?: string | null;
+  departamento?: string | null;
   tipo_documento: string;
   documento: string;
   nombres: string;
@@ -68,6 +71,7 @@ export interface BeneficiarioDataForUpdate {
   sexo: string;
   parentesco: string;
   estado?: string | null;
+  fecha_nacimiento?: string | null;
 }
 
 export interface AuthenticateForDataUpdateResponse {

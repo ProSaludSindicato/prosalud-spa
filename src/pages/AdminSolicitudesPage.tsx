@@ -1098,7 +1098,7 @@ const AdminSolicitudesPage: React.FC = () => {
   //   // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
   //   if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
   //   
-  //   const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
+  //   const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond.request_type ?? '');
   //   if (!isMicrocredito) return;
   //   
   //   // Si el estado es "in_progress" o "resolved", prediligenciar el mensaje
@@ -1116,7 +1116,7 @@ const AdminSolicitudesPage: React.FC = () => {
     // Solo aplicar si es el formulario normal (no compensaciones) y el diálogo está abierto
     if (!responseDialogOpen || !solicitudToRespond || useCompensacionesForm) return;
     
-    const isRetiroSindical = solicitudToRespond.request_type === 'retiro-sindical' || solicitudToRespond.request_type === 'solicitud-retiro-sindical';
+    const isRetiroSindical = (['retiro-sindical', 'solicitud-retiro-sindical'] as string[]).includes(solicitudToRespond.request_type ?? '');
     if (!isRetiroSindical) return;
     
     // Obtener el estado actual del formulario (puede ser el observado o el valor actual)
@@ -1565,7 +1565,7 @@ const AdminSolicitudesPage: React.FC = () => {
       let emailBody = "";
       
       // Si es microcrédito, NO prediligenciar mensaje - prefieren ingresarlo manualmente
-      // const isMicrocredito = solicitudParaResponder.request_type === 'microcredito' || solicitudParaResponder.request_type === 'solicitud-microcredito';
+      // const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudParaResponder.request_type ?? '');
       // if (isMicrocredito) {
       //   if (defaultStatus === 'in_progress' || defaultStatus === 'resolved') {
       //     emailBody = MICROCREDITO_EMAIL_BODY;
@@ -1576,7 +1576,7 @@ const AdminSolicitudesPage: React.FC = () => {
       
       // Si es retiro-sindical y el estado es "resolved", prediligenciar mensaje
       // El efecto se encargará de cargar el PDF automáticamente
-      const isRetiroSindical = solicitudParaResponder.request_type === 'retiro-sindical' || solicitudParaResponder.request_type === 'solicitud-retiro-sindical';
+      const isRetiroSindical = (['retiro-sindical', 'solicitud-retiro-sindical'] as string[]).includes(solicitudParaResponder.request_type ?? '');
       if (isRetiroSindical && defaultStatus === 'resolved') {
         emailBody = RETIRO_SINDICAL_COMPLETADO_EMAIL_BODY;
       }
@@ -1920,7 +1920,7 @@ const AdminSolicitudesPage: React.FC = () => {
     if (!solicitudToRespond) return;
 
     // Si es una solicitud de microcrédito, mostrar modal de confirmación
-    const isMicrocredito = solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito';
+    const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond.request_type ?? '');
     
     if (isMicrocredito) {
       // Guardar los datos pendientes y mostrar el modal de confirmación
@@ -3632,7 +3632,7 @@ const AdminSolicitudesPage: React.FC = () => {
                                 }
                                 
                                 // Formatear Monto Solicitado como dinero COP para solicitudes de microcrédito
-                                const isMicrocredito = selectedSolicitud.request_type === 'microcredito' || selectedSolicitud.request_type === 'solicitud-microcredito';
+                                const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(selectedSolicitud.request_type ?? '');
                                 const isMontoSolicitado = fieldKey === 'montoSolicitado' || fieldKey === 'monto_solicitado';
                                 
                                 if (isMicrocredito && isMontoSolicitado) {
@@ -4523,7 +4523,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           name="rejection_reason"
                           render={({ field }) => {
                             // Determinar si es microcrédito para mostrar opción "otros"
-                            const isMicrocredito = solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito';
+                            const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond?.request_type ?? '');
                             
                             // Filtrar opciones: mostrar "otros" solo para microcrédito
                             const availableOptions = isMicrocredito 
@@ -4774,7 +4774,7 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                             
                             {/* Área separada para pegar contenido de Excel - Solo para microcrédito */}
-                            {(solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito') && (
+                            {((['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond?.request_type ?? '')) && (
                               <div>
                                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
                                   Tabla de Excel (opcional)
@@ -5236,7 +5236,7 @@ const AdminSolicitudesPage: React.FC = () => {
                   )}
 
                     {/* Información específica para solicitudes de microcrédito */}
-                    {solicitudToRespond && (solicitudToRespond.request_type === 'microcredito' || solicitudToRespond.request_type === 'solicitud-microcredito') && (
+                    {solicitudToRespond && ((['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond.request_type ?? '')) && (
                       <Card className="border border-blue-200 bg-blue-50">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-2 mb-3">
@@ -5358,7 +5358,7 @@ const AdminSolicitudesPage: React.FC = () => {
                           name="rejection_reason"
                           render={({ field }) => {
                             // Determinar si es microcrédito para mostrar opción "otros"
-                            const isMicrocredito = solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito';
+                            const isMicrocredito = (['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond?.request_type ?? '');
                             
                             // Filtrar opciones: mostrar "otros" solo para microcrédito
                             const availableOptions = isMicrocredito 
@@ -5609,7 +5609,7 @@ const AdminSolicitudesPage: React.FC = () => {
                             </div>
                             
                             {/* Área separada para pegar contenido de Excel - Solo para microcrédito */}
-                            {(solicitudToRespond?.request_type === 'microcredito' || solicitudToRespond?.request_type === 'solicitud-microcredito') && (
+                            {((['microcredito', 'solicitud-microcredito'] as string[]).includes(solicitudToRespond?.request_type ?? '')) && (
                               <div>
                                 <Label className="text-sm font-medium text-gray-700 mb-2 block">
                                   Tabla de Excel (opcional)

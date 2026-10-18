@@ -21,6 +21,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Tipos (TypeScript)
+        run: npx tsc --noEmit -p tsconfig.app.json
+      # Informativo hasta bajar los ~630 errores históricos de ESLint; luego quitar continue-on-error
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
       - run: npm test
       - run: npm run build
       # Falla solo ante vulnerabilidades críticas en dependencias de producción

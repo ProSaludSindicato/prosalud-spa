@@ -1256,7 +1256,7 @@ export const requestsApiService = {
       
       // Ensure correct MIME type
       let fileToUpload: File = file;
-      if (!file.type || file.type !== correctMimeType || file.type === 'application/zip') {
+      if (!file.type || file.type !== correctMimeType) {
         const arrayBuffer = await file.arrayBuffer();
         const blob = new Blob([arrayBuffer], { type: correctMimeType });
         fileToUpload = new File([blob], file.name, {

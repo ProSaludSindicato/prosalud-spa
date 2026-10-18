@@ -96,7 +96,7 @@ export function useScreenOrientation(): UseScreenOrientationReturn {
         screen.orientation &&
         'lock' in screen.orientation
       ) {
-        await screen.orientation.lock('landscape');
+        await (screen.orientation as unknown as { lock: (orientation: string) => Promise<void> }).lock('landscape');
         setIsLandscape(true);
         setCurrentOrientation('landscape');
       } else if (

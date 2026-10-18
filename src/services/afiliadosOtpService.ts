@@ -42,6 +42,7 @@ export interface VerifyOtpRequest {
 }
 
 export interface AfiliadoData {
+  contacto_emergencia?: string | null;
   tipo_documento: string;
   documento: string;
   nombres: string;
