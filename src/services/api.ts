@@ -154,7 +154,7 @@ authenticatedApi.interceptors.response.use(
       if (isAuthValidation) {
         // NO limpiar ni redirigir aquí - AuthContext lo manejará
         // Solo loguear para debugging
-      } else if (!isRedirecting) {
+      } else if (!isRedirecting && isAdminRoute) {
         // Si recibimos 401 en cualquier otra petición, el token ha expirado
         // Limpiar sesión y redirigir al login automáticamente
         isRedirecting = true;

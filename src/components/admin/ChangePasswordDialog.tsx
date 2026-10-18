@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import axios from 'axios';
+import { authenticatedApi } from '@/services/api';
 import { useSanitizedInput } from '@/hooks/useSanitizedInput';
 
 interface ChangePasswordDialogProps {
@@ -46,10 +47,10 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 12) {
       toast({
         title: "Error",
-        description: "La nueva contraseña debe tener al menos 6 caracteres",
+        description: "La nueva contraseña debe tener al menos 12 caracteres, con mayúscula, minúscula, número y símbolo",
         variant: "destructive"
       });
       return;
@@ -58,32 +59,30 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
+      await authenticatedApi.post('/api/auth/change-password', {
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmPassword,
       });
 
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "¡Éxito!",
-          description: "Contraseña actualizada correctamente",
-          variant: "default",
-          className: "border-green-200 bg-green-50 text-green-800"
-        });
-        onOpenChange(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      }
+      toast({
+        title: "¡Éxito!",
+        description: "Contraseña actualizada correctamente. Tus otras sesiones se cerraron.",
+        variant: "default",
+        className: "border-green-200 bg-green-50 text-green-800"
+      });
+      onOpenChange(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
+      const serverErrors = axios.isAxiosError(error) ? error.response?.data?.errors : undefined;
+      const firstServerError = serverErrors ? (Object.values(serverErrors).flat()[0] as string | undefined) : undefined;
       toast({
         title: "Error",
-        description: "Ocurrió un error inesperado",
+        description: firstServerError
+          ?? (axios.isAxiosError(error) ? error.response?.data?.message : undefined)
+          ?? "Ocurrió un error inesperado",
         variant: "destructive"
       });
     } finally {
@@ -159,7 +158,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                   setNewPassword(sanitized);
                 }}
                 required
-                minLength={6}
+                minLength={12}
                 className="pr-10 bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
               />
               <Button
@@ -191,7 +190,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
                   setConfirmPassword(sanitized);
                 }}
                 required
-                minLength={6}
+                minLength={12}
                 className="pr-10 bg-white border-gray-300 text-gray-900 focus:border-primary-prosalud focus:ring-primary-prosalud"
               />
               <Button
