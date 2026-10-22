@@ -9,6 +9,8 @@ import { AuditFiltersComponent } from "@/components/admin/votaciones/AuditFilter
 import { StatisticsFiltersComponent } from "@/components/admin/votaciones/StatisticsFilters";
 import { AuditTrailTable } from "@/components/admin/votaciones/AuditTrailTable";
 import { CandidatesTable } from "@/components/admin/votaciones/CandidatesTable";
+import { PublicVotingLink } from "@/components/admin/voting/PublicVotingLink";
+import { useActiveVotingMode } from "@/hooks/useActiveVotingMode";
 import { CandidatesUploadGuideDialog, type CandidatesUploadGuideMode } from "@/components/admin/votaciones/CandidatesUploadGuideDialog";
 import { votacionesApi } from "@/services/votacionesApi";
 import { generateVotacionesExcelReport } from "@/components/admin/votaciones/utils/votacionesExcelGenerator";
@@ -17,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Vote, BarChart3, Upload, Download, CheckCircle2, ArrowLeft, Loader2, PlayCircle, Ban, Eye } from "lucide-react";
+import { Vote, BarChart3, Upload, Download, CheckCircle2, ArrowLeft, Loader2, PlayCircle, Ban, Eye, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import type { AuditFilters, CandidateVotingPeriod, Vote as VoteType, StatisticsFilters, StatisticsResponse } from "@/types/votaciones";
@@ -62,6 +64,7 @@ const delegadosPhotosZipConfig = {
 export default function AdminVotacionesPage() {
   const { can } = usePermissions();
   const queryClient = useQueryClient();
+  const { isCandidateEnabled: isPublicCandidateVotingEnabled, isLoading: isVotingModeLoading } = useActiveVotingMode();
 
   const showBackToAssemblyHub = useMemo(
     () =>
@@ -734,6 +737,35 @@ export default function AdminVotacionesPage() {
                   </Button>
                 </div>
               </div>
+
+              {!isVotingModeLoading && (
+                <div className="space-y-3 border-t px-4 py-3">
+                  {isPublicCandidateVotingEnabled && activeCandidateVotingPeriod ? (
+                    <p className="text-sm text-emerald-700">
+                      La votación está abierta. Comparta este enlace con los afiliados para que voten.
+                    </p>
+                  ) : (
+                    <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                      <AlertTriangle className="mt-1 h-4 w-4 shrink-0" aria-hidden />
+                      <p>
+                        {!isPublicCandidateVotingEnabled ? (
+                          <>
+                            Los afiliados aún no pueden votar: la elección de candidatos está deshabilitada. Habilítela en{" "}
+                            <Link to="/admin/asamblea-general" className="font-semibold underline underline-offset-2">
+                              Asamblea General
+                            </Link>
+                            {activeCandidateVotingPeriod ? "." : " y active un periodo."}
+                          </>
+                        ) : (
+                          "Los afiliados aún no pueden votar: active un periodo de votación."
+                        )}{" "}
+                        El enlace funcionará en cuanto la votación esté abierta.
+                      </p>
+                    </div>
+                  )}
+                  <PublicVotingLink mode="candidate" label="Enlace para los afiliados" />
+                </div>
+              )}
             </div>
           );
         })()}
