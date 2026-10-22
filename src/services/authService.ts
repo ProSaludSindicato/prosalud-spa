@@ -335,6 +335,14 @@ class AuthService {
     }
   }
 
+  private hasStoredUser(): boolean {
+    try {
+      return localStorage.getItem(USER_KEY) !== null;
+    } catch {
+      return false;
+    }
+  }
+
   removeUser(): void {
     try {
       localStorage.removeItem(USER_KEY);
@@ -348,9 +356,13 @@ class AuthService {
    * ✅ Ya no limpiamos token de localStorage (está en cookies HttpOnly)
    */
   clearSession(): void {
+    const hadStoredUser = this.hasStoredUser();
     this.removeUser();
-    // Evitar que datos de la sesión anterior queden en memoria o disponibles para el siguiente usuario
-    queryClient.clear();
+    // Evitar que datos de la sesión anterior queden en memoria o disponibles para el siguiente usuario.
+    // resetQueries (no clear) para que las consultas en curso, p. ej. en páginas públicas, sigan notificando.
+    if (hadStoredUser) {
+      void queryClient.resetQueries();
+    }
     try {
       sessionStorage.removeItem('afiliado_auth');
     } catch {
