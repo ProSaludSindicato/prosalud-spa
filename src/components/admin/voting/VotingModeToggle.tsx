@@ -13,6 +13,7 @@ import {
 import { useActiveVotingMode, useSetVotingMode } from "@/hooks/useActiveVotingMode";
 import { toast } from "@/hooks/use-toast";
 import type { ActiveVotingMode } from "@/services/votingModeApi";
+import { PublicVotingLink } from "@/components/admin/voting/PublicVotingLink";
 
 interface VotingModeToggleProps {
   /** Which mode this toggle controls */
@@ -97,6 +98,12 @@ export function VotingModeToggle({ mode }: VotingModeToggleProps) {
             </span>
           )}
         </p>
+        {isEnabled && (
+          <PublicVotingLink
+            mode={mode}
+            label={mode === "candidate" ? "Enlace para los afiliados" : "Enlace para los delegados"}
+          />
+        )}
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
