@@ -15,11 +15,17 @@ export type UpdateVotingModeResponse = {
   message?: string;
 };
 
+const VOTING_MODE_TIMEOUT_MS = 10_000;
+
 export async function getActiveVotingMode(): Promise<VotingModeResponse> {
   const response = await fetch(buildPublicApiUrl("/api/voting/mode"), {
     method: "GET",
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(VOTING_MODE_TIMEOUT_MS),
   });
+  if (!response.ok) {
+    throw new Error(`No se pudo consultar el modo de votación (HTTP ${response.status}).`);
+  }
   return response.json() as Promise<VotingModeResponse>;
 }
 

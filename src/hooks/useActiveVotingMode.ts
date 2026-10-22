@@ -5,18 +5,21 @@ import type { ActiveVotingMode } from "@/services/votingModeApi";
 const QUERY_KEY = ["voting-mode"] as const;
 
 export function useActiveVotingMode() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: getActiveVotingMode,
     staleTime: 30_000,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
+    retry: 1,
   });
 
   return {
     activeMode: data?.active_mode ?? "none",
     isLoading,
     isError,
+    isFetching,
+    refetch,
     isCandidateEnabled: data?.active_mode === "candidate",
     isAssemblyEnabled: data?.active_mode === "assembly",
     isVotingDisabled: !data || data.active_mode === "none",

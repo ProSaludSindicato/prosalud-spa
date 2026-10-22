@@ -3,6 +3,7 @@ import { AssemblyValidationForm } from "@/components/assembly/AssemblyValidation
 import AssemblyVoting from "@/components/assembly/AssemblyVoting";
 import type { UserSession } from "@/types/assemblyVoting";
 import { useActiveVotingMode } from "@/hooks/useActiveVotingMode";
+import { VotingConnectionError } from "@/components/assembly/VotingConnectionError";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 const SESSION_KEY = "assembly:userSession";
@@ -31,7 +32,7 @@ function loadStoredSession(): UserSession | null {
 }
 
 export default function AssemblyDelegatePage() {
-  const { isAssemblyEnabled, isLoading } = useActiveVotingMode();
+  const { isAssemblyEnabled, isLoading, isError, isFetching, refetch } = useActiveVotingMode();
   const [session, setSession] = useState<UserSession | null>(() =>
     typeof window !== "undefined" ? loadStoredSession() : null,
   );
@@ -63,6 +64,10 @@ export default function AssemblyDelegatePage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isError) {
+    return <VotingConnectionError onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   if (!isAssemblyEnabled) {
