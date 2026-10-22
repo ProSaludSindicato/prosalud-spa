@@ -9,6 +9,7 @@ import { AuditFiltersComponent } from "@/components/admin/votaciones/AuditFilter
 import { StatisticsFiltersComponent } from "@/components/admin/votaciones/StatisticsFilters";
 import { AuditTrailTable } from "@/components/admin/votaciones/AuditTrailTable";
 import { CandidatesTable } from "@/components/admin/votaciones/CandidatesTable";
+import { CandidatesUploadGuideDialog, type CandidatesUploadGuideMode } from "@/components/admin/votaciones/CandidatesUploadGuideDialog";
 import { votacionesApi } from "@/services/votacionesApi";
 import { generateVotacionesExcelReport } from "@/components/admin/votaciones/utils/votacionesExcelGenerator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -79,6 +80,7 @@ export default function AdminVotacionesPage() {
   const [isUploadingCandidatePhotos, setIsUploadingCandidatePhotos] = useState(false);
   const [delegadosUploadIntent, setDelegadosUploadIntent] = useState(false);
   const [isDownloadingCandidatos, setIsDownloadingCandidatos] = useState(false);
+  const [uploadGuideMode, setUploadGuideMode] = useState<CandidatesUploadGuideMode | null>(null);
   const [selectedPeriodKeyForManagement, setSelectedPeriodKeyForManagement] = useState<string>("active");
   const [isPeriodActionLoading, setIsPeriodActionLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -506,14 +508,25 @@ export default function AdminVotacionesPage() {
 
   const handleDelegadosUploadButtonClick = () => {
     if (isUploading || isDownloadingCandidatos || isUploadingCandidatePhotos) return;
-    resetUploadState({ preserveContext: false });
-    setDelegadosUploadIntent(true);
-    fileInputRef.current?.click();
+    setUploadGuideMode("candidatos");
   };
 
   const handleCandidatePhotosUploadButtonClick = () => {
     if (isUploading || isDownloadingCandidatos || isUploadingCandidatePhotos) return;
-    photosZipInputRef.current?.click();
+    setUploadGuideMode("fotos");
+  };
+
+  const handleUploadGuideSelectFile = (mode: CandidatesUploadGuideMode) => {
+    setUploadGuideMode(null);
+
+    if (mode === "fotos") {
+      photosZipInputRef.current?.click();
+      return;
+    }
+
+    resetUploadState({ preserveContext: false });
+    setDelegadosUploadIntent(true);
+    fileInputRef.current?.click();
   };
 
   const handleCandidatePhotosZipSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -919,6 +932,18 @@ export default function AdminVotacionesPage() {
           </TabsContent>
           )}
         </Tabs>
+
+        <CandidatesUploadGuideDialog
+          mode={uploadGuideMode}
+          onOpenChange={(open) => {
+            if (!open) {
+              setUploadGuideMode(null);
+            }
+          }}
+          onSelectFile={handleUploadGuideSelectFile}
+          onDownloadCurrent={handleDownloadCandidatosArchivo}
+          isDownloadingCurrent={isDownloadingCandidatos}
+        />
 
         <Dialog open={showUploadConfirmDialog} onOpenChange={handleUploadDialogChange}>
           <DialogContent
