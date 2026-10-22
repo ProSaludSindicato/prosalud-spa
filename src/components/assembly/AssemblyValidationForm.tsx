@@ -121,7 +121,7 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-white via-slate-50 to-slate-100/90">
-      <div className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4 sm:px-4 sm:pb-10 sm:pt-6">
+      <div className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4 sm:flex-none sm:px-4 sm:pb-4 sm:pt-6">
         <header className="pb-4 text-center sm:pb-6">
           <div className="mx-auto flex h-[4.5rem] w-[4.5rem] items-center justify-center sm:h-28 sm:w-28">
             <img src="/images/logo_prosalud.webp" alt="ProSalud" className="h-full w-full object-contain" />
