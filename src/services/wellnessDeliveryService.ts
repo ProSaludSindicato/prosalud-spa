@@ -3,17 +3,42 @@ import { logger } from '@/utils/logger';
 import axios from 'axios';
 import type { SingleBeneficiaryResponse, MultipleBeneficiariesResponse } from './entregasBienestarService';
 
+/** Cupo (fila del listado) de un afiliado en una campaña de entrega con listado */
+export interface ListadoBeneficiario {
+  clave: string;
+  beneficiario: string | null;
+  parentesco: string | null;
+  edad: string | null;
+  cantidad: number;
+  entregado: boolean;
+}
+
+/** Cupos del afiliado en una campaña con modo entrega_listado */
+export interface ListadoCupo {
+  nombre_afiliado: string | null;
+  hospital: string | null;
+  cupo_total: number;
+  cupo_entregado: number;
+  cupo_disponible: number;
+  beneficiarios: ListadoBeneficiario[];
+}
+
 /** Un tipo activo en affiliate-lookup, con indicador de si este documento ya tiene solicitud */
 export interface AffiliateLookupTipoActivo {
   id: number;
   nombre: string;
-  modo_acceso: 'listado' | 'abierto';
+  modo_acceso: ModoAccesoType;
   fecha_desde: string | null;
   fecha_hasta: string | null;
   siempre_activo: boolean;
   tiene_solicitud: boolean;
   solicitud_estado: 'pendiente' | 'entregado' | null;
   solicitud_id: number | null;
+  /** true si para este documento se puede registrar una entrega en esta campaña */
+  disponible?: boolean;
+  motivo_no_disponible?: string | null;
+  /** Solo en modo entrega_listado: cupos y beneficiarios del afiliado (null si no está en el listado) */
+  listado?: ListadoCupo | null;
 }
 
 /** Respuesta plana del endpoint affiliate-lookup (documento sin fecha expedición) */
@@ -46,6 +71,8 @@ export interface AffiliateLookupFlatData {
    * Si puede_registrar_otro_tipo es false → mostrar como mensaje de bloqueo.
    */
   solicitud_existente_mensaje?: string;
+  /** Mensaje cuando no hay ninguna campaña disponible para el documento */
+  mensaje_bloqueo?: string;
 }
 
 /** Estructura de búsqueda por documento; puede ser plana (affiliate-lookup) o igual a authenticate */
@@ -237,7 +264,46 @@ export interface FileVersionsResponse {
 /**
  * Tipo de entrega (campaña) – administrable desde el panel
  */
-export type ModoAccesoType = 'listado' | 'abierto';
+export type ModoAccesoType = 'listado' | 'abierto' | 'entrega_listado';
+
+export const MODO_ACCESO_LABELS: Record<ModoAccesoType, string> = {
+  listado: 'Inscripción',
+  abierto: 'Abierto',
+  entrega_listado: 'Entrega con listado',
+};
+
+/** Resumen del listado cargado en una campaña con modo entrega_listado */
+export interface WellnessDeliveryListSummary {
+  archivo: string | null;
+  cargado_at: string | null;
+  afiliados: number;
+  filas: number;
+  cupos: number;
+}
+
+export interface UploadDeliveryListResponse {
+  success: boolean;
+  message?: string;
+  data?: { listado: WellnessDeliveryListSummary; columnas_ignoradas: string[] };
+  errors?: string[] | Record<string, string[]>;
+  total_errores?: number;
+}
+
+/** Request para POST /api/wellness-delivery-requests/list-delivery (modo_acceso === 'entrega_listado') */
+export interface SubmitListDeliveryRequest {
+  wellness_delivery_type_id: number;
+  documento_afiliado: string;
+  claves: string[];
+  firma: string;
+  nombre_afiliado?: string;
+  hospital?: string;
+}
+
+export interface SubmitListDeliveryResponse {
+  success: boolean;
+  message?: string;
+  data: (SubmitOpenDeliveryResponseData & { cantidad_entregada?: number; cupo_disponible?: number }) | null;
+}
 
 export interface WellnessDeliveryType {
   id: number;
@@ -251,6 +317,8 @@ export interface WellnessDeliveryType {
   fecha_hasta: string | null;
   /** true cuando fecha_desde y fecha_hasta son null */
   siempre_activo?: boolean;
+  /** Solo en modo entrega_listado: resumen del listado cargado */
+  listado?: WellnessDeliveryListSummary | null;
   created_by?: { id: number; name: string } | null;
   created_at: string;
   updated_at?: string;
@@ -767,6 +835,64 @@ class WellnessDeliveryService {
         logger.error('Error al registrar entrega (modo abierto)', { status, data: error.response?.data });
         throw error;
       }
+      throw error;
+    }
+  }
+
+  /**
+   * Descargar la plantilla estándar del listado de entregas.
+   * GET /api/wellness-delivery-types/listado/plantilla
+   */
+  async downloadListTemplate(): Promise<Blob> {
+    const response = await authenticatedApi.get('/api/wellness-delivery-types/listado/plantilla', {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  }
+
+  /**
+   * Cargar (o reemplazar) el listado de cupos de una campaña.
+   * POST /api/wellness-delivery-types/{id}/listado
+   * Devuelve success: false con la lista de errores por fila cuando el archivo no es válido (422).
+   */
+  async uploadDeliveryList(typeId: number, file: File): Promise<UploadDeliveryListResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await authenticatedApi.post<UploadDeliveryListResponse>(
+        `/api/wellness-delivery-types/${typeId}/listado`,
+        formData,
+        { headers: { Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 422) {
+        const body = error.response.data as UploadDeliveryListResponse;
+        return { success: false, message: body?.message || 'El listado no es válido.', errors: body?.errors, total_errores: body?.total_errores };
+      }
+      logger.error('Error al cargar listado de campaña', { typeId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Registrar entrega validada contra el listado de la campaña (modo entrega_listado).
+   * POST /api/wellness-delivery-requests/list-delivery
+   */
+  async submitListDelivery(data: SubmitListDeliveryRequest): Promise<SubmitListDeliveryResponse> {
+    try {
+      const response = await authenticatedApi.post<SubmitListDeliveryResponse>(
+        '/api/wellness-delivery-requests/list-delivery',
+        data,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 422) {
+        const body = error.response.data as { message?: string };
+        return { success: false, message: body?.message || 'No se pudo registrar la entrega.', data: null };
+      }
+      logger.error('Error al registrar entrega con listado', { status: axios.isAxiosError(error) ? error.response?.status : undefined });
       throw error;
     }
   }

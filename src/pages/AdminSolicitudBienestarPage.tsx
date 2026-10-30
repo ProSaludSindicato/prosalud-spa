@@ -63,7 +63,7 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/utils/errorSanitizer';
 import DataPagination from '@/components/ui/data-pagination';
 import { wellnessRequestsService, WellnessRequest } from '@/services/wellnessRequestsApi';
-import { wellnessDeliveryService, WellnessDeliveryRequest, WellnessDeliveryType } from '@/services/wellnessDeliveryService';
+import { wellnessDeliveryService, WellnessDeliveryRequest, WellnessDeliveryType, MODO_ACCESO_LABELS } from '@/services/wellnessDeliveryService';
 import { TableLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -882,26 +882,53 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     },
   });
 
-  // Mutación para crear/actualizar tipo de entrega (campaña)
+  // Mutación para crear/actualizar tipo de entrega (campaña) y, en modo entrega_listado, cargar su listado
   const saveDeliveryTypeMutation = useMutation({
-    mutationFn: async ({ data, id }: { data: WellnessDeliveryTypeFormValues; id?: number }) => {
+    mutationFn: async ({ data, id, listadoFile }: { data: WellnessDeliveryTypeFormValues; id?: number; listadoFile: File | null }) => {
       const payload = {
         nombre: data.nombre,
         modo_acceso: data.modo_acceso,
         fecha_desde: data.siempre_activo ? null : (data.fecha_desde || undefined),
         fecha_hasta: data.siempre_activo ? null : (data.fecha_hasta || undefined),
       };
-      if (id != null) {
-        return wellnessDeliveryService.updateDeliveryType(id, payload);
-      }
-      return wellnessDeliveryService.createDeliveryType(payload);
+      const saved = id != null
+        ? await wellnessDeliveryService.updateDeliveryType(id, payload)
+        : await wellnessDeliveryService.createDeliveryType(payload);
+      const savedId = saved.data?.id ?? id;
+      const listado = listadoFile && savedId != null
+        ? await wellnessDeliveryService.uploadDeliveryList(savedId, listadoFile)
+        : null;
+      return { saved, listado };
     },
-    onSuccess: (_, variables) => {
-      toast.success(variables.id != null ? 'Campaña actualizada' : 'Campaña creada', {
-        description: 'Los cambios se verán reflejados en la página de solicitud de entregas.',
-      });
+    onSuccess: async ({ saved, listado }, variables) => {
       queryClient.invalidateQueries({ queryKey: ['wellness-delivery-types'] });
       refetchDeliveryTypes();
+
+      if (listado && !listado.success) {
+        const rowErrors = Array.isArray(listado.errors) ? listado.errors : [];
+        toast.error('La campaña se guardó, pero el listado tiene errores', {
+          description: (
+            <div className="space-y-1">
+              <p>{listado.message}</p>
+              {rowErrors.slice(0, 5).map((err) => <p key={err}>• {err}</p>)}
+              {(listado.total_errores ?? rowErrors.length) > 5 && <p>… y {(listado.total_errores ?? rowErrors.length) - 5} más.</p>}
+            </div>
+          ),
+          duration: 15000,
+        });
+        if (saved.data?.id != null) {
+          const refreshed = await wellnessDeliveryService.getDeliveryTypeById(saved.data.id);
+          setEditingDeliveryType(refreshed.data);
+        }
+        return;
+      }
+
+      const ignoradas = listado?.data?.columnas_ignoradas ?? [];
+      toast.success(variables.id != null ? 'Campaña actualizada' : 'Campaña creada', {
+        description: listado?.success
+          ? `${listado.message}${ignoradas.length ? ` Columnas ignoradas: ${ignoradas.join(', ')}.` : ''}`
+          : 'Los cambios se verán reflejados en la página de solicitud de entregas.',
+      });
       setShowDeliveryTypeFormDialog(false);
       setEditingDeliveryType(null);
     },
@@ -910,8 +937,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     },
   });
 
-  const handleSaveDeliveryType = async (data: WellnessDeliveryTypeFormValues) => {
-    await saveDeliveryTypeMutation.mutateAsync({ data, id: editingDeliveryType?.id });
+  const handleSaveDeliveryType = async (data: WellnessDeliveryTypeFormValues, listadoFile: File | null) => {
+    await saveDeliveryTypeMutation.mutateAsync({ data, id: editingDeliveryType?.id, listadoFile });
   };
 
   // Función para enviar el cambio de estado
@@ -2307,9 +2334,16 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                           <TableRow key={t.id} className={activaHoy ? 'bg-green-50/50' : undefined}>
                                             <TableCell className="font-medium text-xs sm:text-sm min-w-[120px] max-w-[180px] sm:max-w-none truncate" title={t.nombre}>{t.nombre}</TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
-                                              <Badge variant="outline" className="text-xs">
-                                                {t.modo_acceso === 'abierto' ? 'Abierto' : 'Con listado'}
-                                              </Badge>
+                                              <div className="flex flex-col items-start gap-1">
+                                                <Badge variant="outline" className="text-xs">
+                                                  {MODO_ACCESO_LABELS[t.modo_acceso ?? 'listado']}
+                                                </Badge>
+                                                {t.modo_acceso === 'entrega_listado' && (
+                                                  <span className={`text-xs ${t.listado?.filas ? 'text-gray-500' : 'text-amber-700'}`}>
+                                                    {t.listado?.filas ? `${t.listado.afiliados} afiliados · ${t.listado.cupos} entregas` : 'Sin listado cargado'}
+                                                  </span>
+                                                )}
+                                              </div>
                                             </TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
                                               <div className="flex flex-wrap items-center gap-1.5">
@@ -2405,9 +2439,17 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                               <div className="flex justify-between gap-2">
                                                 <span className="text-gray-500">Modo</span>
                                                 <Badge variant="outline" className="text-xs w-fit">
-                                                  {t.modo_acceso === 'abierto' ? 'Abierto' : 'Con listado'}
+                                                  {MODO_ACCESO_LABELS[t.modo_acceso ?? 'listado']}
                                                 </Badge>
                                               </div>
+                                              {t.modo_acceso === 'entrega_listado' && (
+                                                <div className="flex justify-between gap-2">
+                                                  <span className="text-gray-500">Listado</span>
+                                                  <span className={t.listado?.filas ? 'text-gray-900' : 'text-amber-700'}>
+                                                    {t.listado?.filas ? `${t.listado.afiliados} afiliados · ${t.listado.cupos} entregas` : 'Sin listado cargado'}
+                                                  </span>
+                                                </div>
+                                              )}
                                               <div className="flex justify-between gap-2">
                                                 <span className="text-gray-500">Desde</span>
                                                 <span className="text-gray-900">{t.fecha_desde ? format(parseLocalDate(t.fecha_desde), 'dd/MM/yyyy', { locale: es }) : '—'}</span>

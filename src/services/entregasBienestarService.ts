@@ -7,7 +7,7 @@ import axios from 'axios';
  * Tipo de entrega activo (campaña vigente para la fecha actual).
  * Puede ser siempre activo (sin rango) o con rango de fechas.
  */
-export type ModoAcceso = 'listado' | 'abierto';
+export type ModoAcceso = 'listado' | 'abierto' | 'entrega_listado';
 
 export interface WellnessDeliveryTypeActive {
   id: number;

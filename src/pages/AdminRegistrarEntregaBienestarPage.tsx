@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Search, FileCheck, Loader2, Calendar, CheckCircle2, XCircle, User, Building, Package, UserPlus, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Search, FileCheck, Loader2, Calendar, CheckCircle2, XCircle, User, Building, Package, UserPlus, AlertCircle, ListChecks } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SignaturePad, SignaturePadRef } from '@/components/admin/sst/SignaturePad';
 import { entregasBienestarService } from '@/services/entregasBienestarService';
 import { wellnessDeliveryService, type AffiliateLookupData, type AffiliateLookupFlatData, type AffiliateLookupTipoActivo } from '@/services/wellnessDeliveryService';
@@ -30,13 +31,15 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
   const [lookupError, setLookupError] = useState<string | null>(null);
   /** Tipo de entrega elegido cuando hay varios (desde tipos_activos del lookup) */
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  /** Claves de los cupos del listado marcados para entregar (modo entrega_listado) */
+  const [selectedClaves, setSelectedClaves] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignatureError, setShowSignatureError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [successData, setSuccessData] = useState<{ tipo_entrega_text?: string; estado?: string; created_at?: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ tipo_entrega_text?: string; estado?: string; created_at?: string; cantidad_entregada?: number; cupo_disponible?: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -67,6 +70,20 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  /** true si se puede registrar una entrega para este documento en el tipo dado */
+  const isTipoDisponible = (t: AffiliateLookupTipoActivo): boolean => t.disponible ?? !t.tiene_solicitud;
+
+  /** Al cambiar de tipo, preseleccionar los cupos del listado aún no entregados */
+  const selectType = (typeId: number | null, tipos: AffiliateLookupTipoActivo[]) => {
+    setSelectedTypeId(typeId);
+    const tipo = tipos.find((t) => t.id === typeId);
+    setSelectedClaves(tipo?.listado?.beneficiarios.filter((b) => !b.entregado).map((b) => b.clave) ?? []);
+  };
+
+  const toggleClave = (clave: string, checked: boolean) => {
+    setSelectedClaves((prev) => (checked ? [...prev, clave] : prev.filter((c) => c !== clave)));
+  };
+
   const handleSearch = async () => {
     const doc = documento.trim();
     if (!doc) {
@@ -76,6 +93,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
     setLookupError(null);
     setLookupData(null);
     setSelectedTypeId(null);
+    setSelectedClaves([]);
     setSignature(null);
     signaturePadRef.current?.clear();
     setIsSearching(true);
@@ -85,12 +103,8 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
         setLookupData(res.data);
         const flat = res.data as AffiliateLookupFlatData;
         const tipos = flat.tipos_activos ?? [];
-        const tiposDisponibles = tipos.filter((t) => !t.tiene_solicitud);
-        if (tiposDisponibles.length === 1) {
-          setSelectedTypeId(tiposDisponibles[0].id);
-        } else {
-          setSelectedTypeId(null);
-        }
+        const tiposDisponibles = tipos.filter(isTipoDisponible);
+        selectType(tiposDisponibles.length === 1 ? tiposDisponibles[0].id : null, tipos);
         toast.success('Afiliado encontrado');
       } else {
         setLookupError(res.message || 'No se encontró el afiliado.');
@@ -120,7 +134,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
   const getSolicitudExistenteMensaje = (): string | null => {
     if (!lookupData || !isFlatLookupData(lookupData)) return null;
     const flat = lookupData as AffiliateLookupFlatData;
-    if (!flat.solicitud_existente) return null;
+    if (!flat.solicitud_existente) return flat.puede_registrar_otro_tipo === false ? (flat.mensaje_bloqueo ?? null) : null;
     if (flat.solicitud_existente_mensaje) return flat.solicitud_existente_mensaje;
     const tipoNombre = flat.tipo_entrega_nombre || 'este tipo de entrega';
     const estadoLabel = flat.solicitud_estado === 'entregado' ? 'entregada' : flat.solicitud_estado === 'pendiente' ? 'pendiente' : 'registrada';
@@ -181,8 +195,13 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
       return;
     }
     const selectedType = tipos.find((t) => t.id === typeId);
-    if (selectedType?.tiene_solicitud) {
-      toast.error('El tipo seleccionado ya tiene una solicitud para este documento. Elige otro tipo de la lista.');
+    if (selectedType && !isTipoDisponible(selectedType)) {
+      toast.error(selectedType.motivo_no_disponible || 'El tipo seleccionado ya tiene una solicitud para este documento. Elige otro tipo de la lista.');
+      return;
+    }
+    const isEntregaListado = selectedType?.modo_acceso === 'entrega_listado';
+    if (isEntregaListado && selectedClaves.length === 0) {
+      toast.error('Selecciona al menos un beneficiario a entregar');
       return;
     }
 
@@ -198,7 +217,34 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
     const tipoParaEnvio = tipos.find((t) => t.id === typeId);
     const isModoAbierto = tipoParaEnvio?.modo_acceso === 'abierto';
     try {
-      if (isModoAbierto) {
+      if (isEntregaListado && typeId != null) {
+        const response = await wellnessDeliveryService.submitListDelivery({
+          wellness_delivery_type_id: typeId,
+          documento_afiliado: documento.trim(),
+          claves: selectedClaves,
+          firma: signature,
+          nombre_afiliado: payload.nombre_afiliado || undefined,
+          hospital: payload.hospital || undefined,
+        });
+        if (response.success && response.data) {
+          setSuccessData({
+            tipo_entrega_text: response.data.tipo_entrega_text,
+            estado: response.data.estado,
+            created_at: response.data.created_at,
+            cantidad_entregada: response.data.cantidad_entregada,
+            cupo_disponible: response.data.cupo_disponible,
+          });
+          setShowSuccessModal(true);
+          setLookupData(null);
+          setDocumento('');
+          setSelectedClaves([]);
+          setSignature(null);
+          signaturePadRef.current?.clear();
+        } else {
+          setErrorMessage(response.message || 'Error al registrar la entrega');
+          setShowErrorModal(true);
+        }
+      } else if (isModoAbierto) {
         const response = await wellnessDeliveryService.submitOpenDelivery({
           documento_afiliado: documento.trim(),
           nombre_afiliado: payload.nombre_afiliado,
@@ -255,6 +301,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
     setLookupData(null);
     setLookupError(null);
     setSelectedTypeId(null);
+    setSelectedClaves([]);
     setSignature(null);
     setShowSignatureError(false);
     signaturePadRef.current?.clear();
@@ -455,7 +502,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                               <Label className="text-sm font-medium text-slate-800 sr-only">Tipo de entrega</Label>
                               <Select
                                 value={selectedTypeId != null ? String(selectedTypeId) : ''}
-                                onValueChange={(v) => setSelectedTypeId(v ? Number(v) : null)}
+                                onValueChange={(v) => selectType(v ? Number(v) : null, tipos)}
                               >
                                 <SelectTrigger className="w-full max-w-full sm:max-w-md h-11 min-h-[44px] font-medium border-primary/30 bg-white focus:ring-2 focus:ring-primary/30 touch-manipulation">
                                   <SelectValue placeholder="Elige el tipo de entrega" />
@@ -465,7 +512,7 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                                     <SelectItem
                                       key={t.id}
                                       value={String(t.id)}
-                                      disabled={t.tiene_solicitud}
+                                      disabled={!isTipoDisponible(t)}
                                       className="break-words"
                                     >
                                       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -473,8 +520,12 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                                         {t.siempre_activo && (
                                           <span className="text-xs text-slate-500 font-normal">(siempre activo)</span>
                                         )}
-                                        {t.tiene_solicitud && (
-                                          <span className="text-xs text-amber-600">(ya tiene solicitud)</span>
+                                        {!isTipoDisponible(t) && (
+                                          <span className="text-xs text-amber-600">
+                                            {t.modo_acceso === 'entrega_listado'
+                                              ? (t.listado ? '(entregas completas)' : '(no está en el listado)')
+                                              : '(ya tiene solicitud)'}
+                                          </span>
                                         )}
                                       </span>
                                     </SelectItem>
@@ -483,12 +534,62 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                               </Select>
                               {tipos.length > 1 && (
                                 <p className="text-xs text-slate-500 break-words">
-                                  Los tipos con solicitud ya registrada para este documento aparecen deshabilitados.
+                                  Los tipos que no aplican para este documento (ya registrados, sin cupo o fuera del listado) aparecen deshabilitados.
                                 </p>
                               )}
                             </CardContent>
                           </Card>
                         )}
+
+                        {/* Cupos del listado (modo entrega_listado) */}
+                        {puedeRegistrar && (() => {
+                          const tipoSel = tipos.find((t) => t.id === selectedTypeId);
+                          if (tipoSel?.modo_acceso !== 'entrega_listado' || !tipoSel.listado) return null;
+                          const cupo = tipoSel.listado;
+                          const cantidadSeleccionada = cupo.beneficiarios
+                            .filter((b) => selectedClaves.includes(b.clave))
+                            .reduce((sum, b) => sum + b.cantidad, 0);
+                          return (
+                            <div className="rounded-lg border border-slate-200 p-4 space-y-3 min-w-0">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                                  <ListChecks className="h-5 w-5 text-primary shrink-0" />
+                                  Entregas del listado
+                                </h3>
+                                <Badge variant="outline" className="border-primary/40 bg-primary/5 text-slate-800">
+                                  {cupo.cupo_disponible} de {cupo.cupo_total} disponibles
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-slate-600">Marca a quiénes se entrega ahora. Los ya entregados no se pueden volver a entregar en esta campaña.</p>
+                              <ul className="divide-y divide-slate-100 rounded-md border border-slate-100">
+                                {cupo.beneficiarios.map((b) => (
+                                  <li key={b.clave}>
+                                    <label className={`flex items-center gap-3 px-3 py-2 min-h-[44px] ${b.entregado ? 'opacity-60' : 'cursor-pointer'}`}>
+                                      <Checkbox
+                                        checked={b.entregado || selectedClaves.includes(b.clave)}
+                                        disabled={b.entregado}
+                                        onCheckedChange={(checked) => toggleClave(b.clave, checked === true)}
+                                      />
+                                      <span className="flex-1 min-w-0 text-sm">
+                                        <span className="font-medium text-slate-900 break-words">{b.beneficiario || p?.nombre_afiliado || 'Afiliado'}</span>
+                                        {(b.parentesco || b.edad) && (
+                                          <span className="text-slate-500"> · {[b.parentesco, b.edad ? `${b.edad} años` : null].filter(Boolean).join(', ')}</span>
+                                        )}
+                                      </span>
+                                      {b.cantidad > 1 && <span className="text-xs text-slate-500 shrink-0">x{b.cantidad}</span>}
+                                      {b.entregado && (
+                                        <Badge variant="outline" className="border-green-600 bg-green-50 text-green-800 shrink-0">Entregado</Badge>
+                                      )}
+                                    </label>
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="text-sm text-slate-700">
+                                Se registrarán <strong>{cantidadSeleccionada}</strong> entrega(s).
+                              </p>
+                            </div>
+                          );
+                        })()}
 
                         {/* Formulario de firma y envío solo cuando puede registrar */}
                         {puedeRegistrar && (
@@ -543,6 +644,12 @@ const AdminRegistrarEntregaBienestarPage: React.FC = () => {
                   <p><span className="text-slate-600">Campaña:</span> {successData.tipo_entrega_text}</p>
                 )}
                 <p><span className="text-slate-600">Estado:</span> <span className="capitalize font-medium">{successData.estado}</span></p>
+                {successData.cantidad_entregada != null && (
+                  <p><span className="text-slate-600">Entregas registradas:</span> {successData.cantidad_entregada}</p>
+                )}
+                {successData.cupo_disponible != null && (
+                  <p><span className="text-slate-600">Entregas pendientes del afiliado:</span> {successData.cupo_disponible}</p>
+                )}
                 {successData.created_at && (
                   <p><span className="text-slate-600">Fecha:</span> {formatDate(successData.created_at)}</p>
                 )}

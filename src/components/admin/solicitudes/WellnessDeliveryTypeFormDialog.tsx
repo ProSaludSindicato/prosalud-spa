@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,10 +17,11 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, FileCheck, Globe, CalendarRange, Infinity, FileSpreadsheet } from 'lucide-react';
+import { Loader2, FileCheck, Globe, CalendarRange, Infinity, FileSpreadsheet, ListChecks, Download, Upload, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { WellnessDeliveryType } from '@/services/wellnessDeliveryService';
+import { WellnessDeliveryType, wellnessDeliveryService } from '@/services/wellnessDeliveryService';
+import { logger } from '@/utils/logger';
 
 function getTodayLocalYYYYMMDD(): string {
   const d = new Date();
@@ -29,7 +31,7 @@ function getTodayLocalYYYYMMDD(): string {
 const schema = z
   .object({
     nombre: z.string().min(1, 'El nombre es obligatorio').max(200, 'Máximo 200 caracteres'),
-    modo_acceso: z.enum(['listado', 'abierto'], { required_error: 'El modo de acceso es obligatorio' }),
+    modo_acceso: z.enum(['listado', 'abierto', 'entrega_listado'], { required_error: 'El modo de acceso es obligatorio' }),
     siempre_activo: z.boolean(),
     fecha_desde: z.string(),
     fecha_hasta: z.string(),
@@ -55,7 +57,8 @@ interface WellnessDeliveryTypeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: WellnessDeliveryType | null; // null = crear, no null = editar
-  onSubmit: (data: WellnessDeliveryTypeFormValues) => Promise<void>;
+  /** listadoFile: Excel del listado de cupos (solo modo entrega_listado); se carga después de guardar la campaña */
+  onSubmit: (data: WellnessDeliveryTypeFormValues, listadoFile: File | null) => Promise<void>;
   isSubmitting?: boolean;
   /** Si se proporciona, se muestra un botón para abrir la gestión del archivo Excel cuando el modo es "Con listado" */
   onOpenFileManager?: () => void;
@@ -70,6 +73,9 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
   onOpenFileManager,
 }) => {
   const isEdit = type !== null;
+  const [listadoFile, setListadoFile] = useState<File | null>(null);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+  const listadoInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<WellnessDeliveryTypeFormValues>({
     resolver: zodResolver(schema),
@@ -87,6 +93,7 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
 
   useEffect(() => {
     if (open) {
+      setListadoFile(null);
       if (type) {
         const isAlwaysActive = type.siempre_activo ?? (type.fecha_desde == null && type.fecha_hasta == null);
         form.reset({
@@ -109,9 +116,47 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
   }, [open, type, form]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
-    await onSubmit(data);
+    await onSubmit(data, data.modo_acceso === 'entrega_listado' ? listadoFile : null);
     // El padre cierra el diálogo en onSuccess de la mutación
   });
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const blob = await wellnessDeliveryService.downloadListTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Plantilla_Listado_Entregas_Bienestar.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      logger.error('Error al descargar plantilla de listado', { error });
+      toast.error('No se pudo descargar la plantilla');
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
+
+  const handleListadoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!file) return;
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension !== 'xlsx' && extension !== 'xls') {
+      toast.error('El listado debe ser un Excel (.xlsx o .xls)');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('El listado no puede ser mayor a 10MB');
+      return;
+    }
+    setListadoFile(file);
+  };
+
+  const listadoActual = type?.listado ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,10 +213,10 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
                             <div className="grid gap-1.5 leading-none">
                               <Label htmlFor="modo-listado" className="flex items-center gap-2 font-medium cursor-pointer">
                                 <FileCheck className="h-4 w-4" />
-                                Con listado
+                                Inscripción con listado
                               </Label>
                               <p className="text-sm text-muted-foreground">
-                                Requiere autenticación del afiliado y validación contra el archivo Excel de afiliados permitidos. Debes subir el listado en la sección &quot;Gestión de Archivo Excel&quot;.
+                                El afiliado se inscribe en la página pública (autenticándose contra el Excel general de &quot;Gestión de Archivo Excel&quot;) y luego el personal le entrega.
                               </p>
                             </div>
                           </div>
@@ -187,18 +232,74 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
                               </p>
                             </div>
                           </div>
+                          <div className="flex items-start space-x-3 space-y-0 rounded-lg border border-slate-200 bg-white p-4">
+                            <RadioGroupItem value="entrega_listado" id="modo-entrega-listado" />
+                            <div className="grid gap-1.5 leading-none">
+                              <Label htmlFor="modo-entrega-listado" className="flex items-center gap-2 font-medium cursor-pointer">
+                                <ListChecks className="h-4 w-4" />
+                                Entrega directa con listado
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Las coordinadoras registran la entrega en el acto, pero solo a quienes estén en el listado de esta campaña y hasta su número de entregas (ej. 3 hijos = 3 entregas). El sistema bloquea entregas repetidas.
+                              </p>
+                            </div>
+                          </div>
                         </RadioGroup>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {modoAcceso === 'entrega_listado' && (
+                  <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                          <FileSpreadsheet className="h-4 w-4 text-primary shrink-0" />
+                          Listado de la campaña
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1">
+                          Una fila por beneficiario. Columnas: DOCUMENTO AFILIADO (obligatoria), NOMBRE AFILIADO, HOSPITAL, NOMBRE BENEFICIARIO, PARENTESCO, EDAD y CANTIDAD (vacía = 1).
+                        </p>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" className="shrink-0 bg-white" onClick={handleDownloadTemplate} disabled={isDownloadingTemplate}>
+                        {isDownloadingTemplate ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        Descargar plantilla
+                      </Button>
+                    </div>
+
+                    {listadoActual && listadoActual.filas > 0 && (
+                      <p className="text-xs text-slate-700 rounded-md bg-white border border-slate-200 px-3 py-2 break-words">
+                        Listado actual: <strong>{listadoActual.afiliados}</strong> afiliados, <strong>{listadoActual.cupos}</strong> entregas
+                        {listadoActual.archivo ? ` (${listadoActual.archivo})` : ''}. Si cargas uno nuevo, se reemplaza; las entregas ya registradas se conservan.
+                      </p>
+                    )}
+
+                    <input ref={listadoInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleListadoFileChange} />
+                    {listadoFile ? (
+                      <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                        <span className="text-sm text-slate-800 truncate min-w-0" title={listadoFile.name}>{listadoFile.name}</span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setListadoFile(null)} aria-label="Quitar archivo">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" size="sm" className="bg-white" onClick={() => listadoInputRef.current?.click()}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {listadoActual && listadoActual.filas > 0 ? 'Reemplazar listado' : 'Seleccionar listado (Excel)'}
+                      </Button>
+                    )}
+                    {!listadoFile && !(listadoActual && listadoActual.filas > 0) && (
+                      <p className="text-xs text-amber-700">Sin listado no se podrá entregar a nadie en esta campaña.</p>
+                    )}
+                  </div>
+                )}
                 {modoAcceso === 'listado' && (
                   <Alert className="mt-4 border-amber-200 bg-amber-50">
                     <FileSpreadsheet className="h-4 w-4 text-amber-600" />
                     <AlertTitle className="text-amber-800 text-sm font-semibold">Listado en Excel requerido</AlertTitle>
                     <AlertDescription className="text-amber-700 text-sm">
-                      Con el modo &quot;Con listado&quot; debes adjuntar el archivo Excel con los afiliados permitidos para esta campaña. Sin el listado, los afiliados no podrán autenticarse.
+                      Con el modo &quot;Inscripción con listado&quot; debes adjuntar el archivo Excel con los afiliados permitidos para esta campaña. Sin el listado, los afiliados no podrán autenticarse.
                       {onOpenFileManager && (
                         <Button
                           type="button"
