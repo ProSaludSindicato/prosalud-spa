@@ -95,7 +95,6 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
   const [submittingQuestionId, setSubmittingQuestionId] = useState<string | null>(null);
   const [echoClient, setEchoClient] = useState<ReturnType<typeof getAssemblyEcho>>(null);
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeChannelRef = useRef<{ stopListening: (e: string) => void; leave?: () => void } | null>(null);
   const initialFetchDoneRef = useRef(false);
 
   const loadQuestions = useCallback(async (mode: "initial" | "refresh" = "refresh") => {
@@ -117,8 +116,9 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
         options: q.options.map((opt) => ({ ...opt })),
       }));
 
+      // Solo la pregunta abierta se muestra al delegado; consultar el voto de todas multiplica las peticiones por pregunta.
       const votes: Record<string, AssemblyVote> = {};
-      for (const q of questionsData) {
+      for (const q of questionsData.filter((question) => question.status === "OPEN")) {
         const vote = await assemblyApi.getUserVote(q.id, session.voterToken);
         if (vote) {
           votes[q.id] = vote;
@@ -181,10 +181,6 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       if (fallbackIntervalRef.current) {
         clearInterval(fallbackIntervalRef.current);
       }
-      if (activeChannelRef.current) {
-        activeChannelRef.current.stopListening(".vote.registered");
-        activeChannelRef.current = null;
-      }
     };
   }, [loadQuestions]);
 
@@ -193,44 +189,25 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       return;
     }
 
+    // Cada voto emite un evento a todos los delegados: actualizar solo el contador evita que cada voto
+    // dispare una recarga completa en cada dispositivo. Apertura/cierre de preguntas llegan por polling.
     const resultsChannel = echoClient.channel("assembly.results");
-    const refreshFromResults = () => void loadQuestions();
-    resultsChannel.listen(".vote.registered", refreshFromResults);
+    const applyVoteCount = (payload: { questionId?: string; results?: { totalVotes?: number } }) => {
+      const totalVotes = payload?.results?.totalVotes;
+      if (!payload?.questionId || typeof totalVotes !== "number") {
+        return;
+      }
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === payload.questionId && q.votesCount !== totalVotes ? { ...q, votesCount: totalVotes } : q)),
+      );
+    };
+    resultsChannel.listen(".vote.registered", applyVoteCount);
 
     return () => {
       resultsChannel.stopListening(".vote.registered");
       echoClient.leave("assembly.results");
     };
-  }, [echoClient, loadQuestions]);
-
-  useEffect(() => {
-    if (!echoClient || !activeQuestionId) {
-      if (activeChannelRef.current) {
-        activeChannelRef.current.stopListening(".vote.registered");
-        if (echoClient && activeQuestionId) {
-          echoClient.leave(`assembly.votes.${activeQuestionId}`);
-        }
-        activeChannelRef.current = null;
-      }
-      return;
-    }
-
-    const channelName = `assembly.votes.${activeQuestionId}`;
-    const channel = echoClient.channel(channelName);
-    activeChannelRef.current = channel;
-
-    const handler = () => {
-      void loadQuestions();
-    };
-
-    channel.listen(".vote.registered", handler);
-
-    return () => {
-      channel.stopListening(".vote.registered");
-      echoClient.leave(channelName);
-      activeChannelRef.current = null;
-    };
-  }, [echoClient, activeQuestionId, loadQuestions]);
+  }, [echoClient]);
 
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
@@ -296,7 +273,14 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
         onLogout();
         return;
       }
-      toast.error(error instanceof Error ? error.message : "No se pudo registrar el voto");
+      if (axios.isAxiosError(error) && error.response?.data?.error_code === "VOTE_ALREADY_REGISTERED") {
+        toast.success("Su voto ya estaba registrado");
+        await loadQuestions("refresh");
+        return;
+      }
+      const serverMessage = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+      toast.error(typeof serverMessage === "string" && serverMessage !== "" ? serverMessage : "No se pudo registrar el voto");
+      await loadQuestions("refresh");
     } finally {
       setSubmittingQuestionId(null);
     }
