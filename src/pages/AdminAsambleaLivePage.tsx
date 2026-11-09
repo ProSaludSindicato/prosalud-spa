@@ -70,6 +70,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AssemblyProxiesCard } from "@/components/assembly/AssemblyProxiesCard";
 import { buildPortalUrl } from "@/config/site";
 import { ASSEMBLY_DELEGATE_KIOSK_PATH, ASSEMBLY_DELEGATE_VOTE_PATH } from "@/constants/assemblyDelegateAccess";
 import { openExternalUrl, sanitizeExternalUrl } from '@/utils/safeUrl';
@@ -1137,6 +1138,24 @@ export default function AdminAsambleaLivePage() {
                     inputMode="numeric"
                     disabled={isViewingHistory || !currentAssembly}
                       />
+                  {quorum?.attendance && !isViewingHistory && currentAssembly && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Registrados: {quorum.attendance.total} ({quorum.attendance.inPerson} presenciales +{" "}
+                      {quorum.attendance.byProxy} por poder).{" "}
+                      <button
+                        type="button"
+                        className="font-medium text-primary underline-offset-2 hover:underline"
+                        onClick={() =>
+                          setQuorumForm((prev) => ({
+                            ...prev,
+                            presentDelegates: String(quorum.attendance?.total ?? 0),
+                          }))
+                        }
+                      >
+                        Usar este valor
+                      </button>
+                    </p>
+                  )}
                     </div>
                 <div>
                   <Label>Porcentaje requerido</Label>
@@ -1571,7 +1590,14 @@ export default function AdminAsambleaLivePage() {
                                 </Badge>
                               )}
                             </td>
-                            <td className="py-3 text-slate-700">{record.full_name}</td>
+                            <td className="py-3 text-slate-700">
+                              {record.full_name}
+                              {record.is_delegate === false && (
+                                <Badge variant="outline" className="ml-2 border-amber-300 text-amber-700">
+                                  Apoderado externo
+                                </Badge>
+                              )}
+                            </td>
                             <td className="py-3 text-slate-500">
                               {record.issue_date_normalized
                                 ? new Date(record.issue_date_normalized).toLocaleDateString("es-CO", {
@@ -1649,6 +1675,11 @@ export default function AdminAsambleaLivePage() {
               </div>
             </CardContent>
           </Card>
+
+          <AssemblyProxiesCard
+            assemblyId={(selectedAssemblyForHistory ?? currentAssembly)?.id}
+            canRevoke={!isViewingHistory && Boolean(currentAssembly)}
+          />
         </section>
           </TabsContent>
 

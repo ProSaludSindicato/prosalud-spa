@@ -1,6 +1,11 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { UserSession } from "@/types/assemblyVoting";
-import { LIVE_VOTE_OPTIONS, type AssemblyQuestion, type AssemblyVote } from "@/types/assembly";
+import {
+  LIVE_VOTE_OPTIONS,
+  type AssemblyQuestion,
+  type AssemblyVote,
+  type RepresentedDelegate,
+} from "@/types/assembly";
 import { assemblyApi } from "@/services/assemblyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -8,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import axios from "axios";
 import { toast } from "sonner";
-import { Loader2, Clock, Info, Activity, SendHorizontal } from "lucide-react";
+import { Loader2, Clock, Info, Activity, SendHorizontal, Users } from "lucide-react";
 import { getAssemblyEcho } from "@/lib/assemblyEcho";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +101,21 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
   const [echoClient, setEchoClient] = useState<ReturnType<typeof getAssemblyEcho>>(null);
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initialFetchDoneRef = useRef(false);
+  const [representedDelegates, setRepresentedDelegates] = useState<RepresentedDelegate[]>(
+    session.representedDelegates ?? [],
+  );
+
+  const refreshRepresentedDelegates = useCallback(async () => {
+    try {
+      setRepresentedDelegates(await assemblyApi.getMyRepresentedDelegates(session.voterToken));
+    } catch {
+      /* se conserva la lista conocida; el servidor decide por quién cuenta el voto */
+    }
+  }, [session.voterToken]);
+
+  useEffect(() => {
+    void refreshRepresentedDelegates();
+  }, [refreshRepresentedDelegates]);
 
   const loadQuestions = useCallback(async (mode: "initial" | "refresh" = "refresh") => {
     const isInitial = mode === "initial" || !initialFetchDoneRef.current;
@@ -259,13 +279,20 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
 
     try {
       setSubmittingQuestionId(activeQuestionId);
-      await assemblyApi.submitVote(activeQuestionId, [selectedAnswers[activeQuestionId]], session.voterToken);
+      const { castFor } = await assemblyApi.submitVote(
+        activeQuestionId,
+        [selectedAnswers[activeQuestionId]],
+        session.voterToken,
+      );
 
       toast.success("Voto registrado", {
-        description: "Su voto ha sido registrado exitosamente",
+        description:
+          castFor.length > 1
+            ? `Su voto se registró por ${castFor.length} delegados (usted y sus representados).`
+            : "Su voto ha sido registrado exitosamente",
       });
 
-      await loadQuestions("refresh");
+      await Promise.all([loadQuestions("refresh"), refreshRepresentedDelegates()]);
       setSelectedAnswers({});
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.data?.error_code === "VOTER_SESSION_INVALID") {
@@ -390,6 +417,35 @@ export default function AssemblyVoting({ session, onLogout }: Props) {
       </header>
 
       <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-16 pt-8">
+        {session.isDelegate === false && representedDelegates.length === 0 && (
+          <Card className="rounded-3xl border-none bg-amber-50 shadow-sm ring-1 ring-amber-200">
+            <CardContent className="p-5 text-sm text-amber-800">
+              No tiene votos activos: los delegados que representaba ya no están a su cargo. Comuníquese con la mesa
+              de la asamblea.
+            </CardContent>
+          </Card>
+        )}
+
+        {representedDelegates.length > 0 && (
+          <Card className="rounded-3xl border-none bg-primary/5 shadow-sm ring-1 ring-primary/15">
+            <CardContent className="flex items-start gap-3 p-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Users className="h-5 w-5 text-primary" aria-hidden />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Su voto cuenta por {representedDelegates.length + (session.isDelegate === false ? 0 : 1)}{" "}
+                  delegado{representedDelegates.length + (session.isDelegate === false ? 0 : 1) === 1 ? "" : "s"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {session.isDelegate === false ? "Como apoderado de " : "Usted y, como apoderado, "}
+                  {representedDelegates.map((delegate) => delegate.name || delegate.document).join(", ")}.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="rounded-3xl border-none bg-white/90 shadow-sm">
           <CardContent className="space-y-3 p-6 text-center">
             {currentQuestion ? (

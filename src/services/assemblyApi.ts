@@ -2,15 +2,19 @@ import type { AxiosRequestConfig } from "axios";
 import api, { authenticatedApi } from "@/services/api";
 import type {
   Assembly,
+  AssemblyProxyRecord,
   AssemblyDelegateFileVersion,
   AssemblyDelegatesFileInfo,
   AssemblyQuestion,
   AssemblyStats,
   AssemblyVote,
   AttendanceRecord,
+  AttendanceSummary,
   MajorityType,
   PaginatedResponse,
+  ProxyDeclarationResult,
   QuorumConfig,
+  RepresentedDelegate,
 } from "@/types/assembly";
 
 const PREFIX = "/api/assembly";
@@ -79,6 +83,7 @@ type RemoteQuorum = {
   requiredPercentage?: number;
   required_percentage?: number;
   verified?: boolean;
+  attendance?: AttendanceSummary;
   [key: string]: unknown;
 };
 
@@ -185,6 +190,7 @@ const normalizeQuorum = (payload: RemoteQuorum): QuorumConfig => ({
   presentDelegates: payload.presentDelegates ?? payload.present_delegates ?? 0,
   requiredPercentage: payload.requiredPercentage ?? payload.required_percentage ?? 50,
   verified: payload.verified ?? false,
+  attendance: payload.attendance,
 });
 
 const normalizeStats = (payload: RemoteStats): AssemblyStats => {
@@ -428,12 +434,13 @@ export const assemblyApi = {
     questionId: string,
     selectedOptions: string[],
     voterToken: string | undefined,
-  ): Promise<void> => {
-    await api.post(
+  ): Promise<{ castFor: RepresentedDelegate[] }> => {
+    const { data } = await api.post<{ data?: { castFor?: RepresentedDelegate[] } }>(
       `${PREFIX}/questions/${questionId}/votes`,
       { selectedOptions },
       { headers: voterToken ? { "X-Voter-Token": voterToken } : {} },
     );
+    return { castFor: data?.data?.castFor ?? [] };
   },
 
   getUserVote: async (questionId: string, voterToken: string | undefined): Promise<AssemblyVote | null> => {
@@ -453,6 +460,33 @@ export const assemblyApi = {
     } catch {
       return null;
     }
+  },
+
+  declareProxies: async (voterToken: string | undefined): Promise<ProxyDeclarationResult> => {
+    const { data } = await api.post<{ data: ProxyDeclarationResult }>(
+      `${PREFIX}/proxies/declare`,
+      {},
+      { headers: voterToken ? { "X-Voter-Token": voterToken } : {} },
+    );
+    return data.data;
+  },
+
+  getMyRepresentedDelegates: async (voterToken: string | undefined): Promise<RepresentedDelegate[]> => {
+    const { data } = await api.get<{ data: { registered: RepresentedDelegate[] } }>(`${PREFIX}/proxies/me`, {
+      headers: voterToken ? { "X-Voter-Token": voterToken } : {},
+    });
+    return data.data?.registered ?? [];
+  },
+
+  getProxies: async (assemblyId?: string): Promise<AssemblyProxyRecord[]> => {
+    const { data } = await authenticatedApi.get<{ data: AssemblyProxyRecord[] }>(`${PREFIX}/proxies`, {
+      params: assemblyId ? { assembly_id: assemblyId } : {},
+    });
+    return data.data ?? [];
+  },
+
+  revokeProxy: async (id: number, reason?: string): Promise<void> => {
+    await authenticatedApi.post(`${PREFIX}/proxies/${id}/revoke`, reason ? { reason } : {});
   },
 
   getQuestionResults: async (questionId: string): Promise<AssemblyStats> => {

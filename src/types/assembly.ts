@@ -41,6 +41,43 @@ export interface QuorumConfig {
   presentDelegates: number;
   requiredPercentage: number;
   verified: boolean;
+  /** Delegados registrados en la asamblea activa: presenciales y representados por poder. */
+  attendance?: AttendanceSummary;
+}
+
+export interface AttendanceSummary {
+  inPerson: number;
+  byProxy: number;
+  total: number;
+}
+
+/** Delegado representado por un apoderado (poder). */
+export interface RepresentedDelegate {
+  document: string;
+  name: string;
+}
+
+export interface SkippedRepresentedDelegate extends RepresentedDelegate {
+  reason: "attended_in_person" | "represented_by_other" | "revoked";
+  message: string;
+}
+
+export interface ProxyDeclarationResult {
+  registered: RepresentedDelegate[];
+  skipped: SkippedRepresentedDelegate[];
+}
+
+export interface AssemblyProxyRecord {
+  id: number;
+  proxyDocument: string;
+  proxyName: string | null;
+  representedDocument: string;
+  representedName: string | null;
+  status: "active" | "revoked";
+  declaredAt: string | null;
+  revokedAt: string | null;
+  revokedReason: string | null;
+  votesCount: number;
 }
 
 export interface AssemblyStats {
@@ -67,6 +104,8 @@ export interface AttendanceRecord {
   id: number;
   document_number: string;
   full_name: string;
+  /** false cuando quien firmó es un apoderado que no es delegado (no tiene voto propio). */
+  is_delegate?: boolean;
   issue_date_normalized?: string | null;
   ip_address?: string | null;
   user_agent?: string | null;

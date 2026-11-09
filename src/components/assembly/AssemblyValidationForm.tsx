@@ -6,9 +6,17 @@ import { Loader2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { buildPublicApiUrl } from "@/config/api";
 import { IdentityFieldset } from "@/components/assembly/shared/IdentityFieldset";
+import { ProxyDeclarationStep } from "@/components/assembly/ProxyDeclarationStep";
+import type { RepresentedDelegate } from "@/types/assembly";
 
 interface AssemblyValidationFormProps {
   onValidation: (session: UserSession) => void;
+}
+
+interface PendingProxyDeclaration {
+  session: UserSession;
+  listed: RepresentedDelegate[];
+  registered: RepresentedDelegate[];
 }
 
 const errorToastStyle = {
@@ -24,6 +32,7 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
     expeditionDate: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingProxy, setPendingProxy] = useState<PendingProxyDeclaration | null>(null);
   const signatureRef = useRef<SignatureCanvas>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,6 +97,9 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
           throw new Error("No se encontró el nombre del delegado en la respuesta.");
         }
 
+        const listed: RepresentedDelegate[] = data.proxy?.listed ?? [];
+        const registered: RepresentedDelegate[] = data.proxy?.registered ?? [];
+
         const session: UserSession = {
           hospital: "ASAMBLEA GENERAL",
           position: delegateName,
@@ -95,11 +107,22 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
           documentNumber: formData.documentNumber,
           hasVoted: false,
           voterToken: data.voter_token,
+          representedDelegates: registered,
+          isDelegate: data.data.es_delegado !== false,
         };
 
         toast.success(`¡Bienvenido, ${delegateName}!`, {
           style: { background: "hsl(122 39% 49%)", color: "white", border: "none" },
         });
+
+        const hasPendingProxies = listed.some(
+          (delegate) => !registered.some((item) => item.document === delegate.document),
+        );
+
+        if (hasPendingProxies) {
+          setPendingProxy({ session, listed, registered });
+          return;
+        }
 
         onValidation(session);
       } else {
@@ -118,6 +141,20 @@ export function AssemblyValidationForm({ onValidation }: AssemblyValidationFormP
       setIsLoading(false);
     }
   };
+
+  if (pendingProxy) {
+    return (
+      <ProxyDeclarationStep
+        delegateName={pendingProxy.session.position}
+        isDelegate={pendingProxy.session.isDelegate !== false}
+        voterToken={pendingProxy.session.voterToken}
+        listed={pendingProxy.listed}
+        alreadyRegistered={pendingProxy.registered}
+        onDone={(representedDelegates) => onValidation({ ...pendingProxy.session, representedDelegates })}
+        onSessionExpired={() => setPendingProxy(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-white via-slate-50 to-slate-100/90">
