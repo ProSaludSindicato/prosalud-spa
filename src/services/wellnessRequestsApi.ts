@@ -233,6 +233,52 @@ const handleApiError = (error: any) => {
   throw new Error(error.message || 'Error desconocido en la API');
 };
 
+const ASYNC_EXPORT_POLL_INTERVAL_MS = 5000;
+const ASYNC_EXPORT_MAX_ATTEMPTS = 180; // 15 minutos, igual al tiempo máximo del job en backend
+
+const extractFilename = (contentDisposition: string | undefined, fallback: string): string => {
+  const filenameMatch = contentDisposition?.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  return filenameMatch && filenameMatch[1] ? filenameMatch[1].replace(/['"]/g, '') : fallback;
+};
+
+/**
+ * Espera a que termine un exporte asíncrono (con imágenes) y descarga el archivo.
+ */
+const waitForAsyncExport = async (jobId: string): Promise<{ blob: Blob; filename: string }> => {
+  for (let attempt = 0; attempt < ASYNC_EXPORT_MAX_ATTEMPTS; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, ASYNC_EXPORT_POLL_INTERVAL_MS));
+
+    let status: { status?: string; error?: string; message?: string };
+    try {
+      const response = await wellnessRequestsApi.get(`/api/wellness-requests/export/status/${jobId}`);
+      status = response.data;
+    } catch (error: unknown) {
+      if ((error as { response?: { status?: number } }).response?.status === 404) {
+        throw new Error('El reporte no fue encontrado o expiró. Por favor, intente nuevamente.');
+      }
+      // Error temporal de red: seguir consultando
+      continue;
+    }
+
+    if (status.status === 'failed') {
+      throw new Error(status.error || 'Error al generar el reporte. Por favor, intente nuevamente.');
+    }
+
+    if (status.status === 'completed') {
+      const download = await wellnessRequestsApi.get(`/api/wellness-requests/export/download/${jobId}`, {
+        responseType: 'blob',
+      });
+
+      return {
+        blob: download.data,
+        filename: extractFilename(download.headers['content-disposition'], 'Reporte_Bienestar_ProSalud.xlsx'),
+      };
+    }
+  }
+
+  throw new Error('El reporte está tardando más de lo esperado. Por favor, intente nuevamente.');
+};
+
 export const wellnessRequestsService = {
   /**
    * Create a new wellness request
@@ -640,20 +686,18 @@ export const wellnessRequestsService = {
         }
       );
 
-      // Extract filename from Content-Disposition header
-      const contentDisposition = response.headers['content-disposition'];
-      let filename = 'Reporte_Bienestar_ProSalud.xlsx';
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
+      // Con imágenes el backend genera el reporte en segundo plano (HTTP 202)
+      if (response.status === 202) {
+        const data = JSON.parse(await (response.data as Blob).text());
+        if (!data.success || !data.job_id) {
+          throw new Error(data.message || 'Error al iniciar la generación del reporte');
         }
+        return await waitForAsyncExport(data.job_id);
       }
 
       return {
         blob: response.data,
-        filename,
+        filename: extractFilename(response.headers['content-disposition'], 'Reporte_Bienestar_ProSalud.xlsx'),
       };
     } catch (error: any) {
       // Handle validation errors (400)

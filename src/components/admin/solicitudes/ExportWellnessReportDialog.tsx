@@ -148,6 +148,12 @@ const ExportWellnessReportDialog: React.FC<ExportWellnessReportDialogProps> = ({
       // Incluir imágenes si está activado
       filters.include_images = includeImages;
 
+      if (includeImages) {
+        toast.info('Generando reporte con imágenes', {
+          description: 'Puede tardar varios minutos. La descarga iniciará automáticamente cuando esté listo.',
+        });
+      }
+
       // Call backend API to generate Excel report
       const { blob, filename } = await wellnessRequestsService.exportToExcel(filters);
 
@@ -364,7 +370,7 @@ const ExportWellnessReportDialog: React.FC<ExportWellnessReportDialogProps> = ({
                     Incluir imágenes en el reporte
                   </label>
                   <p className="text-xs text-gray-500">
-                    Se incluirán hasta 3 imágenes por actividad. Las imágenes que excedan 2MB o no se puedan descargar se omitirán automáticamente.
+                    Se incluirán hasta 3 imágenes por actividad. Las imágenes que excedan 2MB o no se puedan descargar se omitirán automáticamente. El reporte se genera en segundo plano y puede tardar varios minutos.
                   </p>
                 </div>
                 <Switch
