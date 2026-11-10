@@ -138,9 +138,14 @@ export default function AssemblyDelegateAccessKioskPage() {
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Enlace directo
           </p>
-          <p className="mt-1 break-all font-mono text-sm text-slate-800 md:text-base dark:text-slate-200">
+          <a
+            href={voteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block break-all font-mono text-sm text-blue-700 underline underline-offset-2 hover:text-blue-800 md:text-base dark:text-blue-400 dark:hover:text-blue-300"
+          >
             {voteUrl}
-          </p>
+          </a>
         </div>
       </div>
     </div>
