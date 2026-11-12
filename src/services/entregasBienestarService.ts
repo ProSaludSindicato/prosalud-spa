@@ -51,12 +51,15 @@ export interface SingleBeneficiaryResponse {
   edad: string;
 }
 
+/** Persona con varios beneficiarios, o sin ninguno (listados solo de personas, ej. invitados a un evento) */
 export interface MultipleBeneficiariesResponse {
   afiliado: {
     cc: string;
-    nombre: string;
-    hospital: string;
-    fecha_expedicion: string;
+    /** null cuando el listado no trae la columna NOMBRE */
+    nombre: string | null;
+    hospital: string | null;
+    /** null cuando el listado no exige fecha de expedición */
+    fecha_expedicion: string | null;
   };
   beneficiarios: Array<{
     beneficiario: string;

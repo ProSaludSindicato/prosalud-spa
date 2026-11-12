@@ -250,10 +250,19 @@ export interface WellnessDeliveryFileVersion {
   updated_at: string;
 }
 
+/** Resumen del listado de inscripción recién cargado */
+export interface EnrollmentListUploadSummary {
+  filas: number;
+  personas: number;
+  /** true cuando el archivo no tiene encabezados reconocibles y se leyó por posición (formato antiguo) */
+  formato_antiguo: boolean;
+  columnas_ignoradas: string[];
+}
+
 export interface UploadFileResponse {
   success: boolean;
   message: string;
-  data: WellnessDeliveryFileVersion;
+  data: WellnessDeliveryFileVersion & { resumen?: EnrollmentListUploadSummary };
 }
 
 export interface FileVersionsResponse {
@@ -687,6 +696,17 @@ class WellnessDeliveryService {
   }
 
   /**
+   * Descargar la plantilla del listado para campañas en modo "Inscripción con listado".
+   * GET /api/wellness-delivery-requests/file/template
+   */
+  async downloadEnrollmentListTemplate(): Promise<Blob> {
+    const response = await authenticatedApi.get('/api/wellness-delivery-requests/file/template', {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  }
+
+  /**
    * Listar versiones del archivo Excel de Kit de Bienestar
    * GET /api/wellness-delivery-requests/file/versions
    */
@@ -840,11 +860,12 @@ class WellnessDeliveryService {
   }
 
   /**
-   * Descargar la plantilla estándar del listado de entregas.
-   * GET /api/wellness-delivery-types/listado/plantilla
+   * Descargar la plantilla del listado de una campaña según su modo (entrega directa o inscripción con listado).
+   * GET /api/wellness-delivery-types/listado/plantilla?modo=...
    */
-  async downloadListTemplate(): Promise<Blob> {
+  async downloadListTemplate(modo: ModoAccesoType = 'entrega_listado'): Promise<Blob> {
     const response = await authenticatedApi.get('/api/wellness-delivery-types/listado/plantilla', {
+      params: { modo },
       responseType: 'blob',
     });
     return response.data as Blob;

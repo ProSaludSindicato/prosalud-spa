@@ -882,7 +882,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     },
   });
 
-  // Mutación para crear/actualizar tipo de entrega (campaña) y, en modo entrega_listado, cargar su listado
+  // Mutación para crear/actualizar tipo de entrega (campaña) y, en modos con listado propio, cargar su listado
   const saveDeliveryTypeMutation = useMutation({
     mutationFn: async ({ data, id, listadoFile }: { data: WellnessDeliveryTypeFormValues; id?: number; listadoFile: File | null }) => {
       const payload = {
@@ -2343,6 +2343,11 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                     {t.listado?.filas ? `${t.listado.afiliados} afiliados · ${t.listado.cupos} entregas` : 'Sin listado cargado'}
                                                   </span>
                                                 )}
+                                                {(t.modo_acceso ?? 'listado') === 'listado' && (
+                                                  <span className="text-xs text-gray-500">
+                                                    {t.listado?.filas ? `${t.listado.afiliados} personas en el listado` : 'Usa el archivo general'}
+                                                  </span>
+                                                )}
                                               </div>
                                             </TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
@@ -2442,6 +2447,14 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                   {MODO_ACCESO_LABELS[t.modo_acceso ?? 'listado']}
                                                 </Badge>
                                               </div>
+                                              {(t.modo_acceso ?? 'listado') === 'listado' && (
+                                                <div className="flex justify-between gap-2">
+                                                  <span className="text-gray-500">Listado</span>
+                                                  <span className="text-gray-900">
+                                                    {t.listado?.filas ? `${t.listado.afiliados} personas` : 'Archivo general'}
+                                                  </span>
+                                                </div>
+                                              )}
                                               {t.modo_acceso === 'entrega_listado' && (
                                                 <div className="flex justify-between gap-2">
                                                   <span className="text-gray-500">Listado</span>
@@ -3697,7 +3710,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                 Gestión de Archivo Excel
               </DialogTitle>
               <DialogDescription>
-                Gestiona el archivo Excel utilizado para autenticar afiliados en las solicitudes de entregas de bienestar
+                Archivo general para campañas de inscripción que no tienen listado propio. Lo recomendado es cargar el listado en el formulario de cada campaña.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">

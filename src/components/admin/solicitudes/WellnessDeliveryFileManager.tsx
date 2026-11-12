@@ -18,14 +18,23 @@ import {
   User,
   Calendar,
   FileText,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
 import { wellnessDeliveryService } from '@/services/wellnessDeliveryService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { parseLocalDate } from '@/utils/dateFormatter';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/context/AuthContext';
+import { logger } from '@/utils/logger';
+
+/** Extrae los errores por fila que devuelve la API cuando el listado no es válido (422). */
+const getRowErrors = (error: unknown): string[] => {
+  const errors = axios.isAxiosError(error) ? (error.response?.data as { errors?: unknown } | undefined)?.errors : undefined;
+  return Array.isArray(errors) ? errors.filter((e: unknown): e is string => typeof e === 'string') : [];
+};
 
 const WellnessDeliveryFileManager: React.FC = () => {
   const { can } = usePermissions();
@@ -35,6 +44,8 @@ const WellnessDeliveryFileManager: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadRowErrors, setUploadRowErrors] = useState<string[]>([]);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
 
   // Query para obtener versiones del archivo
   const {
@@ -55,12 +66,17 @@ const WellnessDeliveryFileManager: React.FC = () => {
   const uploadMutation = useMutation({
     mutationFn: (file: File) => wellnessDeliveryService.uploadFile(file),
     onSuccess: (data) => {
-      toast.success('Archivo actualizado exitosamente', {
-        description: data.message || 'El archivo se ha subido correctamente.',
-      });
+      const resumen = data.data?.resumen;
+      const descripcion = resumen
+        ? `${resumen.personas} persona(s) en ${resumen.filas} fila(s).${
+            resumen.columnas_ignoradas.length > 0 ? ` Columnas ignoradas: ${resumen.columnas_ignoradas.join(', ')}.` : ''
+          }${resumen.formato_antiguo ? ' Se leyó con el formato antiguo por posición; se recomienda usar la plantilla.' : ''}`
+        : data.message || 'El archivo se ha subido correctamente.';
+      toast.success('Listado actualizado exitosamente', { description: descripcion, duration: 8000 });
       setShowUploadDialog(false);
       setSelectedFile(null);
       setUploadError(null);
+      setUploadRowErrors([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -73,6 +89,7 @@ const WellnessDeliveryFileManager: React.FC = () => {
         error.message ||
         'Error al subir el archivo. Por favor, intente nuevamente.';
       setUploadError(errorMessage);
+      setUploadRowErrors(getRowErrors(error));
       toast.error('Error al subir archivo', {
         description: errorMessage,
       });
@@ -110,7 +127,28 @@ const WellnessDeliveryFileManager: React.FC = () => {
 
     setSelectedFile(file);
     setUploadError(null);
+    setUploadRowErrors([]);
     setShowUploadDialog(true);
+  };
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const blob = await wellnessDeliveryService.downloadEnrollmentListTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Plantilla_Listado_Inscripcion.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      logger.error('Error al descargar plantilla del listado de inscripción', { error });
+      toast.error('No se pudo descargar la plantilla');
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
   };
 
   const handleUploadConfirm = () => {
@@ -122,6 +160,7 @@ const WellnessDeliveryFileManager: React.FC = () => {
     setShowUploadDialog(false);
     setSelectedFile(null);
     setUploadError(null);
+    setUploadRowErrors([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -162,28 +201,38 @@ const WellnessDeliveryFileManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header con botón de subir */}
-      <div className="flex items-center justify-end">
-        {/* TODO: Validación temporal - solo admin puede subir archivos. Reemplazar con permiso adecuado cuando esté disponible */}
-        {can('wellness_delivery.manage') && hasRole('admin') && (
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadMutation.isPending}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Subir Archivo
-            </Button>
-          </div>
-        )}
+      {/* Header con plantilla y botón de subir */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-600 max-w-2xl">
+          Archivo general de personas habilitadas, usado por las campañas en modo &quot;Inscripción con listado&quot; que no tienen listado propio.
+          Para listados distintos por campaña (kits, eventos, fiestas, etc.), cárgalos en el formulario de cada campaña. Solo el documento es obligatorio.
+        </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={handleDownloadTemplate} disabled={isDownloadingTemplate}>
+            {isDownloadingTemplate ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Descargar plantilla
+          </Button>
+          {/* TODO: Validación temporal - solo admin puede subir archivos. Reemplazar con permiso adecuado cuando esté disponible */}
+          {can('wellness_delivery.manage') && hasRole('admin') && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadMutation.isPending}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Subir Archivo
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Información de versión activa */}
@@ -361,7 +410,16 @@ const WellnessDeliveryFileManager: React.FC = () => {
               {uploadError && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{uploadError}</AlertDescription>
+                  <AlertDescription>
+                    <p>{uploadError}</p>
+                    {uploadRowErrors.length > 0 && (
+                      <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
+                        {uploadRowErrors.map((rowError, index) => (
+                          <li key={index}>{rowError}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </AlertDescription>
                 </Alert>
               )}
             </div>

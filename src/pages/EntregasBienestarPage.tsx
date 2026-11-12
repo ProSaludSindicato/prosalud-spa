@@ -370,7 +370,7 @@ const EntregasBienestarPage: React.FC = () => {
         }];
       } else if ('beneficiarios' in authResult) {
         const multiple = authResult as MultipleBeneficiariesResponse;
-        nombreAfiliado = multiple.afiliado.nombre;
+        nombreAfiliado = multiple.afiliado.nombre ?? '';
         hospital = multiple.afiliado.hospital ?? '';
         beneficiarios = multiple.beneficiarios;
       }
@@ -489,7 +489,32 @@ const EntregasBienestarPage: React.FC = () => {
       // Múltiples beneficiarios
       const multiple = authResult as MultipleBeneficiariesResponse;
       const nombreAfiliado = formatName(multiple.afiliado.nombre);
-      
+
+      if (multiple.beneficiarios.length === 0) {
+        // Listado solo de personas (ej. invitados a un evento): sin beneficiarios
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-slate-700 text-xl leading-relaxed">
+                {nombreAfiliado ? (
+                  <>Hola <span className="font-semibold">{nombreAfiliado}</span>,</>
+                ) : (
+                  'Hola,'
+                )}
+              </p>
+              <p className="text-slate-700 leading-relaxed">
+                Hemos verificado que estás en el listado de <span className="font-semibold">{campaignName}</span>.
+              </p>
+            </div>
+            <div className="pt-2 border-t border-slate-200">
+              <p className="text-slate-700 leading-relaxed">
+                Para confirmar tu inscripción, por favor firma en el recuadro de abajo.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="space-y-4">
           <div className="space-y-2">
