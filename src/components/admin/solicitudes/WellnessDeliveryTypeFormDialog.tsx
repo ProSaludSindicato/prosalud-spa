@@ -17,7 +17,9 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, FileCheck, Globe, CalendarRange, Infinity, FileSpreadsheet, ListChecks, Download, Upload, X } from 'lucide-react';
+import { Loader2, FileCheck, Globe, CalendarRange, Infinity, FileSpreadsheet, ListChecks, Download, Upload, X, Link2 } from 'lucide-react';
+import CampaignEnrollmentLinkButton from '@/components/admin/solicitudes/CampaignEnrollmentLinkButton';
+import { buildCampaignEnrollmentUrl } from '@/config/site';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WellnessDeliveryType, wellnessDeliveryService } from '@/services/wellnessDeliveryService';
 import { logger } from '@/utils/logger';
@@ -310,6 +312,25 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
                         )}
                       </p>
                     )}
+                  </div>
+                )}
+                {modoAcceso === 'listado' && (
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+                    <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                      <Link2 className="h-4 w-4 text-primary shrink-0" />
+                      Enlace de inscripción
+                    </p>
+                    {type?.slug ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <code className="min-w-0 flex-1 break-all rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                          {buildCampaignEnrollmentUrl(type.slug)}
+                        </code>
+                        <CampaignEnrollmentLinkButton slug={type.slug} className="shrink-0" />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-600">El enlace para compartir con los afiliados estará disponible al guardar la campaña.</p>
+                    )}
+                    <p className="text-xs text-slate-500">Solo funciona mientras la campaña esté vigente. Cambiar el nombre no cambia el enlace.</p>
                   </div>
                 )}
               </CardContent>

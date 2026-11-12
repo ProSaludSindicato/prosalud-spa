@@ -78,6 +78,7 @@ import WellnessActivityReviewDialog from '@/components/admin/solicitudes/Wellnes
 import ExportWellnessReportDialog from '@/components/admin/solicitudes/ExportWellnessReportDialog';
 import ExportWellnessDeliveryReportDialog from '@/components/admin/solicitudes/ExportWellnessDeliveryReportDialog';
 import WellnessDeliveryFileManager from '@/components/admin/solicitudes/WellnessDeliveryFileManager';
+import CampaignEnrollmentLinkButton from '@/components/admin/solicitudes/CampaignEnrollmentLinkButton';
 import WellnessDeliveryTypeFormDialog, { WellnessDeliveryTypeFormValues } from '@/components/admin/solicitudes/WellnessDeliveryTypeFormDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Switch } from '@/components/ui/switch';
@@ -2348,6 +2349,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                     {t.listado?.filas ? `${t.listado.afiliados} personas en el listado` : 'Usa el archivo general'}
                                                   </span>
                                                 )}
+                                                {(t.modo_acceso ?? 'listado') === 'listado' && t.slug && (
+                                                  <CampaignEnrollmentLinkButton slug={t.slug} className="h-7 text-xs" />
+                                                )}
                                               </div>
                                             </TableCell>
                                             <TableCell className="text-xs sm:text-sm whitespace-nowrap">
@@ -2453,6 +2457,12 @@ const AdminSolicitudBienestarPage: React.FC = () => {
                                                   <span className="text-gray-900">
                                                     {t.listado?.filas ? `${t.listado.afiliados} personas` : 'Archivo general'}
                                                   </span>
+                                                </div>
+                                              )}
+                                              {(t.modo_acceso ?? 'listado') === 'listado' && t.slug && (
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span className="text-gray-500">Enlace</span>
+                                                  <CampaignEnrollmentLinkButton slug={t.slug} className="h-8" />
                                                 </div>
                                               )}
                                               {t.modo_acceso === 'entrega_listado' && (

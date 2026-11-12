@@ -131,6 +131,7 @@ const AppRoutes = () => {
             <Route path="/servicios/afiliacion-comfenalco" element={<AfiliacionComfenalcoPage />} />
             <Route path="/servicios/eps-sura" element={<EpsSuraPage />} />
             <Route path="/entregas-bienestar" element={<EntregasBienestarPage />} />
+            <Route path="/entregas-bienestar/:campana" element={<EntregasBienestarPage />} />
             <Route path="/kit-bienestar-escolar" element={<Navigate to="/entregas-bienestar" replace />} />
 
             {/* Admin Routes - Protected */}

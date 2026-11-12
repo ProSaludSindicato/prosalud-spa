@@ -19,3 +19,8 @@ export function buildPortalUrl(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return `${origin}${normalized}`;
 }
+
+/** Enlace público de inscripción de una campaña de bienestar (modo "Inscripción con listado"). */
+export function buildCampaignEnrollmentUrl(slug: string): string {
+  return buildPortalUrl(`/entregas-bienestar/${encodeURIComponent(slug)}`);
+}

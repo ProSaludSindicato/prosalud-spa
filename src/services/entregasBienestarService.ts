@@ -12,6 +12,8 @@ export type ModoAcceso = 'listado' | 'abierto' | 'entrega_listado';
 export interface WellnessDeliveryTypeActive {
   id: number;
   nombre: string;
+  /** Identificador legible para el enlace de inscripción: /entregas-bienestar/{slug} */
+  slug?: string | null;
   /** listado = requiere autenticación contra Excel; abierto = puede buscar por documento sin validar listado */
   modo_acceso?: ModoAcceso;
   /** Y-m-d o null si es siempre activo */

@@ -317,6 +317,8 @@ export interface SubmitListDeliveryResponse {
 export interface WellnessDeliveryType {
   id: number;
   nombre: string;
+  /** Identificador legible para el enlace de inscripción: /entregas-bienestar/{slug} */
+  slug?: string | null;
   activo?: boolean; // legacy; la vigencia se define por rango o siempre_activo
   /** listado = requiere Excel de afiliados; abierto = cualquiera puede solicitar (opcional en respuestas legacy) */
   modo_acceso?: ModoAccesoType;
