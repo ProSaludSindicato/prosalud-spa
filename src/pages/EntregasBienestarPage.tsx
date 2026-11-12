@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -133,6 +133,8 @@ function getListadoTypes(data: WellnessDeliveryTypeActive[] | null): WellnessDel
 
 const EntregasBienestarPage: React.FC = () => {
   const navigate = useNavigate();
+  /** Slug de la campaña cuando se entra por su enlace propio (/entregas-bienestar/{slug}) */
+  const { campana } = useParams<{ campana?: string }>();
   /** Todos los tipos activos hoy (solo listado; los abiertos no se muestran aquí) */
   const [activeTypesListado, setActiveTypesListado] = useState<WellnessDeliveryTypeActive[]>([]);
   const [currentTypeLoading, setCurrentTypeLoading] = useState(true);
@@ -177,6 +179,17 @@ const EntregasBienestarPage: React.FC = () => {
           return;
         }
         const listado = getListadoTypes(data);
+        if (campana) {
+          const fromLink = listado.find((t) => t.slug === campana);
+          if (!fromLink) {
+            setNoCampaignMessage('La campaña de este enlace no está abierta para inscripciones en este momento.');
+            return;
+          }
+          // Solo la campaña del enlace: con un único tipo no se muestra el selector
+          setActiveTypesListado([fromLink]);
+          setSelectedType(fromLink);
+          return;
+        }
         if (listado.length === 0) {
           setNoCampaignMessage('Esta campaña se gestiona de forma interna. Para registrar tu entrega, acude al punto de entrega o contacta al personal autorizado.');
           return;
@@ -196,7 +209,7 @@ const EntregasBienestarPage: React.FC = () => {
     };
     fetchCurrentType();
     return () => { cancelled = true; };
-  }, []);
+  }, [campana]);
 
   const form = useForm<AuthenticateFormValues>({
     resolver: zodResolver(authenticateSchema),
@@ -265,8 +278,9 @@ const EntregasBienestarPage: React.FC = () => {
         documento: data.documento,
         fecha_expedicion: fechaExpedicionFormatted,
       };
-      if (activeTypesListado.length > 1 && selectedType) {
-        payload.wellness_delivery_type_id = selectedType.id;
+      // Siempre se envía la campaña: el backend la exige cuando hay varias activas de cualquier modo (abierto, entrega directa...)
+      if (currentType) {
+        payload.wellness_delivery_type_id = currentType.id;
       }
       const response = await entregasBienestarService.authenticate(payload);
 
