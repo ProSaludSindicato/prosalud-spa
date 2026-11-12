@@ -358,6 +358,8 @@ export interface UpdateWellnessDeliveryTypeRequest {
   modo_acceso?: ModoAccesoType;
   fecha_desde?: string | null;
   fecha_hasta?: string | null;
+  /** true para reemplazar el enlace de inscripción por uno basado en el nuevo nombre (el anterior deja de funcionar) */
+  actualizar_slug?: boolean;
 }
 
 /**

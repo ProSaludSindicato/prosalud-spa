@@ -19,7 +19,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Loader2, FileCheck, Globe, CalendarRange, Infinity, FileSpreadsheet, ListChecks, Download, Upload, X, Link2 } from 'lucide-react';
 import CampaignEnrollmentLinkButton from '@/components/admin/solicitudes/CampaignEnrollmentLinkButton';
-import { buildCampaignEnrollmentUrl } from '@/config/site';
+import { buildCampaignEnrollmentUrl, previewCampaignSlug } from '@/config/site';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { WellnessDeliveryType, wellnessDeliveryService } from '@/services/wellnessDeliveryService';
 import { logger } from '@/utils/logger';
@@ -59,7 +69,8 @@ interface WellnessDeliveryTypeFormDialogProps {
   onOpenChange: (open: boolean) => void;
   type: WellnessDeliveryType | null; // null = crear, no null = editar
   /** listadoFile: Excel del listado propio de la campaña (modos listado y entrega_listado); se carga después de guardar la campaña */
-  onSubmit: (data: WellnessDeliveryTypeFormValues, listadoFile: File | null) => Promise<void>;
+  /** options.actualizarSlug: reemplazar el enlace de inscripción por uno basado en el nuevo nombre */
+  onSubmit: (data: WellnessDeliveryTypeFormValues, listadoFile: File | null, options?: { actualizarSlug?: boolean }) => Promise<void>;
   isSubmitting?: boolean;
   /** Si se proporciona, se muestra un botón para abrir la gestión del archivo Excel cuando el modo es "Con listado" */
   onOpenFileManager?: () => void;
@@ -77,6 +88,8 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
   const [listadoFile, setListadoFile] = useState<File | null>(null);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const listadoInputRef = useRef<HTMLInputElement>(null);
+  /** Datos pendientes de guardar mientras se pregunta si reemplazar el enlace de inscripción */
+  const [pendingSlugChange, setPendingSlugChange] = useState<WellnessDeliveryTypeFormValues | null>(null);
 
   const form = useForm<WellnessDeliveryTypeFormValues>({
     resolver: zodResolver(schema),
@@ -116,10 +129,31 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
     }
   }, [open, type, form]);
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    await onSubmit(data, data.modo_acceso === 'entrega_listado' || data.modo_acceso === 'listado' ? listadoFile : null);
+  const submitWith = async (data: WellnessDeliveryTypeFormValues, actualizarSlug: boolean) => {
+    await onSubmit(
+      data,
+      data.modo_acceso === 'entrega_listado' || data.modo_acceso === 'listado' ? listadoFile : null,
+      { actualizarSlug },
+    );
     // El padre cierra el diálogo en onSuccess de la mutación
+  };
+
+  const handleSubmit = form.handleSubmit(async (data) => {
+    const nombreCambio = !!type && data.nombre.trim() !== type.nombre.trim();
+    if (nombreCambio && type?.slug && data.modo_acceso === 'listado' && previewCampaignSlug(data.nombre) !== type.slug) {
+      setPendingSlugChange(data);
+      return;
+    }
+    await submitWith(data, false);
   });
+
+  const confirmSlugChange = async (actualizarSlug: boolean) => {
+    const data = pendingSlugChange;
+    setPendingSlugChange(null);
+    if (data) {
+      await submitWith(data, actualizarSlug);
+    }
+  };
 
   const handleDownloadTemplate = async () => {
     setIsDownloadingTemplate(true);
@@ -330,7 +364,7 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
                     ) : (
                       <p className="text-xs text-slate-600">El enlace para compartir con los afiliados estará disponible al guardar la campaña.</p>
                     )}
-                    <p className="text-xs text-slate-500">Solo funciona mientras la campaña esté vigente. Cambiar el nombre no cambia el enlace.</p>
+                    <p className="text-xs text-slate-500">Solo funciona mientras la campaña esté vigente. Si cambias el nombre, al guardar podrás elegir si el enlace también se actualiza.</p>
                   </div>
                 )}
               </CardContent>
@@ -420,6 +454,45 @@ const WellnessDeliveryTypeFormDialog: React.FC<WellnessDeliveryTypeFormDialogPro
           </form>
         </Form>
       </DialogContent>
+      <AlertDialog open={pendingSlugChange !== null} onOpenChange={(isOpen) => { if (!isOpen) setPendingSlugChange(null); }}>
+        <AlertDialogContent className="w-[95vw] max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Actualizar también el enlace de inscripción?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-slate-600">
+                <p>Cambiaste el nombre de la campaña. Puedes mantener el enlace actual o reemplazarlo por uno con el nuevo nombre.</p>
+                {type?.slug && (
+                  <div className="space-y-1">
+                    <p className="font-medium text-slate-700">Enlace actual</p>
+                    <code className="block break-all rounded bg-slate-50 px-2 py-1 text-xs">{buildCampaignEnrollmentUrl(type.slug)}</code>
+                  </div>
+                )}
+                {pendingSlugChange && (
+                  <div className="space-y-1">
+                    <p className="font-medium text-slate-700">Nuevo enlace</p>
+                    <code className="block break-all rounded bg-slate-50 px-2 py-1 text-xs">
+                      {buildCampaignEnrollmentUrl(previewCampaignSlug(pendingSlugChange.nombre))}
+                    </code>
+                    <p className="text-xs text-slate-500">Si ya existe otra campaña con ese enlace, se agrega un número al final.</p>
+                  </div>
+                )}
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                  Si lo reemplazas, el enlace actual dejará de funcionar: quienes lo tengan verán que la campaña no está disponible. Tendrás que compartir el nuevo enlace.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button type="button" variant="outline" onClick={() => confirmSlugChange(false)}>
+              Mantener enlace actual
+            </Button>
+            <AlertDialogAction onClick={() => confirmSlugChange(true)}>
+              Reemplazar enlace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

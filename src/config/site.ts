@@ -24,3 +24,17 @@ export function buildPortalUrl(path: string): string {
 export function buildCampaignEnrollmentUrl(slug: string): string {
   return buildPortalUrl(`/entregas-bienestar/${encodeURIComponent(slug)}`);
 }
+
+/**
+ * Vista previa del identificador que el backend genera para el enlace de una campaña (Str::slug).
+ * Si ya existe otra campaña con el mismo, el backend agrega un sufijo (-2, -3...).
+ */
+export function previewCampaignSlug(nombre: string): string {
+  return nombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
+}

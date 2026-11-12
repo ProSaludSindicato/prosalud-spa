@@ -885,7 +885,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
 
   // Mutación para crear/actualizar tipo de entrega (campaña) y, en modos con listado propio, cargar su listado
   const saveDeliveryTypeMutation = useMutation({
-    mutationFn: async ({ data, id, listadoFile }: { data: WellnessDeliveryTypeFormValues; id?: number; listadoFile: File | null }) => {
+    mutationFn: async ({ data, id, listadoFile, actualizarSlug }: { data: WellnessDeliveryTypeFormValues; id?: number; listadoFile: File | null; actualizarSlug?: boolean }) => {
       const payload = {
         nombre: data.nombre,
         modo_acceso: data.modo_acceso,
@@ -893,7 +893,7 @@ const AdminSolicitudBienestarPage: React.FC = () => {
         fecha_hasta: data.siempre_activo ? null : (data.fecha_hasta || undefined),
       };
       const saved = id != null
-        ? await wellnessDeliveryService.updateDeliveryType(id, payload)
+        ? await wellnessDeliveryService.updateDeliveryType(id, { ...payload, ...(actualizarSlug ? { actualizar_slug: true } : {}) })
         : await wellnessDeliveryService.createDeliveryType(payload);
       const savedId = saved.data?.id ?? id;
       const listado = listadoFile && savedId != null
@@ -928,7 +928,9 @@ const AdminSolicitudBienestarPage: React.FC = () => {
       toast.success(variables.id != null ? 'Campaña actualizada' : 'Campaña creada', {
         description: listado?.success
           ? `${listado.message}${ignoradas.length ? ` Columnas ignoradas: ${ignoradas.join(', ')}.` : ''}`
-          : 'Los cambios se verán reflejados en la página de solicitud de entregas.',
+          : variables.actualizarSlug
+            ? 'Se reemplazó el enlace de inscripción: el anterior ya no funciona. Usa «Copiar enlace» para compartir el nuevo.'
+            : 'Los cambios se verán reflejados en la página de solicitud de entregas.',
       });
       setShowDeliveryTypeFormDialog(false);
       setEditingDeliveryType(null);
@@ -938,8 +940,8 @@ const AdminSolicitudBienestarPage: React.FC = () => {
     },
   });
 
-  const handleSaveDeliveryType = async (data: WellnessDeliveryTypeFormValues, listadoFile: File | null) => {
-    await saveDeliveryTypeMutation.mutateAsync({ data, id: editingDeliveryType?.id, listadoFile });
+  const handleSaveDeliveryType = async (data: WellnessDeliveryTypeFormValues, listadoFile: File | null, options?: { actualizarSlug?: boolean }) => {
+    await saveDeliveryTypeMutation.mutateAsync({ data, id: editingDeliveryType?.id, listadoFile, actualizarSlug: options?.actualizarSlug });
   };
 
   // Función para enviar el cambio de estado
