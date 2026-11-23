@@ -87,7 +87,6 @@ const VERIFICACION_PAGOS_SUBTIPOS = [
   { value: 'COMPENSACIÓN POR DESCANSO', label: 'Compensación por Descanso' },
   { value: 'DESCUENTOS SEGURIDAD SOCIAL', label: 'Descuentos Seguridad Social' },
   { value: 'DUPLICADO COLILLAS', label: 'Duplicado Colillas' },
-  { value: 'DUPLICADO DE COLILLAS', label: 'Duplicado Colillas' }, // Variante que se agrupa con DUPLICADO COLILLAS
   { value: 'VIATICOS', label: 'Viáticos' },
   { value: 'Ceiisas', label: 'Ceiisas' },
   { value: 'COMPENSACIÓN. MENSUAL', label: 'Compensación Mensual' },
@@ -3236,13 +3235,7 @@ const AdminSolicitudesPage: React.FC = () => {
                             <div className="bg-white p-2 rounded-md border border-blue-200">
                               {selectedSolicitud.payload?.solicitudRelacionadaCon ? (
                                 <p className="text-sm text-gray-900 break-words">
-                                  {(() => {
-                                    const currentSubtype = selectedSolicitud.payload.solicitudRelacionadaCon;
-                                    const subtypeOption = VERIFICACION_PAGOS_SUBTIPOS.find(
-                                      (st) => st.value === currentSubtype
-                                    );
-                                    return subtypeOption ? subtypeOption.label : currentSubtype;
-                                  })()}
+                                  {getVerificacionPagosSubtypeLabel(selectedSolicitud.payload.solicitudRelacionadaCon)}
                                 </p>
                               ) : (
                                 <p className="text-xs text-blue-800/80 italic">No especificado</p>
